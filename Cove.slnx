@@ -1,2 +1,25 @@
 <Solution>
+  <Folder Name="/benchmarks/">
+    <Project Path="benchmarks/Cove.Benchmarks/Cove.Benchmarks.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/Cove.Cli/Cove.Cli.csproj" />
+    <Project Path="src/Cove.Engine/Cove.Engine.csproj" />
+    <Project Path="src/Cove.Gui/Cove.Gui.csproj" />
+    <Project Path="src/Cove.Persistence/Cove.Persistence.csproj" />
+    <Project Path="src/Cove.Platform/Cove.Platform.csproj" />
+    <Project Path="src/Cove.Protocol/Cove.Protocol.csproj" />
+    <Project Path="src/Cove.SourceGen/Cove.SourceGen.csproj" />
+    <Project Path="src/Cove.Tui/Cove.Tui.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Cove.Cli.Tests/Cove.Cli.Tests.csproj" />
+    <Project Path="tests/Cove.Engine.Tests/Cove.Engine.Tests.csproj" />
+    <Project Path="tests/Cove.Persistence.Tests/Cove.Persistence.Tests.csproj" />
+    <Project Path="tests/Cove.Platform.Tests/Cove.Platform.Tests.csproj" />
+    <Project Path="tests/Cove.Protocol.Tests/Cove.Protocol.Tests.csproj" />
+    <Project Path="tests/Cove.Pty.Harness/Cove.Pty.Harness.csproj" />
+    <Project Path="tests/Cove.SourceGen.Tests/Cove.SourceGen.Tests.csproj" />
+    <Project Path="tests/Cove.Tui.Tests/Cove.Tui.Tests.csproj" />
+  </Folder>
 </Solution>
