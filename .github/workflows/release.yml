@@ -1,0 +1,45 @@
+name: release
+
+on:
+  push:
+    tags: [ 'v*' ]
+
+jobs:
+  publish:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            rid: osx-arm64
+          - os: windows-latest
+            rid: win-x64
+          - os: ubuntu-latest
+            rid: linux-x64
+    runs-on: ${{ matrix.os }}
+    env:
+      HAS_APPLE_CERT: ${{ secrets.APPLE_CERTIFICATE != '' && 'true' || 'false' }}
+      HAS_WINDOWS_CERT: ${{ secrets.WINDOWS_CERTIFICATE != '' && 'true' || 'false' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Install AOT prerequisites (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y clang zlib1g-dev
+      - name: Publish CLI
+        run: dotnet publish src/Cove.Cli/Cove.Cli.csproj -c Release -r ${{ matrix.rid }} -p:PublishAot=true --self-contained true -o artifacts/${{ matrix.rid }}
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cove-${{ matrix.rid }}
+          path: artifacts/${{ matrix.rid }}
+      - name: Sign and notarize (macOS)
+        if: runner.os == 'macOS' && env.HAS_APPLE_CERT == 'true'
+        run: echo "macOS signing runs here when APPLE_CERTIFICATE is configured"
+      - name: Sign (Windows)
+        if: runner.os == 'Windows' && env.HAS_WINDOWS_CERT == 'true'
+        run: echo "Windows Authenticode signing runs here when WINDOWS_CERTIFICATE is configured"

@@ -1,0 +1,22 @@
+name: benchmarks
+
+on:
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  benchmarks:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Build benchmarks
+        run: dotnet build benchmarks/Cove.Benchmarks/Cove.Benchmarks.csproj -c Release
+      - name: Run benchmarks (dry)
+        run: dotnet run --project benchmarks/Cove.Benchmarks/Cove.Benchmarks.csproj -c Release -- --filter '*' --job Dry

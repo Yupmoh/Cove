@@ -1,6 +1,6 @@
+using Cove.Gui;
 using Ryn.Core;
 using Ryn.Ipc;
-using Cove.Gui;
 
 public static class Program
 {

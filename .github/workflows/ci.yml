@@ -1,0 +1,35 @@
+name: ci
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ macos-latest, windows-latest, ubuntu-latest ]
+        configuration: [ Debug, Release ]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build frontend
+        working-directory: src/Cove.Gui/frontend
+        run: npm ci && npm run build
+      - name: Restore
+        run: dotnet restore Cove.slnx
+      - name: Build
+        run: dotnet build Cove.slnx -c ${{ matrix.configuration }} --no-restore
+      - name: Test
+        run: dotnet test Cove.slnx -c ${{ matrix.configuration }} --no-build
