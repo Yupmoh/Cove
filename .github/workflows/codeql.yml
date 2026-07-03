@@ -1,0 +1,36 @@
+name: codeql
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: '0 6 * * 1'
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: csharp
+      - name: Build frontend
+        working-directory: src/Cove.Gui/frontend
+        run: npm ci && npm run build
+      - name: Build
+        run: dotnet build Cove.slnx -c Release
+      - uses: github/codeql-action/analyze@v3

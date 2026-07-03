@@ -1,0 +1,33 @@
+name: aot
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  aot-publish:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            rid: osx-arm64
+          - os: windows-latest
+            rid: win-x64
+          - os: ubuntu-latest
+            rid: linux-x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Install AOT prerequisites (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y clang zlib1g-dev
+      - name: AOT publish CLI
+        run: dotnet publish src/Cove.Cli/Cove.Cli.csproj -c Release -r ${{ matrix.rid }} -p:PublishAot=true --self-contained true
