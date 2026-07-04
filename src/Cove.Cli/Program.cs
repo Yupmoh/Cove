@@ -8,6 +8,8 @@ using Cove.Cli;
 using Cove.Generated;
 
 string[] cliArgs = args;
+using (var cliLoggerFactory = Cove.Platform.CoveLog.CreateConsoleLoggerFactory())
+    cliLoggerFactory.CreateLogger("cove").Invoked(string.Join(' ', cliArgs));
 CoveChannel channel = ParseChannel(cliArgs);
 CoveDataDir dataDir = CoveDataDir.Resolve(channel);
 var paths = new DaemonPaths(dataDir);

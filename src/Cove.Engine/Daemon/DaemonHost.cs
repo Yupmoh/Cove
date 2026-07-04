@@ -3,6 +3,7 @@ using System.Text.Json.Serialization.Metadata;
 using Cove.Platform;
 using Cove.Platform.Ipc;
 using Cove.Protocol;
+using Microsoft.Extensions.Logging;
 
 namespace Cove.Engine.Daemon;
 
@@ -31,6 +32,8 @@ public sealed class DaemonHost
     public async Task<int> RunAsync(CancellationToken externalCancellation)
     {
         CoveTree.Ensure(_paths.DataDir);
+        using var loggerFactory = Cove.Platform.CoveLog.CreateEngineLoggerFactory(_paths.DataDir.LogsDir, _paths.Channel);
+        var logger = loggerFactory.CreateLogger<DaemonHost>();
 
         SingleInstanceGuard? guard = SingleInstanceGuard.TryAcquire(_paths.PidFilePath);
         if (guard is null)
@@ -66,6 +69,7 @@ public sealed class DaemonHost
         guard.WritePid(Environment.ProcessId);
         _lastActivityTicks = DateTimeOffset.UtcNow.Ticks;
         DaemonLog.Write(_paths, $"daemon up pid={Environment.ProcessId} channel={_paths.Channel} addr={_endpoint.Address}");
+        logger.DaemonStarted(System.Environment.ProcessId, _paths.Channel);
 
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(externalCancellation, _shutdown.Token);
         Task? idle = _exitWhenIdle ? Task.Run(() => IdleMonitorAsync(linked.Token)) : null;
@@ -89,6 +93,7 @@ public sealed class DaemonHost
         {
             try { await idle.ConfigureAwait(false); } catch { }
         }
+        logger.DaemonStopping(_paths.Channel);
         DaemonLog.Write(_paths, "daemon down");
         return 0;
     }
