@@ -31,3 +31,34 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y clang zlib1g-dev
       - name: AOT publish CLI
         run: dotnet publish src/Cove.Cli/Cove.Cli.csproj -c Release -r ${{ matrix.rid }} -p:PublishAot=true --self-contained true
+
+  persistence-aot-probe:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            rid: osx-arm64
+            bin: Cove.Persistence.AotProbe
+          - os: windows-latest
+            rid: win-x64
+            bin: Cove.Persistence.AotProbe.exe
+          - os: ubuntu-latest
+            rid: linux-x64
+            bin: Cove.Persistence.AotProbe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Publish AOT probe (${{ matrix.rid }})
+        run: >
+          dotnet publish tests/Cove.Persistence.AotProbe/Cove.Persistence.AotProbe.csproj
+          -c Release -r ${{ matrix.rid }} -p:PublishAot=true
+          -o artifacts/aotprobe/${{ matrix.rid }}
+      - name: Run AOT probe
+        shell: bash
+        run: |
+          ./artifacts/aotprobe/${{ matrix.rid }}/${{ matrix.bin }}
+          echo "exit=$?"

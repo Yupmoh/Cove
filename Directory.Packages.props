@@ -19,4 +19,12 @@
     <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.9" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.Data.Sqlite.Core" Version="10.0.0" />
+    <PackageVersion Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.11" />
+    <PackageVersion Include="SQLitePCLRaw.core" Version="2.1.11" />
+    <PackageVersion Include="Dapper" Version="2.1.35" />
+    <PackageVersion Include="Dapper.AOT" Version="1.0.52" />
+  </ItemGroup>
+
 </Project>
