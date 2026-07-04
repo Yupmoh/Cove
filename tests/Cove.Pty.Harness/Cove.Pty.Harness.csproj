@@ -19,6 +19,12 @@
     <ProjectReference Include="../../src/Cove.Platform/Cove.Platform.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="golden/covptygen-4mib.sha256">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
   <Target Name="BuildCovePtyNative" BeforeTargets="Build" Condition="'$(OS)' != 'Windows_NT'">
     <Exec Command="bash &quot;$(MSBuildProjectDirectory)/../../native/cove_pty/build-unix.sh&quot; &quot;$(OutDir)&quot;" />
   </Target>
