@@ -34,7 +34,12 @@ public sealed class PtyRingBuffer
             if (data.Length >= _buffer.Length)
             {
                 var last = data.Slice(data.Length - _buffer.Length);
-                last.CopyTo(_buffer);
+                long baseOffset = _head + (data.Length - _buffer.Length);
+                int copyStart = (int)(baseOffset & _mask);
+                int copyFirstRun = Math.Min(_buffer.Length - copyStart, last.Length);
+                last.Slice(0, copyFirstRun).CopyTo(_buffer.AsSpan(copyStart));
+                if (copyFirstRun < last.Length)
+                    last.Slice(copyFirstRun).CopyTo(_buffer.AsSpan(0));
                 _head += data.Length;
                 return;
             }
