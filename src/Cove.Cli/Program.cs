@@ -4,6 +4,8 @@ using Cove.Engine.Daemon;
 using Cove.Platform;
 using Cove.Platform.Ipc;
 using Cove.Protocol;
+using Cove.Cli;
+using Cove.Generated;
 
 string[] cliArgs = args;
 CoveChannel channel = ParseChannel(cliArgs);
@@ -20,6 +22,28 @@ if (cliArgs.Length >= 2 && cliArgs[0] == "daemon")
         "stop" => await StopAsync(paths, endpoint),
         _ => Unknown(cliArgs[1]),
     };
+}
+
+string? matchedVerb = null;
+{
+    var positional = new System.Collections.Generic.List<string>();
+    for (int i = 0; i < cliArgs.Length; i++)
+    {
+        if (cliArgs[i] == "--channel" && i + 1 < cliArgs.Length) { i++; continue; }
+        if (cliArgs[i].StartsWith("--", System.StringComparison.Ordinal)) continue;
+        positional.Add(cliArgs[i]);
+    }
+    for (int take = System.Math.Min(positional.Count, 3); take >= 1 && matchedVerb is null; take--)
+    {
+        var candidate = string.Join(' ', positional.GetRange(0, take));
+        if (CoveCommandRegistry.Keys.Contains(candidate)) matchedVerb = candidate;
+    }
+}
+if (matchedVerb is not null)
+{
+    var context = new CommandContext(paths, endpoint, System.Console.Out);
+    var handler = (System.Func<CommandContext, System.Threading.Tasks.Task<int>>)CoveCommandRegistry.Handlers[matchedVerb];
+    return await handler(context);
 }
 
 return await DefaultConnectAndFocusAsync(paths, endpoint);

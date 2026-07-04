@@ -200,6 +200,13 @@ public sealed class DaemonHost
             return false;
         }
 
+        ControlResponse? generated = await Cove.Engine.EngineCommandRouter.RouteAsync(req, cancellationToken).ConfigureAwait(false);
+        if (generated is not null)
+        {
+            await WriteResponseAsync(conn, generated, cancellationToken).ConfigureAwait(false);
+            return false;
+        }
+
         switch (req.Uri)
         {
             case "cove://sys/ping":

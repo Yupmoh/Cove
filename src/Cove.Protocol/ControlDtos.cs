@@ -29,6 +29,8 @@ public sealed record DaemonStatusResult(int Pid, string Channel, string EngineVe
 
 public sealed record PaneInfo(string PaneId, string Command, int Cols, int Rows, bool Alive);
 
+public sealed record PaneListResult(PaneInfo[] Panes);
+
 public sealed record SpawnParams(
     string Command,
     string[] Args,
@@ -55,6 +57,7 @@ public sealed record ResizeParams(string PaneId, int Cols, int Rows);
 [JsonSerializable(typeof(HelloResult))]
 [JsonSerializable(typeof(DaemonStatusResult))]
 [JsonSerializable(typeof(PaneInfo[]))]
+[JsonSerializable(typeof(PaneListResult))]
 [JsonSerializable(typeof(SpawnParams))]
 [JsonSerializable(typeof(SubscribeParams))]
 [JsonSerializable(typeof(SubscribeResult))]
