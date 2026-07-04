@@ -35,6 +35,8 @@ internal static class Program
                 s.AddSingleton<CoveGuiCommands>();
                 s.AddRynCommands();
                 s.AddAppCommands();
+                s.AddCoveGuiCommands();
+                s.AddPerfResultsCommand();
             })
             .Build()
             .Run();

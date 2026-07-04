@@ -1,12 +1,16 @@
-import { defineConfig } from 'vite'
+import { resolve } from "path";
+import { defineConfig } from "vite";
 
 export default defineConfig({
-  server: {
-    port: 5173,
-    strictPort: true,
-  },
   build: {
-    outDir: '../wwwroot',
+    outDir: "../wwwroot",
     emptyOutDir: true,
+    rollupOptions: {
+      input: {
+        main: resolve(__dirname, "index.html"),
+        perf: resolve(__dirname, "perf/index.html"),
+      },
+    },
   },
-})
+  server: { strictPort: true, port: 5173 },
+});

@@ -1,1 +1,1 @@
-{"root":["./src/main.ts","./src/ryn.d.ts","./src/wsproto.test.ts","./src/wsproto.ts"],"version":"5.8.3"}
+{"root":["./src/main.ts","./src/ryn.d.ts","./src/wsproto.test.ts","./src/wsproto.ts","./src/perf/harness.ts","./src/perf/instrument.test.ts","./src/perf/instrument.ts","./src/perf/renderer.test.ts","./src/perf/renderer.ts"],"version":"5.8.3"}
