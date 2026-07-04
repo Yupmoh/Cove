@@ -2,6 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
@@ -10,10 +11,16 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="../../src/Cove.Engine/Cove.Engine.csproj" />
+    <ProjectReference Include="../../src/Cove.Platform/Cove.Platform.csproj" />
   </ItemGroup>
+
+  <Target Name="BuildCovePtyNative" BeforeTargets="Build" Condition="'$(OS)' != 'Windows_NT'">
+    <Exec Command="bash &quot;$(MSBuildProjectDirectory)/../../native/cove_pty/build-unix.sh&quot; &quot;$(OutDir)&quot;" />
+  </Target>
 
 </Project>
