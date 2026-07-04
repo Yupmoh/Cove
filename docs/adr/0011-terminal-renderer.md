@@ -1,6 +1,6 @@
 # ADR 0011 — Terminal renderer + the native-webview bet
 
-Status: Proposed — AWAITING HUMAN GO/NO-GO
+Status: Accepted — GO (owner-ratified 2026-07-04)
 
 ## Context
 
@@ -79,7 +79,7 @@ timestamp: 2026-07-04T04:05:13.336Z
 
 ## Live confirmation
 
-Deferred: engine pane.* live handlers not wired (M0 plan gap).
+Renderer FPS/lag were measured by the TP-11 perf harness (Results table above) driving a synthetic byte feed; the live engine `pane.*` handlers that stream a real PTY to the webview were wired separately (see criterion 5 / `PaneLiveHandlerTests`). The renderer go/no-go does not depend on that wiring.
 
 ## Options considered
 
@@ -91,15 +91,20 @@ Deferred: engine pane.* live handlers not wired (M0 plan gap).
 - Hidden-pane render-pause + lazy unmount (TM-12): the `yesSpamHidden` cell shows
   the effect of not rendering/feeding off-screen panes.
 
-## Decision — AWAITING HUMAN GO/NO-GO
+## Decision
 
-To be decided by a human from the Results table: (1) the default renderer,
-(2) the fallback order and the pane count at which to switch, (3) whether the
-hidden-pane render-pause is mandatory, (4) GO or NO-GO on the ~5 MB
-native-webview bet (PL-88).
+Ratified by Moh (owner) on 2026-07-04 from the Results table:
 
-PENDING
+1. Default renderer: **canvas**. It holds 30.4–30.6 fps idle from 1 to 20 panes with `glLoss=0` and stays at ~30.5 fps under resize storms, with no per-pane GPU-context cap to trip.
+2. Fallback order: **canvas → webgl (opt-in accelerator, only below ~8 live panes) → dom (universal compatibility)**. WebGL is never the default because a browser caps live WebGL2 contexts (~16) and 20 panes force context loss (`glLoss=4`); dom is the last resort (highest per-cell cost, but always available).
+3. Hidden-pane render-pause (TM-12) is **mandatory**. It is the difference between a usable and unusable spam workload at scale: 20 panes under `yesSpam` render at 4.8 fps when all visible but recover to 30.3 fps when only 4 are visible.
+4. **GO** on the ~5 MB native-webview bet (PL-88). Canvas delivers 30 fps idle across every configuration with zero GPU-context risk; the WKWebView footprint is acceptable for the capability.
+
+Under sustained single-pane spam every renderer converges near the ~10 MB/s PTY throughput ceiling regardless of choice, so throughput does not discriminate between them; idle stability, resize behavior, and context safety do — all of which favor canvas.
 
 ## Consequences
 
-PENDING
+- The GUI ships canvas as the default xterm.js renderer; webgl is gated behind an explicit opt-in and an ≤~8-pane guard; dom is the guaranteed fallback.
+- Off-screen panes must pause rendering and PTY feed; this is a correctness-adjacent requirement for multi-pane sessions, not an optimization.
+- `longtask(ms)` reads 0 everywhere because WKWebView does not implement the `PerformanceObserver` longtask API; UI-thread stall is tracked via `frameP95(ms)` instead. This instrumentation gap is a WKWebView limitation, recorded so later milestones do not mistake it for a clean signal.
+- The native-webview architecture (PL-88) is confirmed for M1; no renderer re-litigation is planned unless a measured regression appears.
