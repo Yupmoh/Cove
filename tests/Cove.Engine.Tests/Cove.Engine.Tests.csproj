@@ -23,4 +23,8 @@
     <RuntimeHostConfigurationOption Include="System.IO.DisableFileLocking" Value="true" Trim="false" />
   </ItemGroup>
 
+  <Target Name="BuildCovePtyNative" BeforeTargets="Build" Condition="'$(OS)' != 'Windows_NT'">
+    <Exec Command="bash &quot;$(MSBuildProjectDirectory)/../../native/cove_pty/build-unix.sh&quot; &quot;$(OutDir)&quot;" />
+  </Target>
+
 </Project>

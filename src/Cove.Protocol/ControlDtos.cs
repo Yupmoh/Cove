@@ -45,6 +45,9 @@ public sealed record SubscribeResult(ulong StreamId, ulong BaseOffset, int Windo
 public sealed record WriteParams(ulong StreamId, string DataBase64);
 public sealed record ResizeParams(string PaneId, int Cols, int Rows);
 
+public sealed record PaneWriteParams(string PaneId, string DataBase64);
+public sealed record PaneRefParams(string PaneId);
+
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
@@ -63,5 +66,8 @@ public sealed record ResizeParams(string PaneId, int Cols, int Rows);
 [JsonSerializable(typeof(SubscribeResult))]
 [JsonSerializable(typeof(WriteParams))]
 [JsonSerializable(typeof(ResizeParams))]
+[JsonSerializable(typeof(PaneInfo))]
+[JsonSerializable(typeof(PaneWriteParams))]
+[JsonSerializable(typeof(PaneRefParams))]
 [JsonSerializable(typeof(JsonElement))]
 public sealed partial class CoveJsonContext : JsonSerializerContext;

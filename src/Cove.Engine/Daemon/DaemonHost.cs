@@ -1,7 +1,10 @@
+using System.Buffers.Binary;
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
+using Cove.Engine.Pty;
 using Cove.Platform;
 using Cove.Platform.Ipc;
+using Cove.Platform.Pty;
 using Cove.Protocol;
 using Microsoft.Extensions.Logging;
 
@@ -22,6 +25,9 @@ public sealed class DaemonHost
     private int _activeConnections;
     private long _lastActivityTicks;
 
+    private IPtyHost? _ptyHost;
+    private PaneRegistry? _panes;
+
     public DaemonHost(DaemonPaths paths, IControlEndpoint endpoint, bool exitWhenIdle)
     {
         _paths = paths;
@@ -35,6 +41,8 @@ public sealed class DaemonHost
         using var loggerFactory = Cove.Platform.CoveLog.CreateEngineLoggerFactory(_paths.DataDir.LogsDir, _paths.Channel);
         var logger = loggerFactory.CreateLogger<DaemonHost>();
 
+        _ptyHost = PtyHostFactory.Create(logger);
+        _panes = new PaneRegistry(_ptyHost, logger);
         SingleInstanceGuard? guard = SingleInstanceGuard.TryAcquire(_paths.PidFilePath);
         if (guard is null)
         {
@@ -83,6 +91,7 @@ public sealed class DaemonHost
         }
 
         await listener.DisposeAsync().ConfigureAwait(false);
+        _panes?.Dispose();
         if (!OperatingSystem.IsWindows())
         {
             try { File.Delete(_paths.SocketPath); } catch { }
@@ -142,7 +151,7 @@ public sealed class DaemonHost
                     break;
                 }
                 ControlRequest req = ControlCodec.DecodeRequest(f.Payload);
-                bool stop = await DispatchAsync(conn, state, req, cancellationToken).ConfigureAwait(false);
+                bool stop = await DispatchAsync(conn, stream, state, req, cancellationToken).ConfigureAwait(false);
                 if (stop)
                     break;
             }
@@ -168,7 +177,7 @@ public sealed class DaemonHost
         }
     }
 
-    private async Task<bool> DispatchAsync(FrameConnection conn, ConnState state, ControlRequest req, CancellationToken cancellationToken)
+    private async Task<bool> DispatchAsync(FrameConnection conn, Stream stream, ConnState state, ControlRequest req, CancellationToken cancellationToken)
     {
         if (req.Uri == "cove://sys/hello")
         {
@@ -205,7 +214,7 @@ public sealed class DaemonHost
             return false;
         }
 
-        ControlResponse? generated = await Cove.Engine.EngineCommandRouter.RouteAsync(req, cancellationToken).ConfigureAwait(false);
+        ControlResponse? generated = await Cove.Engine.EngineCommandRouter.RouteAsync(req, _panes, cancellationToken).ConfigureAwait(false);
         if (generated is not null)
         {
             await WriteResponseAsync(conn, generated, cancellationToken).ConfigureAwait(false);
@@ -246,9 +255,96 @@ public sealed class DaemonHost
                     return false;
                 }
 
+            case "cove://commands/pane.subscribe":
+                await StreamPaneAsync(conn, stream, req, cancellationToken).ConfigureAwait(false);
+                return true;
+
             default:
                 await WriteResponseAsync(conn, Fail(req.Id, "not_found", $"unknown command {req.Uri}"), cancellationToken).ConfigureAwait(false);
                 return false;
+        }
+    }
+
+    private async Task StreamPaneAsync(FrameConnection conn, Stream stream, ControlRequest req, CancellationToken cancellationToken)
+    {
+        if (_panes is null || req.Params is not JsonElement el
+            || el.Deserialize(CoveJsonContext.Default.SubscribeParams) is not { } sp)
+        {
+            await WriteResponseAsync(conn, Fail(req.Id, "invalid_params", "subscribe params required"), cancellationToken).ConfigureAwait(false);
+            return;
+        }
+        if (!_panes.TryGet(sp.PaneId, out PaneSession pane))
+        {
+            await WriteResponseAsync(conn, Fail(req.Id, "not_found", $"unknown pane {sp.PaneId}"), cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        const ulong streamId = 1;
+        long head = pane.Ring.Head;
+        long tail = pane.Ring.Tail;
+        long baseOffset = Math.Clamp((long)sp.SinceOffset, tail, head);
+        var subResult = new SubscribeResult(streamId, (ulong)baseOffset, ProtocolConstants.FlowWindow);
+        await WriteResponseAsync(conn, new ControlResponse(req.Id, true, ToElement(subResult, CoveJsonContext.Default.SubscribeResult)), cancellationToken).ConfigureAwait(false);
+
+        var sink = new SocketByteStreamSink(stream);
+        var sender = new PtyStreamSender(streamId, pane.Session.SessionId, pane.Ring, baseOffset, sink);
+        var gate = new object();
+        bool childMarked = false;
+
+        using var streamCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        Task creditLoop = Task.Run(async () =>
+        {
+            try
+            {
+                while (!streamCts.IsCancellationRequested)
+                {
+                    Frame? maybe = await conn.ReadFrameAsync(streamCts.Token).ConfigureAwait(false);
+                    if (maybe is null)
+                        break;
+                    Frame f = maybe.Value;
+                    if (f.Header.Type == FrameType.Credit && f.Payload.Length >= 8)
+                    {
+                        ulong ack = BinaryPrimitives.ReadUInt64LittleEndian(f.Payload);
+                        lock (gate)
+                            sender.OnCredit(ack);
+                    }
+                    pane.Signal.Set();
+                }
+            }
+            catch
+            {
+            }
+            finally
+            {
+                streamCts.Cancel();
+                pane.Signal.Set();
+            }
+        });
+
+        try
+        {
+            while (!streamCts.IsCancellationRequested)
+            {
+                Task wait = pane.Signal.WaitAsync();
+                lock (gate)
+                {
+                    if (!childMarked && pane.Reader.HasCompleted)
+                    {
+                        sender.MarkChildExited(pane.Reader.ExitCode);
+                        childMarked = true;
+                    }
+                    sender.PumpAvailable();
+                }
+                if (sender.Ended || sender.Faulted)
+                    break;
+                try { await wait.WaitAsync(streamCts.Token).ConfigureAwait(false); }
+                catch (OperationCanceledException) { break; }
+            }
+        }
+        finally
+        {
+            streamCts.Cancel();
+            try { await creditLoop.ConfigureAwait(false); } catch { }
         }
     }
 
