@@ -17,4 +17,9 @@
     <ItemGroup>
       <PackageReference Include="Ryn" />
     </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Cove.Protocol\Cove.Protocol.csproj" />
+    <ProjectReference Include="..\Cove.Platform\Cove.Platform.csproj" />
+  </ItemGroup>
 </Project>
