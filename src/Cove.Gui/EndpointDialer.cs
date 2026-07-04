@@ -1,5 +1,5 @@
-using System.Net.Sockets;
 using System.IO.Pipes;
+using System.Net.Sockets;
 using Cove.Platform;
 using Cove.Protocol;
 

@@ -1,11 +1,11 @@
 using System.Runtime.InteropServices;
 using System.Text.Json;
+using Cove.Cli;
 using Cove.Engine.Daemon;
+using Cove.Generated;
 using Cove.Platform;
 using Cove.Platform.Ipc;
 using Cove.Protocol;
-using Cove.Cli;
-using Cove.Generated;
 
 string[] cliArgs = args;
 using (var cliLoggerFactory = Cove.Platform.CoveLog.CreateConsoleLoggerFactory())

@@ -1,7 +1,7 @@
 using System.Linq;
+using Cove.SourceGen;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using Cove.SourceGen;
 using Xunit;
 
 public class GeneratorTests

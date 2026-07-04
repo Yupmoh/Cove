@@ -219,17 +219,17 @@ public sealed class DaemonHost
                 return false;
 
             case "cove://sys/daemon.status":
-            {
-                var status = new DaemonStatusResult(
-                    Environment.ProcessId,
-                    _paths.Channel,
-                    _engineVersion,
-                    Volatile.Read(ref _totalConnections),
-                    0,
-                    (long)(DateTimeOffset.UtcNow - _startedAtUtc).TotalSeconds);
-                await WriteResponseAsync(conn, new ControlResponse(req.Id, true, ToElement(status, CoveJsonContext.Default.DaemonStatusResult)), cancellationToken).ConfigureAwait(false);
-                return false;
-            }
+                {
+                    var status = new DaemonStatusResult(
+                        Environment.ProcessId,
+                        _paths.Channel,
+                        _engineVersion,
+                        Volatile.Read(ref _totalConnections),
+                        0,
+                        (long)(DateTimeOffset.UtcNow - _startedAtUtc).TotalSeconds);
+                    await WriteResponseAsync(conn, new ControlResponse(req.Id, true, ToElement(status, CoveJsonContext.Default.DaemonStatusResult)), cancellationToken).ConfigureAwait(false);
+                    return false;
+                }
 
             case "cove://sys/daemon.stop":
                 await WriteResponseAsync(conn, new ControlResponse(req.Id, true, Parse("{\"stopping\":true}")), cancellationToken).ConfigureAwait(false);
@@ -237,14 +237,14 @@ public sealed class DaemonHost
                 return true;
 
             case "cove://commands/window.focus":
-            {
-                bool focused = TryForwardFocus(cancellationToken);
-                JsonElement data = focused
-                    ? Parse("{\"focused\":true}")
-                    : Parse("{\"focused\":false,\"reason\":\"no_render_client\"}");
-                await WriteResponseAsync(conn, new ControlResponse(req.Id, true, data), cancellationToken).ConfigureAwait(false);
-                return false;
-            }
+                {
+                    bool focused = TryForwardFocus(cancellationToken);
+                    JsonElement data = focused
+                        ? Parse("{\"focused\":true}")
+                        : Parse("{\"focused\":false,\"reason\":\"no_render_client\"}");
+                    await WriteResponseAsync(conn, new ControlResponse(req.Id, true, data), cancellationToken).ConfigureAwait(false);
+                    return false;
+                }
 
             default:
                 await WriteResponseAsync(conn, Fail(req.Id, "not_found", $"unknown command {req.Uri}"), cancellationToken).ConfigureAwait(false);

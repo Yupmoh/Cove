@@ -1,8 +1,8 @@
 using System;
 using System.IO;
-using Microsoft.Extensions.Logging;
 using Cove.Engine;
 using Cove.Platform;
+using Microsoft.Extensions.Logging;
 using Xunit;
 
 public class LoggingAllocationTests
