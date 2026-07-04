@@ -32,6 +32,9 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y clang zlib1g-dev
       - name: Publish CLI
         run: dotnet publish src/Cove.Cli/Cove.Cli.csproj -c Release -r ${{ matrix.rid }} -p:PublishAot=true --self-contained true -o artifacts/${{ matrix.rid }}
+      - name: Bundle PTY shim (unix)
+        if: runner.os != 'Windows'
+        run: bash native/cove_pty/build-unix.sh "artifacts/${{ matrix.rid }}"
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -59,6 +62,9 @@ jobs:
           cd dist
           for d in */; do
             name="${d%/}"
+            rm -f "$d"*.pdb "$d"covptygen
+            rm -rf "$d"cove.dSYM
+            chmod +x "$d"cove 2>/dev/null || true
             (cd "$d" && zip -r "../${name}.zip" .)
           done
           ls -la
