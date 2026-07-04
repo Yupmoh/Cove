@@ -2,6 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
@@ -14,6 +15,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/Cove.Protocol/Cove.Protocol.csproj" />
+    <ProjectReference Include="../../src/Cove.Platform/Cove.Platform.csproj" />
   </ItemGroup>
 
 </Project>
