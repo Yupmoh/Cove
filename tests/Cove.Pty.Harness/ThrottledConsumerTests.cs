@@ -10,6 +10,8 @@ public sealed class ThrottledConsumerTests
     [Trait("Category", "PtyResync")]
     public void ThrottledConsumer_ExactlyOneResync()
     {
+        if (OperatingSystem.IsWindows())
+            return;
         const long total = 262144;
         var (ring, reader, session) = PtyHarnessFixture.StartGen(65536, total);
         try

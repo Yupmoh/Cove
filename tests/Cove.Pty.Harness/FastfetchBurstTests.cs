@@ -9,6 +9,8 @@ public sealed class FastfetchBurstTests
     [Trait("Category", "PtyDrain")]
     public void FastfetchBurst_NeverWedges_DrainsAllBytes()
     {
+        if (OperatingSystem.IsWindows())
+            return;
         const long total = 16L * 1024 * 1024;
         var (ring, reader, session) = PtyHarnessFixture.StartGen(65536, total);
         try

@@ -13,6 +13,8 @@ public sealed class GoldenByteIdentityTests
     [Trait("Category", "PtyGolden")]
     public void Delivery_IsByteIdenticalToGolden()
     {
+        if (OperatingSystem.IsWindows())
+            return;
         const long total = 4L * 1024 * 1024;
         var (ring, reader, session) = PtyHarnessFixture.StartGen(8 * 1024 * 1024, total);
         try

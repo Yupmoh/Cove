@@ -10,7 +10,10 @@ public static class PidFile
         {
             if (!File.Exists(path))
                 return null;
-            string text = File.ReadAllText(path).Trim();
+            string text;
+            using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            using (var sr = new StreamReader(fs))
+                text = sr.ReadToEnd().Trim();
             return int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out int pid) ? pid : null;
         }
         catch

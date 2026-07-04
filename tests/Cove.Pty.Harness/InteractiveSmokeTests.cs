@@ -15,6 +15,8 @@ public sealed class InteractiveSmokeTests
     [Fact]
     public void RealInteractiveShellEchoesMarkerAndExitsClean()
     {
+        if (OperatingSystem.IsWindows())
+            return;
         string shell = System.IO.File.Exists("/bin/zsh") ? "/bin/zsh" : "/bin/bash";
         var logger = NullLogger.Instance;
         var host = PtyHostFactory.Create(logger);

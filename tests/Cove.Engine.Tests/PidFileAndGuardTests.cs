@@ -19,7 +19,9 @@ public sealed class PidFileAndGuardTests
             using SingleInstanceGuard? guard = SingleInstanceGuard.TryAcquire(path);
             Assert.NotNull(guard);
             guard!.WritePid(43127);
-            Assert.Equal("43127\n", File.ReadAllText(path));
+            using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            using (var sr = new StreamReader(fs))
+                Assert.Equal("43127\n", sr.ReadToEnd());
             Assert.Equal(43127, PidFile.Read(path));
         }
         finally { try { File.Delete(path); } catch { } }
