@@ -89,10 +89,22 @@ internal sealed class WindowsControlListener : IControlListener
 
     public async ValueTask<Stream> AcceptAsync(CancellationToken cancellationToken)
     {
-        NamedPipeServerStream server = _pending;
-        await server.WaitForConnectionAsync(cancellationToken).ConfigureAwait(false);
-        _pending = _factory(false);
-        return server;
+        while (true)
+        {
+            NamedPipeServerStream server = _pending;
+            try
+            {
+                await server.WaitForConnectionAsync(cancellationToken).ConfigureAwait(false);
+            }
+            catch (IOException)
+            {
+                server.Dispose();
+                _pending = _factory(false);
+                continue;
+            }
+            _pending = _factory(false);
+            return server;
+        }
     }
 
     public ValueTask DisposeAsync()
