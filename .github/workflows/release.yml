@@ -62,7 +62,7 @@ jobs:
           cd dist
           for d in */; do
             name="${d%/}"
-            rm -f "$d"*.pdb "$d"covptygen
+            rm -f "$d"*.pdb "$d"*.dbg "$d"covptygen
             rm -rf "$d"cove.dSYM
             chmod +x "$d"cove 2>/dev/null || true
             (cd "$d" && zip -r "../${name}.zip" .)
