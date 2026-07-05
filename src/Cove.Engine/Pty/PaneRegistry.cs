@@ -12,12 +12,13 @@ internal sealed class PaneSession
     public required string Command { get; init; }
     public int Cols { get; set; }
     public int Rows { get; set; }
+    public string? Cwd { get; set; }
     public required IPtySession Session { get; init; }
     public required PtyRingBuffer Ring { get; init; }
     public required PtyRingSignal Signal { get; init; }
     public required PtySessionReader Reader { get; init; }
 
-    public PaneInfo ToInfo() => new(PaneId, Command, Cols, Rows, !Reader.HasCompleted);
+    public PaneInfo ToInfo() => new(PaneId, Command, Cols, Rows, !Reader.HasCompleted, Cwd);
 }
 
 public sealed class PaneRegistry : IDisposable
@@ -54,7 +55,6 @@ public sealed class PaneRegistry : IDisposable
         var ring = new PtyRingBuffer();
         var signal = new PtyRingSignal();
         var reader = new PtySessionReader(session, ring, signal, _logger);
-        reader.Start();
         var pane = new PaneSession
         {
             PaneId = paneId,
@@ -66,6 +66,8 @@ public sealed class PaneRegistry : IDisposable
             Signal = signal,
             Reader = reader,
         };
+        reader.OnCwd = c => pane.Cwd = c;
+        reader.Start();
         lock (_sync)
             _panes[paneId] = pane;
         return pane.ToInfo();

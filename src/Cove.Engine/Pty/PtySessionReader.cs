@@ -11,9 +11,12 @@ public sealed class PtySessionReader : IDisposable
     private readonly PtyRingBuffer _ring;
     private readonly PtyRingSignal _signal;
     private readonly ILogger _logger;
+    private readonly Osc7Parser _osc7 = new();
     private Thread? _thread;
     private volatile bool _completed;
     private int _exitCode = -1;
+
+    public Action<string>? OnCwd { get; set; }
 
     public PtySessionReader(IPtySession session, PtyRingBuffer ring, PtyRingSignal signal, ILogger logger)
     {
@@ -47,6 +50,9 @@ public sealed class PtySessionReader : IDisposable
                 if (n == 0)
                     break;
                 _ring.Append(buffer.AsSpan(0, n));
+                var cwd = _osc7.Feed(buffer.AsSpan(0, n));
+                if (cwd is not null)
+                    OnCwd?.Invoke(cwd);
                 _signal.Set();
             }
         }

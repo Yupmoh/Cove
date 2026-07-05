@@ -60,7 +60,7 @@ internal static class LayoutCommands
         var info = ctx.Panes?.List().FirstOrDefault(x => x.PaneId == p.PaneId);
         if (info is null)
             return Task.FromResult(ctx.Fail("not_found", $"unknown pane {p.PaneId}"));
-        return Task.FromResult(ctx.Ok(new SessionStateResult(info.PaneId, info.Command, info.Cols, info.Rows, info.Alive), Cove.Protocol.CoveJsonContext.Default.SessionStateResult));
+        return Task.FromResult(ctx.Ok(new SessionStateResult(info.PaneId, info.Command, info.Cols, info.Rows, info.Alive, info.Cwd), Cove.Protocol.CoveJsonContext.Default.SessionStateResult));
     }
 
     private static ControlResponse MutateOk(Action work, string? roomId, EngineDispatchContext ctx)

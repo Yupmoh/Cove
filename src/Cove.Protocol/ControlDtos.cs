@@ -27,7 +27,7 @@ public sealed record HelloResult(int ProtocolVersion, string EngineVersion, int 
 
 public sealed record DaemonStatusResult(int Pid, string Channel, string EngineVersion, int Connections, int Sessions, long UptimeSeconds);
 
-public sealed record PaneInfo(string PaneId, string Command, int Cols, int Rows, bool Alive);
+public sealed record PaneInfo(string PaneId, string Command, int Cols, int Rows, bool Alive, string? Cwd = null);
 
 public sealed record PaneListResult(PaneInfo[] Panes);
 
@@ -50,7 +50,7 @@ public sealed record PaneRefParams(string PaneId);
 
 public sealed record LayoutMutateParams(string Op, string? RoomId = null, string? TargetPaneId = null, string? NewPaneId = null, string? Orientation = null, string? Name = null, string? PaneId = null, int Dir = 1);
 public sealed record LayoutMutateResult(string? RoomId = null);
-public sealed record SessionStateResult(string PaneId, string Command, int Cols, int Rows, bool Alive);
+public sealed record SessionStateResult(string PaneId, string Command, int Cols, int Rows, bool Alive, string? Cwd = null);
 
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
