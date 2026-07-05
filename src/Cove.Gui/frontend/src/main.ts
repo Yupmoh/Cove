@@ -95,6 +95,7 @@ function makePaneEl(session: Session, paneId: string, since: number): Pane {
 
   const paneEl = document.createElement("div");
   paneEl.className = "pane";
+  paneEl.style.flexGrow = "1";
   const host = document.createElement("div");
   host.className = "term-host";
   paneEl.appendChild(host);
@@ -107,6 +108,48 @@ function makePaneEl(session: Session, paneId: string, since: number): Pane {
   paneEl.addEventListener("mousedown", () => focusPane(pane));
   attachWs(pane);
   return pane;
+}
+
+function relayout(session: Session) {
+  session.gridEl.querySelectorAll(".divider").forEach((d) => d.remove());
+  session.panes.forEach((p, i) => {
+    if (!p.paneEl.style.flexGrow) p.paneEl.style.flexGrow = "1";
+    if (i < session.panes.length - 1) {
+      const div = document.createElement("div");
+      div.className = "divider";
+      p.paneEl.after(div);
+      wireDivider(session, div, p, session.panes[i + 1]);
+    }
+  });
+  fit(session);
+}
+
+function wireDivider(session: Session, div: HTMLElement, a: Pane, b: Pane) {
+  div.addEventListener("mousedown", (e) => {
+    e.preventDefault();
+    const horiz = session.dir === "row";
+    const rect = session.gridEl.getBoundingClientRect();
+    const total = horiz ? rect.width : rect.height;
+    const start = horiz ? e.clientX : e.clientY;
+    const ga = parseFloat(a.paneEl.style.flexGrow || "1");
+    const gb = parseFloat(b.paneEl.style.flexGrow || "1");
+    const sum = ga + gb;
+    const onMove = (m: MouseEvent) => {
+      const frac = ((horiz ? m.clientX : m.clientY) - start) / total;
+      const na = Math.max(sum * 0.12, Math.min(sum * 0.88, ga + frac * sum));
+      a.paneEl.style.flexGrow = String(na);
+      b.paneEl.style.flexGrow = String(sum - na);
+      a.fit.fit();
+      b.fit.fit();
+    };
+    const onUp = () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      fit(session);
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  });
 }
 
 
@@ -185,7 +228,7 @@ async function splitActive(dir: "row" | "col"): Promise<void> {
   const pane = makePaneEl(session, paneId, 0);
   session.panes.push(pane);
   focusPane(pane);
-  fit(session);
+  relayout(session);
   renderSidebar();
 }
 
@@ -199,7 +242,7 @@ async function closePane(pane: Pane): Promise<void> {
   session.panes.splice(session.panes.indexOf(pane), 1);
   if (session.panes.length === 0) { await removeSession(session); return; }
   focusPane(session.panes[session.panes.length - 1]);
-  fit(session);
+  relayout(session);
   renderSidebar();
 }
 
