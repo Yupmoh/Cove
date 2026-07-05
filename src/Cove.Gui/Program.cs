@@ -27,7 +27,7 @@ internal static class Program
                 o.Title = "Cove";
                 o.Width = 1100;
                 o.Height = 720;
-                o.DevTools = true;
+                o.DevTools = Environment.GetEnvironmentVariable("COVE_DEVTOOLS") == "1";
             })
             .ConfigureServices(s =>
             {
