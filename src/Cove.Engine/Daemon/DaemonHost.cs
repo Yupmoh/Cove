@@ -43,7 +43,11 @@ public sealed class DaemonHost
         var logger = loggerFactory.CreateLogger<DaemonHost>();
 
         _ptyHost = PtyHostFactory.Create(logger);
-        _panes = new PaneRegistry(_ptyHost, logger);
+        var probedPath = Cove.Platform.LoginShellPath.Probe(logger);
+        var dataDir = _paths.DataDir.Root;
+        var cliPath = System.IO.Path.Combine(dataDir, "bin", "cove");
+        var spawnEnv = new SpawnEnvironment(probedPath, dataDir, cliPath, "default");
+        _panes = new PaneRegistry(_ptyHost, logger, spawnEnv);
         _layout = new Cove.Engine.Layout.LayoutService();
         SingleInstanceGuard? guard = SingleInstanceGuard.TryAcquire(_paths.PidFilePath);
         if (guard is null)

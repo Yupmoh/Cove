@@ -24,25 +24,29 @@ public sealed class PaneRegistry : IDisposable
 {
     private readonly IPtyHost _host;
     private readonly ILogger _logger;
+    private readonly SpawnEnvironment? _spawnEnv;
     private readonly object _sync = new();
     private readonly Dictionary<string, PaneSession> _panes = new();
 
-    public PaneRegistry(IPtyHost host, ILogger logger)
+    public PaneRegistry(IPtyHost host, ILogger logger, SpawnEnvironment? spawnEnv = null)
     {
         ArgumentNullException.ThrowIfNull(host);
         ArgumentNullException.ThrowIfNull(logger);
         _host = host;
         _logger = logger;
+        _spawnEnv = spawnEnv;
     }
 
     public PaneInfo Spawn(SpawnParams p)
     {
+        string paneId = "pane-" + System.Guid.NewGuid().ToString("N");
+        var envDict = _spawnEnv is { } se ? se.Build(paneId, p.Env) : p.Env;
         var request = new PtySpawnRequest
         {
             Command = p.Command,
             Args = p.Args ?? Array.Empty<string>(),
             WorkingDirectory = string.IsNullOrEmpty(p.Cwd) ? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) : p.Cwd,
-            Environment = p.Env,
+            Environment = envDict,
             Cols = p.Cols,
             Rows = p.Rows,
         };
@@ -51,7 +55,6 @@ public sealed class PaneRegistry : IDisposable
         var signal = new PtyRingSignal();
         var reader = new PtySessionReader(session, ring, signal, _logger);
         reader.Start();
-        string paneId = "pane-" + session.SessionId;
         var pane = new PaneSession
         {
             PaneId = paneId,
