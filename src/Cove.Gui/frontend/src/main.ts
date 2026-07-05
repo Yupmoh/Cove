@@ -26,6 +26,7 @@ interface Pane {
   paneEl: HTMLElement;
   consumed: number;
   lastAck: number;
+  title: string;
 }
 
 interface Session {
@@ -103,10 +104,11 @@ function makePaneEl(session: Session, paneId: string, since: number): Pane {
   term.open(host);
 
   const ws = new WebSocket(`ws://${location.host}/pty?pane=${encodeURIComponent(paneId)}&since=${since}`);
-  const pane: Pane = { paneId, term, fit: fitAddon, ws, paneEl, consumed: 0, lastAck: 0 };
+  const pane: Pane = { paneId, term, fit: fitAddon, ws, paneEl, consumed: 0, lastAck: 0, title: "" };
 
   paneEl.addEventListener("mousedown", () => focusPane(pane));
   attachWs(pane);
+  term.onTitleChange((t) => { pane.title = t; refreshTitles(); });
   return pane;
 }
 
@@ -157,6 +159,7 @@ function focusPane(pane: Pane) {
   focusedPane = pane;
   for (const s of sessions) for (const p of s.panes) p.paneEl.classList.toggle("focused", p === pane);
   pane.term.focus();
+  refreshTitles();
 }
 
 function activateSession(session: Session) {
@@ -170,6 +173,7 @@ function activateSession(session: Session) {
   if (last) focusPane(last);
   fit(session);
   updateChrome();
+  refreshTitles();
 }
 
 async function newSession(): Promise<void> {
@@ -280,6 +284,19 @@ function updateChrome() {
   const count = activeSession.panes.length;
   titleEl.innerHTML = `${activeSession.name}` + (count > 1 ? ` <span class="sub">${count} panes</span>` : "");
 }
+function refreshTitles() {
+  if (activeSession) {
+    const count = activeSession.panes.length;
+    const label = (focusedPane && focusedPane.title) || activeSession.name;
+    titleEl.innerHTML = `${label}` + (count > 1 ? ` <span class="sub">${count} panes</span>` : "");
+  }
+  for (const s of sessions) {
+    const first = s.panes[0];
+    const name = (first && first.title) || s.name;
+    const el = s.sessEl.querySelector(".name") as HTMLElement | null;
+    if (el) el.textContent = name;
+  }
+}
 
 interface Action { label: string; icon: string; key?: string; run: () => void; }
 
@@ -363,6 +380,18 @@ window.addEventListener("keydown", (e) => {
   else if (k === "d") { e.preventDefault(); void splitActive("row"); }
   else if (k === "w") { e.preventDefault(); if (focusedPane) void closePane(focusedPane); }
   else if (k === "b") { e.preventDefault(); toggleSidebar(); }
+  else if (k === "]" && activeSession && activeSession.panes.length) {
+    e.preventDefault();
+    const panes = activeSession.panes;
+    const idx = focusedPane ? panes.indexOf(focusedPane) : -1;
+    focusPane(panes[(idx + 1) % panes.length]);
+  }
+  else if (k === "[" && activeSession && activeSession.panes.length) {
+    e.preventDefault();
+    const panes = activeSession.panes;
+    const idx = focusedPane ? panes.indexOf(focusedPane) : 0;
+    focusPane(panes[(idx - 1 + panes.length) % panes.length]);
+  }
   else if (k >= "1" && k <= "9") { const i = Number(k) - 1; if (sessions[i]) { e.preventDefault(); activateSession(sessions[i]); } }
 }, true);
 
