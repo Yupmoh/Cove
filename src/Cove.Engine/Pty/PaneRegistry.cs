@@ -41,7 +41,7 @@ public sealed class PaneRegistry : IDisposable
         {
             Command = p.Command,
             Args = p.Args ?? Array.Empty<string>(),
-            WorkingDirectory = p.Cwd,
+            WorkingDirectory = string.IsNullOrEmpty(p.Cwd) ? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) : p.Cwd,
             Environment = p.Env,
             Cols = p.Cols,
             Rows = p.Rows,
