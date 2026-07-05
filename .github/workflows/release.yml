@@ -40,6 +40,23 @@ jobs:
         with:
           name: cove-${{ matrix.rid }}
           path: artifacts/${{ matrix.rid }}
+      - uses: actions/setup-node@v4
+        if: runner.os == 'macOS'
+        with:
+          node-version: 20
+      - name: Build GUI frontend (macOS)
+        if: runner.os == 'macOS'
+        working-directory: src/Cove.Gui/frontend
+        run: npm ci && npm run build
+      - name: Bundle macOS app
+        if: runner.os == 'macOS'
+        run: COVE_VERSION="${GITHUB_REF_NAME#v}" bash scripts/package-macos-app.sh ${{ matrix.rid }} appdist
+      - name: Upload macOS app artifact
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cove-macos-app
+          path: appdist
       - name: Sign and notarize (macOS)
         if: runner.os == 'macOS' && env.HAS_APPLE_CERT == 'true'
         run: echo "macOS signing runs here when APPLE_CERTIFICATE is configured"
@@ -64,7 +81,7 @@ jobs:
             name="${d%/}"
             rm -f "$d"*.pdb "$d"*.dbg "$d"covptygen
             rm -rf "$d"cove.dSYM
-            chmod +x "$d"cove 2>/dev/null || true
+            find "$d" -type f \( -name cove -o -name Cove.Gui \) -exec chmod +x {} + 2>/dev/null || true
             (cd "$d" && zip -r "../${name}.zip" .)
           done
           ls -la
