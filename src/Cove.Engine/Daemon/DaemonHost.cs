@@ -47,7 +47,8 @@ public sealed class DaemonHost
         var dataDir = _paths.DataDir.Root;
         var cliPath = System.IO.Path.Combine(dataDir, "bin", "cove");
         var spawnEnv = new SpawnEnvironment(probedPath, dataDir, cliPath, "default");
-        _panes = new PaneRegistry(_ptyHost, logger, spawnEnv);
+        var shellDir = ShellIntegration.Install(dataDir);
+        _panes = new PaneRegistry(_ptyHost, logger, spawnEnv, shellDir);
         _layout = new Cove.Engine.Layout.LayoutService();
         SingleInstanceGuard? guard = SingleInstanceGuard.TryAcquire(_paths.PidFilePath);
         if (guard is null)

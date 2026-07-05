@@ -26,26 +26,31 @@ public sealed class PaneRegistry : IDisposable
     private readonly IPtyHost _host;
     private readonly ILogger _logger;
     private readonly SpawnEnvironment? _spawnEnv;
+    private readonly string? _shellDir;
     private readonly object _sync = new();
     private readonly Dictionary<string, PaneSession> _panes = new();
 
-    public PaneRegistry(IPtyHost host, ILogger logger, SpawnEnvironment? spawnEnv = null)
+    public PaneRegistry(IPtyHost host, ILogger logger, SpawnEnvironment? spawnEnv = null, string? shellDir = null)
     {
         ArgumentNullException.ThrowIfNull(host);
         ArgumentNullException.ThrowIfNull(logger);
         _host = host;
         _logger = logger;
         _spawnEnv = spawnEnv;
+        _shellDir = shellDir;
     }
 
     public PaneInfo Spawn(SpawnParams p)
     {
         string paneId = "pane-" + System.Guid.NewGuid().ToString("N");
         var envDict = _spawnEnv is { } se ? se.Build(paneId, p.Env) : p.Env;
+        var args = p.Args ?? Array.Empty<string>();
+        if (envDict is Dictionary<string, string> ed && _shellDir is { } sd)
+            args = (string[])System.Linq.Enumerable.ToArray(ShellIntegration.Apply(p.Command, sd, args, ed));
         var request = new PtySpawnRequest
         {
             Command = p.Command,
-            Args = p.Args ?? Array.Empty<string>(),
+            Args = args,
             WorkingDirectory = string.IsNullOrEmpty(p.Cwd) ? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) : p.Cwd,
             Environment = envDict,
             Cols = p.Cols,
