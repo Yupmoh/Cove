@@ -6,7 +6,18 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <IsAotCompatible>true</IsAotCompatible>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <CovePtyLibName Condition="$([MSBuild]::IsOSPlatform('OSX'))">libcove_pty.dylib</CovePtyLibName>
+    <CovePtyLibName Condition="$([MSBuild]::IsOSPlatform('Linux'))">libcove_pty.so</CovePtyLibName>
   </PropertyGroup>
+
+  <ItemGroup Condition="'$(CovePtyLibName)' != ''">
+    <None Include="$(OutDir)$(CovePtyLibName)">
+      <Link>$(CovePtyLibName)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <Visible>false</Visible>
+    </None>
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="../Cove.Persistence/Cove.Persistence.csproj" />
