@@ -134,6 +134,21 @@ public sealed class PaneRegistry : IDisposable
         return true;
     }
 
+    public SearchMatch[] Search(string paneId, string query, bool caseSensitive)
+    {
+        if (!TryGet(paneId, out var pane))
+            return Array.Empty<SearchMatch>();
+        long tail = pane.Ring.Tail;
+        long head = pane.Ring.Head;
+        int len = (int)Math.Min(pane.Ring.Capacity, head - tail);
+        if (len <= 0)
+            return Array.Empty<SearchMatch>();
+        var buf = new byte[len];
+        var res = pane.Ring.ReadInto(tail, buf);
+        return RingSearch.Find(buf.AsSpan(0, res.BytesCopied), query, caseSensitive);
+    }
+
+
     private static void Terminate(PaneSession pane)
     {
         try { pane.Session.Kill(); } catch { }

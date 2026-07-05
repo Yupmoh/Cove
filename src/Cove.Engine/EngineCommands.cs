@@ -61,4 +61,15 @@ internal static class EngineCommands
             ? ctx.Ok()
             : ctx.Fail("not_found", $"unknown pane {p.PaneId}"));
     }
-}
+
+    [CoveCommand("cove://commands/pane.search")]
+    public static Task<ControlResponse> PaneSearch(EngineDispatchContext ctx)
+    {
+        if (ctx.Panes is not { } reg)
+            return Task.FromResult(ctx.Fail("not_ready", "pane registry unavailable"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.SearchParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "search params required"));
+        var matches = reg.Search(p.PaneId, p.Query, p.CaseSensitive);
+        return Task.FromResult(ctx.Ok(new SearchResult(matches), CoveJsonContext.Default.SearchResult));
+    }
+ }

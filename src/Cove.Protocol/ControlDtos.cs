@@ -52,6 +52,9 @@ public sealed record PaneRefParams(string PaneId);
 public sealed record LayoutMutateParams(string Op, string? RoomId = null, string? TargetPaneId = null, string? NewPaneId = null, string? Orientation = null, string? Name = null, string? PaneId = null, int Dir = 1);
 public sealed record LayoutMutateResult(string? RoomId = null);
 public sealed record SessionStateResult(string PaneId, string Command, int Cols, int Rows, bool Alive, string? Cwd = null);
+public sealed record SearchParams(string PaneId, string Query, bool CaseSensitive = false);
+public sealed record SearchMatch(int Line, string Text);
+public sealed record SearchResult(SearchMatch[] Matches);
 
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
@@ -77,5 +80,8 @@ public sealed record SessionStateResult(string PaneId, string Command, int Cols,
 [JsonSerializable(typeof(LayoutMutateParams))]
 [JsonSerializable(typeof(LayoutMutateResult))]
 [JsonSerializable(typeof(SessionStateResult))]
-[JsonSerializable(typeof(JsonElement))]
+ [JsonSerializable(typeof(SearchParams))]
+[JsonSerializable(typeof(SearchMatch))]
+[JsonSerializable(typeof(SearchResult))]
+ [JsonSerializable(typeof(JsonElement))]
 public sealed partial class CoveJsonContext : JsonSerializerContext;
