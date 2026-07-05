@@ -37,7 +37,8 @@ public sealed record SpawnParams(
     string? Cwd = null,
     Dictionary<string, string>? Env = null,
     int Cols = 80,
-    int Rows = 24);
+    int Rows = 24,
+    string? InheritCwdFrom = null);
 
 public sealed record SubscribeParams(string PaneId, ulong SinceOffset = 0);
 public sealed record SubscribeResult(ulong StreamId, ulong BaseOffset, int Window);

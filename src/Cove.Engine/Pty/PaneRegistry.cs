@@ -43,6 +43,10 @@ public sealed class PaneRegistry : IDisposable
     public PaneInfo Spawn(SpawnParams p)
     {
         string paneId = "pane-" + System.Guid.NewGuid().ToString("N");
+        string? inherited = null;
+        if (!string.IsNullOrEmpty(p.InheritCwdFrom) && TryGet(p.InheritCwdFrom!, out var srcPane))
+            inherited = srcPane.Cwd;
+        string workingDirectory = ResolveWorkingDirectory(inherited, p.Cwd);
         var envDict = _spawnEnv is { } se ? se.Build(paneId, p.Env) : p.Env;
         var args = p.Args ?? Array.Empty<string>();
         if (envDict is Dictionary<string, string> ed && _shellDir is { } sd)
@@ -51,7 +55,7 @@ public sealed class PaneRegistry : IDisposable
         {
             Command = p.Command,
             Args = args,
-            WorkingDirectory = string.IsNullOrEmpty(p.Cwd) ? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) : p.Cwd,
+            WorkingDirectory = workingDirectory,
             Environment = envDict,
             Cols = p.Cols,
             Rows = p.Rows,
@@ -77,6 +81,9 @@ public sealed class PaneRegistry : IDisposable
             _panes[paneId] = pane;
         return pane.ToInfo();
     }
+
+    public static string ResolveWorkingDirectory(string? inheritedCwd, string? explicitCwd) =>
+        !string.IsNullOrEmpty(inheritedCwd) ? inheritedCwd! : (!string.IsNullOrEmpty(explicitCwd) ? explicitCwd! : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
 
     internal bool TryGet(string paneId, out PaneSession pane)
     {
