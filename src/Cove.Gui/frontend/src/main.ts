@@ -217,6 +217,7 @@ function makePane(paneId: string, since: number): PaneView {
     const mk = (label: string, fn: () => void) => { const r = document.createElement("div"); r.className = "pmi"; r.textContent = label; r.addEventListener("click", (ev) => { ev.stopPropagation(); closePaneMenus(); fn(); }); menu.appendChild(r); };
     mk("Copy Pane ID", () => { if (navigator.clipboard) void navigator.clipboard.writeText(paneId); });
     mk("Rename", startRename);
+    mk("New subtab", () => void addSubtab(paneId));
     mk("Close", () => { focusPane(paneId); void closeFocused(); });
     header.appendChild(menu);
   });
@@ -241,13 +242,50 @@ function isColumn(orientation: number | string): boolean {
 }
 
 function collectLeafIds(node: MosaicNode): string[] {
-  if (node.kind === "leaf") return [node.paneId];
+  if (node.kind === "leaf") return node.subtabs.length > 0 ? node.subtabs.map((s) => s.documentId) : [node.paneId];
   return [...collectLeafIds(node.childA), ...collectLeafIds(node.childB)];
+}
+function findLeafId(node: MosaicNode, termId: string): string | null {
+  if (node.kind === "leaf") return (node.paneId === termId || node.subtabs.some((s) => s.documentId === termId)) ? node.paneId : null;
+  return findLeafId(node.childA, termId) ?? findLeafId(node.childB, termId);
+}
+async function activateSubtab(leafId: string, index: number): Promise<void> {
+  if (!activeRoomId) return;
+  await invoke("app.layoutMutate", { op: "activateSubtab", roomId: activeRoomId, paneId: leafId, targetPaneId: "", newPaneId: "", orientation: "", name: "", dir: index });
+  await reload();
+}
+async function addSubtab(termPaneId: string): Promise<void> {
+  const room = activeRoom();
+  if (!room || !activeRoomId) return;
+  const leafId = findLeafId(room.layoutTree, termPaneId);
+  if (!leafId) return;
+  const sp = (await invoke<{ paneId: string }>("app.paneSpawn", { command: "", cwd: "", inheritCwdFrom: termPaneId, cols: 80, rows: 24 })).paneId;
+  await invoke("app.layoutMutate", { op: "addSubtab", roomId: activeRoomId, paneId: leafId, newPaneId: sp, targetPaneId: "", orientation: "", name: "", dir: 0 });
+  await reload();
+  focusPane(sp);
 }
 
 function renderNode(node: MosaicNode): HTMLElement {
   if (node.kind === "leaf") {
-    return getPane(node.paneId).el;
+    const subs = node.subtabs.length > 0 ? node.subtabs : [{ documentId: node.paneId, paneType: "terminal", title: null }];
+    const activeIdx = Math.min(Math.max(0, node.activeSubtab), subs.length - 1);
+    const activeEl = getPane(subs[activeIdx].documentId).el;
+    if (subs.length <= 1) return activeEl;
+    const wrap = document.createElement("div");
+    wrap.className = "leaf-wrap";
+    const strip = document.createElement("div");
+    strip.className = "subtab-strip";
+    subs.forEach((s, i) => {
+      const tab = document.createElement("div");
+      tab.className = "subtab" + (i === activeIdx ? " active" : "");
+      const pvv = panes.get(s.documentId);
+      tab.textContent = (pvv && (pvv.customTitle || pvv.title)) || s.title || "shell";
+      tab.addEventListener("click", () => { void activateSubtab(node.paneId, i); });
+      strip.appendChild(tab);
+    });
+    wrap.appendChild(strip);
+    wrap.appendChild(activeEl);
+    return wrap;
   }
   const col = isColumn(node.orientation);
   const container = document.createElement("div");
