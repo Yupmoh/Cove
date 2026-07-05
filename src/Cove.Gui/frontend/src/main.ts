@@ -1,6 +1,7 @@
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
+import { SearchAddon } from "@xterm/addon-search";
 import "@xterm/xterm/css/xterm.css";
 import { toBase64Utf8, parseRelayText } from "./wsproto";
 
@@ -68,6 +69,7 @@ interface PaneView {
   title: string;
   customTitle: string;
   headerTitleEl: HTMLElement;
+  search: SearchAddon;
 }
 
 const panes = new Map<string, PaneView>();
@@ -147,6 +149,8 @@ function makePane(paneId: string, since: number): PaneView {
   const fitAddon = new FitAddon();
   term.loadAddon(fitAddon);
   try { term.loadAddon(new WebglAddon()); } catch { void 0; }
+  const searchAddon = new SearchAddon();
+  term.loadAddon(searchAddon);
 
   const el = document.createElement("div");
   el.className = "pane";
@@ -168,7 +172,7 @@ function makePane(paneId: string, since: number): PaneView {
   term.open(host);
 
   const ws = new WebSocket(`ws://${location.host}/pty?pane=${encodeURIComponent(paneId)}&since=${since}`);
-  const pv: PaneView = { paneId, term, fit: fitAddon, ws, el, consumed: 0, lastAck: 0, title: "", customTitle: "", headerTitleEl: titleSpan };
+  const pv: PaneView = { paneId, term, fit: fitAddon, ws, el, consumed: 0, lastAck: 0, title: "", customTitle: "", headerTitleEl: titleSpan, search: searchAddon };
 
   el.addEventListener("mousedown", () => focusPane(paneId));
   attachWs(pv);
@@ -598,6 +602,28 @@ settingsEl.addEventListener("mousedown", (e) => { if (e.target === settingsEl) c
 document.getElementById("set-close")!.addEventListener("click", closeSettings);
 settingsEl.addEventListener("keydown", (e) => { if (e.key === "Escape") closeSettings(); });
 
+const findEl = document.getElementById("findbar")!;
+const findInput = document.getElementById("find-input") as HTMLInputElement;
+const findDecor = { matchBackground: "#2b6d7a", activeMatchBackground: "#4cc2d6", matchOverviewRuler: "#4cc2d6", activeMatchColorOverviewRuler: "#4cc2d6" };
+function activeSearch(): SearchAddon | null { return focusedPaneId ? (panes.get(focusedPaneId)?.search ?? null) : null; }
+function openFind() { findEl.classList.add("open"); findInput.focus(); findInput.select(); }
+function closeFind() { findEl.classList.remove("open"); activeSearch()?.clearDecorations(); if (focusedPaneId) panes.get(focusedPaneId)?.term.focus(); }
+function doFind(dir: number) {
+  const s = activeSearch();
+  const q = findInput.value;
+  if (!s || !q) return;
+  if (dir >= 0) s.findNext(q, { caseSensitive: false, decorations: findDecor });
+  else s.findPrevious(q, { caseSensitive: false, decorations: findDecor });
+}
+findInput.addEventListener("input", () => doFind(1));
+findInput.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") { e.preventDefault(); closeFind(); }
+  else if (e.key === "Enter") { e.preventDefault(); doFind(e.shiftKey ? -1 : 1); }
+});
+document.getElementById("find-next")!.addEventListener("click", () => doFind(1));
+document.getElementById("find-prev")!.addEventListener("click", () => doFind(-1));
+document.getElementById("find-close")!.addEventListener("click", closeFind);
+
 window.addEventListener("keydown", (e) => {
   if (!e.metaKey) return;
   const k = e.key.toLowerCase();
@@ -615,6 +641,7 @@ window.addEventListener("keydown", (e) => {
   else if (k === "-") { e.preventDefault(); settings.fontSize = Math.max(9, settings.fontSize - 1); applySettings(); }
   else if (k === "0") { e.preventDefault(); settings.fontSize = 13; applySettings(); }
   else if (k === ",") { e.preventDefault(); openSettings(); }
+  else if (k === "f") { e.preventDefault(); openFind(); }
   else if (k >= "1" && k <= "9") {
     const i = Number(k) - 1;
     const rooms = layout?.rooms ?? [];

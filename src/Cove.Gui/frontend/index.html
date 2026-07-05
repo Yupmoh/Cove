@@ -134,6 +134,11 @@
     .set-row { display: flex; align-items: center; justify-content: space-between; padding: 9px 0; color: var(--fg); font-size: 13px; }
     .set-row input[type=number], .set-row select { background: var(--panel-2); border: 1px solid var(--border); color: var(--fg); border-radius: 6px; padding: 4px 8px; width: 120px; outline: none; }
     .set-row input[type=checkbox] { width: 16px; height: 16px; }
+    #findbar { position: fixed; top: 40px; right: 24px; display: none; align-items: center; gap: 4px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 4px 6px; z-index: 40; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+    #findbar.open { display: flex; }
+    #find-input { background: transparent; border: none; outline: none; color: var(--fg); font-size: 12px; width: 160px; padding: 4px; }
+    #findbar button { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 12px; padding: 2px 6px; border-radius: 4px; }
+    #findbar button:hover { color: var(--fg); background: var(--border); }
   </style>
 </head>
 <body>
@@ -178,6 +183,12 @@
         <div class="set-row"><label for="set-scrollback">Scrollback lines</label><input type="number" id="set-scrollback" min="100" max="100000" step="100" /></div>
       </div>
     </div>
+  </div>
+  <div id="findbar">
+    <input id="find-input" placeholder="Find" autocomplete="off" spellcheck="false" />
+    <button id="find-prev" title="Previous">&#8593;</button>
+    <button id="find-next" title="Next">&#8595;</button>
+    <button id="find-close" title="Close">&times;</button>
   </div>
   <script type="module" src="/src/main.ts"></script>
 </body>
