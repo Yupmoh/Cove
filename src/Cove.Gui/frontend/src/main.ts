@@ -42,6 +42,8 @@ const sessions: Session[] = [];
 let activeSession: Session | null = null;
 let focusedPane: Pane | null = null;
 let seq = 0;
+const stored = Number(localStorage.getItem("cove.fontSize"));
+let fontSize = stored >= 9 && stored <= 24 ? stored : 13;
 
 const sessionsEl = document.getElementById("sessions")!;
 const gridEl = document.getElementById("grid")!;
@@ -59,6 +61,13 @@ function fit(session: Session) {
   });
 }
 
+function applyFontSize() {
+  for (const s of sessions) {
+    for (const p of s.panes) p.term.options.fontSize = fontSize;
+    fit(s);
+  }
+  localStorage.setItem("cove.fontSize", String(fontSize));
+}
 function attachWs(pane: Pane) {
   const ws = pane.ws;
   ws.binaryType = "arraybuffer";
@@ -89,7 +98,7 @@ function attachWs(pane: Pane) {
 }
 
 function makePaneEl(session: Session, paneId: string, since: number): Pane {
-  const term = new Terminal({ scrollback: 5000, convertEol: false, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 13, theme: THEME });
+  const term = new Terminal({ scrollback: 5000, convertEol: false, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: fontSize, theme: THEME });
   const fitAddon = new FitAddon();
   term.loadAddon(fitAddon);
   try { term.loadAddon(new WebglAddon()); } catch { void 0; }
@@ -307,6 +316,9 @@ function baseActions(): Action[] {
     { label: "Split down", icon: "\u2500", key: "Cmd Shift D", run: () => void splitActive("col") },
     { label: "Close pane", icon: "\u00d7", key: "Cmd W", run: () => { if (focusedPane) void closePane(focusedPane); } },
     { label: "Toggle sidebar", icon: "\u25e7", key: "Cmd B", run: toggleSidebar },
+    { label: "Increase font size", icon: "+", key: "Cmd =", run: () => { fontSize = Math.min(24, fontSize + 1); applyFontSize(); } },
+    { label: "Decrease font size", icon: "-", key: "Cmd -", run: () => { fontSize = Math.max(9, fontSize - 1); applyFontSize(); } },
+    { label: "Reset font size", icon: "\u21ba", key: "Cmd 0", run: () => { fontSize = 13; applyFontSize(); } },
   ];
 }
 
@@ -392,6 +404,9 @@ window.addEventListener("keydown", (e) => {
     const idx = focusedPane ? panes.indexOf(focusedPane) : 0;
     focusPane(panes[(idx - 1 + panes.length) % panes.length]);
   }
+  else if (k === "=" || k === "+") { e.preventDefault(); fontSize = Math.min(24, fontSize + 1); applyFontSize(); }
+  else if (k === "-") { e.preventDefault(); fontSize = Math.max(9, fontSize - 1); applyFontSize(); }
+  else if (k === "0") { e.preventDefault(); fontSize = 13; applyFontSize(); }
   else if (k >= "1" && k <= "9") { const i = Number(k) - 1; if (sessions[i]) { e.preventDefault(); activateSession(sessions[i]); } }
 }, true);
 
