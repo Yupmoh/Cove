@@ -662,6 +662,13 @@ document.getElementById("find-next")!.addEventListener("click", () => doFind(1))
 document.getElementById("find-prev")!.addEventListener("click", () => doFind(-1));
 document.getElementById("find-close")!.addEventListener("click", closeFind);
 
+const launcherEl = document.getElementById("launcher")!;
+function openLauncher() { launcherEl.classList.add("open"); }
+function closeLauncher() { launcherEl.classList.remove("open"); if (focusedPaneId) panes.get(focusedPaneId)?.term.focus(); }
+document.getElementById("launch-term")!.addEventListener("click", () => { closeLauncher(); void newRoom(); });
+launcherEl.addEventListener("mousedown", (e) => { if (e.target === launcherEl) closeLauncher(); });
+launcherEl.addEventListener("keydown", (e) => { if (e.key === "Escape") closeLauncher(); });
+
 window.addEventListener("keydown", (e) => {
   if (!e.metaKey) return;
   const k = e.key.toLowerCase();
@@ -680,6 +687,7 @@ window.addEventListener("keydown", (e) => {
   else if (k === "0") { e.preventDefault(); settings.fontSize = 13; applySettings(); }
   else if (k === ",") { e.preventDefault(); openSettings(); }
   else if (k === "f") { e.preventDefault(); openFind(); }
+  else if (k === "l") { e.preventDefault(); launcherEl.classList.contains("open") ? closeLauncher() : openLauncher(); }
   else if (k >= "1" && k <= "9") {
     const i = Number(k) - 1;
     const rooms = layout?.rooms ?? [];
