@@ -74,8 +74,14 @@ const panes = new Map<string, PaneView>();
 let layout: WorkspaceSnapshot | null = null;
 let activeRoomId: string | null = null;
 let focusedPaneId: string | null = null;
-const stored = Number(localStorage.getItem("cove.fontSize"));
-let fontSize = stored >= 9 && stored <= 24 ? stored : 13;
+interface TermSettings { fontSize: number; lineHeight: number; cursorStyle: "block" | "bar" | "underline"; cursorBlink: boolean; scrollback: number; }
+const defaultSettings: TermSettings = { fontSize: 13, lineHeight: 1.35, cursorStyle: "block", cursorBlink: false, scrollback: 5000 };
+function loadSettings(): TermSettings {
+  try { const raw = localStorage.getItem("cove.settings"); if (raw) return { ...defaultSettings, ...(JSON.parse(raw) as Partial<TermSettings>) }; } catch { void 0; }
+  const fs = Number(localStorage.getItem("cove.fontSize"));
+  return { ...defaultSettings, fontSize: fs >= 9 && fs <= 24 ? fs : 13 };
+}
+let settings = loadSettings();
 
 const sessionsEl = document.getElementById("sessions")!;
 const gridEl = document.getElementById("grid")!;
@@ -96,10 +102,16 @@ function fitAll() {
   });
 }
 
-function applyFontSize() {
-  for (const pv of panes.values()) pv.term.options.fontSize = fontSize;
+function applySettings() {
+  for (const pv of panes.values()) {
+    pv.term.options.fontSize = settings.fontSize;
+    pv.term.options.lineHeight = settings.lineHeight;
+    pv.term.options.cursorStyle = settings.cursorStyle;
+    pv.term.options.cursorBlink = settings.cursorBlink;
+    pv.term.options.scrollback = settings.scrollback;
+  }
   fitAll();
-  localStorage.setItem("cove.fontSize", String(fontSize));
+  localStorage.setItem("cove.settings", JSON.stringify(settings));
 }
 function attachWs(pane: PaneView) {
   const ws = pane.ws;
@@ -131,7 +143,7 @@ function attachWs(pane: PaneView) {
 }
 
 function makePane(paneId: string, since: number): PaneView {
-  const term = new Terminal({ scrollback: 5000, convertEol: false, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: fontSize, theme: THEME });
+  const term = new Terminal({ scrollback: settings.scrollback, convertEol: false, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: settings.fontSize, lineHeight: settings.lineHeight, cursorStyle: settings.cursorStyle, cursorBlink: settings.cursorBlink, theme: THEME });
   const fitAddon = new FitAddon();
   term.loadAddon(fitAddon);
   try { term.loadAddon(new WebglAddon()); } catch { void 0; }
@@ -483,9 +495,10 @@ function baseActions(): Action[] {
     { label: "Split down", icon: "\u2500", key: "Cmd Shift D", run: () => void splitActive("col") },
     { label: "Close pane", icon: "\u00d7", key: "Cmd W", run: () => void closeFocused() },
     { label: "Toggle sidebar", icon: "\u25e7", key: "Cmd B", run: toggleSidebar },
-    { label: "Increase font size", icon: "+", key: "Cmd =", run: () => { fontSize = Math.min(24, fontSize + 1); applyFontSize(); } },
-    { label: "Decrease font size", icon: "-", key: "Cmd -", run: () => { fontSize = Math.max(9, fontSize - 1); applyFontSize(); } },
-    { label: "Reset font size", icon: "\u21ba", key: "Cmd 0", run: () => { fontSize = 13; applyFontSize(); } },
+    { label: "Increase font size", icon: "+", key: "Cmd =", run: () => { settings.fontSize = Math.min(24, settings.fontSize + 1); applySettings(); } },
+    { label: "Decrease font size", icon: "-", key: "Cmd -", run: () => { settings.fontSize = Math.max(9, settings.fontSize - 1); applySettings(); } },
+    { label: "Reset font size", icon: "\u21ba", key: "Cmd 0", run: () => { settings.fontSize = 13; applySettings(); } },
+    { label: "Settings", icon: "\u2699", key: "Cmd ,", run: openSettings },
   ];
 }
 
@@ -556,6 +569,35 @@ palInput.addEventListener("keydown", (e) => {
 });
 paletteEl.addEventListener("mousedown", (e) => { if (e.target === paletteEl) closePalette(); });
 
+const settingsEl = document.getElementById("settings")!;
+const setFont = document.getElementById("set-fontSize") as HTMLInputElement;
+const setLine = document.getElementById("set-lineHeight") as HTMLInputElement;
+const setCursor = document.getElementById("set-cursorStyle") as HTMLSelectElement;
+const setBlink = document.getElementById("set-cursorBlink") as HTMLInputElement;
+const setScroll = document.getElementById("set-scrollback") as HTMLInputElement;
+
+function openSettings() {
+  setFont.value = String(settings.fontSize);
+  setLine.value = String(settings.lineHeight);
+  setCursor.value = settings.cursorStyle;
+  setBlink.checked = settings.cursorBlink;
+  setScroll.value = String(settings.scrollback);
+  settingsEl.classList.add("open");
+}
+function closeSettings() { settingsEl.classList.remove("open"); if (focusedPaneId) panes.get(focusedPaneId)?.term.focus(); }
+function readSettings() {
+  const fs = Number(setFont.value); if (fs >= 9 && fs <= 24) settings.fontSize = fs;
+  const lh = Number(setLine.value); if (lh >= 1 && lh <= 2) settings.lineHeight = lh;
+  const cs = setCursor.value; if (cs === "block" || cs === "bar" || cs === "underline") settings.cursorStyle = cs;
+  settings.cursorBlink = setBlink.checked;
+  const sb = Number(setScroll.value); if (sb >= 100 && sb <= 100000) settings.scrollback = sb;
+  applySettings();
+}
+for (const ctl of [setFont, setLine, setCursor, setBlink, setScroll]) ctl.addEventListener("change", readSettings);
+settingsEl.addEventListener("mousedown", (e) => { if (e.target === settingsEl) closeSettings(); });
+document.getElementById("set-close")!.addEventListener("click", closeSettings);
+settingsEl.addEventListener("keydown", (e) => { if (e.key === "Escape") closeSettings(); });
+
 window.addEventListener("keydown", (e) => {
   if (!e.metaKey) return;
   const k = e.key.toLowerCase();
@@ -569,9 +611,10 @@ window.addEventListener("keydown", (e) => {
   else if (k === "b") { e.preventDefault(); toggleSidebar(); }
   else if (k === "]") { e.preventDefault(); cycleFocus(1); }
   else if (k === "[") { e.preventDefault(); cycleFocus(-1); }
-  else if (k === "=" || k === "+") { e.preventDefault(); fontSize = Math.min(24, fontSize + 1); applyFontSize(); }
-  else if (k === "-") { e.preventDefault(); fontSize = Math.max(9, fontSize - 1); applyFontSize(); }
-  else if (k === "0") { e.preventDefault(); fontSize = 13; applyFontSize(); }
+  else if (k === "=" || k === "+") { e.preventDefault(); settings.fontSize = Math.min(24, settings.fontSize + 1); applySettings(); }
+  else if (k === "-") { e.preventDefault(); settings.fontSize = Math.max(9, settings.fontSize - 1); applySettings(); }
+  else if (k === "0") { e.preventDefault(); settings.fontSize = 13; applySettings(); }
+  else if (k === ",") { e.preventDefault(); openSettings(); }
   else if (k >= "1" && k <= "9") {
     const i = Number(k) - 1;
     const rooms = layout?.rooms ?? [];

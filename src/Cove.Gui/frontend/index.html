@@ -125,6 +125,15 @@
     .pal-item.sel { background: var(--panel-2); }
     .pal-item .ic { color: var(--accent); width: 16px; text-align: center; }
     .pal-item .key { margin-left: auto; color: var(--muted); font-size: 11px; }
+    #settings { position: fixed; inset: 0; display: none; background: rgba(4, 10, 18, 0.55); align-items: flex-start; justify-content: center; z-index: 50; }
+    #settings.open { display: flex; }
+    .set-box { margin-top: 12vh; width: 420px; max-width: 90vw; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; box-shadow: 0 24px 60px rgba(0,0,0,0.5); }
+    .set-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--border); color: var(--fg); font-size: 15px; }
+    .set-head .x { cursor: pointer; color: var(--muted); }
+    .set-body { padding: 10px 18px 16px; }
+    .set-row { display: flex; align-items: center; justify-content: space-between; padding: 9px 0; color: var(--fg); font-size: 13px; }
+    .set-row input[type=number], .set-row select { background: var(--panel-2); border: 1px solid var(--border); color: var(--fg); border-radius: 6px; padding: 4px 8px; width: 120px; outline: none; }
+    .set-row input[type=checkbox] { width: 16px; height: 16px; }
   </style>
 </head>
 <body>
@@ -156,6 +165,18 @@
     <div class="pal-box">
       <input id="pal-input" placeholder="Type a command..." autocomplete="off" spellcheck="false" />
       <div id="pal-list"></div>
+    </div>
+  </div>
+  <div id="settings">
+    <div class="set-box">
+      <div class="set-head"><span>Terminal Settings</span><span class="x" id="set-close">&times;</span></div>
+      <div class="set-body">
+        <div class="set-row"><label for="set-fontSize">Font size</label><input type="number" id="set-fontSize" min="9" max="24" step="1" /></div>
+        <div class="set-row"><label for="set-lineHeight">Line height</label><input type="number" id="set-lineHeight" min="1" max="2" step="0.05" /></div>
+        <div class="set-row"><label for="set-cursorStyle">Cursor style</label><select id="set-cursorStyle"><option value="block">Block</option><option value="bar">Bar</option><option value="underline">Underline</option></select></div>
+        <div class="set-row"><label for="set-cursorBlink">Cursor blink</label><input type="checkbox" id="set-cursorBlink" /></div>
+        <div class="set-row"><label for="set-scrollback">Scrollback lines</label><input type="number" id="set-scrollback" min="100" max="100000" step="100" /></div>
+      </div>
     </div>
   </div>
   <script type="module" src="/src/main.ts"></script>
