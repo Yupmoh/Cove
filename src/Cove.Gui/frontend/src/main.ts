@@ -66,6 +66,8 @@ interface PaneView {
   consumed: number;
   lastAck: number;
   title: string;
+  customTitle: string;
+  headerTitleEl: HTMLElement;
 }
 
 const panes = new Map<string, PaneView>();
@@ -137,13 +139,24 @@ function makePane(paneId: string, since: number): PaneView {
   const el = document.createElement("div");
   el.className = "pane";
   el.style.flexGrow = "1";
+  const header = document.createElement("div");
+  header.className = "pane-header";
+  const titleSpan = document.createElement("span");
+  titleSpan.className = "pt";
+  titleSpan.textContent = "shell";
+  const moreBtn = document.createElement("button");
+  moreBtn.className = "pmore";
+  moreBtn.textContent = "\u22ef";
+  header.appendChild(titleSpan);
+  header.appendChild(moreBtn);
+  el.appendChild(header);
   const host = document.createElement("div");
   host.className = "term-host";
   el.appendChild(host);
   term.open(host);
 
   const ws = new WebSocket(`ws://${location.host}/pty?pane=${encodeURIComponent(paneId)}&since=${since}`);
-  const pv: PaneView = { paneId, term, fit: fitAddon, ws, el, consumed: 0, lastAck: 0, title: "" };
+  const pv: PaneView = { paneId, term, fit: fitAddon, ws, el, consumed: 0, lastAck: 0, title: "", customTitle: "", headerTitleEl: titleSpan };
 
   el.addEventListener("mousedown", () => focusPane(paneId));
   attachWs(pv);
@@ -162,7 +175,36 @@ function makePane(paneId: string, since: number): PaneView {
     }
     return true;
   });
-  term.onTitleChange((t) => { pv.title = t; refreshTitles(); });
+  const setTitle = () => { titleSpan.textContent = pv.customTitle || pv.title || "shell"; };
+  header.addEventListener("mousedown", (e) => { if (e.target !== moreBtn) focusPane(paneId); });
+  const startRename = () => {
+    const input = document.createElement("input");
+    input.className = "prename";
+    input.value = pv.customTitle || pv.title || "";
+    titleSpan.replaceWith(input);
+    input.focus();
+    input.select();
+    const finish = (commit: boolean) => {
+      if (commit) pv.customTitle = input.value.trim();
+      input.replaceWith(titleSpan);
+      setTitle();
+    };
+    input.addEventListener("keydown", (e) => { e.stopPropagation(); if (e.key === "Enter") finish(true); else if (e.key === "Escape") finish(false); });
+    input.addEventListener("blur", () => finish(true));
+  };
+  titleSpan.addEventListener("dblclick", startRename);
+  moreBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    closePaneMenus();
+    const menu = document.createElement("div");
+    menu.className = "pmenu";
+    const mk = (label: string, fn: () => void) => { const r = document.createElement("div"); r.className = "pmi"; r.textContent = label; r.addEventListener("click", (ev) => { ev.stopPropagation(); closePaneMenus(); fn(); }); menu.appendChild(r); };
+    mk("Copy Pane ID", () => { if (navigator.clipboard) void navigator.clipboard.writeText(paneId); });
+    mk("Rename", startRename);
+    mk("Close", () => { focusPane(paneId); void closeFocused(); });
+    header.appendChild(menu);
+  });
+  term.onTitleChange((t) => { pv.title = t; setTitle(); refreshTitles(); });
   panes.set(paneId, pv);
   return pv;
 }
@@ -172,6 +214,11 @@ function getPane(paneId: string): PaneView {
   if (existing) return existing;
   return makePane(paneId, 0);
 }
+
+function closePaneMenus(): void {
+  document.querySelectorAll(".pmenu").forEach((m) => m.remove());
+}
+document.addEventListener("click", closePaneMenus);
 
 function isColumn(orientation: number | string): boolean {
   return orientation === 1 || orientation === "Column" || orientation === "column";
