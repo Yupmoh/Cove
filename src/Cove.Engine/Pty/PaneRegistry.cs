@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Cove.Platform.Pty;
+using Cove.Persistence;
 using Cove.Protocol;
 using Microsoft.Extensions.Logging;
 
@@ -10,6 +11,8 @@ internal sealed class PaneSession
 {
     public required string PaneId { get; init; }
     public required string Command { get; init; }
+    public required string[] Args { get; init; }
+    public required string SpawnCwd { get; init; }
     public int Cols { get; set; }
     public int Rows { get; set; }
     public string? Cwd { get; set; }
@@ -43,22 +46,27 @@ public sealed class PaneRegistry : IDisposable
     public PaneInfo Spawn(SpawnParams p)
     {
         string paneId = "pane-" + System.Guid.NewGuid().ToString("N");
-        string? inherited = null;
-        if (!string.IsNullOrEmpty(p.InheritCwdFrom) && TryGet(p.InheritCwdFrom!, out var srcPane))
-            inherited = srcPane.Cwd;
-        string workingDirectory = ResolveWorkingDirectory(inherited, p.Cwd);
-        var envDict = _spawnEnv is { } se ? se.Build(paneId, p.Env) : p.Env;
-        var args = p.Args ?? Array.Empty<string>();
+        string? inherited = (!string.IsNullOrEmpty(p.InheritCwdFrom) && TryGet(p.InheritCwdFrom!, out var src)) ? src.Cwd : null;
+        string cwd = ResolveWorkingDirectory(inherited, p.Cwd);
+        return SpawnCore(paneId, p.Command, p.Args ?? System.Array.Empty<string>(), cwd, p.Cols, p.Rows, p.Env);
+    }
+
+    public PaneInfo RespawnAs(string paneId, string command, string[] args, string cwd, int cols, int rows)
+        => SpawnCore(paneId, command, args, cwd, cols, rows, null);
+
+    private PaneInfo SpawnCore(string paneId, string command, string[] args, string cwd, int cols, int rows, System.Collections.Generic.IReadOnlyDictionary<string, string>? callerEnv)
+    {
+        var envDict = _spawnEnv is { } se ? se.Build(paneId, callerEnv) : callerEnv;
         if (envDict is Dictionary<string, string> ed && _shellDir is { } sd)
-            args = (string[])System.Linq.Enumerable.ToArray(ShellIntegration.Apply(p.Command, sd, args, ed));
+            args = (string[])System.Linq.Enumerable.ToArray(ShellIntegration.Apply(command, sd, args, ed));
         var request = new PtySpawnRequest
         {
-            Command = p.Command,
+            Command = command,
             Args = args,
-            WorkingDirectory = workingDirectory,
+            WorkingDirectory = cwd,
             Environment = envDict,
-            Cols = p.Cols,
-            Rows = p.Rows,
+            Cols = cols,
+            Rows = rows,
         };
         IPtySession session = _host.Spawn(request);
         var ring = new PtyRingBuffer();
@@ -67,9 +75,11 @@ public sealed class PaneRegistry : IDisposable
         var pane = new PaneSession
         {
             PaneId = paneId,
-            Command = p.Command,
-            Cols = p.Cols,
-            Rows = p.Rows,
+            Command = command,
+            Args = args,
+            SpawnCwd = cwd,
+            Cols = cols,
+            Rows = rows,
             Session = session,
             Ring = ring,
             Signal = signal,
@@ -80,6 +90,18 @@ public sealed class PaneRegistry : IDisposable
         lock (_sync)
             _panes[paneId] = pane;
         return pane.ToInfo();
+    }
+
+    public PaneDescriptor[] Descriptors()
+    {
+        lock (_sync)
+        {
+            var arr = new PaneDescriptor[_panes.Count];
+            int i = 0;
+            foreach (var p in _panes.Values)
+                arr[i++] = new PaneDescriptor(p.PaneId, p.Command, p.Args, string.IsNullOrEmpty(p.Cwd) ? p.SpawnCwd : p.Cwd!);
+            return arr;
+        }
     }
 
     public static string ResolveWorkingDirectory(string? inheritedCwd, string? explicitCwd) =>

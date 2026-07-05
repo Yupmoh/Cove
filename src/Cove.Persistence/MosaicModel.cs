@@ -45,6 +45,8 @@ public sealed record PaneLeaf : MosaicNode
 
 public sealed record Subtab(string DocumentId, PaneType PaneType, string? Title = null);
 
+public sealed record PaneDescriptor(string PaneId, string Command, string[] Args, string Cwd);
+
 public sealed record RoomSnapshot
 {
     public required string Id { get; init; }

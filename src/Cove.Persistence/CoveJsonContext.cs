@@ -17,4 +17,6 @@ namespace Cove.Persistence;
 [JsonSerializable(typeof(Subtab))]
 [JsonSerializable(typeof(IReadOnlyList<Subtab>))]
 [JsonSerializable(typeof(IReadOnlyList<RoomSnapshot>))]
+[JsonSerializable(typeof(PaneDescriptor))]
+[JsonSerializable(typeof(PaneDescriptor[]))]
 public sealed partial class CoveJsonContext : JsonSerializerContext { }
