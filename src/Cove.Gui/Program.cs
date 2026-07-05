@@ -13,7 +13,7 @@ internal static class Program
         var page = Environment.GetEnvironmentVariable("COVE_GUI_PAGE");
         var startPath = string.IsNullOrEmpty(page) ? "" : "/" + page;
 
-        Func<CancellationToken, Task<Stream>> dial = ct => EndpointDialer.DialAsync(channel, ct);
+        Func<CancellationToken, Task<Stream>> dial = ct => GuiEngineLauncher.ConnectOrSpawnAsync(channel, ct);
         var webRoot = Path.Combine(AppContext.BaseDirectory, "wwwroot");
         var server = new LoopbackServer(webRoot, dial, version, channel);
         server.Start();
