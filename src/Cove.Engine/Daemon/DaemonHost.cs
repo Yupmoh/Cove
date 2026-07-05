@@ -28,6 +28,7 @@ public sealed class DaemonHost
     private IPtyHost? _ptyHost;
     private PaneRegistry? _panes;
     private Cove.Engine.Layout.LayoutService? _layout;
+    private System.Threading.Timer? _scrollbackTimer;
 
     public DaemonHost(DaemonPaths paths, IControlEndpoint endpoint, bool exitWhenIdle)
     {
@@ -58,7 +59,7 @@ public sealed class DaemonHost
                 foreach (var leaf in Cove.Engine.Layout.MosaicOps.Leaves(room.LayoutTree))
                     if (sessions.TryGetValue(leaf.PaneId, out var d))
                     {
-                        try { _panes!.RespawnAs(d.PaneId, d.Command, d.Args, d.Cwd, 80, 24); }
+                        try { _panes!.RespawnAs(d.PaneId, d.Command, d.Args, d.Cwd, 80, 24, Cove.Engine.Layout.WorkspacePersistence.LoadScrollback(d.PaneId, wsDir)); }
                         catch (System.Exception ex) { logger.LogWarning(ex, "respawn on restore failed for {PaneId}", d.PaneId); }
                     }
             _layout!.LoadSnapshot(sl);
@@ -68,6 +69,7 @@ public sealed class DaemonHost
             try { Cove.Engine.Layout.WorkspacePersistence.Save(_layout.ToSnapshot("default", "default", System.Environment.CurrentDirectory), _panes!.Descriptors(), wsDir); }
             catch (System.Exception ex) { logger.LogWarning(ex, "workspace persist failed"); }
         };
+        _scrollbackTimer = new System.Threading.Timer(_ => { try { if (_panes is { } reg) foreach (var info in reg.List()) { var bytes = reg.SnapshotRing(info.PaneId); if (bytes.Length > 0) Cove.Engine.Layout.WorkspacePersistence.SaveScrollback(info.PaneId, bytes, wsDir); } } catch (System.Exception ex) { logger.LogWarning(ex, "scrollback snapshot failed"); } }, null, System.TimeSpan.FromSeconds(15), System.TimeSpan.FromSeconds(15));
         SingleInstanceGuard? guard = SingleInstanceGuard.TryAcquire(_paths.PidFilePath);
         if (guard is null)
         {
@@ -116,6 +118,7 @@ public sealed class DaemonHost
         }
 
         await listener.DisposeAsync().ConfigureAwait(false);
+        _scrollbackTimer?.Dispose();
         _panes?.Dispose();
         if (!OperatingSystem.IsWindows())
         {

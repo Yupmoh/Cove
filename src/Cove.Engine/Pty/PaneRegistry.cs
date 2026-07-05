@@ -51,10 +51,10 @@ public sealed class PaneRegistry : IDisposable
         return SpawnCore(paneId, p.Command, p.Args ?? System.Array.Empty<string>(), cwd, p.Cols, p.Rows, p.Env);
     }
 
-    public PaneInfo RespawnAs(string paneId, string command, string[] args, string cwd, int cols, int rows)
-        => SpawnCore(paneId, command, args, cwd, cols, rows, null);
+    public PaneInfo RespawnAs(string paneId, string command, string[] args, string cwd, int cols, int rows, byte[]? priorScrollback = null)
+        => SpawnCore(paneId, command, args, cwd, cols, rows, null, priorScrollback);
 
-    private PaneInfo SpawnCore(string paneId, string command, string[] args, string cwd, int cols, int rows, System.Collections.Generic.IReadOnlyDictionary<string, string>? callerEnv)
+    private PaneInfo SpawnCore(string paneId, string command, string[] args, string cwd, int cols, int rows, System.Collections.Generic.IReadOnlyDictionary<string, string>? callerEnv, byte[]? priorScrollback = null)
     {
         var envDict = _spawnEnv is { } se ? se.Build(paneId, callerEnv) : callerEnv;
         if (envDict is Dictionary<string, string> ed && _shellDir is { } sd)
@@ -70,6 +70,8 @@ public sealed class PaneRegistry : IDisposable
         };
         IPtySession session = _host.Spawn(request);
         var ring = new PtyRingBuffer();
+        if (priorScrollback is { Length: > 0 })
+            ring.Append(priorScrollback);
         var signal = new PtyRingSignal();
         var reader = new PtySessionReader(session, ring, signal, _logger);
         var pane = new PaneSession
@@ -170,6 +172,22 @@ public sealed class PaneRegistry : IDisposable
         return RingSearch.Find(buf.AsSpan(0, res.BytesCopied), query, caseSensitive);
     }
 
+    public byte[] SnapshotRing(string paneId)
+    {
+        if (!TryGet(paneId, out var pane))
+            return System.Array.Empty<byte>();
+        const int cap = 262144;
+        long head = pane.Ring.Head;
+        long tail = pane.Ring.Tail;
+        long avail = head - tail;
+        if (avail <= 0)
+            return System.Array.Empty<byte>();
+        int len = (int)System.Math.Min(cap, avail);
+        long from = head - len;
+        var buf = new byte[len];
+        var res = pane.Ring.ReadInto(from, buf);
+        return res.BytesCopied == len ? buf : buf[..res.BytesCopied];
+    }
 
     private static void Terminate(PaneSession pane)
     {

@@ -33,4 +33,20 @@ public static class WorkspacePersistence
         }
         return (layout, sessions);
     }
+
+    public static void SaveScrollback(string paneId, byte[] bytes, string wsDir)
+    {
+        var dir = Path.Combine(wsDir, "panes", paneId);
+        Directory.CreateDirectory(dir);
+        var path = Path.Combine(dir, "scrollback.bin");
+        var tmp = path + ".tmp";
+        File.WriteAllBytes(tmp, bytes);
+        File.Move(tmp, path, true);
+    }
+
+    public static byte[]? LoadScrollback(string paneId, string wsDir)
+    {
+        var path = Path.Combine(wsDir, "panes", paneId, "scrollback.bin");
+        return File.Exists(path) ? File.ReadAllBytes(path) : null;
+    }
 }
