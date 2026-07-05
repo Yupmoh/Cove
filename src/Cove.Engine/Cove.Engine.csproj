@@ -11,6 +11,7 @@
   <ItemGroup>
     <ProjectReference Include="../Cove.Platform/Cove.Platform.csproj" />
     <ProjectReference Include="../Cove.Protocol/Cove.Protocol.csproj" />
+    <ProjectReference Include="../Cove.Persistence/Cove.Persistence.csproj" />
   </ItemGroup>
 
   <ItemGroup>
