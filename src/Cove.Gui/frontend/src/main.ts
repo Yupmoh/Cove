@@ -242,15 +242,26 @@ function firstLeafOf(room: RoomSnapshot): string | undefined {
 function renderRoom(): void {
   const room = activeRoom();
   gridEl.innerHTML = "";
+  let zoomed = false;
   if (room && room.layoutTree) {
-    gridEl.appendChild(renderNode(room.layoutTree));
-  }
-  const treeIds = new Set<string>(activeLeafIds());
-  for (const [id, pv] of panes) {
-    if (!treeIds.has(id)) {
-      try { pv.ws.close(); } catch { void 0; }
-      pv.term.dispose();
-      panes.delete(id);
+    const treeIds = collectLeafIds(room.layoutTree);
+    const zid = room.zoomedPaneId;
+    if (zid && treeIds.includes(zid)) {
+      gridEl.appendChild(getPane(zid).el);
+      focusedPaneId = zid;
+      zoomed = true;
+    } else {
+      gridEl.appendChild(renderNode(room.layoutTree));
+    }
+    if (!zoomed) {
+      const keep = new Set<string>(treeIds);
+      for (const [id, pv] of panes) {
+        if (!keep.has(id)) {
+          try { pv.ws.close(); } catch { void 0; }
+          pv.term.dispose();
+          panes.delete(id);
+        }
+      }
     }
   }
   for (const [id, pv] of panes) {
@@ -327,6 +338,17 @@ async function closeFocused(): Promise<void> {
   if (!focusedPaneId || !activeRoomId) return;
   await invoke("app.paneKill", { paneId: focusedPaneId });
   await invoke("app.layoutMutate", { op: "close", roomId: activeRoomId, paneId: focusedPaneId, targetPaneId: "", newPaneId: "", orientation: "", name: "", dir: 0 });
+  await reload();
+}
+
+async function toggleZoom(): Promise<void> {
+  if (!focusedPaneId || !activeRoomId) return;
+  const room = activeRoom();
+  if (room && room.zoomedPaneId === focusedPaneId) {
+    await invoke("app.layoutMutate", { op: "unzoom", roomId: activeRoomId, paneId: "", targetPaneId: "", newPaneId: "", orientation: "", name: "", dir: 0 });
+  } else {
+    await invoke("app.layoutMutate", { op: "zoom", roomId: activeRoomId, paneId: focusedPaneId, targetPaneId: "", newPaneId: "", orientation: "", name: "", dir: 0 });
+  }
   await reload();
 }
 
@@ -478,6 +500,7 @@ window.addEventListener("keydown", (e) => {
   if (k === "k") { e.preventDefault(); paletteEl.classList.contains("open") ? closePalette() : openPalette(); return; }
   if (paletteEl.classList.contains("open")) return;
   if (k === "t") { e.preventDefault(); void newRoom(); }
+  else if (k === "z" && !e.shiftKey) { e.preventDefault(); void toggleZoom(); }
   else if (k === "d" && e.shiftKey) { e.preventDefault(); void splitActive("col"); }
   else if (k === "d") { e.preventDefault(); void splitActive("row"); }
   else if (k === "w") { e.preventDefault(); void closeFocused(); }
