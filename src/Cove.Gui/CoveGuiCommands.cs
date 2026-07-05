@@ -14,10 +14,10 @@ public sealed class CoveGuiCommands
         => await Call("cove://commands/pane.list", null, ct);
 
     [RynCommand("app.paneSpawn")]
-    public async ValueTask<string> PaneSpawn(string command, int cols, int rows, CancellationToken ct)
+    public async ValueTask<string> PaneSpawn(string command, string cwd, string inheritCwdFrom, int cols, int rows, CancellationToken ct)
     {
         var shell = string.IsNullOrEmpty(command) ? DefaultShell() : command;
-        var p = JsonSerializer.SerializeToElement(new SpawnParams(shell, Array.Empty<string>(), null, null, cols, rows), CoveJsonContext.Default.SpawnParams);
+        var p = JsonSerializer.SerializeToElement(new SpawnParams(shell, Array.Empty<string>(), N(cwd), null, cols, rows, N(inheritCwdFrom)), CoveJsonContext.Default.SpawnParams);
         return await Call("cove://commands/pane.spawn", p, ct);
     }
 
@@ -36,6 +36,26 @@ public sealed class CoveGuiCommands
     public async ValueTask<string> PaneKill(string paneId, CancellationToken ct)
         => await Call("cove://commands/pane.kill", PaneIdParam(paneId), ct);
 
+    [RynCommand("app.layoutGet")]
+    public async ValueTask<string> LayoutGet(CancellationToken ct)
+        => await Call("cove://commands/layout.get", null, ct);
+
+    [RynCommand("app.layoutMutate")]
+    public async ValueTask<string> LayoutMutate(string op, string roomId, string targetPaneId, string newPaneId, string orientation, string name, string paneId, int dir, CancellationToken ct)
+    {
+        var mp = new LayoutMutateParams(op, N(roomId), N(targetPaneId), N(newPaneId), N(orientation), N(name), N(paneId), dir);
+        var p = JsonSerializer.SerializeToElement(mp, CoveJsonContext.Default.LayoutMutateParams);
+        return await Call("cove://commands/layout.mutate", p, ct);
+    }
+
+    [RynCommand("app.sessionState")]
+    public async ValueTask<string> SessionState(string paneId, CancellationToken ct)
+    {
+        var p = JsonSerializer.SerializeToElement(new PaneRefParams(paneId), CoveJsonContext.Default.PaneRefParams);
+        return await Call("cove://commands/session.state", p, ct);
+    }
+
+
     private static JsonElement PaneIdParam(string paneId, string? dataBase64 = null)
     {
         using var ms = new MemoryStream();
@@ -49,6 +69,8 @@ public sealed class CoveGuiCommands
         using var doc = JsonDocument.Parse(ms.ToArray());
         return doc.RootElement.Clone();
     }
+
+    private static string? N(string s) => string.IsNullOrEmpty(s) ? null : s;
 
     private static string DefaultShell()
         => OperatingSystem.IsWindows() ? "powershell.exe" : (Environment.GetEnvironmentVariable("SHELL") ?? "/bin/zsh");

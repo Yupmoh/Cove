@@ -204,7 +204,7 @@ async function newSession(): Promise<void> {
   sessionsEl.appendChild(sessEl);
   sessions.push(session);
 
-  const paneId = (await invoke<{ paneId: string }>("app.paneSpawn", { command: "", cols: 80, rows: 24 })).paneId;
+  const paneId = (await invoke<{ paneId: string }>("app.paneSpawn", { command: "", cwd: "", inheritCwdFrom: "", cols: 80, rows: 24 })).paneId;
   const pane = makePaneEl(session, paneId, 0);
   session.panes.push(pane);
   activateSession(session);
@@ -237,7 +237,7 @@ async function splitActive(dir: "row" | "col"): Promise<void> {
   const session = activeSession;
   session.dir = dir;
   session.gridEl.classList.toggle("col", dir === "col");
-  const paneId = (await invoke<{ paneId: string }>("app.paneSpawn", { command: "", cols: 80, rows: 24 })).paneId;
+  const paneId = (await invoke<{ paneId: string }>("app.paneSpawn", { command: "", cwd: "", inheritCwdFrom: focusedPane ? focusedPane.paneId : "", cols: 80, rows: 24 })).paneId;
   const pane = makePaneEl(session, paneId, 0);
   session.panes.push(pane);
   focusPane(pane);
