@@ -50,6 +50,24 @@ public sealed class DaemonHost
         var shellDir = ShellIntegration.Install(dataDir);
         _panes = new PaneRegistry(_ptyHost, logger, spawnEnv, shellDir);
         _layout = new Cove.Engine.Layout.LayoutService();
+        var wsDir = System.IO.Path.Combine(dataDir, "workspaces", "default");
+        var (savedLayout, sessions) = Cove.Engine.Layout.WorkspacePersistence.Load(wsDir, logger);
+        if (savedLayout is { } sl)
+        {
+            foreach (var room in sl.Rooms)
+                foreach (var leaf in Cove.Engine.Layout.MosaicOps.Leaves(room.LayoutTree))
+                    if (sessions.TryGetValue(leaf.PaneId, out var d))
+                    {
+                        try { _panes!.RespawnAs(d.PaneId, d.Command, d.Args, d.Cwd, 80, 24); }
+                        catch (System.Exception ex) { logger.LogWarning(ex, "respawn on restore failed for {PaneId}", d.PaneId); }
+                    }
+            _layout!.LoadSnapshot(sl);
+        }
+        _layout!.OnChanged = () =>
+        {
+            try { Cove.Engine.Layout.WorkspacePersistence.Save(_layout.ToSnapshot("default", "default", System.Environment.CurrentDirectory), _panes!.Descriptors(), wsDir); }
+            catch (System.Exception ex) { logger.LogWarning(ex, "workspace persist failed"); }
+        };
         SingleInstanceGuard? guard = SingleInstanceGuard.TryAcquire(_paths.PidFilePath);
         if (guard is null)
         {

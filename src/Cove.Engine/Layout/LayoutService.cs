@@ -17,12 +17,14 @@ public sealed class LayoutService
 
     private readonly Dictionary<string, RoomState> _rooms = new();
     private readonly object _sync = new();
+    public Action? OnChanged { get; set; }
 
     public string CreateRoom(string name, PaneLeaf firstLeaf)
     {
+        string roomId;
         lock (_sync)
         {
-            var roomId = Guid.NewGuid().ToString("N");
+            roomId = Guid.NewGuid().ToString("N");
             _rooms[roomId] = new RoomState
             {
                 Name = name,
@@ -30,8 +32,9 @@ public sealed class LayoutService
                 ActivePaneId = firstLeaf.PaneId,
                 ZoomedPaneId = null,
             };
-            return roomId;
         }
+        OnChanged?.Invoke();
+        return roomId;
     }
 
     public void SplitPane(string roomId, string targetPaneId, SplitOrientation orient, PaneLeaf newLeaf)
@@ -42,6 +45,7 @@ public sealed class LayoutService
             room.Root = MosaicOps.Split(room.Root, targetPaneId, orient, newLeaf);
             room.ActivePaneId = newLeaf.PaneId;
         }
+        OnChanged?.Invoke();
     }
 
     public void ClosePane(string roomId, string paneId)
@@ -53,16 +57,18 @@ public sealed class LayoutService
             if (next is null)
             {
                 _rooms.Remove(roomId);
-                return;
             }
-
-            room.Root = next;
-            if (room.ActivePaneId == paneId)
+            else
             {
-                var leaves = MosaicOps.Leaves(next);
-                room.ActivePaneId = leaves.Count > 0 ? leaves[0].PaneId : null;
+                room.Root = next;
+                if (room.ActivePaneId == paneId)
+                {
+                    var leaves = MosaicOps.Leaves(next);
+                    room.ActivePaneId = leaves.Count > 0 ? leaves[0].PaneId : null;
+                }
             }
         }
+        OnChanged?.Invoke();
     }
 
     public void FocusPane(string roomId, string paneId)
@@ -72,6 +78,7 @@ public sealed class LayoutService
             var room = GetRoomOrThrow(roomId);
             room.ActivePaneId = paneId;
         }
+        OnChanged?.Invoke();
     }
 
     public void CycleFocus(string roomId, int dir)
@@ -85,6 +92,7 @@ public sealed class LayoutService
             if (next is not null)
                 room.ActivePaneId = next;
         }
+        OnChanged?.Invoke();
     }
 
     public void SetZoom(string roomId, string? paneId)
@@ -94,6 +102,7 @@ public sealed class LayoutService
             var room = GetRoomOrThrow(roomId);
             room.ZoomedPaneId = paneId;
         }
+        OnChanged?.Invoke();
     }
 
     public void RenameRoom(string roomId, string name)
@@ -103,6 +112,7 @@ public sealed class LayoutService
             var room = GetRoomOrThrow(roomId);
             room.Name = name;
         }
+        OnChanged?.Invoke();
     }
 
     public WorkspaceSnapshot ToSnapshot(string id, string name, string projectDir)
