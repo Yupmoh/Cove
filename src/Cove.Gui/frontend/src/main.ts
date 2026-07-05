@@ -147,6 +147,21 @@ function makePane(paneId: string, since: number): PaneView {
 
   el.addEventListener("mousedown", () => focusPane(paneId));
   attachWs(pv);
+  term.attachCustomKeyEventHandler((e) => {
+    if (e.type !== "keydown" || !e.metaKey || e.altKey || e.ctrlKey) return true;
+    const k = e.key.toLowerCase();
+    if (k === "c") {
+      if (term.hasSelection()) { const s = term.getSelection(); if (s && navigator.clipboard) void navigator.clipboard.writeText(s); }
+      else { void invoke("app.paneWrite", { paneId, dataBase64: toBase64Utf8("\u0003") }); }
+      return false;
+    }
+    if (k === "a") { term.selectAll(); return false; }
+    if (k === "v") {
+      if (navigator.clipboard && navigator.clipboard.readText) void navigator.clipboard.readText().then((t) => { if (t) void invoke("app.paneWrite", { paneId, dataBase64: toBase64Utf8(t) }); });
+      return false;
+    }
+    return true;
+  });
   term.onTitleChange((t) => { pv.title = t; refreshTitles(); });
   panes.set(paneId, pv);
   return pv;
