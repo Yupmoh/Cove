@@ -27,6 +27,7 @@ public sealed class DaemonHost
 
     private IPtyHost? _ptyHost;
     private PaneRegistry? _panes;
+    private Cove.Engine.Layout.LayoutService? _layout;
 
     public DaemonHost(DaemonPaths paths, IControlEndpoint endpoint, bool exitWhenIdle)
     {
@@ -43,6 +44,7 @@ public sealed class DaemonHost
 
         _ptyHost = PtyHostFactory.Create(logger);
         _panes = new PaneRegistry(_ptyHost, logger);
+        _layout = new Cove.Engine.Layout.LayoutService();
         SingleInstanceGuard? guard = SingleInstanceGuard.TryAcquire(_paths.PidFilePath);
         if (guard is null)
         {
@@ -214,7 +216,7 @@ public sealed class DaemonHost
             return false;
         }
 
-        ControlResponse? generated = await Cove.Engine.EngineCommandRouter.RouteAsync(req, _panes, cancellationToken).ConfigureAwait(false);
+        ControlResponse? generated = await Cove.Engine.EngineCommandRouter.RouteAsync(req, _panes, _layout, cancellationToken).ConfigureAwait(false);
         if (generated is not null)
         {
             await WriteResponseAsync(conn, generated, cancellationToken).ConfigureAwait(false);

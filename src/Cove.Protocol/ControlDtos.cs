@@ -48,6 +48,10 @@ public sealed record ResizeParams(string PaneId, int Cols, int Rows);
 public sealed record PaneWriteParams(string PaneId, string DataBase64);
 public sealed record PaneRefParams(string PaneId);
 
+public sealed record LayoutMutateParams(string Op, string? RoomId = null, string? TargetPaneId = null, string? NewPaneId = null, string? Orientation = null, string? Name = null, string? PaneId = null, int Dir = 1);
+public sealed record LayoutMutateResult(string? RoomId = null);
+public sealed record SessionStateResult(string PaneId, string Command, int Cols, int Rows, bool Alive);
+
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
@@ -69,5 +73,8 @@ public sealed record PaneRefParams(string PaneId);
 [JsonSerializable(typeof(PaneInfo))]
 [JsonSerializable(typeof(PaneWriteParams))]
 [JsonSerializable(typeof(PaneRefParams))]
+[JsonSerializable(typeof(LayoutMutateParams))]
+[JsonSerializable(typeof(LayoutMutateResult))]
+[JsonSerializable(typeof(SessionStateResult))]
 [JsonSerializable(typeof(JsonElement))]
 public sealed partial class CoveJsonContext : JsonSerializerContext;
