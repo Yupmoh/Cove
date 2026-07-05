@@ -79,10 +79,7 @@
     }
     .tbtn:hover { background: var(--panel-2); color: var(--fg); }
     .tbtn svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.6; }
-    #grid { position: relative; flex: 1; min-height: 0; }
-    .sgrid { position: absolute; inset: 0; display: none; gap: 0; padding: 8px; }
-    .sgrid.active { display: flex; }
-    .sgrid.col { flex-direction: column; }
+    #grid { position: relative; flex: 1; min-height: 0; display: flex; padding: 8px; }
     .pane {
       position: relative; flex: 1; min-width: 0; min-height: 0;
       border-radius: 9px; overflow: hidden; background: var(--bg); border: 1px solid var(--border);
@@ -91,11 +88,10 @@
     .term-host { position: absolute; inset: 0; padding: 6px 8px; }
     .xterm { height: 100%; }
     .divider { flex: 0 0 7px; align-self: stretch; position: relative; z-index: 2; cursor: col-resize; }
-    .sgrid.col .divider { cursor: row-resize; }
+    .split.col .divider { cursor: row-resize; }
     .divider::before { content: ""; position: absolute; inset: 0; margin: auto; background: var(--border); }
-    .sgrid:not(.col) .divider::before { width: 1px; }
-    .sgrid.col .divider::before { height: 1px; }
-    .divider:hover::before { background: var(--accent); }
+    .split:not(.col) .divider::before { width: 1px; }
+    .split.col .divider::before { height: 1px; }
     #palette {
       position: fixed; inset: 0; display: none;
       background: rgba(4, 10, 18, 0.55); align-items: flex-start; justify-content: center; z-index: 50;

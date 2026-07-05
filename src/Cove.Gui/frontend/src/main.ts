@@ -18,30 +18,60 @@ async function invoke<T>(cmd: string, args: unknown): Promise<T> {
   return JSON.parse((await window.__ryn.invoke(cmd, args as Record<string, unknown>)) as string) as T;
 }
 
-interface Pane {
+interface Subtab {
+  documentId: string;
+  paneType: string;
+  title: string | null;
+}
+
+interface PaneLeaf {
+  kind: "leaf";
+  paneId: string;
+  subtabs: Subtab[];
+  activeSubtab: number;
+}
+
+interface SplitNode {
+  kind: "split";
+  orientation: number | string;
+  ratio: number;
+  childA: MosaicNode;
+  childB: MosaicNode;
+}
+
+type MosaicNode = SplitNode | PaneLeaf;
+
+interface RoomSnapshot {
+  id: string;
+  name: string;
+  layoutTree: MosaicNode;
+  zoomedPaneId: string | null;
+}
+
+interface WorkspaceSnapshot {
+  schemaVersion: number;
+  id: string;
+  name: string;
+  projectDir: string;
+  activeRoomId: string | null;
+  rooms: RoomSnapshot[];
+}
+
+interface PaneView {
   paneId: string;
   term: Terminal;
   fit: FitAddon;
   ws: WebSocket;
-  paneEl: HTMLElement;
+  el: HTMLElement;
   consumed: number;
   lastAck: number;
   title: string;
 }
 
-interface Session {
-  id: number;
-  name: string;
-  dir: "row" | "col";
-  panes: Pane[];
-  gridEl: HTMLElement;
-  sessEl: HTMLElement;
-}
-
-const sessions: Session[] = [];
-let activeSession: Session | null = null;
-let focusedPane: Pane | null = null;
-let seq = 0;
+const panes = new Map<string, PaneView>();
+let layout: WorkspaceSnapshot | null = null;
+let activeRoomId: string | null = null;
+let focusedPaneId: string | null = null;
 const stored = Number(localStorage.getItem("cove.fontSize"));
 let fontSize = stored >= 9 && stored <= 24 ? stored : 13;
 
@@ -53,22 +83,23 @@ const paletteEl = document.getElementById("palette")!;
 const palInput = document.getElementById("pal-input") as HTMLInputElement;
 const palList = document.getElementById("pal-list")!;
 
-function fit(session: Session) {
+gridEl.style.display = "flex";
+gridEl.style.padding = "8px";
+
+function fitAll() {
   requestAnimationFrame(() => {
-    for (const p of session.panes) {
-      try { p.fit.fit(); } catch { void 0; }
+    for (const pv of panes.values()) {
+      try { pv.fit.fit(); } catch { void 0; }
     }
   });
 }
 
 function applyFontSize() {
-  for (const s of sessions) {
-    for (const p of s.panes) p.term.options.fontSize = fontSize;
-    fit(s);
-  }
+  for (const pv of panes.values()) pv.term.options.fontSize = fontSize;
+  fitAll();
   localStorage.setItem("cove.fontSize", String(fontSize));
 }
-function attachWs(pane: Pane) {
+function attachWs(pane: PaneView) {
   const ws = pane.ws;
   ws.binaryType = "arraybuffer";
   const sendAck = () => {
@@ -97,224 +128,276 @@ function attachWs(pane: Pane) {
   pane.term.onResize(({ cols, rows }) => { void invoke("app.paneResize", { paneId: pane.paneId, cols, rows }); });
 }
 
-function makePaneEl(session: Session, paneId: string, since: number): Pane {
+function makePane(paneId: string, since: number): PaneView {
   const term = new Terminal({ scrollback: 5000, convertEol: false, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: fontSize, theme: THEME });
   const fitAddon = new FitAddon();
   term.loadAddon(fitAddon);
   try { term.loadAddon(new WebglAddon()); } catch { void 0; }
 
-  const paneEl = document.createElement("div");
-  paneEl.className = "pane";
-  paneEl.style.flexGrow = "1";
+  const el = document.createElement("div");
+  el.className = "pane";
+  el.style.flexGrow = "1";
   const host = document.createElement("div");
   host.className = "term-host";
-  paneEl.appendChild(host);
-  session.gridEl.appendChild(paneEl);
+  el.appendChild(host);
   term.open(host);
 
   const ws = new WebSocket(`ws://${location.host}/pty?pane=${encodeURIComponent(paneId)}&since=${since}`);
-  const pane: Pane = { paneId, term, fit: fitAddon, ws, paneEl, consumed: 0, lastAck: 0, title: "" };
+  const pv: PaneView = { paneId, term, fit: fitAddon, ws, el, consumed: 0, lastAck: 0, title: "" };
 
-  paneEl.addEventListener("mousedown", () => focusPane(pane));
-  attachWs(pane);
-  term.onTitleChange((t) => { pane.title = t; refreshTitles(); });
-  return pane;
+  el.addEventListener("mousedown", () => focusPane(paneId));
+  attachWs(pv);
+  term.onTitleChange((t) => { pv.title = t; refreshTitles(); });
+  panes.set(paneId, pv);
+  return pv;
 }
 
-function relayout(session: Session) {
-  session.gridEl.querySelectorAll(".divider").forEach((d) => d.remove());
-  session.panes.forEach((p, i) => {
-    if (!p.paneEl.style.flexGrow) p.paneEl.style.flexGrow = "1";
-    if (i < session.panes.length - 1) {
-      const div = document.createElement("div");
-      div.className = "divider";
-      p.paneEl.after(div);
-      wireDivider(session, div, p, session.panes[i + 1]);
-    }
-  });
-  fit(session);
+function getPane(paneId: string): PaneView {
+  const existing = panes.get(paneId);
+  if (existing) return existing;
+  return makePane(paneId, 0);
 }
 
-function wireDivider(session: Session, div: HTMLElement, a: Pane, b: Pane) {
+function isColumn(orientation: number | string): boolean {
+  return orientation === 1 || orientation === "Column" || orientation === "column";
+}
+
+function collectLeafIds(node: MosaicNode): string[] {
+  if (node.kind === "leaf") return [node.paneId];
+  return [...collectLeafIds(node.childA), ...collectLeafIds(node.childB)];
+}
+
+function renderNode(node: MosaicNode): HTMLElement {
+  if (node.kind === "leaf") {
+    return getPane(node.paneId).el;
+  }
+  const col = isColumn(node.orientation);
+  const container = document.createElement("div");
+  container.className = "split" + (col ? " col" : "");
+  container.style.display = "flex";
+  container.style.flex = "1 1 0";
+  container.style.minWidth = "0";
+  container.style.minHeight = "0";
+  if (col) container.style.flexDirection = "column";
+
+  const a = renderNode(node.childA);
+  const b = renderNode(node.childB);
+  const div = document.createElement("div");
+  div.className = "divider";
+  container.appendChild(a);
+  container.appendChild(div);
+  container.appendChild(b);
+
+  const r = node.ratio > 0 && node.ratio < 1 ? node.ratio : 0.5;
+  a.style.flexGrow = String(r);
+  b.style.flexGrow = String(1 - r);
+
+  wireSplitDivider(div, col, a, b);
+  return container;
+}
+
+function wireSplitDivider(div: HTMLElement, col: boolean, a: HTMLElement, b: HTMLElement) {
   div.addEventListener("mousedown", (e) => {
     e.preventDefault();
-    const horiz = session.dir === "row";
-    const rect = session.gridEl.getBoundingClientRect();
-    const total = horiz ? rect.width : rect.height;
-    const start = horiz ? e.clientX : e.clientY;
-    const ga = parseFloat(a.paneEl.style.flexGrow || "1");
-    const gb = parseFloat(b.paneEl.style.flexGrow || "1");
+    const parent = div.parentElement;
+    if (!parent) return;
+    const rect = parent.getBoundingClientRect();
+    const total = col ? rect.height : rect.width;
+    const start = col ? e.clientY : e.clientX;
+    const ga = parseFloat(a.style.flexGrow || "1");
+    const gb = parseFloat(b.style.flexGrow || "1");
     const sum = ga + gb;
     const onMove = (m: MouseEvent) => {
-      const frac = ((horiz ? m.clientX : m.clientY) - start) / total;
+      const frac = ((col ? m.clientY : m.clientX) - start) / total;
       const na = Math.max(sum * 0.12, Math.min(sum * 0.88, ga + frac * sum));
-      a.paneEl.style.flexGrow = String(na);
-      b.paneEl.style.flexGrow = String(sum - na);
-      a.fit.fit();
-      b.fit.fit();
+      a.style.flexGrow = String(na);
+      b.style.flexGrow = String(sum - na);
+      fitAll();
     };
     const onUp = () => {
       document.removeEventListener("mousemove", onMove);
       document.removeEventListener("mouseup", onUp);
-      fit(session);
+      fitAll();
     };
     document.addEventListener("mousemove", onMove);
     document.addEventListener("mouseup", onUp);
   });
 }
 
-
-function focusPane(pane: Pane) {
-  focusedPane = pane;
-  for (const s of sessions) for (const p of s.panes) p.paneEl.classList.toggle("focused", p === pane);
-  pane.term.focus();
-  refreshTitles();
+function activeRoom(): RoomSnapshot | undefined {
+  if (!layout) return undefined;
+  return layout.rooms.find((r) => r.id === activeRoomId) ?? layout.rooms[0];
 }
 
-function activateSession(session: Session) {
-  activeSession = session;
-  for (const s of sessions) {
-    s.gridEl.classList.toggle("active", s === session);
-    s.sessEl.classList.toggle("active", s === session);
+function activeLeafIds(): string[] {
+  const room = activeRoom();
+  if (!room) return [];
+  return collectLeafIds(room.layoutTree);
+}
+
+function firstLeafOf(room: RoomSnapshot): string | undefined {
+  return collectLeafIds(room.layoutTree)[0];
+}
+
+function renderRoom(): void {
+  const room = activeRoom();
+  gridEl.innerHTML = "";
+  if (room && room.layoutTree) {
+    gridEl.appendChild(renderNode(room.layoutTree));
   }
-  session.gridEl.classList.toggle("col", session.dir === "col");
-  const last = session.panes[session.panes.length - 1];
-  if (last) focusPane(last);
-  fit(session);
-  updateChrome();
+  const treeIds = new Set<string>(activeLeafIds());
+  for (const [id, pv] of panes) {
+    if (!treeIds.has(id)) {
+      try { pv.ws.close(); } catch { void 0; }
+      pv.term.dispose();
+      panes.delete(id);
+    }
+  }
+  for (const [id, pv] of panes) {
+    pv.el.classList.toggle("focused", id === focusedPaneId);
+  }
+  fitAll();
+}
+
+function focusPane(paneId: string): void {
+  focusedPaneId = paneId;
+  for (const [id, pv] of panes) {
+    pv.el.classList.toggle("focused", id === paneId);
+  }
+  panes.get(paneId)?.term.focus();
   refreshTitles();
+  if (activeRoomId) {
+    void invoke("app.layoutMutate", { op: "focus", roomId: activeRoomId, paneId, targetPaneId: "", newPaneId: "", orientation: "", name: "", dir: 0 });
+  }
 }
 
-async function newSession(): Promise<void> {
-  seq += 1;
-  const grid = document.createElement("div");
-  grid.className = "sgrid";
-  gridEl.appendChild(grid);
-
-  const sessEl = document.createElement("div");
-  sessEl.className = "sess";
-  const session: Session = { id: seq, name: `Terminal ${seq}`, dir: "row", panes: [], gridEl: grid, sessEl };
-
-  sessEl.innerHTML = `<span class="dot"></span><span class="name"></span><span class="n"></span><span class="x">&times;</span>`;
-  (sessEl.querySelector(".name") as HTMLElement).textContent = session.name;
-  sessEl.addEventListener("click", (e) => {
-    if ((e.target as HTMLElement).classList.contains("x")) { void closeSession(session); return; }
-    activateSession(session);
+function refreshTitles(): void {
+  const room = activeRoom();
+  if (room) {
+    const leaves = collectLeafIds(room.layoutTree);
+    const count = leaves.length;
+    const focused = focusedPaneId ? panes.get(focusedPaneId) : undefined;
+    const label = (focused && focused.title) || room.name;
+    titleEl.innerHTML = `${label}` + (count > 1 ? ` <span class="sub">${count} panes</span>` : "");
+  }
+  const sessEls = sessionsEl.querySelectorAll<HTMLElement>(".sess");
+  (layout?.rooms ?? []).forEach((r, i) => {
+    const sessEl = sessEls[i];
+    if (!sessEl) return;
+    const leaves = collectLeafIds(r.layoutTree);
+    const first = leaves[0] ? panes.get(leaves[0]) : undefined;
+    const name = (first && first.title) || r.name;
+    const nameEl = sessEl.querySelector<HTMLElement>(".name");
+    if (nameEl) nameEl.textContent = name;
   });
-  sessionsEl.appendChild(sessEl);
-  sessions.push(session);
-
-  const paneId = (await invoke<{ paneId: string }>("app.paneSpawn", { command: "", cwd: "", inheritCwdFrom: "", cols: 80, rows: 24 })).paneId;
-  const pane = makePaneEl(session, paneId, 0);
-  session.panes.push(pane);
-  activateSession(session);
-  renderSidebar();
 }
 
-function adoptSession(paneId: string): void {
-  seq += 1;
-  const grid = document.createElement("div");
-  grid.className = "sgrid";
-  gridEl.appendChild(grid);
-  const sessEl = document.createElement("div");
-  sessEl.className = "sess";
-  const session: Session = { id: seq, name: `Terminal ${seq}`, dir: "row", panes: [], gridEl: grid, sessEl };
-  sessEl.innerHTML = `<span class="dot"></span><span class="name"></span><span class="n"></span><span class="x">&times;</span>`;
-  (sessEl.querySelector(".name") as HTMLElement).textContent = session.name;
-  sessEl.addEventListener("click", (e) => {
-    if ((e.target as HTMLElement).classList.contains("x")) { void closeSession(session); return; }
-    activateSession(session);
-  });
-  sessionsEl.appendChild(sessEl);
-  sessions.push(session);
-  const pane = makePaneEl(session, paneId, 0);
-  session.panes.push(pane);
+async function reload(): Promise<WorkspaceSnapshot> {
+  layout = await invoke<WorkspaceSnapshot>("app.layoutGet", {});
+  if (!activeRoomId) {
+    activeRoomId = layout.activeRoomId ?? layout.rooms[0]?.id ?? null;
+  }
+  const leaves = activeLeafIds();
+  if (!focusedPaneId || !leaves.includes(focusedPaneId)) {
+    focusedPaneId = leaves[0] ?? null;
+  }
+  renderRoom();
   renderSidebar();
+  if (focusedPaneId) {
+    panes.get(focusedPaneId)?.term.focus();
+  }
+  refreshTitles();
+  return layout;
 }
 
 async function splitActive(dir: "row" | "col"): Promise<void> {
-  if (!activeSession) { await newSession(); return; }
-  const session = activeSession;
-  session.dir = dir;
-  session.gridEl.classList.toggle("col", dir === "col");
-  const paneId = (await invoke<{ paneId: string }>("app.paneSpawn", { command: "", cwd: "", inheritCwdFrom: focusedPane ? focusedPane.paneId : "", cols: 80, rows: 24 })).paneId;
-  const pane = makePaneEl(session, paneId, 0);
-  session.panes.push(pane);
-  focusPane(pane);
-  relayout(session);
-  renderSidebar();
-}
-
-async function closePane(pane: Pane): Promise<void> {
-  const session = sessions.find((s) => s.panes.includes(pane));
-  if (!session) return;
-  try { await invoke("app.paneKill", { paneId: pane.paneId }); } catch { void 0; }
-  try { pane.ws.close(); } catch { void 0; }
-  pane.term.dispose();
-  pane.paneEl.remove();
-  session.panes.splice(session.panes.indexOf(pane), 1);
-  if (session.panes.length === 0) { await removeSession(session); return; }
-  focusPane(session.panes[session.panes.length - 1]);
-  relayout(session);
-  renderSidebar();
-}
-
-async function closeSession(session: Session): Promise<void> {
-  for (const p of session.panes.slice()) {
-    try { await invoke("app.paneKill", { paneId: p.paneId }); } catch { void 0; }
-    try { p.ws.close(); } catch { void 0; }
-    p.term.dispose();
-    p.paneEl.remove();
+  if (!layout || layout.rooms.length === 0 || !activeRoomId) {
+    await newRoom();
+    return;
   }
-  session.panes.length = 0;
-  await removeSession(session);
+  const src = focusedPaneId;
+  if (!src) return;
+  const sp = (await invoke<{ paneId: string }>("app.paneSpawn", { command: "", cwd: "", inheritCwdFrom: src, cols: 80, rows: 24 })).paneId;
+  await invoke("app.layoutMutate", { op: "split", roomId: activeRoomId, targetPaneId: src, newPaneId: sp, orientation: dir, name: "", paneId: "", dir: 0 });
+  await reload();
+  focusPane(sp);
 }
 
-async function removeSession(session: Session): Promise<void> {
-  session.gridEl.remove();
-  session.sessEl.remove();
-  sessions.splice(sessions.indexOf(session), 1);
-  if (sessions.length === 0) { await newSession(); return; }
-  if (activeSession === session) activateSession(sessions[sessions.length - 1]);
-  renderSidebar();
+async function closeFocused(): Promise<void> {
+  if (!focusedPaneId || !activeRoomId) return;
+  await invoke("app.paneKill", { paneId: focusedPaneId });
+  await invoke("app.layoutMutate", { op: "close", roomId: activeRoomId, paneId: focusedPaneId, targetPaneId: "", newPaneId: "", orientation: "", name: "", dir: 0 });
+  await reload();
 }
 
-function renderSidebar() {
-  for (const s of sessions) {
-    const n = s.sessEl.querySelector(".n") as HTMLElement;
-    n.textContent = s.panes.length > 1 ? String(s.panes.length) : "";
-  }
-  footEl.textContent = `${sessions.length} terminal${sessions.length === 1 ? "" : "s"}`;
-  updateChrome();
+function cycleFocus(d: number): void {
+  const leaves = activeLeafIds();
+  if (leaves.length === 0) return;
+  const idx = focusedPaneId ? leaves.indexOf(focusedPaneId) : -1;
+  const next = leaves[(idx + d + leaves.length) % leaves.length];
+  focusPane(next);
 }
 
-function updateChrome() {
-  if (!activeSession) return;
-  const count = activeSession.panes.length;
-  titleEl.innerHTML = `${activeSession.name}` + (count > 1 ? ` <span class="sub">${count} panes</span>` : "");
+async function newRoom(): Promise<void> {
+  const sp = (await invoke<{ paneId: string }>("app.paneSpawn", { command: "", cwd: "", inheritCwdFrom: "", cols: 80, rows: 24 })).paneId;
+  const r = await invoke<{ roomId: string }>("app.layoutMutate", { op: "createRoom", newPaneId: sp, name: "Terminal " + (layout ? layout.rooms.length + 1 : 1), roomId: "", targetPaneId: "", orientation: "", paneId: "", dir: 0 });
+  activeRoomId = r.roomId;
+  await reload();
+  focusPane(sp);
 }
-function refreshTitles() {
-  if (activeSession) {
-    const count = activeSession.panes.length;
-    const label = (focusedPane && focusedPane.title) || activeSession.name;
-    titleEl.innerHTML = `${label}` + (count > 1 ? ` <span class="sub">${count} panes</span>` : "");
+
+async function closeRoom(roomId: string): Promise<void> {
+  const room = layout?.rooms.find((r) => r.id === roomId);
+  if (!room) return;
+  const leaves = collectLeafIds(room.layoutTree);
+  for (const id of leaves) {
+    try { await invoke("app.paneKill", { paneId: id }); } catch { void 0; }
+    try { await invoke("app.layoutMutate", { op: "close", roomId, paneId: id, targetPaneId: "", newPaneId: "", orientation: "", name: "", dir: 0 }); } catch { void 0; }
   }
-  for (const s of sessions) {
-    const first = s.panes[0];
-    const name = (first && first.title) || s.name;
-    const el = s.sessEl.querySelector(".name") as HTMLElement | null;
-    if (el) el.textContent = name;
+  if (activeRoomId === roomId) activeRoomId = null;
+  await reload();
+  if (!layout || layout.rooms.length === 0) await newRoom();
+}
+
+function renderSidebar(): void {
+  sessionsEl.innerHTML = "";
+  const rooms = layout?.rooms ?? [];
+  for (const room of rooms) {
+    const sessEl = document.createElement("div");
+    sessEl.className = "sess" + (room.id === activeRoomId ? " active" : "");
+    const leaves = collectLeafIds(room.layoutTree);
+    const count = leaves.length;
+    sessEl.innerHTML = `<span class="dot"></span><span class="name"></span><span class="n"></span><span class="x">&times;</span>`;
+    const nameEl = sessEl.querySelector<HTMLElement>(".name");
+    if (nameEl) {
+      const first = leaves[0] ? panes.get(leaves[0]) : undefined;
+      nameEl.textContent = (first && first.title) || room.name;
+    }
+    const nEl = sessEl.querySelector<HTMLElement>(".n");
+    if (nEl) nEl.textContent = count > 1 ? String(count) : "";
+    sessEl.addEventListener("click", (e) => {
+      if ((e.target as HTMLElement).classList.contains("x")) { void closeRoom(room.id); return; }
+      activeRoomId = room.id;
+      const f = firstLeafOf(room);
+      if (f) focusedPaneId = f;
+      renderRoom();
+      renderSidebar();
+      if (f) focusPane(f);
+    });
+    sessionsEl.appendChild(sessEl);
   }
+  footEl.textContent = `${rooms.length} terminal${rooms.length === 1 ? "" : "s"}`;
+  refreshTitles();
 }
 
 interface Action { label: string; icon: string; key?: string; run: () => void; }
 
 function baseActions(): Action[] {
   return [
-    { label: "New terminal", icon: "+", key: "Cmd T", run: () => void newSession() },
+    { label: "New terminal", icon: "+", key: "Cmd T", run: () => void newRoom() },
     { label: "Split right", icon: "\u2502", key: "Cmd D", run: () => void splitActive("row") },
     { label: "Split down", icon: "\u2500", key: "Cmd Shift D", run: () => void splitActive("col") },
-    { label: "Close pane", icon: "\u00d7", key: "Cmd W", run: () => { if (focusedPane) void closePane(focusedPane); } },
+    { label: "Close pane", icon: "\u00d7", key: "Cmd W", run: () => void closeFocused() },
     { label: "Toggle sidebar", icon: "\u25e7", key: "Cmd B", run: toggleSidebar },
     { label: "Increase font size", icon: "+", key: "Cmd =", run: () => { fontSize = Math.min(24, fontSize + 1); applyFontSize(); } },
     { label: "Decrease font size", icon: "-", key: "Cmd -", run: () => { fontSize = Math.max(9, fontSize - 1); applyFontSize(); } },
@@ -323,11 +406,15 @@ function baseActions(): Action[] {
 }
 
 function jumpActions(): Action[] {
-  return sessions.map((s, i) => ({
-    label: `Go to ${s.name}`,
+  return (layout?.rooms ?? []).map((r, i) => ({
+    label: `Go to ${r.name}`,
     icon: "\u203a",
     key: i < 9 ? `Cmd ${i + 1}` : undefined,
-    run: () => activateSession(s),
+    run: () => {
+      activeRoomId = r.id;
+      const f = firstLeafOf(r);
+      if (f) { focusedPaneId = f; renderRoom(); renderSidebar(); focusPane(f); }
+    },
   }));
 }
 
@@ -344,7 +431,10 @@ function openPalette() {
 
 function closePalette() {
   paletteEl.classList.remove("open");
-  if (focusedPane) focusedPane.term.focus();
+  if (focusedPaneId) {
+    const pv = panes.get(focusedPaneId);
+    if (pv) pv.term.focus();
+  }
 }
 
 function renderPalette() {
@@ -365,9 +455,9 @@ function renderPalette() {
 }
 
 
-function toggleSidebar() { document.body.classList.toggle("sidebar-hidden"); if (activeSession) fit(activeSession); }
+function toggleSidebar() { document.body.classList.toggle("sidebar-hidden"); fitAll(); }
 
-document.getElementById("side-add")!.addEventListener("click", () => void newSession());
+document.getElementById("side-add")!.addEventListener("click", () => void newRoom());
 document.getElementById("tb-split-r")!.addEventListener("click", () => void splitActive("row"));
 document.getElementById("tb-split-d")!.addEventListener("click", () => void splitActive("col"));
 document.getElementById("tb-sidebar")!.addEventListener("click", toggleSidebar);
@@ -387,37 +477,33 @@ window.addEventListener("keydown", (e) => {
   const k = e.key.toLowerCase();
   if (k === "k") { e.preventDefault(); paletteEl.classList.contains("open") ? closePalette() : openPalette(); return; }
   if (paletteEl.classList.contains("open")) return;
-  if (k === "t") { e.preventDefault(); void newSession(); }
+  if (k === "t") { e.preventDefault(); void newRoom(); }
   else if (k === "d" && e.shiftKey) { e.preventDefault(); void splitActive("col"); }
   else if (k === "d") { e.preventDefault(); void splitActive("row"); }
-  else if (k === "w") { e.preventDefault(); if (focusedPane) void closePane(focusedPane); }
+  else if (k === "w") { e.preventDefault(); void closeFocused(); }
   else if (k === "b") { e.preventDefault(); toggleSidebar(); }
-  else if (k === "]" && activeSession && activeSession.panes.length) {
-    e.preventDefault();
-    const panes = activeSession.panes;
-    const idx = focusedPane ? panes.indexOf(focusedPane) : -1;
-    focusPane(panes[(idx + 1) % panes.length]);
-  }
-  else if (k === "[" && activeSession && activeSession.panes.length) {
-    e.preventDefault();
-    const panes = activeSession.panes;
-    const idx = focusedPane ? panes.indexOf(focusedPane) : 0;
-    focusPane(panes[(idx - 1 + panes.length) % panes.length]);
-  }
+  else if (k === "]") { e.preventDefault(); cycleFocus(1); }
+  else if (k === "[") { e.preventDefault(); cycleFocus(-1); }
   else if (k === "=" || k === "+") { e.preventDefault(); fontSize = Math.min(24, fontSize + 1); applyFontSize(); }
   else if (k === "-") { e.preventDefault(); fontSize = Math.max(9, fontSize - 1); applyFontSize(); }
   else if (k === "0") { e.preventDefault(); fontSize = 13; applyFontSize(); }
-  else if (k >= "1" && k <= "9") { const i = Number(k) - 1; if (sessions[i]) { e.preventDefault(); activateSession(sessions[i]); } }
+  else if (k >= "1" && k <= "9") {
+    const i = Number(k) - 1;
+    const rooms = layout?.rooms ?? [];
+    if (rooms[i]) {
+      e.preventDefault();
+      activeRoomId = rooms[i].id;
+      const f = firstLeafOf(rooms[i]);
+      if (f) { focusedPaneId = f; renderRoom(); renderSidebar(); focusPane(f); }
+    }
+  }
 }, true);
 
-window.addEventListener("resize", () => { if (activeSession) fit(activeSession); });
+window.addEventListener("resize", () => fitAll());
 
 (async () => {
-  const list = await invoke<{ panes: { paneId: string }[] }>("app.paneList", {});
-  if (list.panes.length > 0) {
-    for (const info of list.panes) adoptSession(info.paneId);
-    activateSession(sessions[0]);
-  } else {
-    await newSession();
+  const snap = await reload();
+  if (snap.rooms.length === 0) {
+    await newRoom();
   }
 })();
