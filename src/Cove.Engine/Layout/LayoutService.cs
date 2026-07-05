@@ -48,6 +48,42 @@ public sealed class LayoutService
         OnChanged?.Invoke();
     }
 
+    public void AddSubtab(string roomId, string leafPaneId, string subtabDocId)
+    {
+        lock (_sync)
+        {
+            var room = GetRoomOrThrow(roomId);
+            room.Root = MosaicOps.ReplaceLeaf(room.Root, leafPaneId, leaf => leaf with
+            {
+                Subtabs = Append(leaf.Subtabs, new Subtab(subtabDocId, PaneType.Terminal)),
+                ActiveSubtab = leaf.Subtabs.Count,
+            });
+        }
+        OnChanged?.Invoke();
+    }
+
+    public void ActivateSubtab(string roomId, string leafPaneId, int index)
+    {
+        lock (_sync)
+        {
+            var room = GetRoomOrThrow(roomId);
+            room.Root = MosaicOps.ReplaceLeaf(room.Root, leafPaneId, leaf => leaf with
+            {
+                ActiveSubtab = Math.Clamp(index, 0, Math.Max(0, leaf.Subtabs.Count - 1)),
+            });
+        }
+        OnChanged?.Invoke();
+    }
+
+    private static Subtab[] Append(IReadOnlyList<Subtab> list, Subtab item)
+    {
+        var arr = new Subtab[list.Count + 1];
+        for (var i = 0; i < list.Count; i++)
+            arr[i] = list[i];
+        arr[^1] = item;
+        return arr;
+    }
+
     public void ClosePane(string roomId, string paneId)
     {
         lock (_sync)

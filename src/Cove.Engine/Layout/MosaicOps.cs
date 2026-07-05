@@ -37,6 +37,32 @@ public static class MosaicOps
         };
     }
 
+    public static MosaicNode ReplaceLeaf(MosaicNode root, string paneId, Func<PaneLeaf, PaneLeaf> transform)
+    {
+        return Replace(root);
+
+        MosaicNode Replace(MosaicNode node)
+        {
+            if (node is PaneLeaf leaf)
+            {
+                if (leaf.PaneId == paneId)
+                    return transform(leaf);
+                return leaf;
+            }
+
+            if (node is SplitNode split)
+            {
+                var newA = Replace(split.ChildA);
+                var newB = Replace(split.ChildB);
+                if (ReferenceEquals(newA, split.ChildA) && ReferenceEquals(newB, split.ChildB))
+                    return split;
+                return split with { ChildA = newA, ChildB = newB };
+            }
+
+            return node;
+        }
+    }
+
     public static MosaicNode Split(MosaicNode root, string targetPaneId, SplitOrientation orient, PaneLeaf newLeaf, double ratio = 0.5)
     {
         var found = false;

@@ -34,6 +34,8 @@ internal static class LayoutCommands
                 "createRoom" => ctx.Ok(new LayoutMutateResult(layout.CreateRoom(p.Name ?? "main", NewLeaf(p.NewPaneId!))), Cove.Protocol.CoveJsonContext.Default.LayoutMutateResult),
                 "split" => MutateOk(() => layout.SplitPane(p.RoomId!, p.TargetPaneId!, Orient(p.Orientation), NewLeaf(p.NewPaneId!)), p.RoomId, ctx),
                 "close" => MutateOk(() => layout.ClosePane(p.RoomId!, p.PaneId!), p.RoomId, ctx),
+                "addSubtab" => MutateOk(() => layout.AddSubtab(p.RoomId!, p.PaneId!, p.NewPaneId!), p.RoomId, ctx),
+                "activateSubtab" => MutateOk(() => layout.ActivateSubtab(p.RoomId!, p.PaneId!, p.Dir), p.RoomId, ctx),
                 "focus" => MutateOk(() => layout.FocusPane(p.RoomId!, p.PaneId!), p.RoomId, ctx),
                 "cycleFocus" => MutateOk(() => layout.CycleFocus(p.RoomId!, p.Dir), p.RoomId, ctx),
                 "zoom" => MutateOk(() => layout.SetZoom(p.RoomId!, p.PaneId), p.RoomId, ctx),
