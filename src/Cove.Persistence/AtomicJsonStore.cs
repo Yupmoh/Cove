@@ -33,6 +33,31 @@ public static class AtomicJsonStore
             NativePosix.FsyncDir(dir);
     }
 
+    public static void WriteBytes(string path, ReadOnlySpan<byte> bytes)
+    {
+        var fullPath = Path.GetFullPath(path);
+        var dir = Path.GetDirectoryName(fullPath)!;
+        Directory.CreateDirectory(dir);
+
+        var temp = Path.Combine(dir, $".{Path.GetFileName(fullPath)}.tmp-{Guid.NewGuid():N}");
+        using (var fs = new FileStream(temp, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+        {
+            fs.Write(bytes);
+            fs.Flush(flushToDisk: true);
+        }
+
+        if (!OperatingSystem.IsWindows())
+            File.SetUnixFileMode(temp, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+
+        if (File.Exists(fullPath))
+            File.Copy(fullPath, fullPath + ".bak", overwrite: true);
+
+        File.Move(temp, fullPath, overwrite: true);
+
+        if (!OperatingSystem.IsWindows())
+            NativePosix.FsyncDir(dir);
+    }
+
     public static void WriteRawText(string path, string content)
     {
         var fullPath = Path.GetFullPath(path);
