@@ -9,4 +9,12 @@ namespace Cove.Persistence;
 [JsonSerializable(typeof(CoveState))]
 [JsonSerializable(typeof(WindowGeometry))]
 [JsonSerializable(typeof(DataDirMeta))]
+[JsonSerializable(typeof(WorkspaceSnapshot))]
+[JsonSerializable(typeof(RoomSnapshot))]
+[JsonSerializable(typeof(MosaicNode))]
+[JsonSerializable(typeof(SplitNode))]
+[JsonSerializable(typeof(PaneLeaf))]
+[JsonSerializable(typeof(Subtab))]
+[JsonSerializable(typeof(IReadOnlyList<Subtab>))]
+[JsonSerializable(typeof(IReadOnlyList<RoomSnapshot>))]
 public sealed partial class CoveJsonContext : JsonSerializerContext { }
