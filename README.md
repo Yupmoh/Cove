@@ -35,11 +35,25 @@ unzip cove-osx-arm64.zip
 The binaries are not yet code-signed. On macOS, clear the download quarantine
 first: `xattr -dr com.apple.quarantine cove`.
 
+## Desktop app (macOS)
+
+macOS releases include `cove-macos-app.zip` — a self-contained `Cove.app`
+bundling the GUI and its engine. Unzip and launch it:
+
+```
+unzip cove-macos-app.zip
+xattr -dr com.apple.quarantine Cove.app
+open Cove.app
+```
+
+The `xattr` step (or right-click → Open once) clears Gatekeeper for the
+unsigned build. Cove starts its own engine and opens a live terminal.
+
 ## Run the desktop GUI (from source)
 
-The graphical workspace — a native-webview terminal that renders a real shell
-losslessly — currently runs from source while its desktop packaging is built
-out. Start the engine, then the GUI:
+The graphical workspace is a native-webview terminal that renders a real shell
+losslessly. macOS ships the prebuilt `Cove.app` above; on Linux and Windows, or
+for development, run it from source. Start the engine, then the GUI:
 
 ```
 dotnet run --project src/Cove.Cli -- daemon run --channel dev
