@@ -62,6 +62,16 @@ public sealed record RegistryModel
     public string ActiveCollectionId { get; init; } = WorkspaceModel.DefaultCollectionId;
 }
 
+public sealed record WorkspaceSummary(string Id, string Name, string ProjectDir, string CollectionId, bool IsWorktree, bool Active);
+
+public sealed record WorkspaceCreateParams(string Name, string ProjectDir, string? CollectionId = null);
+
+public sealed record WorkspaceIdParams(string Id);
+
+public sealed record WorkspaceIdResult(string Id);
+
+public sealed record WorkspaceListResult(IReadOnlyList<WorkspaceSummary> Workspaces);
+
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     WriteIndented = true,
@@ -75,4 +85,9 @@ public sealed record RegistryModel
 [JsonSerializable(typeof(MosaicNode))]
 [JsonSerializable(typeof(SplitNode))]
 [JsonSerializable(typeof(PaneLeaf))]
+[JsonSerializable(typeof(WorkspaceSummary))]
+[JsonSerializable(typeof(WorkspaceCreateParams))]
+[JsonSerializable(typeof(WorkspaceIdParams))]
+[JsonSerializable(typeof(WorkspaceIdResult))]
+[JsonSerializable(typeof(WorkspaceListResult))]
 public sealed partial class WorkspacesJsonContext : JsonSerializerContext { }

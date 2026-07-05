@@ -101,7 +101,7 @@ public sealed class WorkspaceModelTests
     [Fact]
     public async Task Fuzz_ConcurrentMutations_NoLostUpdates()
     {
-        await using var actor = new WorkspaceActor(Ws([]));
+        await using var actor = new Actor<WorkspaceModel>(Ws([]));
         int n = 0;
         var tasks = Enumerable.Range(0, 50).Select(_ => actor.Mutate(m =>
         {

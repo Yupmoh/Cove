@@ -15,7 +15,7 @@ public sealed class LayoutRoutesTests
         JsonSerializer.SerializeToElement(p, Cove.Protocol.CoveJsonContext.Default.LayoutMutateParams);
 
     private static Task<ControlResponse?> Route(string uri, JsonElement? prm, LayoutService layout) =>
-        EngineCommandRouter.RouteAsync(new ControlRequest("1", uri, prm), null, layout, CancellationToken.None);
+        EngineCommandRouter.RouteAsync(new ControlRequest("1", uri, prm), null, layout);
 
     private static string? RoomIdOf(ControlResponse r)
     {

@@ -2,29 +2,29 @@ using System.Threading.Channels;
 
 namespace Cove.Engine.Workspaces;
 
-public sealed class WorkspaceActor : IAsyncDisposable
+public sealed class Actor<T> : IAsyncDisposable where T : class
 {
-    private readonly Channel<(Func<WorkspaceModel, WorkspaceModel> Mutation, TaskCompletionSource Done)> _channel;
+    private readonly Channel<(Func<T, T> Mutation, TaskCompletionSource Done)> _channel;
     private readonly Task _pump;
-    private readonly Action<WorkspaceModel>? _onChanged;
-    private volatile WorkspaceModel _state;
+    private readonly Action<T>? _onChanged;
+    private volatile T _state;
 
-    public WorkspaceActor(WorkspaceModel initial, Action<WorkspaceModel>? onChanged = null)
+    public Actor(T initial, Action<T>? onChanged = null)
     {
         _state = initial;
         _onChanged = onChanged;
-        _channel = Channel.CreateUnbounded<(Func<WorkspaceModel, WorkspaceModel>, TaskCompletionSource)>(
+        _channel = Channel.CreateUnbounded<(Func<T, T>, TaskCompletionSource)>(
             new UnboundedChannelOptions { SingleReader = true });
         _pump = Task.Run(PumpAsync);
     }
 
-    public WorkspaceModel State => _state;
+    public T State => _state;
 
-    public Task Mutate(Func<WorkspaceModel, WorkspaceModel> mutation)
+    public Task Mutate(Func<T, T> mutation)
     {
         var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         if (!_channel.Writer.TryWrite((mutation, done)))
-            done.SetException(new InvalidOperationException("workspace actor is closed"));
+            done.SetException(new InvalidOperationException("actor is closed"));
         return done.Task;
     }
 
