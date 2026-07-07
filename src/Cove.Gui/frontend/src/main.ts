@@ -84,6 +84,26 @@ function loadSettings(): TermSettings {
   return { ...defaultSettings, fontSize: fs >= 9 && fs <= 24 ? fs : 13 };
 }
 let settings = loadSettings();
+interface KeybindingOverride { chord: string; action: string; }
+function loadKeybindings(): Record<string, string> {
+  const out: Record<string, string> = {};
+  try {
+    const raw = localStorage.getItem("cove.keybindings");
+    if (!raw) return out;
+    const list = JSON.parse(raw) as KeybindingOverride[];
+    for (const o of list) out[o.chord] = o.action;
+  } catch { void 0; }
+  return out;
+}
+function normalizeChord(e: KeyboardEvent): string {
+  const parts: string[] = [];
+  if (e.ctrlKey) parts.push("ctrl");
+  if (e.altKey) parts.push("alt");
+  if (e.shiftKey) parts.push("shift");
+  if (e.metaKey) parts.push("cmd");
+  parts.push(e.key.toLowerCase());
+  return parts.join("+");
+}
 
 const sessionsEl = document.getElementById("sessions")!;
 const gridEl = document.getElementById("grid")!;
@@ -176,8 +196,14 @@ function makePane(paneId: string, since: number): PaneView {
 
   el.addEventListener("mousedown", () => focusPane(paneId));
   attachWs(pv);
+  const overrides = loadKeybindings();
   term.attachCustomKeyEventHandler((e) => {
-    if (e.type !== "keydown" || !e.metaKey || e.altKey || e.ctrlKey) return true;
+    if (e.type !== "keydown") return true;
+    const chord = normalizeChord(e);
+    const action = overrides[chord];
+    if (action && action.startsWith("send-text:")) { void invoke("app.paneWrite", { paneId, dataBase64: toBase64Utf8(action.slice("send-text:".length)) }); return false; }
+    if (e.shiftKey && e.key === "Enter") { void invoke("app.paneWrite", { paneId, dataBase64: toBase64Utf8("\n") }); return false; }
+    if (!e.metaKey || e.altKey || e.ctrlKey) return true;
     const k = e.key.toLowerCase();
     if (k === "c") {
       if (term.hasSelection()) { const s = term.getSelection(); if (s && navigator.clipboard) void navigator.clipboard.writeText(s); }
@@ -189,6 +215,9 @@ function makePane(paneId: string, since: number): PaneView {
       if (navigator.clipboard && navigator.clipboard.readText) void navigator.clipboard.readText().then((t) => { if (t) void invoke("app.paneWrite", { paneId, dataBase64: toBase64Utf8(t) }); });
       return false;
     }
+    if (e.key === "ArrowLeft") { void invoke("app.paneWrite", { paneId, dataBase64: toBase64Utf8("\u0001") }); return false; }
+    if (e.key === "ArrowRight") { void invoke("app.paneWrite", { paneId, dataBase64: toBase64Utf8("\u0005") }); return false; }
+    if (e.key === "Backspace") { void invoke("app.paneWrite", { paneId, dataBase64: toBase64Utf8("\u0015") }); return false; }
     return true;
   });
   const setTitle = () => { titleSpan.textContent = pv.customTitle || pv.title || "shell"; };
