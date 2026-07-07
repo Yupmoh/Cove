@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+
 namespace Cove.Adapters;
 
 public sealed record RecentSession(
@@ -24,8 +25,6 @@ public sealed class SessionService
     private readonly Dictionary<(string adapter, string cwd), (List<RecentSession> sessions, DateTimeOffset at)> _cache = new();
     private readonly Dictionary<string, int> _schemaVersions = new();
 
-    public int CacheHits { get; private set; }
-
     public SessionService(MethodRunner runner, TimeSpan? cacheTtl = null)
     {
         _runner = runner;
@@ -36,10 +35,7 @@ public sealed class SessionService
     {
         var key = (adapterDir, cwd);
         if (_cache.TryGetValue(key, out var entry) && DateTimeOffset.UtcNow - entry.at < _cacheTtl)
-        {
-            CacheHits++;
             return entry.sessions;
-        }
 
         var result = await _runner.RunAsync(adapterDir, "list_recent_sessions.sh", [cwd], TimeSpan.FromMilliseconds(50), null, ct);
 

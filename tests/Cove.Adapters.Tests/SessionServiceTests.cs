@@ -51,7 +51,9 @@ public sealed class SessionServiceTests
         var dir = NewDir();
         try
         {
-            WriteScript(dir, "list_recent_sessions.sh", """
+            var marker = Path.Combine(dir, "calls");
+            WriteScript(dir, "list_recent_sessions.sh", $$"""
+            echo x >> "{{marker}}"
             echo '{"sessions":[{"id":"s1","cwd":"/repo","lastActive":"2024-01-01T00:00:00Z"}]}'
             """);
             var runner = new MethodRunner();
@@ -60,11 +62,11 @@ public sealed class SessionServiceTests
             await svc.ListRecentSessionsAsync(dir, "/repo");
             await svc.ListRecentSessionsAsync(dir, "/repo");
 
-            Assert.Equal(1, svc.CacheHits);
+            Assert.True(File.Exists(marker));
+            Assert.Equal("x\n", await File.ReadAllTextAsync(marker));
         }
         finally { try { Directory.Delete(dir, true); } catch { } }
     }
-
     [Fact]
     public async Task ListRecentSessions_GracefulFailure_ReturnsEmpty()
     {
