@@ -43,6 +43,13 @@ public sealed class CoveGuiCommands
         return await Call("cove://commands/pane.rename", p, ct);
     }
 
+    [RynCommand("app.paneSearch")]
+    public async ValueTask<string> PaneSearch(string paneId, string query, bool caseSensitive, CancellationToken ct)
+    {
+        var p = JsonSerializer.SerializeToElement(new SearchParams(paneId, query, caseSensitive), CoveJsonContext.Default.SearchParams);
+        return await Call("cove://commands/pane.search", p, ct);
+    }
+
     [RynCommand("app.layoutGet")]
     public async ValueTask<string> LayoutGet(CancellationToken ct)
         => await Call("cove://commands/layout.get", null, ct);

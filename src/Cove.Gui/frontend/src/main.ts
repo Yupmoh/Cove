@@ -671,10 +671,15 @@ const findDecor = { matchBackground: "#2b6d7a", activeMatchBackground: "#4cc2d6"
 function activeSearch(): SearchAddon | null { return focusedPaneId ? (panes.get(focusedPaneId)?.search ?? null) : null; }
 function openFind() { findEl.classList.add("open"); findInput.focus(); findInput.select(); }
 function closeFind() { findEl.classList.remove("open"); activeSearch()?.clearDecorations(); if (focusedPaneId) panes.get(focusedPaneId)?.term.focus(); }
-function doFind(dir: number) {
+async function doFind(dir: number) {
   const s = activeSearch();
   const q = findInput.value;
   if (!s || !q) return;
+  const paneId = focusedPaneId!;
+  try {
+    const res = await invoke<{ matches: { line: number; text: string }[] }>("app.paneSearch", { paneId, query: q, caseSensitive: false });
+    if (res.matches.length === 0) { s.clearDecorations(); return; }
+  } catch { void 0; }
   if (dir >= 0) s.findNext(q, { caseSensitive: false, decorations: findDecor });
   else s.findPrevious(q, { caseSensitive: false, decorations: findDecor });
 }
