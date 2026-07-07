@@ -46,7 +46,12 @@ public sealed record WorkspaceModel
     public IReadOnlyList<Wing> Wings { get; init; } = [];
     public IReadOnlyList<Room> Rooms { get; init; } = [];
     public IReadOnlyDictionary<string, PaneRecord> Panes { get; init; } = new Dictionary<string, PaneRecord>();
+    public bool Hidden { get; init; }
+    public string? AccentColor { get; init; }
+    public WorkspaceIcon? Icon { get; init; }
 }
+
+public sealed record WorkspaceIcon(string Kind, string Value);
 
 public sealed record Collection
 {
@@ -63,7 +68,7 @@ public sealed record RegistryModel
     public string ActiveCollectionId { get; init; } = WorkspaceModel.DefaultCollectionId;
 }
 
-public sealed record WorkspaceSummary(string Id, string Name, string ProjectDir, string CollectionId, bool IsWorktree, bool Active);
+public sealed record WorkspaceSummary(string Id, string Name, string ProjectDir, string CollectionId, bool IsWorktree, bool Active, bool Hidden = false);
 
 public sealed record WorkspaceCreateParams(string Name, string ProjectDir, string? CollectionId = null);
 
@@ -80,6 +85,7 @@ public sealed record WorkspaceListResult(IReadOnlyList<WorkspaceSummary> Workspa
 [JsonSerializable(typeof(WorkspaceModel))]
 [JsonSerializable(typeof(RegistryModel))]
 [JsonSerializable(typeof(Room))]
+[JsonSerializable(typeof(WorkspaceIcon))]
 [JsonSerializable(typeof(Wing))]
 [JsonSerializable(typeof(PaneRecord))]
 [JsonSerializable(typeof(Collection))]

@@ -89,7 +89,7 @@ public sealed class WorkspaceManager : IAsyncDisposable
             if (actor is null)
                 continue;
             var w = actor.State;
-            result.Add(new WorkspaceSummary(w.Id, w.Name, w.ProjectDir, w.CollectionId, w.IsWorktree, w.Id == focused));
+            result.Add(new WorkspaceSummary(w.Id, w.Name, w.ProjectDir, w.CollectionId, w.IsWorktree, w.Id == focused, w.Hidden));
         }
         return result;
     }
@@ -188,6 +188,75 @@ public sealed class WorkspaceManager : IAsyncDisposable
         foreach (var c in registry.Collections)
             result.Add(new CollectionSummary(c.Id, c.Name, counts.GetValueOrDefault(c.Id).ToString(), registry.ActiveCollectionId == c.Id));
         return result;
+    }
+
+    public async Task<bool> SetWorkspaceHiddenAsync(string id, bool hidden)
+    {
+        if (Get(id) is not { } actor)
+            return false;
+        await actor.Mutate(m => m with { Hidden = hidden }).ConfigureAwait(false);
+        _emit?.Invoke(new WorkspaceChange(WorkspaceChangeKind.Updated, id));
+        return true;
+    }
+
+    public async Task<bool> SetWorkspaceIconAsync(string id, WorkspaceIcon? icon)
+    {
+        if (Get(id) is not { } actor)
+            return false;
+        await actor.Mutate(m => m with { Icon = icon }).ConfigureAwait(false);
+        _emit?.Invoke(new WorkspaceChange(WorkspaceChangeKind.Updated, id));
+        return true;
+    }
+
+    public async Task<bool> SetWorkspaceAccentAsync(string id, string? accent)
+    {
+        if (Get(id) is not { } actor)
+            return false;
+        await actor.Mutate(m => m with { AccentColor = accent }).ConfigureAwait(false);
+        _emit?.Invoke(new WorkspaceChange(WorkspaceChangeKind.Updated, id));
+        return true;
+    }
+
+    public async Task ReorderWorkspacesAsync(IReadOnlyList<string> orderedIds)
+    {
+        await _registry.Mutate(r =>
+        {
+            var known = new HashSet<string>(r.OpenWorkspaces, StringComparer.Ordinal);
+            var next = new List<string>();
+            foreach (var id in orderedIds)
+                if (known.Contains(id) && !next.Contains(id))
+                    next.Add(id);
+            foreach (var id in r.OpenWorkspaces)
+                if (!next.Contains(id))
+                    next.Add(id);
+            return r with { OpenWorkspaces = next };
+        }).ConfigureAwait(false);
+    }
+
+    public async Task<bool> MoveRoomAsync(string fromWorkspaceId, string roomId, string toWorkspaceId)
+    {
+        if (Get(fromWorkspaceId) is not { } from || Get(toWorkspaceId) is not { } to)
+            return false;
+        var moved = from.State.Rooms.FirstOrDefault(r => r.Id == roomId);
+        if (moved is null)
+            return false;
+
+        var movedPanes = new Dictionary<string, PaneRecord>();
+        foreach (var paneId in WorkspaceInvariants.CollectPaneIds(moved.LayoutTree))
+            if (from.State.Panes.TryGetValue(paneId, out var record))
+                movedPanes[paneId] = record;
+
+        await from.Mutate(m => WorkspaceInvariants.CloseRoom(m, roomId, NewId)).ConfigureAwait(false);
+        await to.Mutate(m =>
+        {
+            var rooms = new List<Room>(m.Rooms) { moved with { WingId = WorkspaceModel.MainWingId } };
+            var panes = new Dictionary<string, PaneRecord>(m.Panes);
+            foreach (var kv in movedPanes)
+                panes[kv.Key] = kv.Value;
+            return m with { Rooms = rooms, Panes = panes, ActiveRoomId = moved.Id };
+        }).ConfigureAwait(false);
+        _emit?.Invoke(new WorkspaceChange(WorkspaceChangeKind.Updated, toWorkspaceId));
+        return true;
     }
 
     private static IReadOnlyList<string> Append(IReadOnlyList<string> list, string item)
