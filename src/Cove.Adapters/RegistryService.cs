@@ -66,16 +66,21 @@ public sealed class RegistryService
         if (GetCached() is { } memCached)
             return memCached;
 
+        Registry? diskCached = null;
         if (_cachePath is not null && File.Exists(_cachePath))
         {
             try
             {
-                var diskJson = await File.ReadAllTextAsync(_cachePath, cancellationToken).ConfigureAwait(false);
-                var diskReg = ParseRegistry(diskJson);
-                if (diskReg is not null)
+                var diskAge = DateTimeOffset.UtcNow - File.GetLastWriteTimeUtc(_cachePath);
+                if (diskAge < _cacheTtl)
                 {
-                    SetCache(diskReg);
-                    return diskReg;
+                    var diskJson = await File.ReadAllTextAsync(_cachePath, cancellationToken).ConfigureAwait(false);
+                    diskCached = ParseRegistry(diskJson);
+                    if (diskCached is not null)
+                    {
+                        SetCache(diskCached);
+                        return diskCached;
+                    }
                 }
             }
             catch (IOException) { }
@@ -106,13 +111,30 @@ public sealed class RegistryService
                     }
                 }
             }
-            catch (Exception) when (_cached is not null)
+            catch (Exception)
             {
-                return _cached;
+                if (diskCached is not null)
+                    return diskCached;
+                if (_cachePath is not null && File.Exists(_cachePath))
+                {
+                    try
+                    {
+                        var staleJson = await File.ReadAllTextAsync(_cachePath, cancellationToken).ConfigureAwait(false);
+                        var staleReg = ParseRegistry(staleJson);
+                        if (staleReg is not null)
+                        {
+                            SetCache(staleReg);
+                            return staleReg;
+                        }
+                    }
+                    catch (IOException) { }
+                }
+                if (_cached is not null)
+                    return _cached;
             }
         }
 
-        return _cached;
+        return diskCached ?? _cached;
     }
 
     public static ParityResult CheckParity(RegistryEntry registryEntry, string installedVersion, string? appVersion = null)
