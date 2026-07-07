@@ -28,6 +28,7 @@ public sealed class HookHttpServer : IDisposable
 
     public void SetContext(JsonElement context) => _context = context;
     public ContextInjector? Injector { get; set; }
+    public AmbientContextAggregator? Aggregator { get; set; }
 
     public async Task StartAsync()
     {
@@ -210,6 +211,12 @@ public sealed class HookHttpServer : IDisposable
                     _logger?.HookPayloadInvalid(adapter, eventName, ex.Message);
                 }
             }
+        }
+        else if (Aggregator is not null)
+        {
+            var ambient = Aggregator.Get(eventName) ?? Aggregator.Get("session");
+            if (ambient is { } amb)
+                context = amb;
         }
 
         var rendered = Injector.Render(adapter, eventName, context);

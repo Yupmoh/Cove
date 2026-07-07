@@ -76,6 +76,8 @@ public sealed class DaemonHost
         PopulateHookMatrix(matrix, System.IO.Path.Combine(dataDir, "adapters"), logger);
         var injector = new Cove.Engine.Hooks.ContextInjector(matrix);
         _hookServer.Injector = injector;
+        var aggregator = new Cove.Engine.Hooks.AmbientContextAggregator();
+        _hookServer.Aggregator = aggregator;
         await _hookServer.StartAsync();
 
         var wsDir = System.IO.Path.Combine(dataDir, "workspaces", "default");
@@ -97,6 +99,7 @@ public sealed class DaemonHost
             _layout!.LoadSnapshot(sl);
         }
         _restoration.EmitProgress("default", "restore_complete", Cove.Engine.Restart.RestorePhase.Completed);
+        PopulateAmbientAggregator(aggregator, dataDir, logger);
         _layout!.OnChanged = () =>
         {
             try { Cove.Engine.Layout.WorkspacePersistence.Save(_layout.ToSnapshot("default", "default", System.Environment.CurrentDirectory), _panes!.Descriptors(), wsDir); }
@@ -464,6 +467,15 @@ public sealed class DaemonHost
                 logger.HookMatrixManifestLoadFailed(manifestPath, ex.Message);
             }
         }
+    }
+
+    private static void PopulateAmbientAggregator(Cove.Engine.Hooks.AmbientContextAggregator aggregator, string dataDir, ILogger logger)
+    {
+        var primerPath = System.IO.Path.Combine(dataDir, "cove-context.md");
+        var primer = System.IO.File.Exists(primerPath) ? System.IO.File.ReadAllText(primerPath) : "";
+        aggregator.Add("sessionStartManifest", new Cove.Engine.Hooks.SessionStartContextProvider(primer, "", ""));
+        aggregator.Add("userPromptSubmit", new Cove.Engine.Hooks.LocationContextProvider("default", null, "default", System.Array.Empty<string?>()));
+        aggregator.Add("preToolUse", new Cove.Engine.Hooks.RunCommandContextProvider(System.Array.Empty<string>()));
     }
 
     private async Task IdleMonitorAsync(CancellationToken cancellationToken)
