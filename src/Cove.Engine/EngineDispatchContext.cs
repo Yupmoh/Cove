@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
 using Cove.Adapters;
 using Cove.Engine.Agents;
+using Cove.Engine.Browser;
 using Cove.Engine.Hooks;
 using Cove.Engine.Knowledge;
 using Cove.Engine.Launch;
@@ -38,7 +39,8 @@ public sealed class EngineDispatchContext
         TaskStore? tasks = null,
         NoteStore? notes = null,
         TimelineStore? timeline = null,
-        PaneTypeRegistry? paneTypes = null)
+        PaneTypeRegistry? paneTypes = null,
+        BrowserPaneManager? browser = null)
     {
         Request = request;
         Panes = panes;
@@ -62,6 +64,7 @@ public sealed class EngineDispatchContext
         Notes = notes;
         Timeline = timeline;
         PaneTypes = paneTypes;
+        Browser = browser;
     }
 
     public ControlRequest Request { get; }
@@ -86,6 +89,7 @@ public sealed class EngineDispatchContext
     public NoteStore? Notes { get; }
     public TimelineStore? Timeline { get; }
     public PaneTypeRegistry? PaneTypes { get; }
+    public BrowserPaneManager? Browser { get; }
 
     public ControlResponse Ok<T>(T data, JsonTypeInfo<T> typeInfo)
         => new ControlResponse(Request.Id, true, JsonSerializer.SerializeToElement(data, typeInfo));

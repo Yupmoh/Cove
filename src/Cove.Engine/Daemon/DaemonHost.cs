@@ -49,6 +49,7 @@ public sealed class DaemonHost
     private Cove.Engine.Knowledge.NoteStore? _notes;
     private Cove.Engine.Knowledge.TimelineStore? _timeline;
     private Cove.Engine.Panes.PaneTypeRegistry? _paneTypes;
+    private Cove.Engine.Browser.BrowserPaneManager? _browser;
 
     public DaemonHost(DaemonPaths paths, IControlEndpoint endpoint, bool exitWhenIdle)
     {
@@ -90,6 +91,7 @@ public sealed class DaemonHost
         _notes = new Cove.Engine.Knowledge.NoteStore(dataDir);
         _timeline = new Cove.Engine.Knowledge.TimelineStore(dataDir);
         _paneTypes = Cove.Engine.Panes.PaneTypeRegistry.CreateWithBuiltins();
+        _browser = new Cove.Engine.Browser.BrowserPaneManager();
         _hookServer.OnEvent += _hookRouter.Route;
         var matrix = new Cove.Engine.Hooks.HookEnvelopeMatrix();
         PopulateHookMatrix(matrix, System.IO.Path.Combine(dataDir, "adapters"), logger);
@@ -303,7 +305,7 @@ public sealed class DaemonHost
             await WriteResponseAsync(conn, Fail(req.Id, "not_ready", "sys/hello required before other requests"), cancellationToken).ConfigureAwait(false);
             return false;
         }
-        ControlResponse? generated = await Cove.Engine.EngineCommandRouter.RouteAsync(req, _panes, _layout, _workspaces, _runCommands, _restoration, _snapshots, _skills, _agents, _launchProfiles, _adapterEnv, _hookServer, _hookRouter, _agentRouter, _activity, _sessions, _lifecycle, _launcher, _tasks, _notes, _timeline, _paneTypes, cancellationToken).ConfigureAwait(false);
+        ControlResponse? generated = await Cove.Engine.EngineCommandRouter.RouteAsync(req, _panes, _layout, _workspaces, _runCommands, _restoration, _snapshots, _skills, _agents, _launchProfiles, _adapterEnv, _hookServer, _hookRouter, _agentRouter, _activity, _sessions, _lifecycle, _launcher, _tasks, _notes, _timeline, _paneTypes, _browser, cancellationToken).ConfigureAwait(false);
 
         if (generated is not null)
         {

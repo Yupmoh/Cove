@@ -164,6 +164,11 @@ public sealed record TimelineListResult(System.Collections.Generic.IReadOnlyList
 public sealed record PaneTypeDto(string Name, string DisplayName, string ContentSource, bool IsDockable);
 public sealed record PaneTypeListResult(System.Collections.Generic.IReadOnlyList<PaneTypeDto> PaneTypes);
 
+public sealed record BrowserOpenParams(string PaneId, string Url);
+public sealed record BrowserNavigateParams(string PaneId, string Url);
+public sealed record BrowserPaneRefParams(string PaneId);
+public sealed record BrowserPaneDto(string PaneId, string CurrentUrl, System.Collections.Generic.IReadOnlyList<string> History, int HistoryIndex, bool CanGoBack, bool CanGoForward);
+
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
@@ -245,5 +250,9 @@ public sealed record PaneTypeListResult(System.Collections.Generic.IReadOnlyList
 [JsonSerializable(typeof(TimelineListResult))]
 [JsonSerializable(typeof(PaneTypeDto))]
 [JsonSerializable(typeof(PaneTypeListResult))]
+[JsonSerializable(typeof(BrowserOpenParams))]
+[JsonSerializable(typeof(BrowserNavigateParams))]
+[JsonSerializable(typeof(BrowserPaneRefParams))]
+[JsonSerializable(typeof(BrowserPaneDto))]
 [JsonSerializable(typeof(JsonElement))]
 public sealed partial class CoveJsonContext : JsonSerializerContext;
