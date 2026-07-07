@@ -14,10 +14,10 @@ public sealed class CoveGuiCommands
         => await Call("cove://commands/pane.list", null, ct);
 
     [RynCommand("app.paneSpawn")]
-    public async ValueTask<string> PaneSpawn(string command, string cwd, string inheritCwdFrom, int cols, int rows, CancellationToken ct)
+    public async ValueTask<string> PaneSpawn(string command, string cwd, string inheritCwdFrom, int cols, int rows, string adapter, string agentName, string workspace, string room, CancellationToken ct)
     {
         var shell = string.IsNullOrEmpty(command) ? DefaultShell() : command;
-        var p = JsonSerializer.SerializeToElement(new SpawnParams(shell, Array.Empty<string>(), N(cwd), null, cols, rows, N(inheritCwdFrom)), CoveJsonContext.Default.SpawnParams);
+        var p = JsonSerializer.SerializeToElement(new SpawnParams(shell, Array.Empty<string>(), N(cwd), null, cols, rows, N(inheritCwdFrom), N(adapter), N(agentName), N(workspace), N(room)), CoveJsonContext.Default.SpawnParams);
         return await Call("cove://commands/pane.spawn", p, ct);
     }
 
@@ -71,6 +71,10 @@ public sealed class CoveGuiCommands
     }
 
     private static string? N(string s) => string.IsNullOrEmpty(s) ? null : s;
+
+    [RynCommand("app.adapterList")]
+    public async ValueTask<string> AdapterList(CancellationToken ct)
+        => await Call("cove://commands/adapter.list", null, ct);
 
     private static string DefaultShell()
         => OperatingSystem.IsWindows() ? "powershell.exe" : (Environment.GetEnvironmentVariable("SHELL") ?? "/bin/zsh");

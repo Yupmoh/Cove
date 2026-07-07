@@ -9,6 +9,7 @@ namespace Cove.Engine.Hooks;
 public sealed class HookHttpServer : IDisposable
 {
     private readonly string _dataDir;
+    public string DataDir => _dataDir;
     private readonly ILogger? _logger;
     private HttpListener? _listener;
     private CancellationTokenSource? _cts;

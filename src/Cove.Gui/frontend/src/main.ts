@@ -663,11 +663,34 @@ document.getElementById("find-prev")!.addEventListener("click", () => doFind(-1)
 document.getElementById("find-close")!.addEventListener("click", closeFind);
 
 const launcherEl = document.getElementById("launcher")!;
-function openLauncher() { launcherEl.classList.add("open"); }
+function openLauncher() { launcherEl.classList.add("open"); void loadLauncherAgents(); }
 function closeLauncher() { launcherEl.classList.remove("open"); if (focusedPaneId) panes.get(focusedPaneId)?.term.focus(); }
-document.getElementById("launch-term")!.addEventListener("click", () => { closeLauncher(); void newRoom(); });
 launcherEl.addEventListener("mousedown", (e) => { if (e.target === launcherEl) closeLauncher(); });
 launcherEl.addEventListener("keydown", (e) => { if (e.key === "Escape") closeLauncher(); });
+
+const launchAgentsEl = document.getElementById("launch-agents")!;
+interface AdapterInfo { name: string; displayName: string; accent: string; binary: string; }
+interface AdapterListResult { adapters: AdapterInfo[]; }
+async function loadLauncherAgents(): Promise<void> {
+  try {
+    const result = await invoke<AdapterListResult>("app.adapterList", {});
+    launchAgentsEl.innerHTML = "";
+    for (const a of result.adapters ?? []) {
+      const tile = document.createElement("div");
+      tile.className = "launch-tile";
+      tile.innerHTML = `<span class="ic" style="color:${a.accent || "#4cc2d6"}">&#9881;</span><span class="lbl">${a.displayName || a.name}</span>`;
+      tile.addEventListener("click", () => { closeLauncher(); void spawnAgent(a); });
+      launchAgentsEl.appendChild(tile);
+    }
+  } catch { void 0; }
+}
+async function spawnAgent(a: AdapterInfo): Promise<void> {
+  const sp = (await invoke<{ paneId: string }>("app.paneSpawn", { command: a.binary, args: [] as string[], cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: a.name, agentName: a.displayName, workspace: "", room: "" })).paneId;
+  const r = await invoke<{ roomId: string }>("app.layoutMutate", { op: "createRoom", newPaneId: sp, name: a.displayName || a.name, roomId: "", targetPaneId: "", orientation: "", paneId: "", dir: 0 });
+  activeRoomId = r.roomId;
+  await reload();
+  focusPane(sp);
+}
 
 window.addEventListener("keydown", (e) => {
   if (!e.metaKey) return;

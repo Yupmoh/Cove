@@ -99,6 +99,9 @@ public sealed record LaunchOverrideGetParams(string PaneId);
 public sealed record ResumeCommandDto(string Command, string[] Args, string Cwd);
 public sealed record LauncherOverridesDto(bool Yolo, string? WorkingDir, string[] ExtraFlags, Dictionary<string, string> Env);
 
+public sealed record AdapterListItemDto(string Name, string DisplayName, string Accent, string Binary);
+public sealed record AdapterListResult(System.Collections.Generic.IReadOnlyList<AdapterListItemDto> Adapters);
+
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
@@ -159,5 +162,7 @@ public sealed record LauncherOverridesDto(bool Yolo, string? WorkingDir, string[
 [JsonSerializable(typeof(LaunchOverrideGetParams))]
 [JsonSerializable(typeof(ResumeCommandDto))]
 [JsonSerializable(typeof(LauncherOverridesDto))]
+[JsonSerializable(typeof(AdapterListItemDto))]
+[JsonSerializable(typeof(AdapterListResult))]
 [JsonSerializable(typeof(JsonElement))]
 public sealed partial class CoveJsonContext : JsonSerializerContext;
