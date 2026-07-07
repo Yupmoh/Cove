@@ -30,6 +30,8 @@ public sealed class WorkspaceManager : IAsyncDisposable
 
     public RegistryModel Registry => _registry.State;
 
+    public string NewId() => _newId();
+
     public Actor<WorkspaceModel>? Get(string id)
     {
         lock (_mapGate)

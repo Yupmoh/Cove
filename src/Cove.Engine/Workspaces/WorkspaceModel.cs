@@ -25,6 +25,7 @@ public sealed record Room
     public string? ActivePaneId { get; init; }
     public required MosaicNode LayoutTree { get; init; }
     public string? ZoomedPaneId { get; init; }
+    public bool Pinned { get; init; }
 }
 
 public sealed record WorkspaceModel

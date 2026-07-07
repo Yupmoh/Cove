@@ -63,6 +63,48 @@ public static class WorkspaceInvariants
         return model with { ActiveRoomId = wingRooms[0].Id };
     }
 
+    public static WorkspaceModel AddRoom(WorkspaceModel model, string wingId, string roomId, string paneId, string name)
+    {
+        var wing = model.Wings.Any(w => w.Id == wingId) ? wingId : WorkspaceModel.MainWingId;
+        var room = new Room
+        {
+            Id = roomId,
+            Name = name,
+            WingId = wing,
+            ActivePaneId = paneId,
+            LayoutTree = new PaneLeaf { PaneId = paneId },
+        };
+        var rooms = new List<Room>(model.Rooms) { room };
+        var panes = new Dictionary<string, PaneRecord>(model.Panes) { [paneId] = new PaneRecord { PaneId = paneId } };
+        return model with { Rooms = rooms, Panes = panes, ActiveRoomId = roomId };
+    }
+
+    public static WorkspaceModel RenameRoom(WorkspaceModel model, string roomId, string name)
+        => model with { Rooms = model.Rooms.Select(r => r.Id == roomId ? r with { Name = name } : r).ToList() };
+
+    public static WorkspaceModel SetRoomPinned(WorkspaceModel model, string roomId, bool pinned)
+        => model with { Rooms = model.Rooms.Select(r => r.Id == roomId ? r with { Pinned = pinned } : r).ToList() };
+
+    public static WorkspaceModel MoveRoomToWing(WorkspaceModel model, string roomId, string wingId)
+    {
+        if (!model.Wings.Any(w => w.Id == wingId))
+            return model;
+        return model with { Rooms = model.Rooms.Select(r => r.Id == roomId ? r with { WingId = wingId } : r).ToList() };
+    }
+
+    public static WorkspaceModel SwitchRoom(WorkspaceModel model, string roomId)
+        => model.Rooms.Any(r => r.Id == roomId) ? model with { ActiveRoomId = roomId } : model;
+
+    public static WorkspaceModel AddWing(WorkspaceModel model, string wingId, string name)
+    {
+        if (model.Wings.Any(w => w.Id == wingId))
+            return model;
+        return model with { Wings = new List<Wing>(model.Wings) { new Wing { Id = wingId, Name = name } } };
+    }
+
+    public static WorkspaceModel RenameWing(WorkspaceModel model, string wingId, string name)
+        => model with { Wings = model.Wings.Select(w => w.Id == wingId ? w with { Name = name } : w).ToList() };
+
     private static (Room Room, PaneRecord Pane) Mint(string wingId, Func<string> newId)
     {
         var paneId = newId();
