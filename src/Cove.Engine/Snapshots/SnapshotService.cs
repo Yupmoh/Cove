@@ -44,6 +44,10 @@ public sealed class SnapshotService
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             await File.WriteAllTextAsync(path, kv.Value).ConfigureAwait(false);
         }
+        await _git.RunAsync(_coveDir, ["add", "-A"], CancellationToken.None).ConfigureAwait(false);
+        await _git.RunAsync(_coveDir, ["commit", "-m", $"{label}:{id} v{Cove.Platform.CoveBuild.InformationalVersion}", "--allow-empty"], CancellationToken.None).ConfigureAwait(false);
+
+
         await _git.RunAsync(_snapshotsDir, ["add", "-A"], CancellationToken.None).ConfigureAwait(false);
         var commitResult = await _git.RunAsync(_snapshotsDir, ["commit", "-m", $"{label}:{id}", "--allow-empty"], CancellationToken.None).ConfigureAwait(false);
         if (!commitResult.Ok)
@@ -136,15 +140,58 @@ public sealed class SnapshotService
         }
         return content;
     }
+    public async Task PruneAsync()
+    {
+        var all = await ListAsync().ConfigureAwait(false);
+        var now = DateTimeOffset.UtcNow;
+        var keep = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var s in all.Where(x => x.TakenAtUtc > now.AddHours(-24)).Take(24))
+            keep.Add(s.Id);
+
+        var older = all.Where(x => x.TakenAtUtc <= now.AddHours(-24)).ToList();
+        var byDay = older.GroupBy(x => x.TakenAtUtc.Date).OrderByDescending(g => g.Key).Take(6);
+        foreach (var day in byDay)
+            foreach (var s in day.Take(1))
+                keep.Add(s.Id);
+
+        foreach (var s in all)
+        {
+            if (keep.Contains(s.Id))
+                continue;
+            var tags = await _git.RunAsync(_snapshotsDir, ["tag", "-l", $"pin-{s.Id}"], CancellationToken.None).ConfigureAwait(false);
+            if (tags.Ok && !string.IsNullOrWhiteSpace(tags.Stdout))
+                keep.Add(s.Id);
+        }
+
+        await _git.RunAsync(_snapshotsDir, ["gc", "--prune=now"], CancellationToken.None).ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyList<Snapshot>> ListRetainedAsync()
+    {
+        var all = await ListAsync().ConfigureAwait(false);
+        var now = DateTimeOffset.UtcNow;
+        var keep = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var s in all.Where(x => x.TakenAtUtc > now.AddHours(-24)).Take(24))
+            keep.Add(s.Id);
+
+        var older = all.Where(x => x.TakenAtUtc <= now.AddHours(-24)).ToList();
+        var byDay = older.GroupBy(x => x.TakenAtUtc.Date).OrderByDescending(g => g.Key).Take(6);
+        foreach (var day in byDay)
+            foreach (var s in day.Take(1))
+                keep.Add(s.Id);
+
+        return all.Where(s => keep.Contains(s.Id)).ToList();
+    }
 
     public async Task PinAsync(string snapshotId)
     {
-        await Task.CompletedTask;
-    }
-
-    public async Task PruneAsync()
-    {
-        await _git.RunAsync(_snapshotsDir, ["gc", "--auto"], CancellationToken.None).ConfigureAwait(false);
+        var list = await ListAsync().ConfigureAwait(false);
+        var snap = list.FirstOrDefault(s => s.Id == snapshotId);
+        if (snap is null)
+            return;
+        await _git.RunAsync(_snapshotsDir, ["tag", $"pin-{snapshotId}", snap.Hash], CancellationToken.None).ConfigureAwait(false);
     }
 
     private async Task EnsureRepoAsync(string dir)
