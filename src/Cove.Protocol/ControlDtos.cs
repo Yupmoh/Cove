@@ -116,6 +116,9 @@ public sealed record OmniChatHistoryParams(string PaneId);
 public sealed record OmniChatHistoryResult(OmniChatMessageDto[] Messages);
 public sealed record OmniChatMessageDto(string Role, string Body, System.DateTimeOffset SentAt);
 public sealed record OmniChatClearParams(string PaneId);
+public sealed record PaneScopeGetParams(string PaneId);
+public sealed record PaneScopeSetParams(string PaneId, string Scope);
+public sealed record PaneScopeResult(string PaneId, string Scope);
 public sealed record LauncherOptionsParams(string Adapter);
 public sealed record LauncherOptionsResponse(LauncherOptionDto[] Options);
 public sealed record LauncherOptionDto(string Key, string Label, string Type, string? DefaultValueRaw, LauncherOptionChoiceDto[]? Choices);
@@ -266,6 +269,9 @@ public sealed record BrowserPaneDto(string PaneId, string CurrentUrl, System.Col
 [JsonSerializable(typeof(OmniChatHistoryParams))]
 [JsonSerializable(typeof(OmniChatHistoryResult))]
 [JsonSerializable(typeof(OmniChatClearParams))]
+[JsonSerializable(typeof(PaneScopeGetParams))]
+[JsonSerializable(typeof(PaneScopeSetParams))]
+[JsonSerializable(typeof(PaneScopeResult))]
 [JsonSerializable(typeof(ProtocolResolveParams))]
 [JsonSerializable(typeof(ProtocolResolveResult))]
 [JsonSerializable(typeof(TaskCard))]

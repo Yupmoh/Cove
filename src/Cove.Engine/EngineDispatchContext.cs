@@ -13,6 +13,7 @@ using Cove.Engine.Panes;
 using Cove.Engine.Pty;
 using Cove.Engine.Sessions;
 using Cove.Engine.Tasks;
+using Cove.Engine.Protocol;
 using Cove.Protocol;
 
 namespace Cove.Engine;
@@ -46,7 +47,8 @@ public sealed class EngineDispatchContext
         ConfigService? config = null,
         AdapterManifestStore? manifestStore = null,
         RegistryService? registry = null,
-        OmniChatStore? omniChat = null)
+        OmniChatStore? omniChat = null,
+        PaneScopeStore? paneScopes = null)
     {
         Request = request;
         Panes = panes;
@@ -75,6 +77,7 @@ public sealed class EngineDispatchContext
         ManifestStore = manifestStore;
         Registry = registry;
         OmniChat = omniChat;
+        PaneScopes = paneScopes;
     }
 
     public ControlRequest Request { get; }
@@ -104,6 +107,7 @@ public sealed class EngineDispatchContext
     public AdapterManifestStore? ManifestStore { get; }
     public OmniChatStore? OmniChat { get; }
     public RegistryService? Registry { get; }
+    public PaneScopeStore? PaneScopes { get; }
 
     public ControlResponse Ok<T>(T data, JsonTypeInfo<T> typeInfo)
         => new ControlResponse(Request.Id, true, JsonSerializer.SerializeToElement(data, typeInfo));
