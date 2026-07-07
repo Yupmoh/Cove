@@ -177,6 +177,7 @@ public sealed class DaemonHost
 
         await listener.DisposeAsync().ConfigureAwait(false);
         try { _restoration?.MarkCleanShutdown(); } catch (System.Exception ex) { logger.LogWarning(ex, "clean-shutdown marker failed"); }
+        try { if (_panes is { } reg) foreach (var info in reg.List()) { var bytes = reg.SnapshotRing(info.PaneId); if (bytes.Length > 0) Cove.Engine.Layout.WorkspacePersistence.SaveScrollback(info.PaneId, bytes, wsDir); } } catch (System.Exception ex) { logger.LogWarning(ex, "shutdown scrollback snapshot failed"); }
         _scrollbackTimer?.Dispose();
         if (_runCommands is not null)
             await _runCommands.DisposeAsync().ConfigureAwait(false);
