@@ -130,20 +130,26 @@ public sealed class AdapterInstallService
         }
     }
 
-    private static void InstallSkill(string adapterDir, AdapterManifest manifest, string name)
+    private void InstallSkill(string adapterDir, AdapterManifest manifest, string name)
     {
         if (string.IsNullOrEmpty(manifest.SkillInstallPath))
             return;
         var source = Path.Combine(adapterDir, "skill.md");
         if (!File.Exists(source))
+        {
+            _logger?.SkillInstallSkipped(name, manifest.SkillInstallPath);
             return;
+        }
         try
         {
             var destDir = Path.GetDirectoryName(manifest.SkillInstallPath);
             if (destDir is not null) Directory.CreateDirectory(destDir);
             File.Copy(source, manifest.SkillInstallPath, overwrite: true);
         }
-        catch (IOException) { }
+        catch (IOException ex)
+        {
+            _logger?.SkillInstallFailed(name, manifest.SkillInstallPath, ex.Message);
+        }
     }
 
     private async Task RunHookAsync(string adapterDir, string @event, string adapterName, CancellationToken ct, int timeoutSeconds)

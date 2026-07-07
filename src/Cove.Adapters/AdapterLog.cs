@@ -17,6 +17,9 @@ internal static partial class AdapterLog
     [ZLoggerMessage(LogLevel.Warning, "skill install skipped missing path adapter={adapter} skillInstallPath={path}")]
     public static partial void SkillInstallSkipped(this ILogger logger, string adapter, string path);
 
+    [ZLoggerMessage(LogLevel.Warning, "skill install failed adapter={adapter} path={path} error={error}")]
+    public static partial void SkillInstallFailed(this ILogger logger, string adapter, string path, string error);
+
     [ZLoggerMessage(LogLevel.Warning, "skill remove failed adapter={adapter} path={path} error={error}")]
     public static partial void SkillRemoveFailed(this ILogger logger, string adapter, string path, string error);
 
