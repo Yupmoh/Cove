@@ -142,7 +142,18 @@ public sealed class SnapshotService
     }
     public async Task PruneAsync()
     {
+        await _git.RunAsync(_snapshotsDir, ["gc", "--prune=now"], CancellationToken.None).ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyList<Snapshot>> ListRetainedAsync()
+    {
         var all = await ListAsync().ConfigureAwait(false);
+        var keep = await ComputeRetainedIdsAsync(all).ConfigureAwait(false);
+        return all.Where(s => keep.Contains(s.Id)).ToList();
+    }
+
+    private async Task<HashSet<string>> ComputeRetainedIdsAsync(IReadOnlyList<Snapshot> all)
+    {
         var now = DateTimeOffset.UtcNow;
         var keep = new HashSet<string>(StringComparer.Ordinal);
 
@@ -164,25 +175,7 @@ public sealed class SnapshotService
                 keep.Add(s.Id);
         }
 
-        await _git.RunAsync(_snapshotsDir, ["gc", "--prune=now"], CancellationToken.None).ConfigureAwait(false);
-    }
-
-    public async Task<IReadOnlyList<Snapshot>> ListRetainedAsync()
-    {
-        var all = await ListAsync().ConfigureAwait(false);
-        var now = DateTimeOffset.UtcNow;
-        var keep = new HashSet<string>(StringComparer.Ordinal);
-
-        foreach (var s in all.Where(x => x.TakenAtUtc > now.AddHours(-24)).Take(24))
-            keep.Add(s.Id);
-
-        var older = all.Where(x => x.TakenAtUtc <= now.AddHours(-24)).ToList();
-        var byDay = older.GroupBy(x => x.TakenAtUtc.Date).OrderByDescending(g => g.Key).Take(6);
-        foreach (var day in byDay)
-            foreach (var s in day.Take(1))
-                keep.Add(s.Id);
-
-        return all.Where(s => keep.Contains(s.Id)).ToList();
+        return keep;
     }
 
     public async Task PinAsync(string snapshotId)

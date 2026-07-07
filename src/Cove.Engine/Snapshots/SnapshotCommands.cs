@@ -28,8 +28,7 @@ public static class SnapshotCommands
     {
         if (ctx.Snapshots is not { } svc)
             return ctx.Fail("not_ready", "snapshot service unavailable");
-
-        var snapshots = await svc.ListAsync().ConfigureAwait(false);
+        var snapshots = await svc.ListRetainedAsync().ConfigureAwait(false);
         var result = snapshots.Select(s => new SnapshotListItem(s.Id, s.Hash, s.Trigger.ToString(), s.TakenAtUtc, s.Pinned)).ToList();
         return ctx.Ok(new SnapshotListResult(result), SnapshotVerbJsonContext.Default.SnapshotListResult);
     }
