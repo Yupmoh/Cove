@@ -124,6 +124,10 @@ public sealed class DaemonHost
 
         await listener.DisposeAsync().ConfigureAwait(false);
         _scrollbackTimer?.Dispose();
+        if (_runCommands is not null)
+            await _runCommands.DisposeAsync().ConfigureAwait(false);
+        if (_workspaces is not null)
+            await _workspaces.DisposeAsync().ConfigureAwait(false);
         _panes?.Dispose();
         if (!OperatingSystem.IsWindows())
         {
