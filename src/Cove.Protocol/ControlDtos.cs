@@ -19,6 +19,7 @@ public sealed record ControlResponse(
 public sealed record ControlError(string Code, string Message);
 
 public sealed record ControlEvent(string Channel, JsonElement Payload);
+public sealed record StateChangedEvent(string Uri);
 
 public sealed record ControlErrorFrame(string Code, string Message, ulong? StreamId = null);
 
@@ -182,6 +183,7 @@ public sealed record BrowserPaneDto(string PaneId, string CurrentUrl, System.Col
 [JsonSerializable(typeof(ControlRequest))]
 [JsonSerializable(typeof(ControlResponse))]
 [JsonSerializable(typeof(ControlEvent))]
+[JsonSerializable(typeof(StateChangedEvent))]
 [JsonSerializable(typeof(ControlErrorFrame))]
 [JsonSerializable(typeof(HelloParams))]
 [JsonSerializable(typeof(HelloResult))]

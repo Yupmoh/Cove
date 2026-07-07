@@ -313,6 +313,8 @@ public sealed class DaemonHost
 
         if (generated is not null)
         {
+            if (generated.Ok && IsMutatingVerb(req.Uri))
+                BroadcastEvent("state.changed", new StateChangedEvent(req.Uri), Cove.Protocol.CoveJsonContext.Default.StateChangedEvent);
             await WriteResponseAsync(conn, generated, cancellationToken).ConfigureAwait(false);
             return false;
         }
@@ -470,6 +472,16 @@ public sealed class DaemonHost
             _ = gui.WriteFrameAsync(FrameType.Event, 0, frame, _shutdown.Token);
     }
 
+    private static bool IsMutatingVerb(string uri)
+    {
+        return uri.StartsWith("cove://commands/workspace.", System.StringComparison.Ordinal)
+            || uri.StartsWith("cove://commands/room.", System.StringComparison.Ordinal)
+            || uri.StartsWith("cove://commands/wing.", System.StringComparison.Ordinal)
+            || uri.StartsWith("cove://commands/collection.", System.StringComparison.Ordinal)
+            || uri.StartsWith("cove://commands/resident.", System.StringComparison.Ordinal)
+            || uri.StartsWith("cove://commands/worktree.", System.StringComparison.Ordinal)
+            || uri.StartsWith("cove://commands/workspace-command.", System.StringComparison.Ordinal);
+    }
     private static void PopulateHookMatrix(Cove.Engine.Hooks.HookEnvelopeMatrix matrix, string adaptersRoot, ILogger logger)
     {
         if (!System.IO.Directory.Exists(adaptersRoot))
