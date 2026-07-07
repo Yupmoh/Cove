@@ -25,4 +25,10 @@ internal static partial class HookLog
 
     [ZLoggerMessage(LogLevel.Warning, "hook event unknown adapter={adapter} event={eventName}")]
     public static partial void HookEventUnknown(this ILogger logger, string adapter, string eventName);
+
+    [ZLoggerMessage(LogLevel.Warning, "hook resolve missing params adapter={adapter} event={eventName}")]
+    public static partial void HookResolveMissingParams(this ILogger logger, string adapter, string eventName);
+
+    [ZLoggerMessage(LogLevel.Warning, "hook matrix manifest load failed path={path} error={error}")]
+    public static partial void HookMatrixManifestLoadFailed(this ILogger logger, string path, string error);
 }

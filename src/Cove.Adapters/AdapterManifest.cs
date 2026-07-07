@@ -22,7 +22,17 @@ public sealed record AdapterManifest
     public AdapterRetention? Retention { get; init; }
     public SessionExtractor? SessionExtractor { get; init; }
     public LauncherOptions? LauncherOptions { get; init; }
+    public IReadOnlyList<HookEnvelopeDeclaration> HookEnvelopes { get; init; } = [];
 }
+
+public sealed record HookEnvelopeDeclaration
+{
+    public required string Event { get; init; }
+    public required HookEnvelopeKind Kind { get; init; }
+    public bool IncludeSystemMessage { get; init; }
+}
+
+public enum HookEnvelopeKind { None, Identity, HookSpecificOutput, FlatAdditionalContext }
 
 public sealed record AdapterMethod
 {
@@ -107,8 +117,10 @@ public sealed record HookEvent
 [JsonSerializable(typeof(AdapterManifest))]
 [JsonSerializable(typeof(AdapterMethod))]
 [JsonSerializable(typeof(BinaryDiscovery))]
-[JsonSerializable(typeof(AdapterRetention))]
-[JsonSerializable(typeof(SessionExtractor))]
+[JsonSerializable(typeof(HookEnvelopeDeclaration))]
+[JsonSerializable(typeof(List<HookEnvelopeDeclaration>))]
+[JsonSerializable(typeof(AdapterEnvVar))]
+[JsonSerializable(typeof(List<AdapterEnvVar>))]
 [JsonSerializable(typeof(Registry))]
 [JsonSerializable(typeof(List<RegistryEntry>))]
 [JsonSerializable(typeof(InstallRecipe))]
@@ -117,6 +129,4 @@ public sealed record HookEvent
 [JsonSerializable(typeof(RecentSession))]
 [JsonSerializable(typeof(List<RecentSession>))]
 [JsonSerializable(typeof(LaunchProfile))]
-[JsonSerializable(typeof(AdapterEnvVar))]
-[JsonSerializable(typeof(List<AdapterEnvVar>))]
 public sealed partial class AdaptersJsonContext : JsonSerializerContext { }

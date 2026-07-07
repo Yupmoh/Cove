@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
+using Cove.Engine.Hooks;
 using Cove.Engine.Pty;
 using Cove.Platform;
 using Cove.Platform.Ipc;
@@ -71,6 +72,10 @@ public sealed class DaemonHost
         _hookServer = new Cove.Engine.Hooks.HookHttpServer(dataDir, logger);
         _hookRouter = new Cove.Engine.Hooks.HookEventRouter(logger);
         _hookServer.OnEvent += _hookRouter.Route;
+        var matrix = new Cove.Engine.Hooks.HookEnvelopeMatrix();
+        PopulateHookMatrix(matrix, System.IO.Path.Combine(dataDir, "adapters"), logger);
+        var injector = new Cove.Engine.Hooks.ContextInjector(matrix);
+        _hookServer.Injector = injector;
         await _hookServer.StartAsync();
 
         var wsDir = System.IO.Path.Combine(dataDir, "workspaces", "default");
@@ -436,6 +441,29 @@ public sealed class DaemonHost
         var frame = ControlCodec.Encode(new ControlEvent(channel, element));
         foreach (var gui in guis)
             _ = gui.WriteFrameAsync(FrameType.Event, 0, frame, _shutdown.Token);
+    }
+
+    private static void PopulateHookMatrix(Cove.Engine.Hooks.HookEnvelopeMatrix matrix, string adaptersRoot, ILogger logger)
+    {
+        if (!System.IO.Directory.Exists(adaptersRoot))
+            return;
+        foreach (var dir in System.IO.Directory.EnumerateDirectories(adaptersRoot))
+        {
+            var manifestPath = System.IO.Path.Combine(dir, "adapter.json");
+            if (!System.IO.File.Exists(manifestPath))
+                continue;
+            try
+            {
+                var json = System.IO.File.ReadAllText(manifestPath);
+                var manifest = System.Text.Json.JsonSerializer.Deserialize(json, Cove.Adapters.AdaptersJsonContext.Default.AdapterManifest);
+                if (manifest is not null)
+                    matrix.RegisterFromManifest(manifest);
+            }
+            catch (System.Exception ex)
+            {
+                logger.HookMatrixManifestLoadFailed(manifestPath, ex.Message);
+            }
+        }
     }
 
     private async Task IdleMonitorAsync(CancellationToken cancellationToken)

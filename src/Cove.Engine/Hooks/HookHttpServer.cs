@@ -27,6 +27,7 @@ public sealed class HookHttpServer : IDisposable
     }
 
     public void SetContext(JsonElement context) => _context = context;
+    public ContextInjector? Injector { get; set; }
 
     public async Task StartAsync()
     {
@@ -92,6 +93,12 @@ public sealed class HookHttpServer : IDisposable
             if (method == "POST" && path.StartsWith("/api/adapter/", StringComparison.Ordinal))
             {
                 RespondEmit(ctx);
+                return;
+            }
+
+            if (method == "POST" && path == "/resolve")
+            {
+                RespondResolve(ctx);
                 return;
             }
 
@@ -168,6 +175,49 @@ public sealed class HookHttpServer : IDisposable
             writer.Flush();
         }
         var bytes = buffer.ToArray();
+        ctx.Response.OutputStream.Write(bytes, 0, bytes.Length);
+        ctx.Response.Close();
+    }
+
+    private void RespondResolve(HttpListenerContext ctx)
+    {
+        var adapter = ctx.Request.Headers["X-Cove-Adapter"];
+        var eventName = ctx.Request.Headers["X-Cove-Event"];
+        var paneId = ctx.Request.Headers["X-Cove-Pane-Id"];
+
+        if (Injector is null || adapter is null || eventName is null)
+        {
+            _logger?.HookResolveMissingParams(adapter ?? "", eventName ?? "");
+            ctx.Response.StatusCode = 400;
+            ctx.Response.Close();
+            return;
+        }
+
+        JsonElement context = JsonDocument.Parse("{}").RootElement.Clone();
+        if (ctx.Request.HasEntityBody && ctx.Request.ContentLength64 > 0)
+        {
+            using var reader = new StreamReader(ctx.Request.InputStream);
+            var body = reader.ReadToEnd();
+            if (!string.IsNullOrEmpty(body))
+            {
+                try
+                {
+                    using var doc = JsonDocument.Parse(body);
+                    context = doc.RootElement.Clone();
+                }
+                catch (JsonException ex)
+                {
+                    _logger?.HookPayloadInvalid(adapter, eventName, ex.Message);
+                }
+            }
+        }
+
+        var rendered = Injector.Render(adapter, eventName, context);
+        if (paneId is not null)
+            ctx.Response.Headers["X-Cove-Pane-Id"] = paneId;
+        ctx.Response.StatusCode = 200;
+        ctx.Response.ContentType = "application/json";
+        var bytes = System.Text.Encoding.UTF8.GetBytes(rendered);
         ctx.Response.OutputStream.Write(bytes, 0, bytes.Length);
         ctx.Response.Close();
     }
