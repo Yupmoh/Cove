@@ -6,6 +6,7 @@ using Cove.Engine.Hooks;
 using Cove.Engine.Knowledge;
 using Cove.Engine.Launch;
 using Cove.Engine.Lifecycle;
+using Cove.Engine.Panes;
 using Cove.Engine.Pty;
 using Cove.Engine.Sessions;
 using Cove.Engine.Tasks;
@@ -36,7 +37,8 @@ public sealed class EngineDispatchContext
         LaunchOrchestrator? launcher = null,
         TaskStore? tasks = null,
         NoteStore? notes = null,
-        TimelineStore? timeline = null)
+        TimelineStore? timeline = null,
+        PaneTypeRegistry? paneTypes = null)
     {
         Request = request;
         Panes = panes;
@@ -59,6 +61,7 @@ public sealed class EngineDispatchContext
         Tasks = tasks;
         Notes = notes;
         Timeline = timeline;
+        PaneTypes = paneTypes;
     }
 
     public ControlRequest Request { get; }
@@ -82,6 +85,7 @@ public sealed class EngineDispatchContext
     public TaskStore? Tasks { get; }
     public NoteStore? Notes { get; }
     public TimelineStore? Timeline { get; }
+    public PaneTypeRegistry? PaneTypes { get; }
 
     public ControlResponse Ok<T>(T data, JsonTypeInfo<T> typeInfo)
         => new ControlResponse(Request.Id, true, JsonSerializer.SerializeToElement(data, typeInfo));

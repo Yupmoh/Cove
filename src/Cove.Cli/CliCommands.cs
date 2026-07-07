@@ -265,4 +265,8 @@ internal static class CliCommands
     [CoveCommand("timeline append")]
     public static Task<int> TimelineAppend(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/timeline.append");
+
+    [CoveCommand("pane-types list")]
+    public static Task<int> PaneTypesList(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/pane-types.list");
 }

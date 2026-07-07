@@ -161,6 +161,9 @@ public sealed record TimelineAppendParams(string WorkspaceId, string Kind, strin
 public sealed record TimelineListParams(string WorkspaceId);
 public sealed record TimelineListResult(System.Collections.Generic.IReadOnlyList<TimelineEntry> Entries);
 
+public sealed record PaneTypeDto(string Name, string DisplayName, string ContentSource, bool IsDockable);
+public sealed record PaneTypeListResult(System.Collections.Generic.IReadOnlyList<PaneTypeDto> PaneTypes);
+
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
@@ -240,5 +243,7 @@ public sealed record TimelineListResult(System.Collections.Generic.IReadOnlyList
 [JsonSerializable(typeof(TimelineAppendParams))]
 [JsonSerializable(typeof(TimelineListParams))]
 [JsonSerializable(typeof(TimelineListResult))]
+[JsonSerializable(typeof(PaneTypeDto))]
+[JsonSerializable(typeof(PaneTypeListResult))]
 [JsonSerializable(typeof(JsonElement))]
 public sealed partial class CoveJsonContext : JsonSerializerContext;
