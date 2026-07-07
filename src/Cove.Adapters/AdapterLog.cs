@@ -28,4 +28,10 @@ internal static partial class AdapterLog
 
     [ZLoggerMessage(LogLevel.Warning, "referenced script missing adapter={adapter} script={script}")]
     public static partial void ReferencedScriptMissing(this ILogger logger, string adapter, string script);
+
+    [ZLoggerMessage(LogLevel.Warning, "skill index rebuild failed error={error}")]
+    public static partial void SkillRebuildFailed(this ILogger logger, string error);
+
+    [ZLoggerMessage(LogLevel.Warning, "skill watch root missing root={root}")]
+    public static partial void SkillWatchRootMissing(this ILogger logger, string root);
 }

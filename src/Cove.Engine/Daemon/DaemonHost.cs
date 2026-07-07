@@ -33,6 +33,7 @@ public sealed class DaemonHost
     private Cove.Engine.Workspaces.RunCommandService? _runCommands;
     private Cove.Engine.Restart.RestorationService? _restoration;
     private Cove.Engine.Snapshots.SnapshotService? _snapshots;
+    private Cove.Engine.Skills.SkillsService? _skills;
 
     public DaemonHost(DaemonPaths paths, IControlEndpoint endpoint, bool exitWhenIdle)
     {
@@ -59,6 +60,7 @@ public sealed class DaemonHost
         _runCommands = new Cove.Engine.Workspaces.RunCommandService(new Cove.Engine.Workspaces.RunCommandStore(System.IO.Path.Combine(dataDir, "run-commands"), logger), new Cove.Engine.Workspaces.PtyRunCommandSessionFactory(_ptyHost, spawnEnv, shellDir, logger));
         _restoration = new Cove.Engine.Restart.RestorationService(dataDir, logger, emitProgress: e => BroadcastEvent("restore.progress", e, Cove.Engine.Restart.RestorationJsonContext.Default.RestoreProgressEvent));
         _snapshots = new Cove.Engine.Snapshots.SnapshotService(dataDir, System.IO.Path.Combine(dataDir, "snapshots"), new Cove.Engine.Workspaces.ProcessGitRunner(), logger);
+        _skills = new Cove.Engine.Skills.SkillsService(dataDir, logger: logger);
 
 
         var wsDir = System.IO.Path.Combine(dataDir, "workspaces", "default");
@@ -141,6 +143,7 @@ public sealed class DaemonHost
         if (_workspaces is not null)
             await _workspaces.DisposeAsync().ConfigureAwait(false);
         _panes?.Dispose();
+        _skills?.Dispose();
         if (!OperatingSystem.IsWindows())
         {
             try { File.Delete(_paths.SocketPath); } catch { }
@@ -262,8 +265,8 @@ public sealed class DaemonHost
             await WriteResponseAsync(conn, Fail(req.Id, "not_ready", "sys/hello required before other requests"), cancellationToken).ConfigureAwait(false);
             return false;
         }
+        ControlResponse? generated = await Cove.Engine.EngineCommandRouter.RouteAsync(req, _panes, _layout, _workspaces, _runCommands, _restoration, _snapshots, _skills, cancellationToken).ConfigureAwait(false);
 
-        ControlResponse? generated = await Cove.Engine.EngineCommandRouter.RouteAsync(req, _panes, _layout, _workspaces, _runCommands, _restoration, _snapshots, cancellationToken).ConfigureAwait(false);
         if (generated is not null)
         {
             await WriteResponseAsync(conn, generated, cancellationToken).ConfigureAwait(false);

@@ -8,11 +8,12 @@
     <AssemblyName>cove</AssemblyName>
     <IsAotCompatible>true</IsAotCompatible>
   </PropertyGroup>
-
+  <ItemGroup>
+    <InternalsVisibleTo Include="Cove.Cli.Tests" />
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Cove.Engine/Cove.Engine.csproj" />
   </ItemGroup>
-
   <ItemGroup>
     <PackageReference Include="ZLogger" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />

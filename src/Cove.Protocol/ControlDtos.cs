@@ -55,6 +55,8 @@ public sealed record SessionStateResult(string PaneId, string Command, int Cols,
 public sealed record SearchParams(string PaneId, string Query, bool CaseSensitive = false);
 public sealed record SearchMatch(int Line, string Text);
 public sealed record SearchResult(SearchMatch[] Matches);
+public sealed record SkillIndexItem(string Name, string Description, string Source, string Provenance, string? Adapter);
+public sealed record SkillsIndexResult(SkillIndexItem[] Skills);
 
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
@@ -83,5 +85,7 @@ public sealed record SearchResult(SearchMatch[] Matches);
 [JsonSerializable(typeof(SearchParams))]
 [JsonSerializable(typeof(SearchMatch))]
 [JsonSerializable(typeof(SearchResult))]
+[JsonSerializable(typeof(SkillsIndexResult))]
+[JsonSerializable(typeof(SkillIndexItem))]
 [JsonSerializable(typeof(JsonElement))]
 public sealed partial class CoveJsonContext : JsonSerializerContext;

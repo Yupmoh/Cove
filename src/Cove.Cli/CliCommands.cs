@@ -16,4 +16,8 @@ internal static class CliCommands
     [CoveCommand("pane list")]
     public static Task<int> PaneList(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/pane.list");
+
+    [CoveCommand("skills list")]
+    public static Task<int> SkillsList(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/skills.index");
 }
