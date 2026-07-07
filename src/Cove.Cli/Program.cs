@@ -43,7 +43,7 @@ string? matchedVerb = null;
 }
 if (matchedVerb is not null)
 {
-    var context = new CommandContext(paths, endpoint, System.Console.Out);
+    var context = new CommandContext(paths, endpoint, System.Console.Out, args: cliArgs);
     var handler = (System.Func<CommandContext, System.Threading.Tasks.Task<int>>)CoveCommandRegistry.Handlers[matchedVerb];
     return await handler(context);
 }
