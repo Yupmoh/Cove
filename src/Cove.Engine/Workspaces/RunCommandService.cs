@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+
 namespace Cove.Engine.Workspaces;
 
 public interface IRunCommandSessionFactory
@@ -19,14 +21,16 @@ public sealed class RunCommandService : IAsyncDisposable
     private readonly IRunCommandStore _store;
     private readonly IRunCommandSessionFactory? _sessionFactory;
     private readonly Func<string> _newId;
+    private readonly Microsoft.Extensions.Logging.ILogger? _logger;
     private readonly Dictionary<string, RunCommandRuntime> _runtime = new(StringComparer.Ordinal);
     private readonly object _gate = new();
 
-    public RunCommandService(IRunCommandStore store, IRunCommandSessionFactory? sessionFactory = null, Func<string>? newId = null)
+    public RunCommandService(IRunCommandStore store, IRunCommandSessionFactory? sessionFactory = null, Func<string>? newId = null, Microsoft.Extensions.Logging.ILogger? logger = null)
     {
         _store = store;
         _sessionFactory = sessionFactory;
         _newId = newId ?? (() => "rc-" + Guid.NewGuid().ToString("N"));
+        _logger = logger;
     }
 
     public async Task<RunCommandDefinition> CreateAsync(string workspaceId, string label, string command, string? cwd)
@@ -119,6 +123,7 @@ public sealed class RunCommandService : IAsyncDisposable
         };
         lock (_gate)
             _runtime[id] = runtime;
+        PersistRunningSet();
         return ToStatus(id, runtime);
     }
 
@@ -134,6 +139,7 @@ public sealed class RunCommandService : IAsyncDisposable
         runtime.Session!.Stop();
         runtime.Lifecycle = RunCommandLifecycle.Stopped;
         runtime.StoppedAtUtc = DateTimeOffset.UtcNow;
+        PersistRunningSet();
         return ToStatus(id, runtime);
     }
 
@@ -170,6 +176,7 @@ public sealed class RunCommandService : IAsyncDisposable
         }
         lock (_gate)
             _runtime[id] = restarted;
+        PersistRunningSet();
         return ToStatus(id, restarted);
     }
 
@@ -240,6 +247,7 @@ public sealed class RunCommandService : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        PersistRunningSet();
         List<RunCommandRuntime> runtimes;
         lock (_gate)
         {
@@ -250,6 +258,43 @@ public sealed class RunCommandService : IAsyncDisposable
             r.Session?.Dispose();
     }
 
+    public async Task RelaunchPreviouslyRunningAsync()
+    {
+        var running = LoadRunningSet();
+        foreach (var id in running)
+        {
+            var def = await _store.GetAsync(id).ConfigureAwait(false);
+            if (def is null)
+                continue;
+            try { await StartAsync(id).ConfigureAwait(false); }
+            catch (System.Exception ex) { _logger?.LogWarning(ex, "run-command relaunch failed for {Id}", id); }
+        }
+    }
+
+    private void PersistRunningSet()
+    {
+        try
+        {
+            List<string> running;
+            lock (_gate)
+                running = _runtime.Where(kv => kv.Value.Lifecycle == RunCommandLifecycle.Running).Select(kv => kv.Key).ToList();
+            var path = System.IO.Path.Combine(_store is RunCommandStore rs ? rs.Dir : ".", "running.json");
+            Cove.Persistence.AtomicJsonStore.WriteRawText(path, System.Text.Json.JsonSerializer.Serialize(running, Cove.Protocol.CoveJsonContext.Default.ListString));
+        }
+        catch (System.Exception ex) { _logger?.LogWarning(ex, "run-command running-set persist failed"); }
+    }
+
+    private List<string> LoadRunningSet()
+    {
+        try
+        {
+            var path = System.IO.Path.Combine(_store is RunCommandStore rs ? rs.Dir : ".", "running.json");
+            if (!System.IO.File.Exists(path))
+                return new List<string>();
+            return System.Text.Json.JsonSerializer.Deserialize(System.IO.File.ReadAllText(path), Cove.Protocol.CoveJsonContext.Default.ListString) ?? new List<string>();
+        }
+        catch (System.Exception ex) { _logger?.LogWarning(ex, "run-command running-set load failed"); return new List<string>(); }
+    }
     private sealed class RunCommandRuntime
     {
         public string SessionId { get; init; } = "";

@@ -7,6 +7,7 @@ public sealed class RunCommandStore : IRunCommandStore
 {
     private readonly string _dir;
     private readonly ILogger? _logger;
+    public string Dir => _dir;
 
     public RunCommandStore(string dir, ILogger? logger = null)
     {

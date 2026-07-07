@@ -74,7 +74,7 @@ public sealed class DaemonHost
         _panes = new PaneRegistry(_ptyHost, logger, spawnEnv, shellDir);
         _layout = new Cove.Engine.Layout.LayoutService();
         _workspaces = new Cove.Engine.Workspaces.WorkspaceManager();
-        _runCommands = new Cove.Engine.Workspaces.RunCommandService(new Cove.Engine.Workspaces.RunCommandStore(System.IO.Path.Combine(dataDir, "run-commands"), logger), new Cove.Engine.Workspaces.PtyRunCommandSessionFactory(_ptyHost, spawnEnv, shellDir, logger));
+        _runCommands = new Cove.Engine.Workspaces.RunCommandService(new Cove.Engine.Workspaces.RunCommandStore(System.IO.Path.Combine(dataDir, "run-commands"), logger), new Cove.Engine.Workspaces.PtyRunCommandSessionFactory(_ptyHost, spawnEnv, shellDir, logger), logger: logger);
         _restoration = new Cove.Engine.Restart.RestorationService(dataDir, logger, emitProgress: e => BroadcastEvent("restore.progress", e, Cove.Engine.Restart.RestorationJsonContext.Default.RestoreProgressEvent));
         _snapshots = new Cove.Engine.Snapshots.SnapshotService(dataDir, System.IO.Path.Combine(dataDir, "snapshots"), new Cove.Engine.Workspaces.ProcessGitRunner(), logger);
         _skills = new Cove.Engine.Skills.SkillsService(dataDir, logger: logger);
@@ -122,6 +122,8 @@ public sealed class DaemonHost
             _restoration.EmitProgress("default", "materialize_panes", Cove.Engine.Restart.RestorePhase.PanesMaterialized);
             _layout!.LoadSnapshot(sl);
         }
+        try { if (_runCommands is not null) await _runCommands.RelaunchPreviouslyRunningAsync().ConfigureAwait(false); }
+        catch (System.Exception ex) { logger.LogWarning(ex, "run-command relaunch on restore failed"); }
         _restoration.EmitProgress("default", "restore_complete", Cove.Engine.Restart.RestorePhase.Completed);
         PopulateAmbientAggregator(aggregator, dataDir, logger);
         _layout!.OnChanged = () =>

@@ -127,6 +127,34 @@ public sealed class RunCommandTests
         var s = await svc.StartAsync("no-such-id");
         Assert.Null(s);
     }
+
+    [Fact]
+    public async Task RunningSet_PersistsAndRelaunches_OnRestart()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "cove-rc-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var store = new RunCommandStore(dir);
+            RunCommandService svc1 = new(store, new FakeSessionFactory());
+            var d = await svc1.CreateAsync("ws", "watcher", "sleep 30", null);
+            await svc1.StartAsync(d.Id);
+            await svc1.DisposeAsync();
+
+            var runningJson = Path.Combine(dir, "running.json");
+            Assert.True(File.Exists(runningJson));
+            var persisted = System.Text.Json.JsonSerializer.Deserialize<List<string>>(
+                await File.ReadAllTextAsync(runningJson), Cove.Protocol.CoveJsonContext.Default.ListString);
+            Assert.Contains(d.Id, persisted!);
+
+            RunCommandService svc2 = new(store, new FakeSessionFactory());
+            await svc2.RelaunchPreviouslyRunningAsync();
+            var status = await svc2.StatusAsync(d.Id);
+            Assert.Equal(Cove.Engine.Workspaces.RunCommandLifecycle.Running, status!.Lifecycle);
+            await svc2.DisposeAsync();
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
 }
 
 internal sealed class InMemoryRunCommandStore : IRunCommandStore

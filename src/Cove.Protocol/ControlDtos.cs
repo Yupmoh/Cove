@@ -205,6 +205,7 @@ public sealed record BrowserPaneDto(string PaneId, string CurrentUrl, System.Col
 [JsonSerializable(typeof(ConfigGetResult))]
 [JsonSerializable(typeof(ConfigSetParams))]
 [JsonSerializable(typeof(System.Collections.Generic.Dictionary<string, string>))]
+[JsonSerializable(typeof(System.Collections.Generic.List<string>))]
 [JsonSerializable(typeof(LayoutMutateParams))]
 [JsonSerializable(typeof(LayoutMutateResult))]
 [JsonSerializable(typeof(SessionStateResult))]
