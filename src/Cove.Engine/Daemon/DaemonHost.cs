@@ -50,6 +50,7 @@ public sealed class DaemonHost
     private Cove.Engine.Activity.ActivityAggregate? _activity;
     private Cove.Engine.Hooks.NeedsInputSignaler? _needsInputSignaler;
     private Cove.Engine.Sessions.SessionResumeOrchestrator? _sessions;
+    private Cove.Engine.Activity.OmniChatStore? _omniChat;
     private Cove.Engine.Lifecycle.AgentLifecycleController? _lifecycle;
     private Cove.Engine.Launch.LaunchOrchestrator? _launcher;
     private Cove.Engine.Tasks.TaskStore? _tasks;
@@ -107,6 +108,7 @@ public sealed class DaemonHost
         _tasks = new Cove.Engine.Tasks.TaskStore(dataDir);
         _notes = new Cove.Engine.Knowledge.NoteStore(dataDir);
         _timeline = new Cove.Engine.Knowledge.TimelineStore(dataDir);
+        _omniChat = new Cove.Engine.Activity.OmniChatStore(System.IO.Path.Combine(dataDir, "omni-chat"), logger);
         _browser = new Cove.Engine.Browser.BrowserPaneManager();
         _config = new Cove.Engine.Config.ConfigService(dataDir, logger);
         _hookServer.OnEvent += _hookRouter.Route;
@@ -340,7 +342,7 @@ public sealed class DaemonHost
             await WriteResponseAsync(conn, Fail(req.Id, "not_ready", "sys/hello required before commands"), cancellationToken).ConfigureAwait(false);
             return false;
         }
-        ControlResponse? generated = await Cove.Engine.EngineCommandRouter.RouteAsync(req, _panes, _layout, _workspaces, _runCommands, _restoration, _snapshots, _skills, _agents, _launchProfiles, _adapterEnv, _hookServer, _hookRouter, _agentRouter, _activity, _sessions, _lifecycle, _launcher, _tasks, _notes, _timeline, _paneTypes, _browser, _config, _manifestStore, _registry, cancellationToken).ConfigureAwait(false);
+        ControlResponse? generated = await Cove.Engine.EngineCommandRouter.RouteAsync(req, _panes, _layout, _workspaces, _runCommands, _restoration, _snapshots, _skills, _agents, _launchProfiles, _adapterEnv, _hookServer, _hookRouter, _agentRouter, _activity, _sessions, _lifecycle, _launcher, _tasks, _notes, _timeline, _paneTypes, _browser, _config, _manifestStore, _registry, _omniChat, cancellationToken).ConfigureAwait(false);
 
         if (generated is not null)
         {

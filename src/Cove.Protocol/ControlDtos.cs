@@ -111,6 +111,11 @@ public sealed record AdapterListResult(System.Collections.Generic.IReadOnlyList<
 public sealed record RegistryEntryDto(string Name, string DisplayName, string Version, bool Official);
 public sealed record RegistryFetchResult(RegistryEntryDto[] Adapters);
 public sealed record NeedsInputSignalDto(string PaneId, string Adapter);
+public sealed record OmniChatAppendParams(string PaneId, string Role, string Body);
+public sealed record OmniChatHistoryParams(string PaneId);
+public sealed record OmniChatHistoryResult(OmniChatMessageDto[] Messages);
+public sealed record OmniChatMessageDto(string Role, string Body, System.DateTimeOffset SentAt);
+public sealed record OmniChatClearParams(string PaneId);
 
 public sealed record ProtocolResolveParams(string Uri, string? FocusedPaneId, string? ActiveRoomId);
 public sealed record ProtocolResolveResult(string Uri, System.Text.Json.JsonElement? Params);
@@ -251,6 +256,10 @@ public sealed record BrowserPaneDto(string PaneId, string CurrentUrl, System.Col
 [JsonSerializable(typeof(AdapterListResult))]
 [JsonSerializable(typeof(RegistryFetchResult))]
 [JsonSerializable(typeof(NeedsInputSignalDto))]
+[JsonSerializable(typeof(OmniChatAppendParams))]
+[JsonSerializable(typeof(OmniChatHistoryParams))]
+[JsonSerializable(typeof(OmniChatHistoryResult))]
+[JsonSerializable(typeof(OmniChatClearParams))]
 [JsonSerializable(typeof(ProtocolResolveParams))]
 [JsonSerializable(typeof(ProtocolResolveResult))]
 [JsonSerializable(typeof(TaskCard))]
