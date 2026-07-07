@@ -299,10 +299,47 @@ async function addSubtab(termPaneId: string): Promise<void> {
   focusPane(sp);
 }
 
+function emptyPaneStrip(paneId: string): HTMLElement {
+  const el = document.createElement("div");
+  el.className = "pane empty-pane";
+  el.style.flex = "1 1 0";
+  el.style.minWidth = "0";
+  el.style.minHeight = "0";
+  el.style.display = "flex";
+  el.style.flexDirection = "column";
+  el.style.alignItems = "center";
+  el.style.justifyContent = "flex-end";
+  el.style.paddingBottom = "24px";
+  const strip = document.createElement("div");
+  strip.className = "pane-dock";
+  strip.style.display = "flex";
+  strip.style.gap = "8px";
+  const tile = document.createElement("button");
+  tile.className = "dock-tile";
+  tile.textContent = "Terminal";
+  tile.addEventListener("click", (e) => {
+    e.stopPropagation();
+    void spawnIntoPane(paneId);
+  });
+  strip.appendChild(tile);
+  el.appendChild(strip);
+  el.addEventListener("mousedown", () => focusPane(paneId));
+  return el;
+}
+
+async function spawnIntoPane(paneId: string): Promise<void> {
+  if (!activeRoomId) return;
+  const sp = (await invoke<{ paneId: string }>("app.paneSpawn", { command: "", cwd: "", inheritCwdFrom: "", cols: 80, rows: 24 })).paneId;
+  await invoke("app.layoutMutate", { op: "addSubtab", roomId: activeRoomId, paneId: paneId, newPaneId: sp, targetPaneId: "", orientation: "", name: "", dir: 0 });
+  await reload();
+}
 function renderNode(node: MosaicNode): HTMLElement {
   if (node.kind === "leaf") {
     const subs = node.subtabs.length > 0 ? node.subtabs : [{ documentId: node.paneId, paneType: "terminal", title: null }];
     const activeIdx = Math.min(Math.max(0, node.activeSubtab), subs.length - 1);
+    const active = subs[activeIdx];
+    const isEmpty = active.paneType === "empty" || node.subtabs.length === 0;
+    if (isEmpty) return emptyPaneStrip(node.paneId);
     const activeEl = getPane(subs[activeIdx].documentId).el;
     if (subs.length <= 1) return activeEl;
     const wrap = document.createElement("div");
