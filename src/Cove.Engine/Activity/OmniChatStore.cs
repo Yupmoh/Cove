@@ -35,14 +35,20 @@ public sealed class OmniChatStore
     public IReadOnlyList<OmniChatMessage> LoadHistory(string paneId)
     {
         if (!IsValidPaneId(paneId))
+        {
+            _logger?.OmniChatLoadRejectedInvalidPaneId(paneId);
             return Array.Empty<OmniChatMessage>();
+        }
         return LoadRaw(paneId);
     }
 
     public void Clear(string paneId)
     {
         if (!IsValidPaneId(paneId))
+        {
+            _logger?.OmniChatClearRejectedInvalidPaneId(paneId);
             return;
+        }
         var path = GetPath(paneId);
         if (File.Exists(path))
         {
@@ -88,6 +94,10 @@ internal static partial class OmniChatLog
 
     [ZLoggerMessage(LogLevel.Warning, "omni chat load failed paneId={paneId} error={error}")]
     public static partial void OmniChatLoadFailed(this ILogger logger, string paneId, string error);
+    [ZLoggerMessage(LogLevel.Warning, "omni chat load rejected invalid paneId={paneId}")]
+    public static partial void OmniChatLoadRejectedInvalidPaneId(this ILogger logger, string paneId);
+    [ZLoggerMessage(LogLevel.Warning, "omni chat clear rejected invalid paneId={paneId}")]
+    public static partial void OmniChatClearRejectedInvalidPaneId(this ILogger logger, string paneId);
 
     [ZLoggerMessage(LogLevel.Warning, "omni chat clear failed paneId={paneId} error={error}")]
     public static partial void OmniChatClearFailed(this ILogger logger, string paneId, string error);
