@@ -3,6 +3,7 @@
     <Project Path="benchmarks/Cove.Benchmarks/Cove.Benchmarks.csproj" />
   </Folder>
   <Folder Name="/src/">
+    <Project Path="src/Cove.Adapters/Cove.Adapters.csproj" />
     <Project Path="src/Cove.Cli/Cove.Cli.csproj" />
     <Project Path="src/Cove.Engine/Cove.Engine.csproj" />
     <Project Path="src/Cove.Gui/Cove.Gui.csproj" />
@@ -13,6 +14,7 @@
     <Project Path="src/Cove.Tui/Cove.Tui.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Cove.Adapters.Tests/Cove.Adapters.Tests.csproj" />
     <Project Path="tests/Cove.Cli.Tests/Cove.Cli.Tests.csproj" />
     <Project Path="tests/Cove.Engine.Tests/Cove.Engine.Tests.csproj" />
     <Project Path="tests/Cove.Gui.Tests/Cove.Gui.Tests.csproj" />
