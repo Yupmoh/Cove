@@ -19,6 +19,7 @@ public sealed record Wing
 {
     public required string Id { get; init; }
     public required string Name { get; init; }
+    public WorkspaceIcon? Icon { get; init; }
 }
 
 public sealed record Room

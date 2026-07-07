@@ -105,6 +105,22 @@ public static class WorkspaceInvariants
     public static WorkspaceModel RenameWing(WorkspaceModel model, string wingId, string name)
         => model with { Wings = model.Wings.Select(w => w.Id == wingId ? w with { Name = name } : w).ToList() };
 
+    public static WorkspaceModel ReorderWings(WorkspaceModel model, IReadOnlyList<string> orderedIds)
+    {
+        var known = new HashSet<string>(model.Wings.Select(w => w.Id), System.StringComparer.Ordinal);
+        var next = new List<Wing>();
+        foreach (var id in orderedIds)
+            if (known.Contains(id))
+                next.Add(model.Wings.First(w => w.Id == id));
+        foreach (var w in model.Wings)
+            if (!next.Exists(x => x.Id == w.Id))
+                next.Add(w);
+        return model with { Wings = next };
+    }
+
+    public static WorkspaceModel SetWingIcon(WorkspaceModel model, string wingId, WorkspaceIcon? icon)
+        => model with { Wings = model.Wings.Select(w => w.Id == wingId ? w with { Icon = icon } : w).ToList() };
+
     private static (Room Room, PaneRecord Pane) Mint(string wingId, Func<string> newId)
     {
         var paneId = newId();

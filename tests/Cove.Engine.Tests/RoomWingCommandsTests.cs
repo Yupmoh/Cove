@@ -70,4 +70,39 @@ public sealed class RoomWingCommandsTests
         Assert.True(removed!.Ok);
         Assert.DoesNotContain(mgr.Get(ws.Id)!.State.Wings, w => w.Id == wingId);
     }
+    [Fact]
+    public async Task Wing_Reorder_And_SetIcon_RoundTrip()
+    {
+        int n = 0;
+        await using var mgr = new WorkspaceManager(newId: () => $"id-{++n}");
+        var ws = await mgr.CreateWorkspaceAsync("proj", "/tmp/proj");
+        var wsId = ws.Id;
+
+        var w1 = await Route(mgr, "cove://commands/wing.create",
+            El(new WingCreateParams(wsId, "alpha"), RoomWingJsonContext.Default.WingCreateParams));
+        var w1Id = w1!.Data!.Value.GetProperty("wingId").GetString()!;
+        var w2 = await Route(mgr, "cove://commands/wing.create",
+            El(new WingCreateParams(wsId, "beta"), RoomWingJsonContext.Default.WingCreateParams));
+        var w2Id = w2!.Data!.Value.GetProperty("wingId").GetString()!;
+
+        var setIcon = await Route(mgr, "cove://commands/wing.set-icon",
+            El(new WingIconParams(wsId, w1Id, "emoji", "🦑"), RoomWingJsonContext.Default.WingIconParams));
+        Assert.True(setIcon!.Ok);
+
+        var wings = mgr.Get(wsId)!.State.Wings;
+        var alpha = wings.First(w => w.Id == w1Id);
+        Assert.Equal("🦑", alpha.Icon!.Value);
+
+        await Route(mgr, "cove://commands/wing.reorder",
+            El(new WingReorderParams(wsId, new[] { w2Id, w1Id, WorkspaceModel.MainWingId }), RoomWingJsonContext.Default.WingReorderParams));
+        var reordered = mgr.Get(wsId)!.State.Wings;
+        Assert.Equal(w2Id, reordered[0].Id);
+        Assert.Equal(w1Id, reordered[1].Id);
+
+        var listed = await Route(mgr, "cove://commands/wing.list",
+            El(new WorkspaceRef(wsId), RoomWingJsonContext.Default.WorkspaceRef));
+        var listArr = listed!.Data!.Value.GetProperty("wings").EnumerateArray().ToArray();
+        var listedAlpha = listArr.First(e => e.GetProperty("id").GetString() == w1Id);
+        Assert.Equal("🦑", listedAlpha.GetProperty("icon").GetProperty("value").GetString());
+    }
 }

@@ -146,6 +146,34 @@ public static class RoomWingCommands
         return ctx.Ok();
     }
 
+    [CoveCommand("cove://commands/wing.reorder")]
+    public static async Task<ControlResponse> WingReorder(EngineDispatchContext ctx)
+    {
+        if (ctx.Workspaces is not { } manager)
+            return ctx.Fail("no_workspaces", "workspace manager unavailable");
+        if (ctx.Request.Params is not JsonElement el
+            || el.Deserialize(RoomWingJsonContext.Default.WingReorderParams) is not { } p)
+            return ctx.Fail("bad_params", "workspaceId and orderedWingIds are required");
+        if (manager.Get(p.WorkspaceId) is not { } actor)
+            return ctx.Fail("not_found", $"workspace {p.WorkspaceId} not found");
+        await actor.Mutate(m => WorkspaceInvariants.ReorderWings(m, p.OrderedWingIds)).ConfigureAwait(false);
+        return ctx.Ok();
+    }
+
+    [CoveCommand("cove://commands/wing.set-icon")]
+    public static async Task<ControlResponse> WingSetIcon(EngineDispatchContext ctx)
+    {
+        if (ctx.Workspaces is not { } manager)
+            return ctx.Fail("no_workspaces", "workspace manager unavailable");
+        if (ctx.Request.Params is not JsonElement el
+            || el.Deserialize(RoomWingJsonContext.Default.WingIconParams) is not { } p)
+            return ctx.Fail("bad_params", "workspaceId and wingId are required");
+        if (manager.Get(p.WorkspaceId) is not { } actor)
+            return ctx.Fail("not_found", $"workspace {p.WorkspaceId} not found");
+        WorkspaceIcon? icon = string.IsNullOrEmpty(p.Kind) ? null : new WorkspaceIcon(p.Kind, p.Value ?? "");
+        await actor.Mutate(m => WorkspaceInvariants.SetWingIcon(m, p.WingId, icon)).ConfigureAwait(false);
+        return ctx.Ok();
+    }
     [CoveCommand("cove://commands/wing.list")]
     public static Task<ControlResponse> WingList(EngineDispatchContext ctx)
     {
@@ -156,7 +184,7 @@ public static class RoomWingCommands
             return Task.FromResult(ctx.Fail("bad_params", "workspaceId is required"));
         if (manager.Get(p.WorkspaceId) is not { } actor)
             return Task.FromResult(ctx.Fail("not_found", $"workspace {p.WorkspaceId} not found"));
-        var wings = actor.State.Wings.Select(w => new WingSummary(w.Id, w.Name)).ToList();
+        var wings = actor.State.Wings.Select(w => new WingSummary(w.Id, w.Name, w.Icon)).ToList();
         return Task.FromResult(ctx.Ok(new WingListResult(wings), RoomWingJsonContext.Default.WingListResult));
     }
 
@@ -174,6 +202,9 @@ public static class RoomWingCommands
     }
 }
 
+public sealed record WingReorderParams(string WorkspaceId, IReadOnlyList<string> OrderedWingIds);
+public sealed record WingIconParams(string WorkspaceId, string WingId, string? Kind = null, string? Value = null);
+
 public sealed record WorkspaceRef(string WorkspaceId);
 public sealed record RoomCreateParams(string WorkspaceId, string? WingId = null, string? Name = null);
 public sealed record RoomTargetParams(string WorkspaceId, string RoomId);
@@ -187,7 +218,7 @@ public sealed record WingCreateParams(string WorkspaceId, string Name);
 public sealed record WingTargetParams(string WorkspaceId, string WingId);
 public sealed record WingRenameParams(string WorkspaceId, string WingId, string Name);
 public sealed record WingIdResult(string WingId);
-public sealed record WingSummary(string Id, string Name);
+public sealed record WingSummary(string Id, string Name, WorkspaceIcon? Icon = null);
 public sealed record WingListResult(IReadOnlyList<WingSummary> Wings);
 
 [JsonSourceGenerationOptions(
@@ -207,4 +238,6 @@ public sealed record WingListResult(IReadOnlyList<WingSummary> Wings);
 [JsonSerializable(typeof(WingRenameParams))]
 [JsonSerializable(typeof(WingIdResult))]
 [JsonSerializable(typeof(WingListResult))]
+[JsonSerializable(typeof(WingReorderParams))]
+[JsonSerializable(typeof(WingIconParams))]
 public sealed partial class RoomWingJsonContext : JsonSerializerContext { }
