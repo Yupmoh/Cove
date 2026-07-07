@@ -113,5 +113,7 @@ public sealed record HookEvent
 [JsonSerializable(typeof(InstallRecipe))]
 [JsonSerializable(typeof(InstalledAdapter))]
 [JsonSerializable(typeof(HookEvent))]
-[JsonSerializable(typeof(List<RegistryEntry>))]
+[JsonSerializable(typeof(RecentSession))]
+[JsonSerializable(typeof(List<RecentSession>))]
+[JsonSerializable(typeof(CanonicalEvent))]
 public sealed partial class AdaptersJsonContext : JsonSerializerContext { }
