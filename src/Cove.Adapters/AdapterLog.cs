@@ -55,4 +55,7 @@ internal static partial class AdapterLog
 
     [ZLoggerMessage(LogLevel.Warning, "env store delete failed adapter={adapter} error={error}")]
     public static partial void EnvStoreDeleteFailed(this ILogger logger, string adapter, string error);
+
+    [ZLoggerMessage(LogLevel.Warning, "env store save rejected invalid adapter={adapter}")]
+    public static partial void EnvStoreSaveRejectedInvalidAdapter(this ILogger logger, string adapter);
 }

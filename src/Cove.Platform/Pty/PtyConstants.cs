@@ -16,6 +16,8 @@ public static class PtyConstants
     public const int SigKill = 9;
     public const int SigTerm = 15;
     public const int Esrch = 3;
+
+    public static int SigUsr1 => OperatingSystem.IsMacOS() ? 30 : 10;
     public const string DefaultTerm = "xterm-256color";
     public const string NativeLibrary = "cove_pty";
 }

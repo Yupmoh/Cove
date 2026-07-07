@@ -75,4 +75,38 @@ public sealed class AdapterEnvStoreTests
         }
         finally { try { Directory.Delete(dir, true); } catch { } }
     }
+
+    [Fact]
+    public void Save_FiresEnvSavedEvent_WithAdapter()
+    {
+        var dir = NewDir();
+        try
+        {
+            var store = new AdapterEnvStore(dir);
+            string? firedAdapter = null;
+            store.EnvSaved += adapter => firedAdapter = adapter;
+
+            store.Save("claude-code", new List<AdapterEnvVar> { new("A", "1") });
+
+            Assert.Equal("claude-code", firedAdapter);
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
+
+    [Fact]
+    public void EnvSaved_DoesNotFire_WhenAdapterInvalid()
+    {
+        var dir = NewDir();
+        try
+        {
+            var store = new AdapterEnvStore(dir);
+            int fireCount = 0;
+            store.EnvSaved += _ => fireCount++;
+
+            store.Save("Bad_Adapter!", new List<AdapterEnvVar> { new("A", "1") });
+
+            Assert.Equal(0, fireCount);
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
 }

@@ -15,6 +15,8 @@ public sealed class AdapterEnvStore
         _logger = logger;
     }
 
+    public event Action<string>? EnvSaved;
+
     public List<AdapterEnvVar> Load(string adapter)
     {
         var path = GetPath(adapter);
@@ -34,10 +36,16 @@ public sealed class AdapterEnvStore
 
     public void Save(string adapter, List<AdapterEnvVar> entries)
     {
+        if (!LaunchProfileValidator.IsValidAdapter(adapter))
+        {
+            _logger?.EnvStoreSaveRejectedInvalidAdapter(adapter);
+            return;
+        }
         var path = GetPath(adapter);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         var json = JsonSerializer.Serialize(entries, AdaptersJsonContext.Default.ListAdapterEnvVar);
         File.WriteAllText(path, json);
+        EnvSaved?.Invoke(adapter);
     }
 
     public List<string> ListAdapters()

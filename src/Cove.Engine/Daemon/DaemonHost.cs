@@ -38,6 +38,7 @@ public sealed class DaemonHost
     private Cove.Adapters.AgentDefinitionStore? _agents;
     private Cove.Adapters.LaunchProfileStore? _launchProfiles;
     private Cove.Adapters.AdapterEnvStore? _adapterEnv;
+    private Cove.Engine.Adapters.EnvPropagationService? _envPropagation;
     private Cove.Engine.Hooks.HookHttpServer? _hookServer;
     private Cove.Engine.Hooks.HookEventRouter? _hookRouter;
     private Cove.Engine.Agents.AgentMessageRouter? _agentRouter;
@@ -81,6 +82,7 @@ public sealed class DaemonHost
         _agents = new Cove.Adapters.AgentDefinitionStore(System.IO.Path.Combine(dataDir, "agents"), logger);
         _launchProfiles = new Cove.Adapters.LaunchProfileStore(System.IO.Path.Combine(dataDir, "launch-profiles"), logger);
         _adapterEnv = new Cove.Adapters.AdapterEnvStore(System.IO.Path.Combine(dataDir, "adapter-env"), logger);
+        _envPropagation = new Cove.Engine.Adapters.EnvPropagationService(_adapterEnv, new Cove.Engine.Adapters.PaneRegistryEnvTarget(_panes), a => ResolveAdapterBinary(a, logger), logger);
         _hookServer = new Cove.Engine.Hooks.HookHttpServer(dataDir, logger);
         _hookRouter = new Cove.Engine.Hooks.HookEventRouter(logger);
         _agentRouter = new Cove.Engine.Agents.AgentMessageRouter();
@@ -461,6 +463,23 @@ public sealed class DaemonHost
         return true;
     }
 
+    private string? ResolveAdapterBinary(string adapter, ILogger logger)
+    {
+        var manifestPath = System.IO.Path.Combine(_paths.DataDir.Root, "adapters", adapter, "adapter.json");
+        if (!System.IO.File.Exists(manifestPath))
+            return null;
+        try
+        {
+            var json = System.IO.File.ReadAllText(manifestPath);
+            var manifest = System.Text.Json.JsonSerializer.Deserialize(json, Cove.Adapters.AdaptersJsonContext.Default.AdapterManifest);
+            return manifest?.Binary;
+        }
+        catch (System.Text.Json.JsonException ex)
+        {
+            logger.EnvPropagationManifestParseFailed(adapter, ex.Message);
+            return null;
+        }
+    }
     private void BroadcastEvent<T>(string channel, T payload, System.Text.Json.Serialization.Metadata.JsonTypeInfo<T> typeInfo)
     {
         FrameConnection[] guis;
