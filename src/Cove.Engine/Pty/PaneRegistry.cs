@@ -25,7 +25,7 @@ internal sealed class PaneSession
     public PaneInfo ToInfo() => new(PaneId, Command, Cols, Rows, !Reader.HasCompleted, Cwd, Title);
 }
 
-public sealed class PaneRegistry : IDisposable
+public sealed class PaneRegistry : IDisposable, Cove.Engine.Agents.IPaneWriter
 {
     private readonly IPtyHost _host;
     private readonly ILogger _logger;

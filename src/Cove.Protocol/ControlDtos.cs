@@ -86,7 +86,7 @@ public sealed record HookStateResult(int Port, bool Running);
 public sealed record PaneStateItem(string PaneId, string Adapter, string Status, int ActiveSubagents, System.DateTimeOffset LastEventAt);
 public sealed record PaneStatesResult(PaneStateItem[] Panes);
 
-public sealed record AgentMessageParams(string Target, string Body, string? FromPaneId, string? FromAdapter, string? FromName, bool NoFrame);
+public sealed record AgentMessageParams(string Target, string Body, string? FromPaneId, string? FromAdapter, string? FromName, bool NoFrame, int? SubmitPauseMs);
 public sealed record AgentListDto(string PaneId, string Adapter, string? Name, string? Workspace, string? Room, string Status, string McpAccessScope);
 public sealed record AgentListResult(System.Collections.Generic.IReadOnlyList<AgentListDto> Agents);
 

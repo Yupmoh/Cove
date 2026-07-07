@@ -23,12 +23,11 @@ public static class AgentMessageCommands
         var sender = new AgentMessageSender(p.FromPaneId ?? "", p.FromAdapter ?? "", p.FromName);
         var body = p.NoFrame ? AgentMessageFramer.NoFrame(p.Body) : AgentMessageFramer.Frame(sender, p.Body, replyPrefix: p.FromPaneId);
 
-        var payload = System.Text.Encoding.UTF8.GetBytes(body + "\r");
-        var written = panes.Write(target.PaneId, payload);
-        if (!written)
+        var delivery = new AgentMessageDelivery(panes);
+        var delivered = await delivery.DeliverAsync(target.PaneId, body, p.SubmitPauseMs).ConfigureAwait(false);
+        if (!delivered)
             return ctx.Fail("write_failed", $"failed to write to pane {target.PaneId}");
 
-        await Task.CompletedTask;
         return ctx.Ok();
     }
 
