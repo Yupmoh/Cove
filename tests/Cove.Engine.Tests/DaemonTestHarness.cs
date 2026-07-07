@@ -17,11 +17,12 @@ public sealed class DaemonTestHarness : IAsyncDisposable
     private Task _run = null!;
     private string _parent = "";
     private string? _prev;
-    private readonly CancellationTokenSource _cts = new();
+    private CancellationTokenSource _cts = new();
+    private DaemonHost? _host;
 
     public IControlEndpoint Endpoint { get; private set; } = null!;
     public Task Run => _run;
-
+    public string DataDir => _parent;
     public static async Task<DaemonTestHarness> StartAsync()
     {
         var h = new DaemonTestHarness();
@@ -33,6 +34,7 @@ public sealed class DaemonTestHarness : IAsyncDisposable
         h._paths = new DaemonPaths(dd);
         h.Endpoint = ControlEndpointFactory.FromSocketPath(dd.SocketPath);
         var host = new DaemonHost(h._paths, h.Endpoint, exitWhenIdle: false);
+        h._host = host;
         h._run = Task.Run(() => host.RunAsync(h._cts.Token));
 
         var sw = System.Diagnostics.Stopwatch.StartNew();
@@ -58,6 +60,26 @@ public sealed class DaemonTestHarness : IAsyncDisposable
         Assert.True(r.Ok);
         return conn;
     }
+    public async Task RestartAsync()
+    {
+        _cts.Cancel();
+        try { await _run.WaitAsync(TimeSpan.FromSeconds(5)); } catch { }
+        _cts.Dispose();
+        _cts = new CancellationTokenSource();
+        _host = new DaemonHost(_paths, Endpoint, exitWhenIdle: false);
+        var runHost = _host;
+        var runCts = _cts;
+        _run = Task.Run(() => runHost.RunAsync(runCts.Token));
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        while (sw.Elapsed.TotalSeconds < 10)
+        {
+            if (Endpoint.TryProbe(100))
+                return;
+            await Task.Delay(20);
+        }
+        throw new TimeoutException("daemon did not restart");
+    }
+
 
     public async ValueTask DisposeAsync()
     {
