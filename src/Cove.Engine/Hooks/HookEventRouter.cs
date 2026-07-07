@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Text.Json;
 using Cove.Adapters;
 using Microsoft.Extensions.Logging;
 
@@ -9,9 +10,11 @@ public sealed record PaneAgentState(
     string Adapter,
     string Status,
     int ActiveSubagents,
-    System.DateTimeOffset LastEventAt)
+    System.DateTimeOffset LastEventAt,
+    string? StopReason = null)
 {
     public PaneAgentState WithStatus(string status) => this with { Status = status, LastEventAt = System.DateTimeOffset.UtcNow };
+    public PaneAgentState WithStop(string? reason) => this with { Status = "error", StopReason = reason, LastEventAt = System.DateTimeOffset.UtcNow };
 }
 
 public sealed class HookEventRouter
@@ -24,6 +27,11 @@ public sealed class HookEventRouter
         "notification", "user-prompt-submit",
         "permission-request",
         "subagent-start", "subagent-stop",
+    };
+
+    private static readonly HashSet<string> SpecialStopReasons = new()
+    {
+        "rate-limited", "auth-failed", "billing-exceeded",
     };
 
     private readonly ConcurrentDictionary<string, PaneAgentState> _paneStates = new();
@@ -54,13 +62,14 @@ public sealed class HookEventRouter
                 _paneStates[ev.PaneId] = new PaneAgentState(ev.PaneId, ev.Adapter, "active", 0, System.DateTimeOffset.UtcNow);
                 break;
             case "session-end":
-                UpdateState(ev.PaneId, s => s.WithStatus("idle"));
+                UpdateState(ev.PaneId, s => s with { Status = "idle", StopReason = null, LastEventAt = System.DateTimeOffset.UtcNow });
                 break;
             case "stop":
                 UpdateState(ev.PaneId, s => s.WithStatus("needs-input"));
                 break;
             case "stop-failure":
-                UpdateState(ev.PaneId, s => s.WithStatus("error"));
+                var reason = ExtractStopReason(ev.Payload);
+                UpdateState(ev.PaneId, s => s.WithStop(reason));
                 break;
             case "user-prompt-submit":
                 UpdateState(ev.PaneId, s => s.WithStatus("active"));
@@ -82,6 +91,25 @@ public sealed class HookEventRouter
                 UpdateState(ev.PaneId, s => s with { LastEventAt = System.DateTimeOffset.UtcNow });
                 break;
         }
+    }
+
+    private static string? ExtractStopReason(JsonElement? payload)
+    {
+        if (payload is not { } el || el.ValueKind != JsonValueKind.Object)
+            return null;
+        if (el.TryGetProperty("reason", out var reasonEl) && reasonEl.ValueKind == JsonValueKind.String)
+        {
+            var reason = reasonEl.GetString();
+            if (reason is not null && SpecialStopReasons.Contains(reason))
+                return reason;
+        }
+        if (el.TryGetProperty("error", out var errorEl) && errorEl.ValueKind == JsonValueKind.String)
+        {
+            var error = errorEl.GetString();
+            if (error is not null && SpecialStopReasons.Contains(error))
+                return error;
+        }
+        return null;
     }
 
     private void UpdateState(string paneId, System.Func<PaneAgentState, PaneAgentState> update)

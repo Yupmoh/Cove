@@ -82,6 +82,10 @@ public sealed record PaneStatesResult(PaneStateItem[] Panes);
 public sealed record AgentMessageParams(string Target, string Body, string? FromPaneId, string? FromAdapter, string? FromName, bool NoFrame);
 public sealed record AgentListDto(string PaneId, string Adapter, string? Name, string? Workspace, string? Room, string Status, string McpAccessScope);
 public sealed record AgentListResult(System.Collections.Generic.IReadOnlyList<AgentListDto> Agents);
+
+public sealed record ActivityCardDto(string PaneId, string Adapter, string? Name, string? Workspace, string? Room, string Status, string? StopReason, int ActiveSubagents, string? LastEvent, System.DateTimeOffset LastEventAt);
+public sealed record ActivityListResult(System.Collections.Generic.IReadOnlyList<ActivityCardDto> Cards);
+
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
@@ -130,5 +134,7 @@ public sealed record AgentListResult(System.Collections.Generic.IReadOnlyList<Ag
 [JsonSerializable(typeof(AgentMessageParams))]
 [JsonSerializable(typeof(AgentListDto))]
 [JsonSerializable(typeof(AgentListResult))]
+[JsonSerializable(typeof(ActivityCardDto))]
+[JsonSerializable(typeof(ActivityListResult))]
 [JsonSerializable(typeof(JsonElement))]
 public sealed partial class CoveJsonContext : JsonSerializerContext;

@@ -23,6 +23,7 @@ public static class EngineCommandRouter
         HookHttpServer? hookServer = null,
         HookEventRouter? hookRouter = null,
         Agents.AgentMessageRouter? agentRouter = null,
+        Activity.ActivityAggregate? activity = null,
         System.Threading.CancellationToken cancellationToken = default)
     {
         System.Func<EngineDispatchContext, System.Threading.Tasks.Task<ControlResponse>> typed;
@@ -38,7 +39,7 @@ public static class EngineCommandRouter
         }
         try
         {
-            return await typed(new EngineDispatchContext(request, panes, layout, workspaces, runCommands, restoration, snapshots, skills, agents, launchProfiles, adapterEnv, hookServer, hookRouter, agentRouter));
+            return await typed(new EngineDispatchContext(request, panes, layout, workspaces, runCommands, restoration, snapshots, skills, agents, launchProfiles, adapterEnv, hookServer, hookRouter, agentRouter, activity));
         }
         catch (System.Exception ex)
         {

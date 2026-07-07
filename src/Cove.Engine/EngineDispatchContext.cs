@@ -24,7 +24,8 @@ public sealed class EngineDispatchContext
         AdapterEnvStore? adapterEnv = null,
         HookHttpServer? hookServer = null,
         HookEventRouter? hookRouter = null,
-        AgentMessageRouter? agentRouter = null)
+        AgentMessageRouter? agentRouter = null,
+        Cove.Engine.Activity.ActivityAggregate? activity = null)
     {
         Request = request;
         Panes = panes;
@@ -40,6 +41,7 @@ public sealed class EngineDispatchContext
         HookServer = hookServer;
         HookRouter = hookRouter;
         AgentRouter = agentRouter;
+        Activity = activity;
     }
 
     public ControlRequest Request { get; }
@@ -56,6 +58,7 @@ public sealed class EngineDispatchContext
     public HookHttpServer? HookServer { get; }
     public HookEventRouter? HookRouter { get; }
     public AgentMessageRouter? AgentRouter { get; }
+    public Cove.Engine.Activity.ActivityAggregate? Activity { get; }
 
     public ControlResponse Ok<T>(T data, JsonTypeInfo<T> typeInfo)
         => new ControlResponse(Request.Id, true, JsonSerializer.SerializeToElement(data, typeInfo));
