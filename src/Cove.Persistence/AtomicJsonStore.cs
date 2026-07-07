@@ -89,11 +89,11 @@ public static class AtomicJsonStore
             var bak = path + ".bak";
             if (File.Exists(bak))
             {
-                logger.LogWarning(ex, "flat-json file {Path} failed to parse; falling back to .bak", path);
+                logger.FlatJsonParseFailedFallbackBak(path, ex.Message);
                 using var fs = File.OpenRead(bak);
                 return JsonSerializer.Deserialize(fs, typeInfo);
             }
-            logger.LogWarning(ex, "flat-json file {Path} failed to parse and no .bak exists", path);
+            logger.FlatJsonParseFailedNoBak(path, ex.Message);
             throw;
         }
     }

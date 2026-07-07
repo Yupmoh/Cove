@@ -42,7 +42,7 @@ public sealed class StateStore : IDisposable
         {
             if (!_registrations.ContainsKey(fileKey))
             {
-                _logger.LogWarning("MarkDirty for unregistered state key {Key}", fileKey);
+                _logger.MarkDirtyUnregistered(fileKey);
                 return;
             }
             _dirty.Add(fileKey);
@@ -81,7 +81,7 @@ public sealed class StateStore : IDisposable
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "state write failed for {Key}; retaining dirty mark", key);
+                _logger.StateWriteFailed(key, ex.Message);
                 lock (_gate)
                     _dirty.Add(key);
             }
@@ -118,12 +118,12 @@ public sealed class StateStore : IDisposable
                 if (value is null)
                     continue;
                 if (!string.Equals(candidate, path, StringComparison.Ordinal))
-                    _logger.LogWarning("state {Key} recovered from fallback {Path}", fileKey, candidate);
+                    _logger.StateRecoveredFromFallback(fileKey, candidate);
                 return value;
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "state {Key} candidate {Path} unreadable; trying older", fileKey, candidate);
+                _logger.StateCandidateUnreadable(fileKey, candidate, ex.Message);
             }
         }
 
@@ -149,7 +149,7 @@ public sealed class StateStore : IDisposable
         for (int i = _journalKeep; i < entries.Length; i++)
         {
             try { File.Delete(entries[i]); }
-            catch (Exception ex) { _logger.LogWarning(ex, "journal prune failed for {Path}", entries[i]); }
+            catch (Exception ex) { _logger.JournalPruneFailed(entries[i], ex.Message); }
         }
     }
 
@@ -169,7 +169,7 @@ public sealed class StateStore : IDisposable
     private void SafeFlush()
     {
         try { Flush(); }
-        catch (Exception ex) { _logger.LogError(ex, "debounced state flush failed"); }
+        catch (Exception ex) { _logger.DebouncedFlushFailed(ex.Message); }
     }
 
     public void Dispose()

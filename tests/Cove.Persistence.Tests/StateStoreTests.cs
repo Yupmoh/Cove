@@ -106,4 +106,34 @@ public sealed class StateStoreTests : IDisposable
         var journals = Directory.GetFiles(_journalDir, "state.*.json");
         Assert.True(journals.Length <= 3, $"expected <= 3 journal entries, found {journals.Length}");
     }
+
+    [Fact]
+    public void StrayTmpFromKilledWrite_LoadReturnsOldContent_AndNextFlushRecovers()
+    {
+        using var store = NewStore();
+        _content = Encoding.UTF8.GetBytes("value-good");
+        store.MarkDirty("state");
+        store.Flush();
+
+        var strayTmp = Path.Combine(_dir, ".state.json.tmp-deadprocess");
+        File.WriteAllBytes(strayTmp, Encoding.UTF8.GetBytes("!!partial-dead!!"));
+
+        var recovered = store.Load<string>(_path, "state", static bytes =>
+        {
+            var s = Encoding.UTF8.GetString(bytes);
+            return s.StartsWith("value", StringComparison.Ordinal) ? s : null;
+        });
+        Assert.Equal("value-good", recovered);
+
+        _content = Encoding.UTF8.GetBytes("value-updated");
+        store.MarkDirty("state");
+        store.Flush();
+
+        var afterRecover = store.Load<string>(_path, "state", static bytes =>
+        {
+            var s = Encoding.UTF8.GetString(bytes);
+            return s.StartsWith("value", StringComparison.Ordinal) ? s : null;
+        });
+        Assert.Equal("value-updated", afterRecover);
+    }
 }
