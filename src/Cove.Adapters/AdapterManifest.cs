@@ -13,15 +13,19 @@ public sealed record AdapterManifest
     public required string Accent { get; init; }
     public required string Binary { get; init; }
     public required string Version { get; init; }
+    public string? Author { get; init; }
     public required IReadOnlyDictionary<string, AdapterMethod> Methods { get; init; }
     public BinaryDiscovery? BinaryDiscovery { get; init; }
-    public string? IconSvg { get; init; }
+    public string? Icon { get; init; }
     public string? SkillInstallPath { get; init; }
     public IReadOnlyList<string> WellKnownPaths { get; init; } = [];
     public IReadOnlyList<string> SuggestedFlags { get; init; } = [];
     public AdapterRetention? Retention { get; init; }
     public SessionExtractor? SessionExtractor { get; init; }
     public LauncherOptions? LauncherOptions { get; init; }
+    public IReadOnlyDictionary<string, string> Hooks { get; init; } = new Dictionary<string, string>();
+    public string? SkillsDir { get; init; }
+    public IReadOnlyDictionary<string, InstallRecipe> Install { get; init; } = new Dictionary<string, InstallRecipe>();
     public IReadOnlyList<HookEnvelopeDeclaration> HookEnvelopes { get; init; } = [];
 }
 
@@ -43,6 +47,7 @@ public sealed record AdapterMethod
 public sealed record BinaryDiscovery
 {
     public IReadOnlyList<string> Commands { get; init; } = [];
+    public IReadOnlyList<string> WellKnownPaths { get; init; } = [];
     public string? VersionFlag { get; init; }
     public string? VersionRegex { get; init; }
 }
@@ -79,13 +84,14 @@ public sealed record RegistryEntry
     public bool Official { get; init; }
     public string? IconSvg { get; init; }
     public IReadOnlyList<string> Models { get; init; } = [];
+    public IReadOnlyList<string> Platforms { get; init; } = [];
     public IReadOnlyDictionary<string, InstallRecipe> Install { get; init; } = new Dictionary<string, InstallRecipe>();
 }
 
 public sealed record InstallRecipe
 {
     public required string Cmd { get; init; }
-    public string? PostInstallAuth { get; init; }
+    public bool? PostInstallAuth { get; init; }
 }
 
 public sealed record InstalledAdapter
