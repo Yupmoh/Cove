@@ -89,6 +89,9 @@ public sealed record ActivityListResult(System.Collections.Generic.IReadOnlyList
 public sealed record SessionStateDto(string PaneId, string Adapter, string? SessionId, string Lifecycle, bool Resumable);
 public sealed record SessionListResult(System.Collections.Generic.IReadOnlyList<SessionStateDto> Sessions);
 
+public sealed record ReplayInfoDto(string Command, int? ExitCode, int? Signal);
+public sealed record SpawnedPanesResult(System.Collections.Generic.IReadOnlyList<string> PaneIds);
+
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
@@ -141,5 +144,7 @@ public sealed record SessionListResult(System.Collections.Generic.IReadOnlyList<
 [JsonSerializable(typeof(ActivityListResult))]
 [JsonSerializable(typeof(SessionStateDto))]
 [JsonSerializable(typeof(SessionListResult))]
+[JsonSerializable(typeof(ReplayInfoDto))]
+[JsonSerializable(typeof(SpawnedPanesResult))]
 [JsonSerializable(typeof(JsonElement))]
 public sealed partial class CoveJsonContext : JsonSerializerContext;

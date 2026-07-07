@@ -158,6 +158,17 @@ public sealed class PaneRegistry : IDisposable
         return true;
     }
 
+    public bool Stop(string paneId)
+    {
+        lock (_sync)
+        {
+            if (!_panes.TryGetValue(paneId, out var pane))
+                return false;
+            try { return pane.Session.Signal(Cove.Platform.Pty.PtyConstants.SigTerm); }
+            catch { return false; }
+        }
+    }
+
     public SearchMatch[] Search(string paneId, string query, bool caseSensitive)
     {
         if (!TryGet(paneId, out var pane))

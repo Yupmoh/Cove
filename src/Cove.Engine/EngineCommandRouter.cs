@@ -1,5 +1,6 @@
 using Cove.Adapters;
 using Cove.Engine.Hooks;
+using Cove.Engine.Lifecycle;
 using Cove.Engine.Pty;
 using Cove.Engine.Sessions;
 using Cove.Generated;
@@ -26,6 +27,7 @@ public static class EngineCommandRouter
         Agents.AgentMessageRouter? agentRouter = null,
         Activity.ActivityAggregate? activity = null,
         SessionResumeOrchestrator? sessions = null,
+        AgentLifecycleController? lifecycle = null,
         System.Threading.CancellationToken cancellationToken = default)
     {
         System.Func<EngineDispatchContext, System.Threading.Tasks.Task<ControlResponse>> typed;
@@ -41,7 +43,7 @@ public static class EngineCommandRouter
         }
         try
         {
-            return await typed(new EngineDispatchContext(request, panes, layout, workspaces, runCommands, restoration, snapshots, skills, agents, launchProfiles, adapterEnv, hookServer, hookRouter, agentRouter, activity, sessions));
+            return await typed(new EngineDispatchContext(request, panes, layout, workspaces, runCommands, restoration, snapshots, skills, agents, launchProfiles, adapterEnv, hookServer, hookRouter, agentRouter, activity, sessions, lifecycle));
         }
         catch (System.Exception ex)
         {

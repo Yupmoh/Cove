@@ -11,5 +11,6 @@ public interface IPtySession : IDisposable
     void Write(ReadOnlySpan<byte> data);
     void Resize(int cols, int rows);
     void Kill();
+    bool Signal(int signum);
     int WaitForExit();
 }

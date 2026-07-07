@@ -14,6 +14,7 @@ public static class PtyConstants
     public const int DefaultCols = 80;
     public const int DefaultRows = 24;
     public const int SigKill = 9;
+    public const int SigTerm = 15;
     public const int Esrch = 3;
     public const string DefaultTerm = "xterm-256color";
     public const string NativeLibrary = "cove_pty";

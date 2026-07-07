@@ -65,6 +65,17 @@ public sealed class UnixPtySession : IPtySession
             _logger.LogWarning("pty kill failed (session {Id}, errno {Errno}).", SessionId, -rc);
     }
 
+    public bool Signal(int signum)
+    {
+        int rc = CovePtyNative.Kill(_pid, signum);
+        if (rc != 0 && -rc != PtyConstants.Esrch)
+        {
+            _logger.LogWarning("pty signal {sig} failed (session {Id}, errno {Errno}).", signum, SessionId, -rc);
+            return false;
+        }
+        return true;
+    }
+
     public int WaitForExit()
     {
         if (HasExited)
