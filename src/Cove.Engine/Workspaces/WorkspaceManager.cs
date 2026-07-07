@@ -380,6 +380,45 @@ public sealed class WorkspaceManager : IAsyncDisposable
                 .ToList();
     }
 
+    public async Task<WorkspaceModel?> AdoptWorktreeAsync(string parentId, string location, string branch)
+    {
+        if (Get(parentId) is not { } parent)
+            return null;
+        var bound = new HashSet<string>(StringComparer.Ordinal);
+        lock (_mapGate)
+            foreach (var a in _workspaces.Values)
+                if (a.State.IsWorktree)
+                    bound.Add(PathRealpath.Normalize(a.State.ProjectDir));
+        var orphans = await _worktrees.OrphansAsync(parent.State.ProjectDir, bound).ConfigureAwait(false);
+        var target = PathRealpath.Normalize(location);
+        if (!orphans.Any(o => PathRealpath.Normalize(o) == target))
+            return null;
+
+        var id = _newId();
+        var paneId = _newId();
+        var roomId = _newId();
+        var model = new WorkspaceModel
+        {
+            Id = id,
+            Name = branch,
+            ProjectDir = location,
+            CollectionId = parent.State.CollectionId,
+            IsWorktree = true,
+            ParentWorkspaceId = parentId,
+            WorktreeBranch = branch,
+            Wings = [new Wing { Id = WorkspaceModel.MainWingId, Name = "main" }],
+            Rooms = [new Room { Id = roomId, Name = "shell", WingId = WorkspaceModel.MainWingId, ActivePaneId = paneId, LayoutTree = new PaneLeaf { PaneId = paneId } }],
+            Panes = new Dictionary<string, PaneRecord> { [paneId] = new PaneRecord { PaneId = paneId } },
+            ActiveRoomId = roomId,
+            FocusedPaneId = paneId,
+        };
+        lock (_mapGate)
+            _workspaces[id] = new Actor<WorkspaceModel>(model);
+        await _registry.Mutate(r => r with { OpenWorkspaces = Append(r.OpenWorkspaces, id) }).ConfigureAwait(false);
+        _emit?.Invoke(new WorkspaceChange(WorkspaceChangeKind.Created, id));
+        return model;
+    }
+
     public async Task<bool> RemoveWorktreeAsync(string worktreeWorkspaceId, bool force = true)
     {
         if (Get(worktreeWorkspaceId) is not { } actor)

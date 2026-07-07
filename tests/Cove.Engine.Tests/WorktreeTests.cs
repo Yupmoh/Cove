@@ -205,4 +205,45 @@ public sealed class WorktreeTests
             try { Directory.Delete(real, true); } catch { }
         }
     }
+    [Fact]
+    public async Task AdoptWorktree_BindsOrphan_AsChildWorkspace()
+    {
+        var repo = Path.Combine(Path.GetTempPath(), "cove-adopt-" + Guid.NewGuid().ToString("N"));
+        var wtPath = Path.Combine(Path.GetTempPath(), "cove-adopt-wt-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(repo);
+        var git = new ProcessGitRunner();
+        try
+        {
+            await git.RunAsync(repo, ["init"]);
+            await git.RunAsync(repo, ["config", "user.email", "t@example.com"]);
+            await git.RunAsync(repo, ["config", "user.name", "t"]);
+            File.WriteAllText(Path.Combine(repo, "README.md"), "hi");
+            await git.RunAsync(repo, ["add", "."]);
+            await git.RunAsync(repo, ["commit", "-m", "init"]);
+            await git.RunAsync(repo, ["worktree", "add", wtPath, "-b", "feature"]);
+
+            int n = 0;
+            var changes = new System.Collections.Generic.List<WorkspaceChange>();
+            await using var m = new WorkspaceManager(
+                newId: () => $"id-{++n}",
+                gitRunner: git,
+                emit: c => changes.Add(c));
+            var parent = await m.CreateWorkspaceAsync("proj", repo);
+
+            var adopted = await m.AdoptWorktreeAsync(parent.Id, wtPath, "feature");
+            Assert.NotNull(adopted);
+            Assert.True(adopted!.IsWorktree);
+            Assert.Equal(parent.Id, adopted.ParentWorkspaceId);
+            Assert.Equal("feature", adopted.WorktreeBranch);
+            Assert.Equal(wtPath, adopted.ProjectDir);
+
+            var orphans = await m.WorktreeOrphansAsync(parent.Id);
+            Assert.DoesNotContain(wtPath, orphans);
+        }
+        finally
+        {
+            try { Directory.Delete(repo, true); } catch { }
+            try { Directory.Delete(wtPath, true); } catch { }
+        }
+    }
 }

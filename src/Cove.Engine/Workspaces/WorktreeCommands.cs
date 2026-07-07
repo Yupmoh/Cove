@@ -77,11 +77,27 @@ public static class WorktreeCommands
             ? ctx.Ok()
             : ctx.Fail("git_failed", "git worktree prune failed or parent not found");
     }
+
+    [CoveCommand("cove://commands/worktree.adopt")]
+    public static async Task<ControlResponse> WorktreeAdopt(EngineDispatchContext ctx)
+    {
+        if (ctx.Workspaces is not { } manager)
+            return ctx.Fail("no_workspaces", "workspace manager unavailable");
+        if (ctx.Request.Params is not JsonElement el
+            || el.Deserialize(WorktreeJsonContext.Default.WorktreeAdoptParams) is not { } p
+            || string.IsNullOrWhiteSpace(p.Location) || string.IsNullOrWhiteSpace(p.Branch))
+            return ctx.Fail("bad_params", "parentWorkspaceId, branch and location are required");
+        var workspace = await manager.AdoptWorktreeAsync(p.ParentWorkspaceId, p.Location, p.Branch).ConfigureAwait(false);
+        return workspace is null
+            ? ctx.Fail("not_orphan", "path is not an orphan worktree or parent not found")
+            : ctx.Ok(new WorktreeIdResult(workspace.Id), WorktreeJsonContext.Default.WorktreeIdResult);
+    }
 }
 
 public sealed record WorktreeCreateParams(string ParentWorkspaceId, string Branch, string Location, bool NewBranch = true, string? BaseRef = null);
 public sealed record WorktreeListParams(string ParentWorkspaceId);
 public sealed record WorktreeRemoveParams(string WorktreeWorkspaceId, bool Force = true);
+public sealed record WorktreeAdoptParams(string ParentWorkspaceId, string Location, string Branch);
 public sealed record WorktreeIdResult(string WorkspaceId);
 public sealed record WorktreeSummary(string WorkspaceId, string Branch, string ProjectDir);
 public sealed record WorktreeListResult(IReadOnlyList<WorktreeSummary> Worktrees);
@@ -94,6 +110,7 @@ public sealed record WorktreeOrphansResult(IReadOnlyList<string> Paths);
 [JsonSerializable(typeof(WorktreeCreateParams))]
 [JsonSerializable(typeof(WorktreeListParams))]
 [JsonSerializable(typeof(WorktreeRemoveParams))]
+[JsonSerializable(typeof(WorktreeAdoptParams))]
 [JsonSerializable(typeof(WorktreeIdResult))]
 [JsonSerializable(typeof(WorktreeListResult))]
 [JsonSerializable(typeof(WorktreeOrphansResult))]
