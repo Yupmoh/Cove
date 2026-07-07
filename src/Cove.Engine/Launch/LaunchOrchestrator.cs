@@ -1,6 +1,8 @@
 using System.Text.Json.Serialization;
 using Cove.Adapters;
 using Cove.Engine.Restart;
+using Microsoft.Extensions.Logging;
+using ZLogger;
 
 namespace Cove.Engine.Launch;
 
@@ -26,14 +28,14 @@ public sealed class LaunchOrchestrator
     private readonly string? _loginShellPath;
     private readonly Dictionary<string, LauncherOverrides> _paneOverrides = new();
     private readonly LauncherOverrideStore? _overrideStore;
+    private readonly Microsoft.Extensions.Logging.ILogger? _logger;
 
     public LaunchOrchestrator(AgentResumeService? resumeService = null, LauncherOverrideStore? overrideStore = null)
     {
         _resumeService = resumeService;
         _overrideStore = overrideStore;
     }
-
-    public LaunchOrchestrator(AdapterManifestStore manifestStore, MethodRunner methodRunner, BinaryDiscoveryService binaryDiscovery, string? loginShellPath = null, AgentResumeService? resumeService = null, LauncherOverrideStore? overrideStore = null)
+    public LaunchOrchestrator(AdapterManifestStore manifestStore, MethodRunner methodRunner, BinaryDiscoveryService binaryDiscovery, string? loginShellPath = null, AgentResumeService? resumeService = null, LauncherOverrideStore? overrideStore = null, Microsoft.Extensions.Logging.ILogger? logger = null)
     {
         _manifestStore = manifestStore;
         _methodRunner = methodRunner;
@@ -41,6 +43,7 @@ public sealed class LaunchOrchestrator
         _loginShellPath = loginShellPath;
         _resumeService = resumeService;
         _overrideStore = overrideStore;
+        _logger = logger;
     }
 
     public ResumeCommand BuildLaunchCommand(LaunchProfile profile, LauncherOverrides overrides)
@@ -111,6 +114,80 @@ public sealed class LaunchOrchestrator
 
         return null;
     }
+    public async Task<LauncherOptionsResult?> LoadLauncherOptionsAsync(string adapter, System.Threading.CancellationToken cancellationToken = default)
+    {
+        if (_manifestStore is null)
+            return null;
+        var manifest = _manifestStore.Load(adapter);
+        if (manifest is null)
+            return null;
+        if (!manifest.Methods.TryGetValue("launcher_options", out var method))
+            return null;
+        var adapterDir = _manifestStore.ResolveDir(adapter);
+        System.Text.Json.JsonElement output;
+        if (!string.IsNullOrEmpty(method.Static))
+        {
+            var staticPath = System.IO.Path.Combine(adapterDir, method.Static);
+            if (!System.IO.File.Exists(staticPath))
+            {
+                _logger?.LauncherOptionsStaticMissing(adapter, method.Static);
+                return null;
+            }
+            try
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(System.IO.File.ReadAllText(staticPath));
+                output = doc.RootElement.Clone();
+            }
+            catch (System.Text.Json.JsonException ex)
+            {
+                _logger?.LauncherOptionsParseFailed(adapter, ex.Message);
+                return null;
+            }
+        }
+        else if (!string.IsNullOrEmpty(method.Script) && _methodRunner is not null)
+        {
+            var result = await _methodRunner.RunAsync(adapterDir, method.Script, Array.Empty<string>(), TimeSpan.FromSeconds(5), cancellationToken: cancellationToken).ConfigureAwait(false);
+            if (!result.Ok || result.Json is not { } json)
+            {
+                _logger?.LauncherOptionsScriptFailed(adapter, result.ExitCode, result.Stderr);
+                return null;
+            }
+            output = json;
+        }
+        else
+        {
+            return null;
+        }
+        return ParseLauncherOptions(output);
+    }
+    private static LauncherOptionsResult? ParseLauncherOptions(System.Text.Json.JsonElement json)
+    {
+        if (!json.TryGetProperty("options", out var optsProp) || optsProp.ValueKind != System.Text.Json.JsonValueKind.Array)
+            return null;
+        var options = new List<LauncherOption>();
+        foreach (var item in optsProp.EnumerateArray())
+        {
+            if (!item.TryGetProperty("key", out var keyProp) || !item.TryGetProperty("label", out var labelProp) || !item.TryGetProperty("type", out var typeProp))
+                continue;
+            string? defaultValueRaw = null;
+            if (item.TryGetProperty("default", out var defProp) && defProp.ValueKind != System.Text.Json.JsonValueKind.Null)
+                defaultValueRaw = defProp.ValueKind == System.Text.Json.JsonValueKind.String ? defProp.GetString() : defProp.GetRawText();
+            List<LauncherOptionChoice>? choices = null;
+            if (item.TryGetProperty("choices", out var choicesProp) && choicesProp.ValueKind == System.Text.Json.JsonValueKind.Array)
+            {
+                choices = new List<LauncherOptionChoice>();
+                foreach (var c in choicesProp.EnumerateArray())
+                {
+                    if (c.ValueKind == System.Text.Json.JsonValueKind.String)
+                        choices.Add(new LauncherOptionChoice(c.GetString()!, null));
+                    else if (c.TryGetProperty("value", out var valProp))
+                        choices.Add(new LauncherOptionChoice(valProp.GetString()!, c.TryGetProperty("label", out var lblProp) ? lblProp.GetString() : null));
+                }
+            }
+            options.Add(new LauncherOption(keyProp.GetString()!, labelProp.GetString()!, typeProp.GetString()!, defaultValueRaw, choices));
+        }
+        return new LauncherOptionsResult(options);
+    }
 
     private static ResumeCommand ParseCommand(System.Text.Json.JsonElement json, string? workingDir)
     {
@@ -178,4 +255,16 @@ public sealed class LaunchOrchestrator
         _paneOverrides.Remove(paneId);
         _overrideStore?.Delete(paneId);
     }
+}
+
+internal static partial class LauncherOptionsLog
+{
+    [ZLoggerMessage(LogLevel.Warning, "launcher options static file missing adapter={adapter} file={file}")]
+    public static partial void LauncherOptionsStaticMissing(this Microsoft.Extensions.Logging.ILogger logger, string adapter, string file);
+
+    [ZLoggerMessage(LogLevel.Warning, "launcher options parse failed adapter={adapter} error={error}")]
+    public static partial void LauncherOptionsParseFailed(this Microsoft.Extensions.Logging.ILogger logger, string adapter, string error);
+
+    [ZLoggerMessage(LogLevel.Warning, "launcher options script failed adapter={adapter} exit={exit} stderr={stderr}")]
+    public static partial void LauncherOptionsScriptFailed(this Microsoft.Extensions.Logging.ILogger logger, string adapter, int exit, string stderr);
 }
