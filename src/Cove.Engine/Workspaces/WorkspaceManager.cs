@@ -14,7 +14,7 @@ public sealed class WorkspaceManager : IAsyncDisposable
     private readonly Action<WorkspaceChange>? _emit;
     private readonly Func<string> _newId;
     private readonly WorktreeService _worktrees;
-
+    private readonly Dictionary<string, GitWatchService> _watchers = new(StringComparer.Ordinal);
     public WorkspaceManager(
         RegistryModel? registry = null,
         IEnumerable<WorkspaceModel>? workspaces = null,
@@ -398,7 +398,7 @@ public sealed class WorkspaceManager : IAsyncDisposable
         lock (_mapGate)
             bound = _workspaces.Values
                 .Where(a => a.State.IsWorktree && a.State.ParentWorkspaceId == parentId)
-                .Select(a => a.State.ProjectDir)
+                .Select(a => PathRealpath.Normalize(a.State.ProjectDir))
                 .ToList();
         return _worktrees.OrphansAsync(parent.State.ProjectDir, bound);
     }
@@ -411,6 +411,91 @@ public sealed class WorkspaceManager : IAsyncDisposable
         return result.Ok;
     }
 
+    public async Task RefreshWorktreesAsync(string parentId)
+    {
+        if (Get(parentId) is not { } parent)
+            return;
+        var entries = await _worktrees.ListAsync(parent.State.ProjectDir).ConfigureAwait(false);
+        if (entries.Count == 0)
+            return;
+        var onDisk = entries.Where(e => !string.IsNullOrEmpty(e.Path)).Skip(1).ToDictionary(e => PathRealpath.Normalize(e.Path!), StringComparer.Ordinal);
+
+        List<Actor<WorkspaceModel>> bound;
+        lock (_mapGate)
+            bound = _workspaces.Values
+                .Where(a => a.State.IsWorktree && a.State.ParentWorkspaceId == parentId)
+                .ToList();
+
+        var deletedIds = new List<string>();
+        var updatedIds = new List<string>();
+        foreach (var actor in bound)
+        {
+            var w = actor.State;
+            var key = PathRealpath.Normalize(w.ProjectDir);
+            if (!onDisk.ContainsKey(key))
+            {
+                deletedIds.Add(w.Id);
+                continue;
+            }
+            if (onDisk[key].Branch is { } rawBranch)
+            {
+                var shortBranch = rawBranch.StartsWith("refs/heads/", StringComparison.Ordinal) ? rawBranch["refs/heads/".Length..] : rawBranch;
+                if (!string.Equals(w.WorktreeBranch, shortBranch, StringComparison.Ordinal))
+                {
+                    await actor.Mutate(m => m with { WorktreeBranch = shortBranch }).ConfigureAwait(false);
+                    updatedIds.Add(w.Id);
+                }
+            }
+        }
+
+        foreach (var id in deletedIds)
+        {
+            Actor<WorkspaceModel>? actor;
+            lock (_mapGate)
+            {
+                if (!_workspaces.TryGetValue(id, out actor))
+                    continue;
+                _workspaces.Remove(id);
+            }
+            await actor.DisposeAsync().ConfigureAwait(false);
+            await _registry.Mutate(r =>
+            {
+                var open = r.OpenWorkspaces.Where(x => x != id).ToList();
+                var focused = r.FocusedWorkspaceId == id ? parentId : r.FocusedWorkspaceId;
+                return r with { OpenWorkspaces = open, FocusedWorkspaceId = focused };
+            }).ConfigureAwait(false);
+            _emit?.Invoke(new WorkspaceChange(WorkspaceChangeKind.Deleted, id));
+        }
+
+        foreach (var id in updatedIds)
+            _emit?.Invoke(new WorkspaceChange(WorkspaceChangeKind.Updated, id));
+    }
+
+    public Task WatchWorktreeRepoAsync(string parentId)
+    {
+        if (Get(parentId) is not { } parent)
+            return Task.CompletedTask;
+        lock (_watchers)
+        {
+            if (_watchers.ContainsKey(parentId))
+                return Task.CompletedTask;
+            var watch = new GitWatchService(async _ => await RefreshWorktreesAsync(parentId).ConfigureAwait(false));
+            watch.Start(parent.State.ProjectDir);
+            _watchers[parentId] = watch;
+        }
+        return Task.CompletedTask;
+    }
+
+    public Task UnwatchWorktreeRepoAsync(string parentId)
+    {
+        lock (_watchers)
+        {
+            if (_watchers.Remove(parentId, out var watch))
+                watch.Dispose();
+        }
+        return Task.CompletedTask;
+    }
+
     private static IReadOnlyList<string> Append(IReadOnlyList<string> list, string item)
     {
         var next = new List<string>(list);
@@ -421,6 +506,14 @@ public sealed class WorkspaceManager : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        List<GitWatchService> watchers;
+        lock (_watchers)
+        {
+            watchers = _watchers.Values.ToList();
+            _watchers.Clear();
+        }
+        foreach (var w in watchers)
+            w.Dispose();
         List<Actor<WorkspaceModel>> actors;
         lock (_mapGate)
         {

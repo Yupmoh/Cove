@@ -278,6 +278,8 @@ public sealed class DaemonHost
             case "cove://commands/window.focus":
                 {
                     bool focused = TryForwardFocus(cancellationToken);
+                    if (focused && _workspaces is not null && _workspaces.Registry.FocusedWorkspaceId is { } focusedWs)
+                        _ = _workspaces.RefreshWorktreesAsync(focusedWs);
                     JsonElement data = focused
                         ? Parse("{\"focused\":true}")
                         : Parse("{\"focused\":false,\"reason\":\"no_render_client\"}");
