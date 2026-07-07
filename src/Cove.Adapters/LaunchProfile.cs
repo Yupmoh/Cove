@@ -85,6 +85,8 @@ public sealed class LaunchProfileStore
 
         foreach (var file in Directory.EnumerateFiles(adapterDir, "*.json"))
         {
+            if (Path.GetFileName(file) == ".panes.json")
+                continue;
             try
             {
                 var profile = JsonSerializer.Deserialize(File.ReadAllText(file), AdaptersJsonContext.Default.LaunchProfile);
@@ -196,4 +198,97 @@ public sealed class LaunchProfileStore
     }
 
     private string GetProfilePath(string adapter, string slug) => Path.Combine(_root, adapter, slug + ".json");
+
+    private string GetPanesPath(string adapter) => Path.Combine(_root, adapter, ".panes.json");
+
+    private PaneSelectionStore LoadPanes(string adapter)
+    {
+        var path = GetPanesPath(adapter);
+        if (!File.Exists(path))
+            return new PaneSelectionStore(new Dictionary<string, PaneSelection>(), null);
+        try
+        {
+            var content = File.ReadAllText(path);
+            var store = JsonSerializer.Deserialize(content, AdaptersJsonContext.Default.PaneSelectionStore);
+            return store ?? new PaneSelectionStore(new Dictionary<string, PaneSelection>(), null);
+        }
+        catch (JsonException) { }
+        return new PaneSelectionStore(new Dictionary<string, PaneSelection>(), null);
+    }
+
+    private void SavePanes(string adapter, PaneSelectionStore store)
+    {
+        var path = GetPanesPath(adapter);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        var json = JsonSerializer.Serialize(store, AdaptersJsonContext.Default.PaneSelectionStore);
+        File.WriteAllText(path, json);
+    }
+
+    public void SetProfileForPane(string adapter, string slug, string paneId)
+    {
+        if (!LaunchProfileValidator.IsValidAdapter(adapter) || !LaunchProfileValidator.IsValidSlug(slug))
+        {
+            _logger?.LaunchProfileLoadInvalidSlug(slug);
+            return;
+        }
+        var panes = LoadPanes(adapter);
+        var selections = new Dictionary<string, PaneSelection>(panes.PaneSelections)
+        {
+            [paneId] = new PaneSelection(slug, DateTimeOffset.UtcNow)
+        };
+        SavePanes(adapter, panes with { PaneSelections = selections, LastUsed = slug });
+    }
+
+    public string? GetProfileForPane(string adapter, string paneId)
+    {
+        if (!LaunchProfileValidator.IsValidAdapter(adapter))
+            return null;
+        var panes = LoadPanes(adapter);
+        return panes.PaneSelections.TryGetValue(paneId, out var sel) ? sel.Slug : null;
+    }
+
+    public void RecordLastUsed(string adapter, string slug)
+    {
+        if (!LaunchProfileValidator.IsValidAdapter(adapter) || !LaunchProfileValidator.IsValidSlug(slug))
+        {
+            _logger?.LaunchProfileLoadInvalidSlug(slug);
+            return;
+        }
+        var panes = LoadPanes(adapter);
+        var selections = new Dictionary<string, PaneSelection>(panes.PaneSelections);
+        foreach (var (pid, sel) in panes.PaneSelections)
+        {
+            if (sel.Slug == slug)
+                selections[pid] = sel with { LastUsedAt = DateTimeOffset.UtcNow };
+        }
+        SavePanes(adapter, panes with { PaneSelections = selections, LastUsed = slug });
+    }
+
+    public string? GetLastUsed(string adapter)
+    {
+        if (!LaunchProfileValidator.IsValidAdapter(adapter))
+            return null;
+        var panes = LoadPanes(adapter);
+        return panes.LastUsed;
+    }
+
+    public FooterChipData? GetFooterChipData(string adapter, string paneId)
+    {
+        var paneSlug = GetProfileForPane(adapter, paneId);
+        var effectiveSlug = paneSlug ?? GetDefault(adapter).Slug;
+        var profile = Load(adapter, effectiveSlug);
+        if (profile is null)
+            return null;
+        var panes = LoadPanes(adapter);
+        DateTimeOffset? lastUsedAt = null;
+        foreach (var (_, sel) in panes.PaneSelections)
+        {
+            if (sel.Slug == effectiveSlug)
+            {
+                lastUsedAt = sel.LastUsedAt;
+                break;
+            }
+        }
+        return new FooterChipData(effectiveSlug, profile.IsDefault, lastUsedAt);
+    }
 }

@@ -157,4 +157,140 @@ public sealed class LaunchProfileTests
         }
         finally { try { Directory.Delete(dir, true); } catch { } }
     }
+
+    [Fact]
+    public void SetProfileForPane_PersistsAndLoads()
+    {
+        var dir = NewDir();
+        try
+        {
+            var store = new LaunchProfileStore(dir);
+            store.Save(MakeProfile("Default", "default", "claude-code", isDefault: true));
+            store.Save(MakeProfile("Fast", "fast", "claude-code"));
+
+            store.SetProfileForPane("claude-code", "fast", "pane-1");
+
+            Assert.Equal("fast", store.GetProfileForPane("claude-code", "pane-1"));
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
+
+    [Fact]
+    public void GetProfileForPane_UnknownPane_ReturnsNull()
+    {
+        var dir = NewDir();
+        try
+        {
+            var store = new LaunchProfileStore(dir);
+            store.Save(MakeProfile("Default", "default", "claude-code", isDefault: true));
+
+            Assert.Null(store.GetProfileForPane("claude-code", "never-seen"));
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
+
+    [Fact]
+    public void SetProfileForPane_OverwritesPrevious()
+    {
+        var dir = NewDir();
+        try
+        {
+            var store = new LaunchProfileStore(dir);
+            store.Save(MakeProfile("Default", "default", "claude-code", isDefault: true));
+            store.Save(MakeProfile("Fast", "fast", "claude-code"));
+
+            store.SetProfileForPane("claude-code", "default", "pane-1");
+            store.SetProfileForPane("claude-code", "fast", "pane-1");
+
+            Assert.Equal("fast", store.GetProfileForPane("claude-code", "pane-1"));
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
+
+    [Fact]
+    public void RecordLastUsed_UpdatesLastUsed()
+    {
+        var dir = NewDir();
+        try
+        {
+            var store = new LaunchProfileStore(dir);
+            store.Save(MakeProfile("Default", "default", "claude-code", isDefault: true));
+            store.Save(MakeProfile("Fast", "fast", "claude-code"));
+
+            store.RecordLastUsed("claude-code", "default");
+            Assert.Equal("default", store.GetLastUsed("claude-code"));
+
+            store.RecordLastUsed("claude-code", "fast");
+            Assert.Equal("fast", store.GetLastUsed("claude-code"));
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
+
+    [Fact]
+    public void GetLastUsed_NoHistory_ReturnsNull()
+    {
+        var dir = NewDir();
+        try
+        {
+            var store = new LaunchProfileStore(dir);
+            Assert.Null(store.GetLastUsed("claude-code"));
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
+
+    [Fact]
+    public void GetFooterChipData_ReturnsSelectedProfile()
+    {
+        var dir = NewDir();
+        try
+        {
+            var store = new LaunchProfileStore(dir);
+            store.Save(MakeProfile("Default", "default", "claude-code", isDefault: true));
+            store.Save(MakeProfile("Fast", "fast", "claude-code"));
+
+            store.SetProfileForPane("claude-code", "fast", "pane-1");
+            var chip = store.GetFooterChipData("claude-code", "pane-1");
+
+            Assert.NotNull(chip);
+            Assert.Equal("fast", chip!.ProfileSlug);
+            Assert.False(chip.IsDefault);
+            Assert.NotNull(chip.LastUsedAt);
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
+
+    [Fact]
+    public void GetFooterChipData_UnknownPane_FallsBackToDefault()
+    {
+        var dir = NewDir();
+        try
+        {
+            var store = new LaunchProfileStore(dir);
+            store.Save(MakeProfile("Default", "default", "claude-code", isDefault: true));
+
+            var chip = store.GetFooterChipData("claude-code", "unknown-pane");
+
+            Assert.NotNull(chip);
+            Assert.Equal("default", chip!.ProfileSlug);
+            Assert.True(chip.IsDefault);
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
+
+    [Fact]
+    public void List_SkipsPanesFile()
+    {
+        var dir = NewDir();
+        try
+        {
+            var store = new LaunchProfileStore(dir);
+            store.Save(MakeProfile("Default", "default", "claude-code", isDefault: true));
+            store.SetProfileForPane("claude-code", "default", "pane-1");
+
+            var profiles = store.List("claude-code");
+            Assert.Single(profiles);
+            Assert.Equal("default", profiles[0].Slug);
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
 }

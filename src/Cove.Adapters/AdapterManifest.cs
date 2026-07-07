@@ -109,6 +109,14 @@ public sealed record HookEvent
     public System.Text.Json.JsonElement? Payload { get; init; }
 }
 
+public sealed record PaneSelection(string Slug, DateTimeOffset LastUsedAt);
+
+public sealed record PaneSelectionStore(
+    IReadOnlyDictionary<string, PaneSelection> PaneSelections,
+    string? LastUsed);
+
+public sealed record FooterChipData(string ProfileSlug, bool IsDefault, DateTimeOffset? LastUsedAt);
+
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     WriteIndented = true,
@@ -129,4 +137,7 @@ public sealed record HookEvent
 [JsonSerializable(typeof(RecentSession))]
 [JsonSerializable(typeof(List<RecentSession>))]
 [JsonSerializable(typeof(LaunchProfile))]
+[JsonSerializable(typeof(PaneSelectionStore))]
+[JsonSerializable(typeof(PaneSelection))]
+[JsonSerializable(typeof(FooterChipData))]
 public sealed partial class AdaptersJsonContext : JsonSerializerContext { }
