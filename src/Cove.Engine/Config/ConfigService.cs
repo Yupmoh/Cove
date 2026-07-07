@@ -2,66 +2,135 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using Cove.Persistence;
-using Cove.Protocol;
 using Microsoft.Extensions.Logging;
 
 namespace Cove.Engine.Config;
 
-public sealed class ConfigService
+public sealed class ConfigService : System.IDisposable
 {
     private readonly string _path;
     private readonly ILogger _logger;
     private readonly object _lock = new();
+    private Dictionary<string, string> _values = new();
+    private FileSystemWatcher? _watcher;
+    private bool _disposed;
+
+    public event Action<string>? SettingsChanged;
 
     public ConfigService(string dataDir, ILogger logger)
     {
         _path = Path.Combine(dataDir, "config.json");
         _logger = logger;
+        Load();
     }
 
     public string? Get(string key)
     {
-        var normalized = Normalize(key);
         lock (_lock)
-        {
-            var values = Load();
-            return values.TryGetValue(normalized, out var v) ? v : null;
-        }
+            return _values.TryGetValue(key, out var v) ? v : null;
     }
 
     public void Set(string key, string value)
     {
-        var normalized = Normalize(key);
         lock (_lock)
         {
-            var values = Load();
-            values[normalized] = value;
-            Save(values);
+            _values[key] = value;
+            Save();
         }
+        SettingsChanged?.Invoke(key);
     }
 
-    private static string Normalize(string key) => key.Replace(".", ":");
+    public void StartWatching()
+    {
+        if (_watcher is not null) return;
+        var dir = Path.GetDirectoryName(_path);
+        if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir)) return;
+        _watcher = new FileSystemWatcher(dir, Path.GetFileName(_path))
+        {
+            NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.Size,
+            EnableRaisingEvents = true,
+        };
+        _watcher.Changed += OnFileChanged;
+        _watcher.Created += OnFileChanged;
+        _watcher.Renamed += (sender, e) => OnFileChanged(sender, e);
+    }
 
-    private Dictionary<string, string> Load()
+    private void OnFileChanged(object sender, FileSystemEventArgs e)
+    {
+        var changed = ReloadAndCollectChanges();
+        foreach (var key in changed)
+            SettingsChanged?.Invoke(key);
+    }
+
+    public void Reload()
+    {
+        var changed = ReloadAndCollectChanges();
+        foreach (var key in changed)
+            SettingsChanged?.Invoke(key);
+    }
+
+    private List<string> ReloadAndCollectChanges()
+    {
+        lock (_lock)
+        {
+            var before = new Dictionary<string, string>(_values);
+            Load();
+            var changed = new List<string>();
+            foreach (var kv in _values)
+                if (!before.TryGetValue(kv.Key, out var prev) || prev != kv.Value)
+                    changed.Add(kv.Key);
+            foreach (var key in before.Keys)
+                if (!_values.ContainsKey(key))
+                    changed.Add(key);
+            return changed;
+        }
+    }
+    private void Load()
     {
         if (!File.Exists(_path))
-            return new Dictionary<string, string>();
-        try
         {
-            var json = File.ReadAllText(_path);
-            using var doc = JsonDocument.Parse(json);
-            var result = new Dictionary<string, string>();
-            foreach (var prop in doc.RootElement.EnumerateObject())
-                result[prop.Name] = prop.Value.ToString();
-            return result;
+            _values = new Dictionary<string, string>();
+            return;
         }
-        catch (System.Exception ex)
+        for (var attempt = 0; attempt < 5; attempt++)
         {
-            _logger.ConfigParseFailed(_path, ex.Message);
-            return new Dictionary<string, string>();
+            try
+            {
+                var json = File.ReadAllText(_path);
+                var result = JsonSerializer.Deserialize(json, Cove.Protocol.CoveJsonContext.Default.DictionaryStringString);
+                _values = result ?? new Dictionary<string, string>();
+                return;
+            }
+            catch (JsonException ex)
+            {
+                _logger.ConfigParseFailed(_path, ex.Message);
+                _values = new Dictionary<string, string>();
+                return;
+            }
+            catch (IOException)
+            {
+                System.Threading.Thread.Sleep(20);
+            }
         }
+        _logger.ConfigReadFailed(_path);
     }
 
-    private void Save(Dictionary<string, string> values)
-        => AtomicJsonStore.WriteRawText(_path, JsonSerializer.Serialize(values, Cove.Protocol.CoveJsonContext.Default.DictionaryStringString));
+    private void Save()
+    {
+        var dir = Path.GetDirectoryName(_path);
+        if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+        AtomicJsonStore.WriteRawText(_path, JsonSerializer.Serialize(_values, Cove.Protocol.CoveJsonContext.Default.DictionaryStringString));
+    }
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+        if (_watcher is not null)
+        {
+            _watcher.Changed -= OnFileChanged;
+            _watcher.Created -= OnFileChanged;
+            _watcher.Dispose();
+        }
+    }
 }

@@ -1,0 +1,162 @@
+using System.IO;
+using System.Threading;
+using Cove.Engine.Config;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using Xunit;
+
+namespace Cove.Engine.Tests;
+
+public sealed class ConfigHotReloadTests
+{
+    private static string NewDir() => Path.Combine(Path.GetTempPath(), "cove-cfg-" + Guid.NewGuid().ToString("N"));
+
+    [Fact]
+    public void Set_ThenGet_RoundTrips()
+    {
+        var dir = NewDir();
+        try
+        {
+            var cfg = new ConfigService(dir, NullLogger.Instance);
+            cfg.Set("terminal.fontSize", "14");
+            Assert.Equal("14", cfg.Get("terminal.fontSize"));
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
+
+    [Fact]
+    public void Set_Bool_PreservesType()
+    {
+        var dir = NewDir();
+        try
+        {
+            var cfg = new ConfigService(dir, NullLogger.Instance);
+            cfg.Set("ui.animations", "true");
+            Assert.Equal("true", cfg.Get("ui.animations"));
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
+
+    [Fact]
+    public void Set_PersistsAcrossInstances()
+    {
+        var dir = NewDir();
+        try
+        {
+            var cfg1 = new ConfigService(dir, NullLogger.Instance);
+            cfg1.Set("terminal.fontFamily", "FiraCode");
+            var cfg2 = new ConfigService(dir, NullLogger.Instance);
+            Assert.Equal("FiraCode", cfg2.Get("terminal.fontFamily"));
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
+
+    [Fact]
+    public void Set_FiresSettingsChanged()
+    {
+        var dir = NewDir();
+        try
+        {
+            var cfg = new ConfigService(dir, NullLogger.Instance);
+            string changedKey = "";
+            cfg.SettingsChanged += key => changedKey = key;
+            cfg.Set("terminal.fontSize", "14");
+            Assert.Equal("terminal.fontSize", changedKey);
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
+
+    [Fact]
+    public void Load_PicksUpExternalFileChange()
+    {
+        var dir = NewDir();
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var path = Path.Combine(dir, "config.json");
+            File.WriteAllText(path, "{\"terminal.fontSize\":\"12\"}");
+            var cfg = new ConfigService(dir, NullLogger.Instance);
+            Assert.Equal("12", cfg.Get("terminal.fontSize"));
+
+            File.WriteAllText(path, "{\"terminal.fontSize\":\"14\"}");
+            cfg.Reload();
+            Assert.Equal("14", cfg.Get("terminal.fontSize"));
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
+
+    [Fact]
+    public void HotReload_AtomicWrite_FiresSettingsChanged()
+    {
+        var dir = NewDir();
+        Directory.CreateDirectory(dir);
+        ConfigService? cfg = null;
+        try
+        {
+            var path = Path.Combine(dir, "config.json");
+            File.WriteAllText(path, "{\"terminal.fontSize\":\"12\"}");
+            cfg = new ConfigService(dir, NullLogger.Instance);
+            cfg.StartWatching();
+            var changedKeys = new System.Collections.Generic.List<string>();
+            cfg.SettingsChanged += key => changedKeys.Add(key);
+
+            var cfg2 = new ConfigService(dir, NullLogger.Instance);
+            cfg2.Set("terminal.fontSize", "14");
+
+            for (var i = 0; i < 50 && cfg.Get("terminal.fontSize") != "14"; i++)
+                Thread.Sleep(100);
+
+            Assert.Equal("14", cfg.Get("terminal.fontSize"));
+            Assert.Contains("terminal.fontSize", changedKeys);
+        }
+        finally { try { cfg?.Dispose(); } catch { } try { Directory.Delete(dir, true); } catch { } }
+    }
+
+    [Fact]
+    public void CorruptFile_FallsBackSafely()
+    {
+        var dir = NewDir();
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var path = Path.Combine(dir, "config.json");
+            File.WriteAllText(path, "{ this is not valid json");
+            var cfg = new ConfigService(dir, NullLogger.Instance);
+            Assert.Null(cfg.Get("terminal.fontSize"));
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
+
+    [Fact]
+    public void UnknownKey_PreservedAcrossRewrite()
+    {
+        var dir = NewDir();
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var path = Path.Combine(dir, "config.json");
+            File.WriteAllText(path, "{\"terminal.fontSize\":\"12\",\"custom.unknown\":\"preserved\"}");
+            var cfg = new ConfigService(dir, NullLogger.Instance);
+            Assert.Equal("preserved", cfg.Get("custom.unknown"));
+            cfg.Set("terminal.fontSize", "14");
+            var cfg2 = new ConfigService(dir, NullLogger.Instance);
+            Assert.Equal("preserved", cfg2.Get("custom.unknown"));
+            Assert.Equal("14", cfg2.Get("terminal.fontSize"));
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
+
+    [Fact]
+    public void AutoDetectType_IntStoredAsString()
+    {
+        var dir = NewDir();
+        try
+        {
+            var cfg = new ConfigService(dir, NullLogger.Instance);
+            cfg.Set("terminal.fontSize", "14");
+            var raw = File.ReadAllText(Path.Combine(dir, "config.json"));
+            Assert.Contains("\"14\"", raw);
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
+}
