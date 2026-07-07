@@ -104,7 +104,7 @@ public sealed class DaemonHost
             ? new Cove.Adapters.FileRegistryFetcher(devRegistryPath, logger)
             : new Cove.Adapters.HttpRegistryFetcher(Cove.Adapters.RegistryConstants.RegistryContentsUrl, logger);
         _registry = new Cove.Adapters.RegistryService(registryCachePath, fetcher);
-        _launcher = new Cove.Engine.Launch.LaunchOrchestrator(_manifestStore, new Cove.Adapters.MethodRunner(), new Cove.Adapters.BinaryDiscoveryService(), probedPath, overrideStore: new Cove.Engine.Launch.LauncherOverrideStore(System.IO.Path.Combine(dataDir, "launcher-overrides"), logger));
+        _launcher = new Cove.Engine.Launch.LaunchOrchestrator(_manifestStore, new Cove.Adapters.MethodRunner(), new Cove.Adapters.BinaryDiscoveryService(), probedPath, overrideStore: new Cove.Engine.Launch.LauncherOverrideStore(System.IO.Path.Combine(dataDir, "launcher-overrides"), logger), logger: logger);
         _tasks = new Cove.Engine.Tasks.TaskStore(dataDir);
         _notes = new Cove.Engine.Knowledge.NoteStore(dataDir);
         _timeline = new Cove.Engine.Knowledge.TimelineStore(dataDir);
