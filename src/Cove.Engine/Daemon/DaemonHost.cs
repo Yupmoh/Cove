@@ -31,6 +31,7 @@ public sealed class DaemonHost
     private System.Threading.Timer? _scrollbackTimer;
     private Cove.Engine.Workspaces.WorkspaceManager? _workspaces;
     private Cove.Engine.Workspaces.RunCommandService? _runCommands;
+    private Cove.Engine.Restart.RestorationService? _restoration;
 
     public DaemonHost(DaemonPaths paths, IControlEndpoint endpoint, bool exitWhenIdle)
     {
@@ -55,11 +56,17 @@ public sealed class DaemonHost
         _layout = new Cove.Engine.Layout.LayoutService();
         _workspaces = new Cove.Engine.Workspaces.WorkspaceManager();
         _runCommands = new Cove.Engine.Workspaces.RunCommandService(new Cove.Engine.Workspaces.RunCommandStore(System.IO.Path.Combine(dataDir, "run-commands"), logger), new Cove.Engine.Workspaces.PtyRunCommandSessionFactory(_ptyHost, spawnEnv, shellDir, logger));
+        _restoration = new Cove.Engine.Restart.RestorationService(dataDir, logger, emitProgress: e => BroadcastEvent("restore.progress", e, Cove.Engine.Restart.RestorationJsonContext.Default.RestoreProgressEvent));
+
 
         var wsDir = System.IO.Path.Combine(dataDir, "workspaces", "default");
+        var wasClean = _restoration.WasCleanShutdown();
+        _restoration.MarkLaunching();
+        _restoration.EmitProgress("default", "load_workspace", Cove.Engine.Restart.RestorePhase.Started, wasClean ? "clean" : "unclean");
         var (savedLayout, sessions) = Cove.Engine.Layout.WorkspacePersistence.Load(wsDir, logger);
         if (savedLayout is { } sl)
         {
+            _restoration.EmitProgress("default", "load_workspace", Cove.Engine.Restart.RestorePhase.WorkspaceLoaded);
             foreach (var room in sl.Rooms)
                 foreach (var leaf in Cove.Engine.Layout.MosaicOps.Leaves(room.LayoutTree))
                     if (sessions.TryGetValue(leaf.PaneId, out var d))
@@ -67,8 +74,10 @@ public sealed class DaemonHost
                         try { _panes!.RespawnAs(d.PaneId, d.Command, d.Args, d.Cwd, 80, 24, Cove.Engine.Layout.WorkspacePersistence.LoadScrollback(d.PaneId, wsDir)); }
                         catch (System.Exception ex) { logger.LogWarning(ex, "respawn on restore failed for {PaneId}", d.PaneId); }
                     }
+            _restoration.EmitProgress("default", "materialize_panes", Cove.Engine.Restart.RestorePhase.PanesMaterialized);
             _layout!.LoadSnapshot(sl);
         }
+        _restoration.EmitProgress("default", "restore_complete", Cove.Engine.Restart.RestorePhase.Completed);
         _layout!.OnChanged = () =>
         {
             try { Cove.Engine.Layout.WorkspacePersistence.Save(_layout.ToSnapshot("default", "default", System.Environment.CurrentDirectory), _panes!.Descriptors(), wsDir); }
@@ -123,6 +132,7 @@ public sealed class DaemonHost
         }
 
         await listener.DisposeAsync().ConfigureAwait(false);
+        try { _restoration?.MarkCleanShutdown(); } catch (System.Exception ex) { logger.LogWarning(ex, "clean-shutdown marker failed"); }
         _scrollbackTimer?.Dispose();
         if (_runCommands is not null)
             await _runCommands.DisposeAsync().ConfigureAwait(false);
@@ -396,6 +406,19 @@ public sealed class DaemonHost
             return false;
         _ = gui.WriteFrameAsync(FrameType.Event, 0, ControlCodec.Encode(new ControlEvent("window.focus", Parse("{}"))), cancellationToken);
         return true;
+    }
+
+    private void BroadcastEvent<T>(string channel, T payload, System.Text.Json.Serialization.Metadata.JsonTypeInfo<T> typeInfo)
+    {
+        FrameConnection[] guis;
+        lock (_guiLock)
+            guis = _guiConnections.ToArray();
+        if (guis.Length == 0)
+            return;
+        var element = System.Text.Json.JsonSerializer.SerializeToElement(payload, typeInfo);
+        var frame = ControlCodec.Encode(new ControlEvent(channel, element));
+        foreach (var gui in guis)
+            _ = gui.WriteFrameAsync(FrameType.Event, 0, frame, _shutdown.Token);
     }
 
     private async Task IdleMonitorAsync(CancellationToken cancellationToken)

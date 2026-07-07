@@ -6,6 +6,8 @@ public sealed record CoveState
     public string? FocusedWorkspace { get; init; }
     public IReadOnlyList<string> OpenWorkspaces { get; init; } = Array.Empty<string>();
     public WindowGeometry? WindowGeometry { get; init; }
+    public bool CleanShutdown { get; init; }
+    public DateTimeOffset? ShutdownAtUtc { get; init; }
 }
 
 public sealed record WindowGeometry(double X, double Y, double Width, double Height);
