@@ -57,6 +57,9 @@ public sealed record PaneRefParams(string PaneId);
 public sealed record PaneRenameParams(string PaneId, string Title);
 public sealed record PaneReadParams(string PaneId, long Offset = 0, int MaxBytes = 65536);
 public sealed record PaneReadResult(string DataBase64, long NextOffset, long Head);
+public sealed record ConfigGetParams(string Key);
+public sealed record ConfigGetResult(string Value);
+public sealed record ConfigSetParams(string Key, string Value);
 
 public sealed record LayoutMutateParams(string Op, string? RoomId = null, string? TargetPaneId = null, string? NewPaneId = null, string? Orientation = null, string? Name = null, string? PaneId = null, int Dir = 1);
 public sealed record LayoutMutateResult(string? RoomId = null);
@@ -196,6 +199,10 @@ public sealed record BrowserPaneDto(string PaneId, string CurrentUrl, System.Col
 [JsonSerializable(typeof(PaneRenameParams))]
 [JsonSerializable(typeof(PaneReadParams))]
 [JsonSerializable(typeof(PaneReadResult))]
+[JsonSerializable(typeof(ConfigGetParams))]
+[JsonSerializable(typeof(ConfigGetResult))]
+[JsonSerializable(typeof(ConfigSetParams))]
+[JsonSerializable(typeof(System.Collections.Generic.Dictionary<string, string>))]
 [JsonSerializable(typeof(LayoutMutateParams))]
 [JsonSerializable(typeof(LayoutMutateResult))]
 [JsonSerializable(typeof(SessionStateResult))]

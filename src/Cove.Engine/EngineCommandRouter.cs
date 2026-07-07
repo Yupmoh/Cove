@@ -1,5 +1,6 @@
 using Cove.Adapters;
 using Cove.Engine.Browser;
+using Cove.Engine.Config;
 using Cove.Engine.Hooks;
 using Cove.Engine.Knowledge;
 using Cove.Engine.Launch;
@@ -39,6 +40,7 @@ public static class EngineCommandRouter
         TimelineStore? timeline = null,
         PaneTypeRegistry? paneTypes = null,
         BrowserPaneManager? browser = null,
+        ConfigService? config = null,
         System.Threading.CancellationToken cancellationToken = default)
     {
         System.Func<EngineDispatchContext, System.Threading.Tasks.Task<ControlResponse>> typed;
@@ -54,7 +56,7 @@ public static class EngineCommandRouter
         }
         try
         {
-            return await typed(new EngineDispatchContext(request, panes, layout, workspaces, runCommands, restoration, snapshots, skills, agents, launchProfiles, adapterEnv, hookServer, hookRouter, agentRouter, activity, sessions, lifecycle, launcher, tasks, notes, timeline, paneTypes, browser));
+            return await typed(new EngineDispatchContext(request, panes, layout, workspaces, runCommands, restoration, snapshots, skills, agents, launchProfiles, adapterEnv, hookServer, hookRouter, agentRouter, activity, sessions, lifecycle, launcher, tasks, notes, timeline, paneTypes, browser, config));
         }
         catch (System.Exception ex)
         {

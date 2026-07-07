@@ -69,6 +69,19 @@ public sealed class CoveGuiCommands
         return await Call("cove://commands/session.state", p, ct);
     }
 
+    [RynCommand("app.configGet")]
+    public async ValueTask<string> ConfigGet(string key, CancellationToken ct)
+    {
+        var p = JsonSerializer.SerializeToElement(new ConfigGetParams(key), CoveJsonContext.Default.ConfigGetParams);
+        return await Call("cove://commands/config.get", p, ct);
+    }
+
+    [RynCommand("app.configSet")]
+    public async ValueTask<string> ConfigSet(string key, string value, CancellationToken ct)
+    {
+        var p = JsonSerializer.SerializeToElement(new ConfigSetParams(key, value), CoveJsonContext.Default.ConfigSetParams);
+        return await Call("cove://commands/config.set", p, ct);
+    }
 
     private static JsonElement PaneIdParam(string paneId, string? dataBase64 = null)
     {

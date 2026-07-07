@@ -7,13 +7,21 @@ import { toBase64Utf8, parseRelayText } from "./wsproto";
 
 const CREDIT_THRESHOLD = 131072;
 
+const THEME_BG = "#0b1622";
 const THEME = {
-  background: "#0b1622",
+  background: THEME_BG,
   foreground: "#e5e9f0",
   cursor: "#4cc2d6",
-  cursorAccent: "#0b1622",
+  cursorAccent: THEME_BG,
   selectionBackground: "#2b6d7a",
 };
+function themeBackgroundWithOpacity(opacity: number): string {
+  const n = opacity >= 0 && opacity <= 1 ? opacity : 1;
+  const r = parseInt(THEME_BG.slice(1, 3), 16);
+  const g = parseInt(THEME_BG.slice(3, 5), 16);
+  const b = parseInt(THEME_BG.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${n})`;
+}
 
 async function invoke<T>(cmd: string, args: unknown): Promise<T> {
   return JSON.parse((await window.__ryn.invoke(cmd, args as Record<string, unknown>)) as string) as T;
@@ -76,14 +84,52 @@ const panes = new Map<string, PaneView>();
 let layout: WorkspaceSnapshot | null = null;
 let activeRoomId: string | null = null;
 let focusedPaneId: string | null = null;
-interface TermSettings { fontSize: number; lineHeight: number; cursorStyle: "block" | "bar" | "underline"; cursorBlink: boolean; scrollback: number; }
-const defaultSettings: TermSettings = { fontSize: 13, lineHeight: 1.35, cursorStyle: "block", cursorBlink: false, scrollback: 5000 };
-function loadSettings(): TermSettings {
-  try { const raw = localStorage.getItem("cove.settings"); if (raw) return { ...defaultSettings, ...(JSON.parse(raw) as Partial<TermSettings>) }; } catch { void 0; }
-  const fs = Number(localStorage.getItem("cove.fontSize"));
-  return { ...defaultSettings, fontSize: fs >= 9 && fs <= 24 ? fs : 13 };
+interface TermSettings {
+  fontFamily: string;
+  fontSize: number;
+  lineHeight: number;
+  cursorStyle: "block" | "bar" | "underline";
+  cursorBlink: boolean;
+  ligatures: boolean;
+  scrollback: number;
+  padding: number;
+  backgroundOpacity: number;
 }
-let settings = loadSettings();
+const defaultSettings: TermSettings = {
+  fontFamily: "",
+  fontSize: 13,
+  lineHeight: 1.35,
+  cursorStyle: "block",
+  cursorBlink: false,
+  ligatures: false,
+  scrollback: 5000,
+  padding: 8,
+  backgroundOpacity: 1,
+};
+function clampInt(v: unknown, lo: number, hi: number, dflt: number): number {
+  const n = Number(v); return Number.isFinite(n) && n >= lo && n <= hi ? Math.trunc(n) : dflt;
+}
+function clampFloat(v: unknown, lo: number, hi: number, dflt: number): number {
+  const n = Number(v); return Number.isFinite(n) && n >= lo && n <= hi ? n : dflt;
+}
+async function loadSettings(): Promise<TermSettings> {
+  const get = async (k: string): Promise<string | null> => {
+    try { const res = await invoke<{ ok: boolean; value?: string }>("app.configGet", { key: k }); return res.ok ? res.value ?? null : null; } catch { return null; }
+  };
+  const fontFamily = (await get("terminal.fontFamily")) ?? defaultSettings.fontFamily;
+  const fontSize = clampInt(await get("terminal.fontSize"), 9, 24, defaultSettings.fontSize);
+  const lhRaw = Number(await get("terminal.lineHeight"));
+  const lineHeight = clampFloat(lhRaw, 1, 2, defaultSettings.lineHeight);
+  const scrollback = clampInt(await get("terminal.scrollbackLines"), 100, 100000, defaultSettings.scrollback);
+  const padding = clampInt(await get("terminal.padding"), 0, 40, defaultSettings.padding);
+  const backgroundOpacity = clampFloat(await get("terminal.backgroundOpacity"), 0, 1, defaultSettings.backgroundOpacity);
+  const cs = await get("terminal.cursorStyle");
+  const cursorStyle: TermSettings["cursorStyle"] = cs === "bar" || cs === "underline" ? cs : "block";
+  const cursorBlink = (await get("terminal.cursorBlink")) === "true";
+  const ligatures = (await get("terminal.ligatures")) === "true";
+  return { fontFamily, fontSize, lineHeight, cursorStyle, cursorBlink, ligatures, scrollback, padding, backgroundOpacity };
+}
+let settings: TermSettings = { ...defaultSettings };
 interface KeybindingOverride { chord: string; action: string; }
 function loadKeybindings(): Record<string, string> {
   const out: Record<string, string> = {};
@@ -126,14 +172,33 @@ function fitAll() {
 
 function applySettings() {
   for (const pv of panes.values()) {
+    if (settings.fontFamily) pv.term.options.fontFamily = settings.fontFamily;
     pv.term.options.fontSize = settings.fontSize;
     pv.term.options.lineHeight = settings.lineHeight;
     pv.term.options.cursorStyle = settings.cursorStyle;
     pv.term.options.cursorBlink = settings.cursorBlink;
     pv.term.options.scrollback = settings.scrollback;
+    pv.term.options.theme = { ...THEME, background: themeBackgroundWithOpacity(settings.backgroundOpacity) };
   }
+  gridEl.style.padding = `${settings.padding}px`;
+  document.documentElement.style.setProperty("--cove-bg-opacity", String(settings.backgroundOpacity));
   fitAll();
-  localStorage.setItem("cove.settings", JSON.stringify(settings));
+  persistSettings();
+}
+function persistSettings() {
+  const entries: [string, string][] = [
+    ["terminal.fontFamily", settings.fontFamily],
+    ["terminal.fontSize", String(settings.fontSize)],
+    ["terminal.lineHeight", String(settings.lineHeight)],
+    ["terminal.cursorStyle", settings.cursorStyle],
+    ["terminal.cursorBlink", String(settings.cursorBlink)],
+    ["terminal.ligatures", String(settings.ligatures)],
+    ["terminal.scrollbackLines", String(settings.scrollback)],
+    ["terminal.padding", String(settings.padding)],
+    ["terminal.backgroundOpacity", String(settings.backgroundOpacity)],
+  ];
+  for (const [k, v] of entries)
+    invoke("app.configSet", { key: k, value: v }).catch((e) => console.warn("configSet failed", k, e));
 }
 function attachWs(pane: PaneView) {
   const ws = pane.ws;
@@ -165,7 +230,7 @@ function attachWs(pane: PaneView) {
 }
 
 function makePane(paneId: string, since: number): PaneView {
-  const term = new Terminal({ scrollback: settings.scrollback, convertEol: false, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: settings.fontSize, lineHeight: settings.lineHeight, cursorStyle: settings.cursorStyle, cursorBlink: settings.cursorBlink, theme: THEME });
+  const term = new Terminal({ allowTransparency: true, scrollback: settings.scrollback, convertEol: false, fontFamily: settings.fontFamily || "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: settings.fontSize, lineHeight: settings.lineHeight, cursorStyle: settings.cursorStyle, cursorBlink: settings.cursorBlink, theme: { ...THEME, background: themeBackgroundWithOpacity(settings.backgroundOpacity) } });
   const fitAddon = new FitAddon();
   term.loadAddon(fitAddon);
   try { term.loadAddon(new WebglAddon()); } catch { void 0; }
@@ -703,30 +768,42 @@ palInput.addEventListener("keydown", (e) => {
 paletteEl.addEventListener("mousedown", (e) => { if (e.target === paletteEl) closePalette(); });
 
 const settingsEl = document.getElementById("settings")!;
+const setFontFam = document.getElementById("set-fontFamily") as HTMLInputElement;
 const setFont = document.getElementById("set-fontSize") as HTMLInputElement;
 const setLine = document.getElementById("set-lineHeight") as HTMLInputElement;
 const setCursor = document.getElementById("set-cursorStyle") as HTMLSelectElement;
 const setBlink = document.getElementById("set-cursorBlink") as HTMLInputElement;
-const setScroll = document.getElementById("set-scrollback") as HTMLInputElement;
+const setLig = document.getElementById("set-ligatures") as HTMLInputElement;
+const setScroll = document.getElementById("set-scrollbackLines") as HTMLInputElement;
+const setPad = document.getElementById("set-padding") as HTMLInputElement;
+const setBgOp = document.getElementById("set-backgroundOpacity") as HTMLInputElement;
 
 function openSettings() {
+  setFontFam.value = settings.fontFamily;
   setFont.value = String(settings.fontSize);
   setLine.value = String(settings.lineHeight);
   setCursor.value = settings.cursorStyle;
   setBlink.checked = settings.cursorBlink;
+  setLig.checked = settings.ligatures;
   setScroll.value = String(settings.scrollback);
+  setPad.value = String(settings.padding);
+  setBgOp.value = String(settings.backgroundOpacity);
   settingsEl.classList.add("open");
 }
 function closeSettings() { settingsEl.classList.remove("open"); if (focusedPaneId) panes.get(focusedPaneId)?.term.focus(); }
 function readSettings() {
+  settings.fontFamily = setFontFam.value.trim();
   const fs = Number(setFont.value); if (fs >= 9 && fs <= 24) settings.fontSize = fs;
   const lh = Number(setLine.value); if (lh >= 1 && lh <= 2) settings.lineHeight = lh;
   const cs = setCursor.value; if (cs === "block" || cs === "bar" || cs === "underline") settings.cursorStyle = cs;
   settings.cursorBlink = setBlink.checked;
+  settings.ligatures = setLig.checked;
   const sb = Number(setScroll.value); if (sb >= 100 && sb <= 100000) settings.scrollback = sb;
+  const pd = Number(setPad.value); if (pd >= 0 && pd <= 40) settings.padding = pd;
+  const bo = Number(setBgOp.value); if (bo >= 0 && bo <= 1) settings.backgroundOpacity = bo;
   applySettings();
 }
-for (const ctl of [setFont, setLine, setCursor, setBlink, setScroll]) ctl.addEventListener("change", readSettings);
+for (const ctl of [setFontFam, setFont, setLine, setCursor, setBlink, setLig, setScroll, setPad, setBgOp]) ctl.addEventListener("change", readSettings);
 settingsEl.addEventListener("mousedown", (e) => { if (e.target === settingsEl) closeSettings(); });
 document.getElementById("set-close")!.addEventListener("click", closeSettings);
 settingsEl.addEventListener("keydown", (e) => { if (e.key === "Escape") closeSettings(); });
@@ -822,6 +899,8 @@ window.addEventListener("keydown", (e) => {
 window.addEventListener("resize", () => fitAll());
 
 (async () => {
+  settings = await loadSettings();
+  applySettings();
   const snap = await reload();
   if (snap.rooms.length === 0) {
     await newRoom();
