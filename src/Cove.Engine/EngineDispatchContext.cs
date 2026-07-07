@@ -4,6 +4,7 @@ using Cove.Adapters;
 using Cove.Engine.Agents;
 using Cove.Engine.Hooks;
 using Cove.Engine.Pty;
+using Cove.Engine.Sessions;
 using Cove.Protocol;
 
 namespace Cove.Engine;
@@ -25,7 +26,8 @@ public sealed class EngineDispatchContext
         HookHttpServer? hookServer = null,
         HookEventRouter? hookRouter = null,
         AgentMessageRouter? agentRouter = null,
-        Cove.Engine.Activity.ActivityAggregate? activity = null)
+        Cove.Engine.Activity.ActivityAggregate? activity = null,
+        SessionResumeOrchestrator? sessions = null)
     {
         Request = request;
         Panes = panes;
@@ -42,6 +44,7 @@ public sealed class EngineDispatchContext
         HookRouter = hookRouter;
         AgentRouter = agentRouter;
         Activity = activity;
+        Sessions = sessions;
     }
 
     public ControlRequest Request { get; }
@@ -59,6 +62,7 @@ public sealed class EngineDispatchContext
     public HookEventRouter? HookRouter { get; }
     public AgentMessageRouter? AgentRouter { get; }
     public Cove.Engine.Activity.ActivityAggregate? Activity { get; }
+    public SessionResumeOrchestrator? Sessions { get; }
 
     public ControlResponse Ok<T>(T data, JsonTypeInfo<T> typeInfo)
         => new ControlResponse(Request.Id, true, JsonSerializer.SerializeToElement(data, typeInfo));

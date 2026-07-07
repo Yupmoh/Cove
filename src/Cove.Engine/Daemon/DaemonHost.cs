@@ -42,6 +42,7 @@ public sealed class DaemonHost
     private Cove.Engine.Hooks.HookEventRouter? _hookRouter;
     private Cove.Engine.Agents.AgentMessageRouter? _agentRouter;
     private Cove.Engine.Activity.ActivityAggregate? _activity;
+    private Cove.Engine.Sessions.SessionResumeOrchestrator? _sessions;
 
     public DaemonHost(DaemonPaths paths, IControlEndpoint endpoint, bool exitWhenIdle)
     {
@@ -76,6 +77,7 @@ public sealed class DaemonHost
         _hookRouter = new Cove.Engine.Hooks.HookEventRouter(logger);
         _agentRouter = new Cove.Engine.Agents.AgentMessageRouter();
         _activity = new Cove.Engine.Activity.ActivityAggregate(_hookRouter, _agentRouter);
+        _sessions = new Cove.Engine.Sessions.SessionResumeOrchestrator(logger);
         _hookServer.OnEvent += _hookRouter.Route;
         var matrix = new Cove.Engine.Hooks.HookEnvelopeMatrix();
         PopulateHookMatrix(matrix, System.IO.Path.Combine(dataDir, "adapters"), logger);
@@ -289,7 +291,7 @@ public sealed class DaemonHost
             await WriteResponseAsync(conn, Fail(req.Id, "not_ready", "sys/hello required before other requests"), cancellationToken).ConfigureAwait(false);
             return false;
         }
-        ControlResponse? generated = await Cove.Engine.EngineCommandRouter.RouteAsync(req, _panes, _layout, _workspaces, _runCommands, _restoration, _snapshots, _skills, _agents, _launchProfiles, _adapterEnv, _hookServer, _hookRouter, _agentRouter, _activity, cancellationToken).ConfigureAwait(false);
+        ControlResponse? generated = await Cove.Engine.EngineCommandRouter.RouteAsync(req, _panes, _layout, _workspaces, _runCommands, _restoration, _snapshots, _skills, _agents, _launchProfiles, _adapterEnv, _hookServer, _hookRouter, _agentRouter, _activity, _sessions, cancellationToken).ConfigureAwait(false);
 
         if (generated is not null)
         {
