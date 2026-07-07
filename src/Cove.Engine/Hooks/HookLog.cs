@@ -31,4 +31,7 @@ internal static partial class HookLog
 
     [ZLoggerMessage(LogLevel.Warning, "hook matrix manifest load failed path={path} error={error}")]
     public static partial void HookMatrixManifestLoadFailed(this ILogger logger, string path, string error);
+
+    [ZLoggerMessage(LogLevel.Warning, "ambient run-command enumeration failed error={error}")]
+    public static partial void AmbientRunCommandFailed(this ILogger logger, string error);
 }

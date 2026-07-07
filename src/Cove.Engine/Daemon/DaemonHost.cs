@@ -469,13 +469,62 @@ public sealed class DaemonHost
         }
     }
 
-    private static void PopulateAmbientAggregator(Cove.Engine.Hooks.AmbientContextAggregator aggregator, string dataDir, ILogger logger)
+    private void PopulateAmbientAggregator(Cove.Engine.Hooks.AmbientContextAggregator aggregator, string dataDir, ILogger logger)
     {
         var primerPath = System.IO.Path.Combine(dataDir, "cove-context.md");
-        var primer = System.IO.File.Exists(primerPath) ? System.IO.File.ReadAllText(primerPath) : "";
-        aggregator.Add("sessionStartManifest", new Cove.Engine.Hooks.SessionStartContextProvider(primer, "", ""));
-        aggregator.Add("userPromptSubmit", new Cove.Engine.Hooks.LocationContextProvider("default", null, "default", System.Array.Empty<string?>()));
-        aggregator.Add("preToolUse", new Cove.Engine.Hooks.RunCommandContextProvider(System.Array.Empty<string>()));
+        aggregator.Add("sessionStartManifest", new Cove.Engine.Hooks.SessionStartContextProvider(
+            primer: () => System.IO.File.Exists(primerPath) ? System.IO.File.ReadAllText(primerPath) : "",
+            skillsManifest: () => BuildSkillsManifest(),
+            agentPackaging: () => ""));
+        aggregator.Add("userPromptSubmit", new Cove.Engine.Hooks.LocationContextProvider(
+            room: () => "default",
+            wing: () => null,
+            workspace: () => "default",
+            otherPanes: () => _panes?.List().Select(p => p.PaneId).ToList() ?? new List<string>()));
+        aggregator.Add("preToolUse", new Cove.Engine.Hooks.RunCommandContextProvider(
+            runningCommands: () => GetRunningCommands(logger)));
+    }
+
+    private string BuildSkillsManifest()
+    {
+        if (_skills is null)
+            return "";
+        var entries = _skills.List();
+        if (entries.Count == 0)
+            return "";
+        using var buffer = new System.IO.MemoryStream();
+        using (var writer = new System.Text.Json.Utf8JsonWriter(buffer))
+        {
+            writer.WriteStartArray();
+            foreach (var skill in entries)
+            {
+                writer.WriteStartObject();
+                writer.WriteString("name", skill.Name);
+                writer.WriteString("source", skill.Source.ToString().ToLowerInvariant());
+                writer.WriteEndObject();
+            }
+            writer.WriteEndArray();
+            writer.Flush();
+        }
+        return System.Text.Encoding.UTF8.GetString(buffer.ToArray());
+    }
+
+    private IReadOnlyList<string> GetRunningCommands(ILogger logger)
+    {
+        if (_runCommands is null)
+            return System.Array.Empty<string>();
+        try
+        {
+            return _runCommands.ListEffectiveAsync("default", null).GetAwaiter().GetResult()
+                .Where(c => c.Lifecycle == Cove.Engine.Workspaces.RunCommandLifecycle.Running)
+                .Select(c => c.Definition.Label)
+                .ToList();
+        }
+        catch (System.Exception ex)
+        {
+            logger.AmbientRunCommandFailed(ex.Message);
+            return System.Array.Empty<string>();
+        }
     }
 
     private async Task IdleMonitorAsync(CancellationToken cancellationToken)

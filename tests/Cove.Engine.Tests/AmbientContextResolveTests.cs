@@ -23,7 +23,7 @@ public sealed class AmbientContextResolveTests
             matrix.Register("claude-code", "sessionStartManifest", HookEnvelopeKind.Identity);
             server.Injector = new ContextInjector(matrix);
             var aggregator = new AmbientContextAggregator();
-            aggregator.Add("session", new SessionStartContextProvider("ambient primer", "{}", "{}"));
+            aggregator.Add("session", new SessionStartContextProvider(() => "ambient primer", () => "{}", () => "{}"));
             server.Aggregator = aggregator;
             await server.StartAsync();
 
@@ -79,7 +79,7 @@ public sealed class AmbientContextResolveTests
             matrix.Register("claude-code", "sessionStartManifest", HookEnvelopeKind.Identity);
             server.Injector = new ContextInjector(matrix);
             var aggregator = new AmbientContextAggregator();
-            aggregator.Add("session", new SessionStartContextProvider("ambient primer", "{}", "{}"));
+            aggregator.Add("session", new SessionStartContextProvider(() => "ambient primer", () => "{}", () => "{}"));
             server.Aggregator = aggregator;
             await server.StartAsync();
 

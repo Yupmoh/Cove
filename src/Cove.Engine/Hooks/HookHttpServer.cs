@@ -214,7 +214,7 @@ public sealed class HookHttpServer : IDisposable
         }
         else if (Aggregator is not null)
         {
-            var ambient = Aggregator.Get(eventName) ?? Aggregator.Get("session");
+            var ambient = Aggregator.Get(eventName, paneId) ?? Aggregator.Get("session", paneId);
             if (ambient is { } amb)
                 context = amb;
         }
