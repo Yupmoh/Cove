@@ -3,6 +3,7 @@ using System.Text.Json.Serialization.Metadata;
 using Cove.Adapters;
 using Cove.Engine.Agents;
 using Cove.Engine.Hooks;
+using Cove.Engine.Knowledge;
 using Cove.Engine.Launch;
 using Cove.Engine.Lifecycle;
 using Cove.Engine.Pty;
@@ -33,7 +34,9 @@ public sealed class EngineDispatchContext
         SessionResumeOrchestrator? sessions = null,
         AgentLifecycleController? lifecycle = null,
         LaunchOrchestrator? launcher = null,
-        TaskStore? tasks = null)
+        TaskStore? tasks = null,
+        NoteStore? notes = null,
+        TimelineStore? timeline = null)
     {
         Request = request;
         Panes = panes;
@@ -54,6 +57,8 @@ public sealed class EngineDispatchContext
         Lifecycle = lifecycle;
         Launcher = launcher;
         Tasks = tasks;
+        Notes = notes;
+        Timeline = timeline;
     }
 
     public ControlRequest Request { get; }
@@ -75,6 +80,8 @@ public sealed class EngineDispatchContext
     public AgentLifecycleController? Lifecycle { get; }
     public LaunchOrchestrator? Launcher { get; }
     public TaskStore? Tasks { get; }
+    public NoteStore? Notes { get; }
+    public TimelineStore? Timeline { get; }
 
     public ControlResponse Ok<T>(T data, JsonTypeInfo<T> typeInfo)
         => new ControlResponse(Request.Id, true, JsonSerializer.SerializeToElement(data, typeInfo));

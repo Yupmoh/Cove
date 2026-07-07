@@ -1,5 +1,6 @@
 using Cove.Adapters;
 using Cove.Engine.Hooks;
+using Cove.Engine.Knowledge;
 using Cove.Engine.Launch;
 using Cove.Engine.Lifecycle;
 using Cove.Engine.Pty;
@@ -32,6 +33,8 @@ public static class EngineCommandRouter
         AgentLifecycleController? lifecycle = null,
         LaunchOrchestrator? launcher = null,
         TaskStore? tasks = null,
+        NoteStore? notes = null,
+        TimelineStore? timeline = null,
         System.Threading.CancellationToken cancellationToken = default)
     {
         System.Func<EngineDispatchContext, System.Threading.Tasks.Task<ControlResponse>> typed;
@@ -47,7 +50,7 @@ public static class EngineCommandRouter
         }
         try
         {
-            return await typed(new EngineDispatchContext(request, panes, layout, workspaces, runCommands, restoration, snapshots, skills, agents, launchProfiles, adapterEnv, hookServer, hookRouter, agentRouter, activity, sessions, lifecycle, launcher, tasks));
+            return await typed(new EngineDispatchContext(request, panes, layout, workspaces, runCommands, restoration, snapshots, skills, agents, launchProfiles, adapterEnv, hookServer, hookRouter, agentRouter, activity, sessions, lifecycle, launcher, tasks, notes, timeline));
         }
         catch (System.Exception ex)
         {

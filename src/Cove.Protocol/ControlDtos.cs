@@ -129,6 +129,38 @@ public sealed record TaskRefParams(string? Id, string? HumanId);
 public sealed record TaskListParams(string WorkspaceId);
 public sealed record TaskUpdateParams(string Id, string? Title, string? StatusId, string? Description, string? Assignee);
 public sealed record TaskListResult(System.Collections.Generic.IReadOnlyList<TaskCard> Cards);
+
+public sealed record Note
+{
+    public string Id { get; set; } = "";
+    public required string Title { get; init; }
+    public string Content { get; init; } = "";
+    public required string WorkspaceId { get; init; }
+    public required string Source { get; init; }
+    public string Kind { get; init; } = "markdown";
+    public System.DateTimeOffset CreatedAt { get; init; }
+    public System.DateTimeOffset UpdatedAt { get; init; }
+}
+public sealed record TimelineEntry
+{
+    public string Id { get; init; } = "";
+    public required string WorkspaceId { get; init; }
+    public required string Kind { get; init; }
+    public required string Source { get; init; }
+    public string? Scope { get; init; }
+    public string? Summary { get; init; }
+    public string? JsonPayload { get; init; }
+    public System.DateTimeOffset Timestamp { get; init; }
+}
+public sealed record NoteCreateParams(string Title, string WorkspaceId, string Source, string? Content, string? Kind);
+public sealed record NoteRefParams(string Id);
+public sealed record NoteListParams(string WorkspaceId);
+public sealed record NoteUpdateParams(string Id, string? Title, string? Content);
+public sealed record NoteListResult(System.Collections.Generic.IReadOnlyList<Note> Notes);
+public sealed record TimelineAppendParams(string WorkspaceId, string Kind, string Source, string? Scope, string? Summary);
+public sealed record TimelineListParams(string WorkspaceId);
+public sealed record TimelineListResult(System.Collections.Generic.IReadOnlyList<TimelineEntry> Entries);
+
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
@@ -198,5 +230,15 @@ public sealed record TaskListResult(System.Collections.Generic.IReadOnlyList<Tas
 [JsonSerializable(typeof(TaskListParams))]
 [JsonSerializable(typeof(TaskUpdateParams))]
 [JsonSerializable(typeof(TaskListResult))]
+[JsonSerializable(typeof(Note))]
+[JsonSerializable(typeof(NoteCreateParams))]
+[JsonSerializable(typeof(NoteRefParams))]
+[JsonSerializable(typeof(NoteListParams))]
+[JsonSerializable(typeof(NoteUpdateParams))]
+[JsonSerializable(typeof(NoteListResult))]
+[JsonSerializable(typeof(TimelineEntry))]
+[JsonSerializable(typeof(TimelineAppendParams))]
+[JsonSerializable(typeof(TimelineListParams))]
+[JsonSerializable(typeof(TimelineListResult))]
 [JsonSerializable(typeof(JsonElement))]
 public sealed partial class CoveJsonContext : JsonSerializerContext;
