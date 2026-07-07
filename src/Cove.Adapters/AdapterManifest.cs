@@ -2,6 +2,7 @@ using System.Text.Json.Serialization;
 
 namespace Cove.Adapters;
 
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record AdapterManifest
 {
     public int SdkVersion { get; init; }

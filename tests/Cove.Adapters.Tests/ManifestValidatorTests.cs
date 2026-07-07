@@ -151,4 +151,29 @@ public sealed class ManifestValidatorTests
         Assert.Null(manifest);
         Assert.True(errors.Count >= 5);
     }
+
+    [Fact]
+    public void Parse_RejectsUnknownTopLevelProperty()
+    {
+        var json = """
+        {
+          "sdkVersion": 2,
+          "name": "codex",
+          "displayName": "Codex",
+          "description": "OpenAI CLI",
+          "accent": "#10A37F",
+          "binary": "codex",
+          "version": "0.1.0",
+          "methods": {
+            "build_launch_command": { "script": "build_launch_command.sh" },
+            "build_resume_command": { "script": "build_resume_command.sh" },
+            "list_recent_sessions": { "script": "list_recent_sessions.sh" }
+          },
+          "unknownExtraField": true
+        }
+        """;
+        var (manifest, errors) = ManifestValidator.Parse(json);
+        Assert.Null(manifest);
+        Assert.Contains(errors, e => e.Code == "json_error");
+    }
 }
