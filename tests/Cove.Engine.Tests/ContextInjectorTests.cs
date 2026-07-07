@@ -77,10 +77,10 @@ public sealed class HookEnvelopeMatrixTests
             Binary = "claude",
             Version = "1.0",
             Methods = new Dictionary<string, AdapterMethod>(),
-            HookEnvelopes = new List<HookEnvelopeDeclaration>
+            HookEnvelopes = new Dictionary<string, HookEnvelopeDeclaration>
             {
-                new() { Event = "sessionStartManifest", Kind = HookEnvelopeKind.Identity },
-                new() { Event = "userPromptSubmit", Kind = HookEnvelopeKind.HookSpecificOutput, IncludeSystemMessage = true },
+                ["sessionStartManifest"] = new() { Kind = HookEnvelopeKind.Identity },
+                ["userPromptSubmit"] = new() { Kind = HookEnvelopeKind.HookSpecificOutput, IncludeSystemMessage = true },
             },
         };
 

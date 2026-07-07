@@ -1,6 +1,6 @@
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using Cove.Protocol;
-
 namespace Cove.Adapters;
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
@@ -26,17 +26,22 @@ public sealed record AdapterManifest
     public IReadOnlyDictionary<string, string> Hooks { get; init; } = new Dictionary<string, string>();
     public string? SkillsDir { get; init; }
     public IReadOnlyDictionary<string, InstallRecipe> Install { get; init; } = new Dictionary<string, InstallRecipe>();
-    public IReadOnlyList<HookEnvelopeDeclaration> HookEnvelopes { get; init; } = [];
+    public IReadOnlyDictionary<string, HookEnvelopeDeclaration> HookEnvelopes { get; init; } = new Dictionary<string, HookEnvelopeDeclaration>();
 }
 
 public sealed record HookEnvelopeDeclaration
 {
-    public required string Event { get; init; }
     public required HookEnvelopeKind Kind { get; init; }
     public bool IncludeSystemMessage { get; init; }
 }
 
+[JsonConverter(typeof(HookEnvelopeKindConverter))]
 public enum HookEnvelopeKind { None, Identity, HookSpecificOutput, FlatAdditionalContext }
+
+sealed class HookEnvelopeKindConverter : JsonStringEnumConverter<HookEnvelopeKind>
+{
+    public HookEnvelopeKindConverter() : base(JsonNamingPolicy.CamelCase, allowIntegerValues: false) { }
+}
 
 public sealed record AdapterMethod
 {
@@ -132,8 +137,7 @@ public sealed record FooterChipData(string ProfileSlug, bool IsDefault, DateTime
 [JsonSerializable(typeof(AdapterMethod))]
 [JsonSerializable(typeof(BinaryDiscovery))]
 [JsonSerializable(typeof(HookEnvelopeDeclaration))]
-[JsonSerializable(typeof(List<HookEnvelopeDeclaration>))]
-[JsonSerializable(typeof(AdapterEnvVar))]
+[JsonSerializable(typeof(Dictionary<string, HookEnvelopeDeclaration>))]
 [JsonSerializable(typeof(List<AdapterEnvVar>))]
 [JsonSerializable(typeof(Registry))]
 [JsonSerializable(typeof(List<RegistryEntry>))]

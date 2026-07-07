@@ -35,8 +35,8 @@ public sealed class HookEnvelopeMatrix
 
     public void RegisterFromManifest(AdapterManifest manifest)
     {
-        foreach (var decl in manifest.HookEnvelopes)
-            _capabilities[(manifest.Name, decl.Event)] = new HookEnvelopeCapability(decl.Kind, decl.IncludeSystemMessage);
+        foreach (var (eventName, decl) in manifest.HookEnvelopes)
+            _capabilities[(manifest.Name, eventName)] = new HookEnvelopeCapability(decl.Kind, decl.IncludeSystemMessage);
     }
 
     public HookEnvelopeCapability GetCapability(string adapter, string eventName)

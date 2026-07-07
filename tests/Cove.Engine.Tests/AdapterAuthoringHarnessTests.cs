@@ -142,7 +142,7 @@ public sealed class AdapterTestFixtureTests
     {
         var manifest = AdapterTestFixture.CreateManifestWithHooks("test-adapter");
         Assert.NotEmpty(manifest.HookEnvelopes);
-        Assert.Contains(manifest.HookEnvelopes, h => h.Event == "sessionStartManifest");
+        Assert.Contains("sessionStartManifest", manifest.HookEnvelopes.Keys);
     }
 
     [Fact]

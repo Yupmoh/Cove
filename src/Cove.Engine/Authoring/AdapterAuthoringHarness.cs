@@ -34,9 +34,9 @@ public sealed class AdapterAuthoringHarness
             {
                 ["hooks"] = new() { Script = "scripts/hooks.sh" },
             },
-            HookEnvelopes = new List<HookEnvelopeDeclaration>
+            HookEnvelopes = new Dictionary<string, HookEnvelopeDeclaration>
             {
-                new() { Event = "sessionStartManifest", Kind = HookEnvelopeKind.Identity },
+                ["sessionStartManifest"] = new() { Kind = HookEnvelopeKind.Identity },
             },
         };
 
@@ -93,11 +93,11 @@ public static class AdapterTestFixture
 
     public static AdapterManifest CreateManifestWithHooks(string name) => CreateMinimalManifest(name) with
     {
-        HookEnvelopes = new List<HookEnvelopeDeclaration>
+        HookEnvelopes = new Dictionary<string, HookEnvelopeDeclaration>
         {
-            new() { Event = "sessionStartManifest", Kind = HookEnvelopeKind.Identity },
-            new() { Event = "userPromptSubmit", Kind = HookEnvelopeKind.HookSpecificOutput, IncludeSystemMessage = true },
-            new() { Event = "preToolUse", Kind = HookEnvelopeKind.FlatAdditionalContext },
+            ["sessionStartManifest"] = new() { Kind = HookEnvelopeKind.Identity },
+            ["userPromptSubmit"] = new() { Kind = HookEnvelopeKind.HookSpecificOutput, IncludeSystemMessage = true },
+            ["preToolUse"] = new() { Kind = HookEnvelopeKind.FlatAdditionalContext },
         },
     };
 
