@@ -52,6 +52,7 @@ public sealed class DaemonHost
     private Cove.Engine.Sessions.SessionResumeOrchestrator? _sessions;
     private Cove.Engine.Activity.OmniChatStore? _omniChat;
     private Cove.Engine.Protocol.PaneScopeStore? _paneScopes;
+    private Cove.Engine.Protocol.StateBus? _stateBus;
     private Cove.Engine.Lifecycle.AgentLifecycleController? _lifecycle;
     private Cove.Engine.Launch.LaunchOrchestrator? _launcher;
     private Cove.Engine.Tasks.TaskStore? _tasks;
@@ -109,6 +110,7 @@ public sealed class DaemonHost
         var resumeService = new Cove.Engine.Restart.AgentResumeService(resumeProtocol);
         _launcher = new Cove.Engine.Launch.LaunchOrchestrator(_manifestStore, new Cove.Adapters.MethodRunner(), new Cove.Adapters.BinaryDiscoveryService(), probedPath, resumeService, new Cove.Engine.Launch.LauncherOverrideStore(System.IO.Path.Combine(dataDir, "launcher-overrides"), logger), logger);
         _tasks = new Cove.Engine.Tasks.TaskStore(dataDir);
+        _stateBus = new Cove.Engine.Protocol.StateBus(dataDir, logger);
         _paneScopes = new Cove.Engine.Protocol.PaneScopeStore(dataDir, logger);
         _notes = new Cove.Engine.Knowledge.NoteStore(dataDir);
         _timeline = new Cove.Engine.Knowledge.TimelineStore(dataDir);
@@ -347,12 +349,17 @@ public sealed class DaemonHost
             return false;
         }
 
-        ControlResponse? generated = await Cove.Engine.EngineCommandRouter.RouteAsync(req, _panes, _layout, _workspaces, _runCommands, _restoration, _snapshots, _skills, _agents, _launchProfiles, _adapterEnv, _hookServer, _hookRouter, _agentRouter, _activity, _sessions, _lifecycle, _launcher, _tasks, _notes, _timeline, _paneTypes, _browser, _config, _manifestStore, _registry, _omniChat, _paneScopes, cancellationToken).ConfigureAwait(false);
+        ControlResponse? generated = await Cove.Engine.EngineCommandRouter.RouteAsync(req, _panes, _layout, _workspaces, _runCommands, _restoration, _snapshots, _skills, _agents, _launchProfiles, _adapterEnv, _hookServer, _hookRouter, _agentRouter, _activity, _sessions, _lifecycle, _launcher, _tasks, _notes, _timeline, _paneTypes, _browser, _config, _manifestStore, _registry, _omniChat, _paneScopes, _stateBus, cancellationToken).ConfigureAwait(false);
         if (generated is not null)
         {
             if (generated.Ok && IsMutatingVerb(req.Uri))
                 BroadcastEvent("state.changed", new StateChangedEvent(req.Uri), Cove.Protocol.CoveJsonContext.Default.StateChangedEvent);
             await WriteResponseAsync(conn, generated, cancellationToken).ConfigureAwait(false);
+            return false;
+        }
+        if (req.Uri.StartsWith("cove://state/", System.StringComparison.Ordinal))
+        {
+            await HandleStateUriAsync(conn, req, cancellationToken).ConfigureAwait(false);
             return false;
         }
 
@@ -400,6 +407,54 @@ public sealed class DaemonHost
                 await WriteResponseAsync(conn, Fail(req.Id, "not_found", $"unknown command {req.Uri}"), cancellationToken).ConfigureAwait(false);
                 return false;
         }
+    }
+
+    private async Task HandleStateUriAsync(FrameConnection conn, ControlRequest req, CancellationToken cancellationToken)
+    {
+        if (_stateBus is null)
+        {
+            await WriteResponseAsync(conn, Fail(req.Id, "not_ready", "state bus unavailable"), cancellationToken).ConfigureAwait(false);
+            return;
+        }
+        var path = req.Uri["cove://state/".Length..];
+        var parts = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length < 2)
+        {
+            await WriteResponseAsync(conn, Fail(req.Id, "invalid_params", "cove://state/<scope>/<namespace>[/<id>] required"), cancellationToken).ConfigureAwait(false);
+            return;
+        }
+        var scope = parts[0];
+        var ns = parts[1];
+        var id = parts.Length > 2 ? parts[2] : "default";
+        if (!Cove.Engine.Protocol.StateBus.IsValidScope(scope))
+        {
+            await WriteResponseAsync(conn, Fail(req.Id, "invalid_params", "scope must be app, workspace, tab, or pane"), cancellationToken).ConfigureAwait(false);
+            return;
+        }
+        JsonElement valProp = default;
+        bool isWrite = req.Params is JsonElement we && we.TryGetProperty("value", out valProp);
+        if (isWrite)
+        {
+            string? rawValue = valProp.ValueKind == System.Text.Json.JsonValueKind.Null ? null : valProp.ValueKind == System.Text.Json.JsonValueKind.String ? valProp.GetString() : valProp.GetRawText();
+            _stateBus.Write(scope, ns, id, rawValue);
+            await WriteResponseAsync(conn, new ControlResponse(req.Id, true, Parse("{\"ok\":true}")), cancellationToken).ConfigureAwait(false);
+            return;
+        }
+        var (exists, val) = _stateBus.Read(scope, ns, id);
+        using var buf = new System.IO.MemoryStream();
+        using (var writer = new System.Text.Json.Utf8JsonWriter(buf))
+        {
+            writer.WriteStartObject();
+            writer.WriteBoolean("exists", exists);
+            if (exists && val is not null)
+                writer.WriteString("value", val);
+            else
+                writer.WriteNull("value");
+            writer.WriteEndObject();
+            writer.Flush();
+        }
+        var data = System.Text.Json.JsonDocument.Parse(buf.ToArray()).RootElement.Clone();
+        await WriteResponseAsync(conn, new ControlResponse(req.Id, true, data), cancellationToken).ConfigureAwait(false);
     }
 
     private async Task StreamPaneAsync(FrameConnection conn, Stream stream, ControlRequest req, CancellationToken cancellationToken)

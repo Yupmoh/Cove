@@ -74,6 +74,9 @@ public sealed record ResolvedSigil(string Name, string? Scope, string Body);
 public sealed record SigilResolutionResult(ResolvedSigil[] Resolved, string[] Unresolved);
 public sealed record SkillsResolveManifestParams(string Name);
 public sealed record SkillManifestResult(string Name, string Body, string Source);
+public sealed record StateReadParams(string Scope, string Namespace, string Id);
+public sealed record StateReadResult(bool Exists, string? Value);
+public sealed record StateWriteParams(string Scope, string Namespace, string Id, string? Value);
 public sealed record AgentDefinitionListItem(string Slug, string Name, string Description, string Adapter, int SkillCount);
 public sealed record AgentDefinitionListResult(AgentDefinitionListItem[] Agents);
 public sealed record AgentDefinitionShowResult(string Slug, string Name, string Description, string Adapter, string Prompt, string[] AttachedSkills);
@@ -230,6 +233,9 @@ public sealed record BrowserPaneDto(string PaneId, string CurrentUrl, System.Col
 [JsonSerializable(typeof(SearchMatch))]
 [JsonSerializable(typeof(SearchResult))]
 [JsonSerializable(typeof(SkillIndexItem))]
+[JsonSerializable(typeof(StateReadParams))]
+[JsonSerializable(typeof(StateReadResult))]
+[JsonSerializable(typeof(StateWriteParams))]
 [JsonSerializable(typeof(SkillsIndexResult))]
 [JsonSerializable(typeof(SkillsResolveManifestParams))]
 [JsonSerializable(typeof(SkillManifestResult))]

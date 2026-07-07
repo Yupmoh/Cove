@@ -45,6 +45,7 @@ public static class EngineCommandRouter
         Cove.Adapters.RegistryService? registry = null,
         Cove.Engine.Activity.OmniChatStore? omniChat = null,
         Cove.Engine.Protocol.PaneScopeStore? paneScopes = null,
+        Cove.Engine.Protocol.StateBus? stateBus = null,
         System.Threading.CancellationToken cancellationToken = default)
     {
         System.Func<EngineDispatchContext, System.Threading.Tasks.Task<ControlResponse>> typed;
@@ -60,7 +61,7 @@ public static class EngineCommandRouter
         }
         try
         {
-            return await typed(new EngineDispatchContext(request, panes, layout, workspaces, runCommands, restoration, snapshots, skills, agents, launchProfiles, adapterEnv, hookServer, hookRouter, agentRouter, activity, sessions, lifecycle, launcher, tasks, notes, timeline, paneTypes, browser, config, manifestStore, registry, omniChat, paneScopes));
+            return await typed(new EngineDispatchContext(request, panes, layout, workspaces, runCommands, restoration, snapshots, skills, agents, launchProfiles, adapterEnv, hookServer, hookRouter, agentRouter, activity, sessions, lifecycle, launcher, tasks, notes, timeline, paneTypes, browser, config, manifestStore, registry, omniChat, paneScopes, stateBus));
         }
         catch (System.Exception ex)
         {
