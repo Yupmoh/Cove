@@ -19,4 +19,10 @@ internal static partial class HookLog
 
     [ZLoggerMessage(LogLevel.Warning, "hook request handler error error={error}")]
     public static partial void HookRequestError(this ILogger logger, string error);
+
+    [ZLoggerMessage(LogLevel.Warning, "hook event dropped no pane-id adapter={adapter} event={eventName}")]
+    public static partial void HookEventNoPaneId(this ILogger logger, string adapter, string eventName);
+
+    [ZLoggerMessage(LogLevel.Warning, "hook event unknown adapter={adapter} event={eventName}")]
+    public static partial void HookEventUnknown(this ILogger logger, string adapter, string eventName);
 }

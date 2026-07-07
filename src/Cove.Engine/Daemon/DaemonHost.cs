@@ -38,7 +38,7 @@ public sealed class DaemonHost
     private Cove.Adapters.LaunchProfileStore? _launchProfiles;
     private Cove.Adapters.AdapterEnvStore? _adapterEnv;
     private Cove.Engine.Hooks.HookHttpServer? _hookServer;
-
+    private Cove.Engine.Hooks.HookEventRouter? _hookRouter;
     public DaemonHost(DaemonPaths paths, IControlEndpoint endpoint, bool exitWhenIdle)
     {
         _paths = paths;
@@ -69,6 +69,8 @@ public sealed class DaemonHost
         _launchProfiles = new Cove.Adapters.LaunchProfileStore(System.IO.Path.Combine(dataDir, "launch-profiles"), logger);
         _adapterEnv = new Cove.Adapters.AdapterEnvStore(System.IO.Path.Combine(dataDir, "adapter-env"), logger);
         _hookServer = new Cove.Engine.Hooks.HookHttpServer(dataDir, logger);
+        _hookRouter = new Cove.Engine.Hooks.HookEventRouter(logger);
+        _hookServer.OnEvent += _hookRouter.Route;
         await _hookServer.StartAsync();
 
         var wsDir = System.IO.Path.Combine(dataDir, "workspaces", "default");
@@ -275,7 +277,7 @@ public sealed class DaemonHost
             return false;
         }
 
-        ControlResponse? generated = await Cove.Engine.EngineCommandRouter.RouteAsync(req, _panes, _layout, _workspaces, _runCommands, _restoration, _snapshots, _skills, _agents, _launchProfiles, _adapterEnv, _hookServer, cancellationToken).ConfigureAwait(false);
+        ControlResponse? generated = await Cove.Engine.EngineCommandRouter.RouteAsync(req, _panes, _layout, _workspaces, _runCommands, _restoration, _snapshots, _skills, _agents, _launchProfiles, _adapterEnv, _hookServer, _hookRouter, cancellationToken).ConfigureAwait(false);
 
         if (generated is not null)
         {

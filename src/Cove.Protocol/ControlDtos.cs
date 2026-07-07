@@ -70,6 +70,9 @@ public sealed record ResolvedEnvVar(string Key, string Value);
 public sealed record AdapterEnvResolveResult(ResolvedEnvVar[] Vars);
 public sealed record AdapterEnvVar(string Key, string Value, bool Enabled = true, string? Id = null);
 public sealed record HookStateResult(int Port, bool Running);
+public sealed record PaneStateItem(string PaneId, string Adapter, string Status, int ActiveSubagents, System.DateTimeOffset LastEventAt);
+public sealed record PaneStatesResult(PaneStateItem[] Panes);
+
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
@@ -110,7 +113,10 @@ public sealed record HookStateResult(int Port, bool Running);
 [JsonSerializable(typeof(List<AdapterEnvVar>))]
 [JsonSerializable(typeof(AdapterEnvVarItem))]
 [JsonSerializable(typeof(AdapterEnvListResult))]
+[JsonSerializable(typeof(ResolvedEnvVar))]
 [JsonSerializable(typeof(AdapterEnvResolveResult))]
 [JsonSerializable(typeof(HookStateResult))]
+[JsonSerializable(typeof(PaneStateItem))]
+[JsonSerializable(typeof(PaneStatesResult))]
 [JsonSerializable(typeof(JsonElement))]
 public sealed partial class CoveJsonContext : JsonSerializerContext;

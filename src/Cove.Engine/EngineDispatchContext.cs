@@ -21,7 +21,8 @@ public sealed class EngineDispatchContext
         AgentDefinitionStore? agents = null,
         LaunchProfileStore? launchProfiles = null,
         AdapterEnvStore? adapterEnv = null,
-        HookHttpServer? hookServer = null)
+        HookHttpServer? hookServer = null,
+        HookEventRouter? hookRouter = null)
     {
         Request = request;
         Panes = panes;
@@ -35,6 +36,7 @@ public sealed class EngineDispatchContext
         LaunchProfiles = launchProfiles;
         AdapterEnv = adapterEnv;
         HookServer = hookServer;
+        HookRouter = hookRouter;
     }
 
     public ControlRequest Request { get; }
@@ -49,6 +51,7 @@ public sealed class EngineDispatchContext
     public LaunchProfileStore? LaunchProfiles { get; }
     public AdapterEnvStore? AdapterEnv { get; }
     public HookHttpServer? HookServer { get; }
+    public HookEventRouter? HookRouter { get; }
 
     public ControlResponse Ok<T>(T data, JsonTypeInfo<T> typeInfo)
         => new ControlResponse(Request.Id, true, JsonSerializer.SerializeToElement(data, typeInfo));

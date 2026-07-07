@@ -1,6 +1,3 @@
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 using Cove.Adapters;
 using Cove.Engine.Hooks;
 using Cove.Engine.Pty;
@@ -24,14 +21,15 @@ public static class EngineCommandRouter
         LaunchProfileStore? launchProfiles = null,
         AdapterEnvStore? adapterEnv = null,
         HookHttpServer? hookServer = null,
-        CancellationToken cancellationToken = default)
+        HookEventRouter? hookRouter = null,
+        System.Threading.CancellationToken cancellationToken = default)
     {
-        Func<EngineDispatchContext, Task<ControlResponse>> typed;
+        System.Func<EngineDispatchContext, System.Threading.Tasks.Task<ControlResponse>> typed;
         try
         {
             if (!CoveCommandRegistry.Handlers.TryGetValue(request.Uri, out var handler))
                 return null;
-            typed = (Func<EngineDispatchContext, Task<ControlResponse>>)handler;
+            typed = (System.Func<EngineDispatchContext, System.Threading.Tasks.Task<ControlResponse>>)handler;
         }
         catch
         {
@@ -39,9 +37,9 @@ public static class EngineCommandRouter
         }
         try
         {
-            return await typed(new EngineDispatchContext(request, panes, layout, workspaces, runCommands, restoration, snapshots, skills, agents, launchProfiles, adapterEnv, hookServer));
+            return await typed(new EngineDispatchContext(request, panes, layout, workspaces, runCommands, restoration, snapshots, skills, agents, launchProfiles, adapterEnv, hookServer, hookRouter));
         }
-        catch (Exception ex)
+        catch (System.Exception ex)
         {
             return new ControlResponse(request.Id, false, null, new ControlError("handler_error", ex.Message));
         }
