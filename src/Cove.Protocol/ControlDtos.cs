@@ -105,6 +105,30 @@ public sealed record AdapterListResult(System.Collections.Generic.IReadOnlyList<
 public sealed record ProtocolResolveParams(string Uri, string? FocusedPaneId, string? ActiveRoomId);
 public sealed record ProtocolResolveResult(string Uri, System.Text.Json.JsonElement? Params);
 
+public enum TaskPriority { Low, Medium, High, Critical }
+public enum TaskSize { Xs, S, M, L, Xl }
+public sealed record TaskCard
+{
+    public string Id { get; set; } = "";
+    public required string Title { get; init; }
+    public string Description { get; init; } = "";
+    public string StatusId { get; set; } = "todo";
+    public TaskPriority Priority { get; init; } = TaskPriority.Medium;
+    public TaskSize Size { get; init; } = TaskSize.M;
+    public string? Assignee { get; init; }
+    public required string Source { get; init; }
+    public required string WorkspaceId { get; init; }
+    public int TaskNumber { get; init; }
+    public string? CurrentPrimaryRunId { get; init; }
+    public System.DateTimeOffset CreatedAt { get; init; }
+    public System.DateTimeOffset UpdatedAt { get; init; }
+    public string HumanId => $"COVE-{TaskNumber}";
+}
+public sealed record TaskCreateParams(string Title, string WorkspaceId, string Source, string? Description, string? Priority, string? Size, string? Assignee);
+public sealed record TaskRefParams(string? Id, string? HumanId);
+public sealed record TaskListParams(string WorkspaceId);
+public sealed record TaskUpdateParams(string Id, string? Title, string? StatusId, string? Description, string? Assignee);
+public sealed record TaskListResult(System.Collections.Generic.IReadOnlyList<TaskCard> Cards);
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
@@ -168,5 +192,11 @@ public sealed record ProtocolResolveResult(string Uri, System.Text.Json.JsonElem
 [JsonSerializable(typeof(AdapterListResult))]
 [JsonSerializable(typeof(ProtocolResolveParams))]
 [JsonSerializable(typeof(ProtocolResolveResult))]
+[JsonSerializable(typeof(TaskCard))]
+[JsonSerializable(typeof(TaskCreateParams))]
+[JsonSerializable(typeof(TaskRefParams))]
+[JsonSerializable(typeof(TaskListParams))]
+[JsonSerializable(typeof(TaskUpdateParams))]
+[JsonSerializable(typeof(TaskListResult))]
 [JsonSerializable(typeof(JsonElement))]
 public sealed partial class CoveJsonContext : JsonSerializerContext;

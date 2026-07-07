@@ -217,4 +217,24 @@ internal static class CliCommands
         var uri = args[0];
         return ctx.RouteCoreAsync($"cove://commands/protocol.resolve?uri={uri}");
     }
+
+    [CoveCommand("task list")]
+    public static Task<int> TaskList(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/task.list");
+
+    [CoveCommand("task get")]
+    public static Task<int> TaskGet(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/task.get");
+
+    [CoveCommand("task create")]
+    public static Task<int> TaskCreate(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/task.create");
+
+    [CoveCommand("task update")]
+    public static Task<int> TaskUpdate(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/task.update");
+
+    [CoveCommand("task delete")]
+    public static Task<int> TaskDelete(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/task.delete");
 }

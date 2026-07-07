@@ -7,6 +7,7 @@ using Cove.Engine.Launch;
 using Cove.Engine.Lifecycle;
 using Cove.Engine.Pty;
 using Cove.Engine.Sessions;
+using Cove.Engine.Tasks;
 using Cove.Protocol;
 
 namespace Cove.Engine;
@@ -31,7 +32,8 @@ public sealed class EngineDispatchContext
         Cove.Engine.Activity.ActivityAggregate? activity = null,
         SessionResumeOrchestrator? sessions = null,
         AgentLifecycleController? lifecycle = null,
-        LaunchOrchestrator? launcher = null)
+        LaunchOrchestrator? launcher = null,
+        TaskStore? tasks = null)
     {
         Request = request;
         Panes = panes;
@@ -51,6 +53,7 @@ public sealed class EngineDispatchContext
         Sessions = sessions;
         Lifecycle = lifecycle;
         Launcher = launcher;
+        Tasks = tasks;
     }
 
     public ControlRequest Request { get; }
@@ -71,6 +74,7 @@ public sealed class EngineDispatchContext
     public SessionResumeOrchestrator? Sessions { get; }
     public AgentLifecycleController? Lifecycle { get; }
     public LaunchOrchestrator? Launcher { get; }
+    public TaskStore? Tasks { get; }
 
     public ControlResponse Ok<T>(T data, JsonTypeInfo<T> typeInfo)
         => new ControlResponse(Request.Id, true, JsonSerializer.SerializeToElement(data, typeInfo));
