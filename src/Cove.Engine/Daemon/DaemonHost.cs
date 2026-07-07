@@ -30,6 +30,7 @@ public sealed class DaemonHost
     private Cove.Engine.Layout.LayoutService? _layout;
     private System.Threading.Timer? _scrollbackTimer;
     private Cove.Engine.Workspaces.WorkspaceManager? _workspaces;
+    private Cove.Engine.Workspaces.RunCommandService? _runCommands;
 
     public DaemonHost(DaemonPaths paths, IControlEndpoint endpoint, bool exitWhenIdle)
     {
@@ -53,6 +54,8 @@ public sealed class DaemonHost
         _panes = new PaneRegistry(_ptyHost, logger, spawnEnv, shellDir);
         _layout = new Cove.Engine.Layout.LayoutService();
         _workspaces = new Cove.Engine.Workspaces.WorkspaceManager();
+        _runCommands = new Cove.Engine.Workspaces.RunCommandService(new Cove.Engine.Workspaces.RunCommandStore(System.IO.Path.Combine(dataDir, "run-commands"), logger), new Cove.Engine.Workspaces.PtyRunCommandSessionFactory(_ptyHost, spawnEnv, shellDir, logger));
+
         var wsDir = System.IO.Path.Combine(dataDir, "workspaces", "default");
         var (savedLayout, sessions) = Cove.Engine.Layout.WorkspacePersistence.Load(wsDir, logger);
         if (savedLayout is { } sl)
@@ -244,7 +247,7 @@ public sealed class DaemonHost
             return false;
         }
 
-        ControlResponse? generated = await Cove.Engine.EngineCommandRouter.RouteAsync(req, _panes, _layout, _workspaces, cancellationToken).ConfigureAwait(false);
+        ControlResponse? generated = await Cove.Engine.EngineCommandRouter.RouteAsync(req, _panes, _layout, _workspaces, _runCommands, cancellationToken).ConfigureAwait(false);
         if (generated is not null)
         {
             await WriteResponseAsync(conn, generated, cancellationToken).ConfigureAwait(false);
