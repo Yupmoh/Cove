@@ -29,3 +29,4 @@ dist/
 .vite/
 
 BenchmarkDotNet.Artifacts/
+WATCHDOG.yml
