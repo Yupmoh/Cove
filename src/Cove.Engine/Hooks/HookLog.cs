@@ -34,4 +34,6 @@ internal static partial class HookLog
 
     [ZLoggerMessage(LogLevel.Warning, "ambient run-command enumeration failed error={error}")]
     public static partial void AmbientRunCommandFailed(this ILogger logger, string error);
+    [ZLoggerMessage(LogLevel.Warning, "context injection failed adapter={adapter} event={eventName} error={error}")]
+    public static partial void ContextInjectionFailed(this ILogger logger, string adapter, string eventName, string error);
 }

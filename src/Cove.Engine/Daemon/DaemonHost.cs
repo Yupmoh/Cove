@@ -112,7 +112,7 @@ public sealed class DaemonHost
         _paneTypes = Cove.Engine.Panes.PaneTypeRegistry.CreateWithBuiltins();
         _hookMatrix = new Cove.Engine.Hooks.HookEnvelopeMatrix();
         PopulateHookMatrix(_hookMatrix, _manifestStore!, logger);
-        _hookInjector = new Cove.Engine.Hooks.ContextInjector(_hookMatrix);
+        _hookInjector = new Cove.Engine.Hooks.ContextInjector(_hookMatrix, ParseAwareness(_config.Get("context.awareness")), logger);
         _hookServer.Injector = _hookInjector;
         var adaptersRoot = System.IO.Path.Combine(dataDir, "adapters");
         System.IO.Directory.CreateDirectory(adaptersRoot);
@@ -487,6 +487,16 @@ public sealed class DaemonHost
     {
         return _manifestStore?.Load(adapter)?.Binary;
     }
+
+    private static Cove.Engine.Hooks.AwarenessLevel ParseAwareness(string? value)
+    {
+        return value?.ToLowerInvariant() switch
+        {
+            "off" => Cove.Engine.Hooks.AwarenessLevel.Off,
+            "minimal" => Cove.Engine.Hooks.AwarenessLevel.Minimal,
+            _ => Cove.Engine.Hooks.AwarenessLevel.Full,
+        };
+    }
     private void BroadcastEvent<T>(string channel, T payload, System.Text.Json.Serialization.Metadata.JsonTypeInfo<T> typeInfo)
     {
         FrameConnection[] guis;
@@ -496,6 +506,7 @@ public sealed class DaemonHost
             return;
         var element = System.Text.Json.JsonSerializer.SerializeToElement(payload, typeInfo);
         var frame = ControlCodec.Encode(new ControlEvent(channel, element));
+
         foreach (var gui in guis)
             _ = gui.WriteFrameAsync(FrameType.Event, 0, frame, _shutdown.Token);
     }
