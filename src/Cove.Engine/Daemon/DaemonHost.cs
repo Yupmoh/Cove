@@ -34,7 +34,7 @@ public sealed class DaemonHost
     private Cove.Engine.Restart.RestorationService? _restoration;
     private Cove.Engine.Snapshots.SnapshotService? _snapshots;
     private Cove.Engine.Skills.SkillsService? _skills;
-
+    private Cove.Adapters.AgentDefinitionStore? _agents;
     public DaemonHost(DaemonPaths paths, IControlEndpoint endpoint, bool exitWhenIdle)
     {
         _paths = paths;
@@ -61,7 +61,7 @@ public sealed class DaemonHost
         _restoration = new Cove.Engine.Restart.RestorationService(dataDir, logger, emitProgress: e => BroadcastEvent("restore.progress", e, Cove.Engine.Restart.RestorationJsonContext.Default.RestoreProgressEvent));
         _snapshots = new Cove.Engine.Snapshots.SnapshotService(dataDir, System.IO.Path.Combine(dataDir, "snapshots"), new Cove.Engine.Workspaces.ProcessGitRunner(), logger);
         _skills = new Cove.Engine.Skills.SkillsService(dataDir, logger: logger);
-
+        _agents = new Cove.Adapters.AgentDefinitionStore(System.IO.Path.Combine(dataDir, "agents"), logger);
 
         var wsDir = System.IO.Path.Combine(dataDir, "workspaces", "default");
         var wasClean = _restoration.WasCleanShutdown();
@@ -265,7 +265,8 @@ public sealed class DaemonHost
             await WriteResponseAsync(conn, Fail(req.Id, "not_ready", "sys/hello required before other requests"), cancellationToken).ConfigureAwait(false);
             return false;
         }
-        ControlResponse? generated = await Cove.Engine.EngineCommandRouter.RouteAsync(req, _panes, _layout, _workspaces, _runCommands, _restoration, _snapshots, _skills, cancellationToken).ConfigureAwait(false);
+
+        ControlResponse? generated = await Cove.Engine.EngineCommandRouter.RouteAsync(req, _panes, _layout, _workspaces, _runCommands, _restoration, _snapshots, _skills, _agents, cancellationToken).ConfigureAwait(false);
 
         if (generated is not null)
         {

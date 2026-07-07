@@ -34,4 +34,13 @@ internal static partial class AdapterLog
 
     [ZLoggerMessage(LogLevel.Warning, "skill watch root missing root={root}")]
     public static partial void SkillWatchRootMissing(this ILogger logger, string root);
+
+    [ZLoggerMessage(LogLevel.Warning, "agent load rejected invalid slug={slug}")]
+    public static partial void AgentLoadInvalidSlug(this ILogger logger, string slug);
+
+    [ZLoggerMessage(LogLevel.Warning, "agent delete rejected invalid slug={slug}")]
+    public static partial void AgentDeleteInvalidSlug(this ILogger logger, string slug);
+
+    [ZLoggerMessage(LogLevel.Warning, "agent delete failed slug={slug} error={error}")]
+    public static partial void AgentDeleteFailed(this ILogger logger, string slug, string error);
 }

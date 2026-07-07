@@ -24,4 +24,16 @@ internal static class CliCommands
     [CoveCommand("skills resolve-prompt-sigils")]
     public static Task<int> SkillsResolvePromptSigils(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/skills.resolve-prompt-sigils");
+
+    [CoveCommand("agent definition list")]
+    public static Task<int> AgentDefinitionList(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/agent.definition.list");
+
+    [CoveCommand("agent definition show")]
+    public static Task<int> AgentDefinitionShow(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/agent.definition.show");
+
+    [CoveCommand("agent definition delete")]
+    public static Task<int> AgentDefinitionDelete(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/agent.definition.delete");
 }
