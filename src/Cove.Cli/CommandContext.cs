@@ -1,6 +1,3 @@
-using System.IO;
-using System.Threading;
-using System.Threading.Tasks;
 using Cove.Engine.Daemon;
 using Cove.Platform.Ipc;
 using Cove.Protocol;
@@ -9,18 +6,18 @@ namespace Cove.Cli;
 
 public sealed class CommandContext
 {
-    public CommandContext(DaemonPaths paths, IControlEndpoint endpoint, TextWriter stdout)
+    public CommandContext(DaemonPaths paths, IControlEndpoint endpoint, TextWriter stdout, TextWriter? stderr = null)
     {
         Paths = paths;
         Endpoint = endpoint;
         Stdout = stdout;
+        Stderr = stderr ?? System.Console.Error;
     }
 
     public DaemonPaths Paths { get; }
-
     public IControlEndpoint Endpoint { get; }
-
     public TextWriter Stdout { get; }
+    public TextWriter Stderr { get; }
 
     public async Task<int> RouteCoreAsync(string uri)
     {
