@@ -152,6 +152,32 @@ public sealed class RegistryServiceTests
         }
         finally { try { Directory.Delete(dir, true); } catch { } }
     }
+
+    [Fact]
+    public async Task FetchAsync_StaleDiskNullFetcher_StillServesAsFallback()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "cove-registry-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var cachePath = Path.Combine(dir, "registry-cache.json");
+            var fetcher = new TestFetcher("""{"schemaVersion":1,"adapters":[{"name":"x","displayName":"X","description":"","accent":"#000000","binary":"x","sdkVersion":2,"version":"1.0.0","official":false}]}""");
+            var svc = new RegistryService(cachePath, fetcher, cacheTtl: TimeSpan.FromMilliseconds(1));
+            await svc.FetchAsync();
+            await Task.Delay(10);
+
+            File.SetLastWriteTimeUtc(cachePath, DateTime.UtcNow.AddHours(-2));
+
+            var nullFetcher = new NullFetcher();
+            var svcOffline = new RegistryService(cachePath, nullFetcher, cacheTtl: TimeSpan.FromMilliseconds(1));
+            var result = await svcOffline.FetchAsync();
+
+            Assert.NotNull(result);
+            Assert.Single(result!.Adapters);
+            Assert.Equal("x", result.Adapters[0].Name);
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
     [Fact]
     public async Task FetchAsync_OfflineFallsBackToDiskCache()
     {
@@ -173,6 +199,11 @@ public sealed class RegistryServiceTests
         }
         finally { try { Directory.Delete(dir, true); } catch { } }
     }
+}
+
+internal sealed class NullFetcher : IRegistryFetcher
+{
+    public Task<string?> FetchAsync(CancellationToken ct = default) => Task.FromResult<string?>(null);
 }
 
 internal sealed class TestFetcher : IRegistryFetcher
