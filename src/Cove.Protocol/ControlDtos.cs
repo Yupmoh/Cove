@@ -110,6 +110,7 @@ public sealed record AdapterListItemDto(string Name, string DisplayName, string 
 public sealed record AdapterListResult(System.Collections.Generic.IReadOnlyList<AdapterListItemDto> Adapters);
 public sealed record RegistryEntryDto(string Name, string DisplayName, string Version, bool Official);
 public sealed record RegistryFetchResult(RegistryEntryDto[] Adapters);
+public sealed record NeedsInputSignalDto(string PaneId, string Adapter);
 
 public sealed record ProtocolResolveParams(string Uri, string? FocusedPaneId, string? ActiveRoomId);
 public sealed record ProtocolResolveResult(string Uri, System.Text.Json.JsonElement? Params);
@@ -249,6 +250,7 @@ public sealed record BrowserPaneDto(string PaneId, string CurrentUrl, System.Col
 [JsonSerializable(typeof(LauncherOverridesDto))]
 [JsonSerializable(typeof(AdapterListResult))]
 [JsonSerializable(typeof(RegistryFetchResult))]
+[JsonSerializable(typeof(NeedsInputSignalDto))]
 [JsonSerializable(typeof(ProtocolResolveParams))]
 [JsonSerializable(typeof(ProtocolResolveResult))]
 [JsonSerializable(typeof(TaskCard))]

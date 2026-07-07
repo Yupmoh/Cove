@@ -42,6 +42,8 @@ public sealed class HookEventRouter
         _logger = logger;
     }
 
+    public event Action<string, bool>? NeedsInputTransition;
+
     public void Route(HookEvent ev)
     {
         if (ev.PaneId is null)
@@ -63,9 +65,11 @@ public sealed class HookEventRouter
                 break;
             case "session-end":
                 UpdateState(ev.PaneId, s => s with { Status = "idle", StopReason = null, LastEventAt = System.DateTimeOffset.UtcNow });
+                NeedsInputTransition?.Invoke(ev.PaneId, false);
                 break;
             case "stop":
                 UpdateState(ev.PaneId, s => s.WithStatus("needs-input"));
+                NeedsInputTransition?.Invoke(ev.PaneId, true);
                 break;
             case "stop-failure":
                 var reason = ExtractStopReason(ev.Payload);
@@ -73,6 +77,7 @@ public sealed class HookEventRouter
                 break;
             case "user-prompt-submit":
                 UpdateState(ev.PaneId, s => s.WithStatus("active"));
+                NeedsInputTransition?.Invoke(ev.PaneId, false);
                 break;
             case "pre-tool-use":
                 UpdateState(ev.PaneId, s => s.WithStatus("tool-running"));
@@ -89,6 +94,7 @@ public sealed class HookEventRouter
             case "notification":
             case "permission-request":
                 UpdateState(ev.PaneId, s => s with { LastEventAt = System.DateTimeOffset.UtcNow });
+                NeedsInputTransition?.Invoke(ev.PaneId, true);
                 break;
         }
     }

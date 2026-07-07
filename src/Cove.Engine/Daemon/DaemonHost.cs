@@ -48,6 +48,7 @@ public sealed class DaemonHost
     private Cove.Engine.Hooks.HookEventRouter? _hookRouter;
     private Cove.Engine.Agents.AgentMessageRouter? _agentRouter;
     private Cove.Engine.Activity.ActivityAggregate? _activity;
+    private Cove.Engine.Hooks.NeedsInputSignaler? _needsInputSignaler;
     private Cove.Engine.Sessions.SessionResumeOrchestrator? _sessions;
     private Cove.Engine.Lifecycle.AgentLifecycleController? _lifecycle;
     private Cove.Engine.Launch.LaunchOrchestrator? _launcher;
@@ -110,6 +111,12 @@ public sealed class DaemonHost
         _config = new Cove.Engine.Config.ConfigService(dataDir, logger);
         _hookServer.OnEvent += _hookRouter.Route;
         _paneTypes = Cove.Engine.Panes.PaneTypeRegistry.CreateWithBuiltins();
+        _needsInputSignaler = new Cove.Engine.Hooks.NeedsInputSignaler(_activity!, new DaemonNotificationBus(this), () => GetFocusedPane());
+        _hookRouter.NeedsInputTransition += (paneId, needsInput) =>
+        {
+            if (needsInput) _needsInputSignaler!.CheckAndSignal(paneId);
+            else _needsInputSignaler!.ClearSignal(paneId);
+        };
         _hookMatrix = new Cove.Engine.Hooks.HookEnvelopeMatrix();
         PopulateHookMatrix(_hookMatrix, _manifestStore!, logger);
         _hookInjector = new Cove.Engine.Hooks.ContextInjector(_hookMatrix, ParseAwareness(_config.Get("context.awareness")), logger);
@@ -497,6 +504,17 @@ public sealed class DaemonHost
             _ => Cove.Engine.Hooks.AwarenessLevel.Full,
         };
     }
+
+    private string? GetFocusedPane()
+    {
+        if (_workspaces is null || _layout is null)
+            return null;
+        var focusedWs = _workspaces.Registry.FocusedWorkspaceId;
+        if (focusedWs is null || _workspaces.Get(focusedWs) is not { } actor)
+            return null;
+        var roomId = actor.State.ActiveRoomId;
+        return roomId is null ? null : _layout.GetActive(roomId);
+    }
     private void BroadcastEvent<T>(string channel, T payload, System.Text.Json.Serialization.Metadata.JsonTypeInfo<T> typeInfo)
     {
         FrameConnection[] guis;
@@ -649,5 +667,24 @@ public sealed class DaemonHost
     {
         public bool HelloDone;
         public bool IsGui;
+    }
+
+    private sealed class DaemonNotificationBus : Cove.Engine.Hooks.INotificationBus
+    {
+        private readonly DaemonHost _host;
+
+        public DaemonNotificationBus(DaemonHost host) => _host = host;
+
+        public void BroadcastNeedsInputSignal(string paneId, string adapter)
+            => _host.BroadcastEvent("needs-input.signal", new Cove.Protocol.NeedsInputSignalDto(paneId, adapter), Cove.Protocol.CoveJsonContext.Default.NeedsInputSignalDto);
+
+        public void BroadcastDockBadge(string paneId, string adapter)
+            => _host.BroadcastEvent("dock.badge", new Cove.Protocol.NeedsInputSignalDto(paneId, adapter), Cove.Protocol.CoveJsonContext.Default.NeedsInputSignalDto);
+
+        public void ClearNeedsInputSignal(string paneId)
+            => _host.BroadcastEvent("needs-input.clear", new Cove.Protocol.NeedsInputSignalDto(paneId, ""), Cove.Protocol.CoveJsonContext.Default.NeedsInputSignalDto);
+
+        public void ClearDockBadge()
+            => _host.BroadcastEvent("dock.badge.clear", new Cove.Protocol.NeedsInputSignalDto("", ""), Cove.Protocol.CoveJsonContext.Default.NeedsInputSignalDto);
     }
 }
