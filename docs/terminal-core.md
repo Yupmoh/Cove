@@ -32,13 +32,13 @@ Per workspace under `$COVE_DATA_DIR/workspaces/default/`:
 
 - `workspace.json` — the layout snapshot (rooms, trees, focus, zoom), written atomically on every `OnChanged`.
 - `panes/<paneId>/session.json` — the pane's spawn descriptor (command, args, cwd) for respawn.
-- `panes/<paneId>/scrollback.bin` — a periodic (15 s) ring snapshot, capped, used to restore prior history on cold restart.
+- `panes/<paneId>/scrollback.bin` — a periodic (15 s) ring snapshot plus a final snapshot on clean shutdown, capped, used to restore prior history on cold restart.
 
 All JSON goes through source-generated `System.Text.Json` (`CoveJsonContext`) and the atomic temp-then-rename store; scrollback is raw bytes written the same atomic way.
 
 ## GUI surface
 
-Command palette (⌘K), split (⌘D / ⌘⇧D), zoom (⌘Z), new terminal (⌘T), per-pane header with inline rename and an overflow menu, copy-or-SIGINT / select-all / paste keybinds, terminal settings panel (⌘,), scrollback find bar (⌘F), and a launcher overlay (⌘L). Leaves can stack multiple terminals as subtabs with a tab strip.
+Command palette (⌘K), split (⌘D / ⌘⇧D), zoom (⌘Z), new terminal (⌘T), per-pane header with inline rename and an overflow menu, copy-or-SIGINT / select-all / paste keybinds, terminal settings panel (⌘,) with 9 `terminal.*` keys (fontFamily/fontSize/lineHeight/cursorStyle/cursorBlink/ligatures/scrollbackLines/padding/backgroundOpacity) live-applied to xterm and persisted to engine `config.json` via `config.get`/`config.set` routes, scrollback find bar (⌘F), and a launcher overlay (⌘L). Leaves can stack multiple terminals as subtabs with a tab strip.
 
 ## Cross-platform PTY
 
