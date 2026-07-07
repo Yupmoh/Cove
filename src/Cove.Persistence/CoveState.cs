@@ -8,6 +8,7 @@ public sealed record CoveState
     public WindowGeometry? WindowGeometry { get; init; }
     public bool CleanShutdown { get; init; }
     public DateTimeOffset? ShutdownAtUtc { get; init; }
+    public bool AutoRestoreOnLaunch { get; init; }
 }
 
 public sealed record WindowGeometry(double X, double Y, double Width, double Height);
