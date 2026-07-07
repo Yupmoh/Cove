@@ -67,4 +67,18 @@ public sealed class ResidentCommandsTests
             El(new ResidentCollapseParams(a.Id, paneId, true), ResidentJsonContext.Default.ResidentCollapseParams));
         Assert.True(m.Get(a.Id)!.State.Panes[paneId].ResidentCollapsed);
     }
+    [Fact]
+    public async Task Resident_SetHeight_Persists()
+    {
+        int n = 0;
+        await using var m = new WorkspaceManager(newId: () => $"id-{++n}");
+        var a = await m.CreateWorkspaceAsync("a", "/a");
+        var d = await Route(m, "cove://commands/resident.dock",
+            El(new ResidentDockParams(a.Id, null, "workspace", 0), ResidentJsonContext.Default.ResidentDockParams));
+        var paneId = d!.Data!.Value.GetProperty("paneId").GetString()!;
+
+        await Route(m, "cove://commands/resident.set-height",
+            El(new ResidentHeightParams(a.Id, paneId, 240), ResidentJsonContext.Default.ResidentHeightParams));
+        Assert.Equal(240, m.Get(a.Id)!.State.Panes[paneId].ResidentHeight);
+    }
 }

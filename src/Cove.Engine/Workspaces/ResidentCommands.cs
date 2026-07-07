@@ -47,6 +47,19 @@ public static class ResidentCommands
             : ctx.Fail("not_found", "workspace or pane not found");
     }
 
+    [CoveCommand("cove://commands/resident.set-height")]
+    public static async Task<ControlResponse> ResidentSetHeight(EngineDispatchContext ctx)
+    {
+        if (ctx.Workspaces is not { } manager)
+            return ctx.Fail("no_workspaces", "workspace manager unavailable");
+        if (ctx.Request.Params is not JsonElement el
+            || el.Deserialize(ResidentJsonContext.Default.ResidentHeightParams) is not { } p)
+            return ctx.Fail("bad_params", "workspaceId and paneId are required");
+        return await manager.SetResidentHeightAsync(p.WorkspaceId, p.PaneId, p.Height).ConfigureAwait(false)
+            ? ctx.Ok()
+            : ctx.Fail("not_found", "workspace or pane not found");
+    }
+
     [CoveCommand("cove://commands/resident.list")]
     public static Task<ControlResponse> ResidentList(EngineDispatchContext ctx)
     {
@@ -62,6 +75,7 @@ public static class ResidentCommands
 public sealed record ResidentDockParams(string WorkspaceId, string? PaneId, string Scope, int Slot);
 public sealed record ResidentTargetParams(string WorkspaceId, string PaneId);
 public sealed record ResidentCollapseParams(string WorkspaceId, string PaneId, bool Collapsed);
+public sealed record ResidentHeightParams(string WorkspaceId, string PaneId, int Height);
 public sealed record ResidentListParams(string WorkspaceId);
 public sealed record ResidentDockResult(string PaneId);
 public sealed record ResidentSummary(string PaneId, string WorkspaceId, string Scope, int Slot, bool Collapsed);
@@ -74,6 +88,7 @@ public sealed record ResidentListResult(IReadOnlyList<ResidentSummary> Residents
 [JsonSerializable(typeof(ResidentDockParams))]
 [JsonSerializable(typeof(ResidentTargetParams))]
 [JsonSerializable(typeof(ResidentCollapseParams))]
+[JsonSerializable(typeof(ResidentHeightParams))]
 [JsonSerializable(typeof(ResidentListParams))]
 [JsonSerializable(typeof(ResidentDockResult))]
 [JsonSerializable(typeof(ResidentListResult))]

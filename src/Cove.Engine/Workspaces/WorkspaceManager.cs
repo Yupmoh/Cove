@@ -293,6 +293,20 @@ public sealed class WorkspaceManager : IAsyncDisposable
         return true;
     }
 
+    public async Task<bool> SetResidentHeightAsync(string workspaceId, string paneId, int height)
+    {
+        if (Get(workspaceId) is not { } actor || !actor.State.Panes.ContainsKey(paneId))
+            return false;
+        await actor.Mutate(m =>
+        {
+            var panes = new Dictionary<string, PaneRecord>(m.Panes);
+            if (panes.TryGetValue(paneId, out var record))
+                panes[paneId] = record with { ResidentHeight = height };
+            return m with { Panes = panes };
+        }).ConfigureAwait(false);
+        return true;
+    }
+
     public async Task<bool> SetResidentCollapsedAsync(string workspaceId, string paneId, bool collapsed)
     {
         if (Get(workspaceId) is not { } actor || !actor.State.Panes.ContainsKey(paneId))
