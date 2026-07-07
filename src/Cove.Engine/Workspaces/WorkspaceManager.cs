@@ -13,15 +13,18 @@ public sealed class WorkspaceManager : IAsyncDisposable
     private readonly object _mapGate = new();
     private readonly Action<WorkspaceChange>? _emit;
     private readonly Func<string> _newId;
+    private readonly WorktreeService _worktrees;
 
     public WorkspaceManager(
         RegistryModel? registry = null,
         IEnumerable<WorkspaceModel>? workspaces = null,
         Action<WorkspaceChange>? emit = null,
-        Func<string>? newId = null)
+        Func<string>? newId = null,
+        IGitRunner? gitRunner = null)
     {
         _newId = newId ?? (() => Guid.NewGuid().ToString("N"));
         _emit = emit;
+        _worktrees = new WorktreeService(gitRunner ?? new ProcessGitRunner());
         _registry = new Actor<RegistryModel>(registry ?? new RegistryModel());
         if (workspaces is not null)
             foreach (var workspace in workspaces)
@@ -319,6 +322,93 @@ public sealed class WorkspaceManager : IAsyncDisposable
                         result.Add(new ResidentSummary(p.PaneId, kv.Key, "global", p.ResidentSlot, p.ResidentCollapsed));
         }
         return result;
+    }
+
+    public async Task<WorkspaceModel?> CreateWorktreeAsync(string parentId, string branch, string location, bool newBranch, string? baseRef = null)
+    {
+        if (Get(parentId) is not { } parent)
+            return null;
+        var result = await _worktrees.CreateAsync(parent.State.ProjectDir, location, branch, newBranch, baseRef).ConfigureAwait(false);
+        if (!result.Ok)
+            return null;
+
+        var id = _newId();
+        var paneId = _newId();
+        var roomId = _newId();
+        var model = new WorkspaceModel
+        {
+            Id = id,
+            Name = branch,
+            ProjectDir = location,
+            CollectionId = parent.State.CollectionId,
+            IsWorktree = true,
+            ParentWorkspaceId = parentId,
+            WorktreeBranch = branch,
+            Wings = [new Wing { Id = WorkspaceModel.MainWingId, Name = "main" }],
+            Rooms = [new Room { Id = roomId, Name = "shell", WingId = WorkspaceModel.MainWingId, ActivePaneId = paneId, LayoutTree = new PaneLeaf { PaneId = paneId } }],
+            Panes = new Dictionary<string, PaneRecord> { [paneId] = new PaneRecord { PaneId = paneId } },
+            ActiveRoomId = roomId,
+            FocusedPaneId = paneId,
+        };
+        lock (_mapGate)
+            _workspaces[id] = new Actor<WorkspaceModel>(model);
+        await _registry.Mutate(r => r with { OpenWorkspaces = Append(r.OpenWorkspaces, id) }).ConfigureAwait(false);
+        _emit?.Invoke(new WorkspaceChange(WorkspaceChangeKind.Created, id));
+        return model;
+    }
+
+    public IReadOnlyList<WorkspaceModel> ListWorktrees(string parentId)
+    {
+        lock (_mapGate)
+            return _workspaces.Values
+                .Where(a => a.State.IsWorktree && a.State.ParentWorkspaceId == parentId)
+                .Select(a => a.State)
+                .ToList();
+    }
+
+    public async Task<bool> RemoveWorktreeAsync(string worktreeWorkspaceId, bool force = true)
+    {
+        if (Get(worktreeWorkspaceId) is not { } actor)
+            return false;
+        var w = actor.State;
+        if (!w.IsWorktree || w.ParentWorkspaceId is not { } parentId || Get(parentId) is not { } parent)
+            return false;
+        var result = await _worktrees.RemoveAsync(parent.State.ProjectDir, w.ProjectDir, force).ConfigureAwait(false);
+        if (!result.Ok)
+            return false;
+
+        lock (_mapGate)
+            _workspaces.Remove(worktreeWorkspaceId);
+        await actor.DisposeAsync().ConfigureAwait(false);
+        await _registry.Mutate(r =>
+        {
+            var open = r.OpenWorkspaces.Where(x => x != worktreeWorkspaceId).ToList();
+            var focused = r.FocusedWorkspaceId == worktreeWorkspaceId ? parentId : r.FocusedWorkspaceId;
+            return r with { OpenWorkspaces = open, FocusedWorkspaceId = focused };
+        }).ConfigureAwait(false);
+        _emit?.Invoke(new WorkspaceChange(WorkspaceChangeKind.Deleted, worktreeWorkspaceId));
+        return true;
+    }
+
+    public Task<IReadOnlyList<string>> WorktreeOrphansAsync(string parentId)
+    {
+        if (Get(parentId) is not { } parent)
+            return Task.FromResult<IReadOnlyList<string>>([]);
+        List<string> bound;
+        lock (_mapGate)
+            bound = _workspaces.Values
+                .Where(a => a.State.IsWorktree && a.State.ParentWorkspaceId == parentId)
+                .Select(a => a.State.ProjectDir)
+                .ToList();
+        return _worktrees.OrphansAsync(parent.State.ProjectDir, bound);
+    }
+
+    public async Task<bool> PruneWorktreesAsync(string parentId)
+    {
+        if (Get(parentId) is not { } parent)
+            return false;
+        var result = await _worktrees.PruneAsync(parent.State.ProjectDir).ConfigureAwait(false);
+        return result.Ok;
     }
 
     private static IReadOnlyList<string> Append(IReadOnlyList<string> list, string item)
