@@ -38,7 +38,13 @@ public sealed record SpawnParams(
     Dictionary<string, string>? Env = null,
     int Cols = 80,
     int Rows = 24,
-    string? InheritCwdFrom = null);
+    string? InheritCwdFrom = null,
+    string? Adapter = null,
+    string? AgentName = null,
+    string? Workspace = null,
+    string? Room = null,
+    string McpAccessScope = "same-tab",
+    bool McpVisible = true);
 
 public sealed record SubscribeParams(string PaneId, ulong SinceOffset = 0);
 public sealed record SubscribeResult(ulong StreamId, ulong BaseOffset, int Window);
@@ -73,6 +79,9 @@ public sealed record HookStateResult(int Port, bool Running);
 public sealed record PaneStateItem(string PaneId, string Adapter, string Status, int ActiveSubagents, System.DateTimeOffset LastEventAt);
 public sealed record PaneStatesResult(PaneStateItem[] Panes);
 
+public sealed record AgentMessageParams(string Target, string Body, string? FromPaneId, string? FromAdapter, string? FromName, bool NoFrame);
+public sealed record AgentListDto(string PaneId, string Adapter, string? Name, string? Workspace, string? Room, string Status, string McpAccessScope);
+public sealed record AgentListResult(System.Collections.Generic.IReadOnlyList<AgentListDto> Agents);
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
@@ -118,5 +127,8 @@ public sealed record PaneStatesResult(PaneStateItem[] Panes);
 [JsonSerializable(typeof(HookStateResult))]
 [JsonSerializable(typeof(PaneStateItem))]
 [JsonSerializable(typeof(PaneStatesResult))]
+[JsonSerializable(typeof(AgentMessageParams))]
+[JsonSerializable(typeof(AgentListDto))]
+[JsonSerializable(typeof(AgentListResult))]
 [JsonSerializable(typeof(JsonElement))]
 public sealed partial class CoveJsonContext : JsonSerializerContext;

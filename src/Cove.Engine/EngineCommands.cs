@@ -1,6 +1,4 @@
-using System;
 using System.Text.Json;
-using System.Threading.Tasks;
 using Cove.Protocol;
 
 namespace Cove.Engine;
@@ -22,6 +20,8 @@ internal static class EngineCommands
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.SpawnParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "spawn params required"));
         PaneInfo info = reg.Spawn(p);
+        if (ctx.AgentRouter is { } router && p.Adapter is { } adapter)
+            router.Register(info.PaneId, adapter, p.AgentName, p.Workspace, p.Room, mcpAccessScope: p.McpAccessScope, mcpVisible: p.McpVisible);
         return Task.FromResult(ctx.Ok(info, CoveJsonContext.Default.PaneInfo));
     }
 
@@ -57,9 +57,10 @@ internal static class EngineCommands
             return Task.FromResult(ctx.Fail("not_ready", "pane registry unavailable"));
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.PaneRefParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "pane ref required"));
+        ctx.AgentRouter?.Unregister(p.PaneId);
         return Task.FromResult(reg.Kill(p.PaneId)
-            ? ctx.Ok()
-            : ctx.Fail("not_found", $"unknown pane {p.PaneId}"));
+                ? ctx.Ok()
+                : ctx.Fail("not_found", $"unknown pane {p.PaneId}"));
     }
 
     [CoveCommand("cove://commands/pane.search")]
