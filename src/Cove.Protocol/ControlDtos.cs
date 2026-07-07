@@ -27,7 +27,7 @@ public sealed record HelloResult(int ProtocolVersion, string EngineVersion, int 
 
 public sealed record DaemonStatusResult(int Pid, string Channel, string EngineVersion, int Connections, int Sessions, long UptimeSeconds);
 
-public sealed record PaneInfo(string PaneId, string Command, int Cols, int Rows, bool Alive, string? Cwd = null);
+public sealed record PaneInfo(string PaneId, string Command, int Cols, int Rows, bool Alive, string? Cwd = null, string? Title = null);
 
 public sealed record PaneListResult(PaneInfo[] Panes);
 
@@ -54,6 +54,9 @@ public sealed record ResizeParams(string PaneId, int Cols, int Rows);
 
 public sealed record PaneWriteParams(string PaneId, string DataBase64);
 public sealed record PaneRefParams(string PaneId);
+public sealed record PaneRenameParams(string PaneId, string Title);
+public sealed record PaneReadParams(string PaneId, long Offset = 0, int MaxBytes = 65536);
+public sealed record PaneReadResult(string DataBase64, long NextOffset, long Head);
 
 public sealed record LayoutMutateParams(string Op, string? RoomId = null, string? TargetPaneId = null, string? NewPaneId = null, string? Orientation = null, string? Name = null, string? PaneId = null, int Dir = 1);
 public sealed record LayoutMutateResult(string? RoomId = null);
@@ -190,6 +193,9 @@ public sealed record BrowserPaneDto(string PaneId, string CurrentUrl, System.Col
 [JsonSerializable(typeof(PaneInfo))]
 [JsonSerializable(typeof(PaneWriteParams))]
 [JsonSerializable(typeof(PaneRefParams))]
+[JsonSerializable(typeof(PaneRenameParams))]
+[JsonSerializable(typeof(PaneReadParams))]
+[JsonSerializable(typeof(PaneReadResult))]
 [JsonSerializable(typeof(LayoutMutateParams))]
 [JsonSerializable(typeof(LayoutMutateResult))]
 [JsonSerializable(typeof(SessionStateResult))]

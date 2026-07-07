@@ -16,12 +16,13 @@ internal sealed class PaneSession
     public int Cols { get; set; }
     public int Rows { get; set; }
     public string? Cwd { get; set; }
+    public string? Title { get; set; }
     public required IPtySession Session { get; init; }
     public required PtyRingBuffer Ring { get; init; }
     public required PtyRingSignal Signal { get; init; }
     public required PtySessionReader Reader { get; init; }
 
-    public PaneInfo ToInfo() => new(PaneId, Command, Cols, Rows, !Reader.HasCompleted, Cwd);
+    public PaneInfo ToInfo() => new(PaneId, Command, Cols, Rows, !Reader.HasCompleted, Cwd, Title);
 }
 
 public sealed class PaneRegistry : IDisposable
@@ -195,6 +196,33 @@ public sealed class PaneRegistry : IDisposable
             return System.Array.Empty<byte>();
         int len = (int)System.Math.Min(cap, avail);
         long from = head - len;
+        var buf = new byte[len];
+        var res = pane.Ring.ReadInto(from, buf);
+        return res.BytesCopied == len ? buf : buf[..res.BytesCopied];
+    }
+
+    public bool Rename(string paneId, string title)
+    {
+        lock (_sync)
+        {
+            if (!_panes.TryGetValue(paneId, out var pane))
+                return false;
+            pane.Title = title;
+            return true;
+        }
+    }
+
+    public byte[] Read(string paneId, long offset, int maxBytes)
+    {
+        if (!TryGet(paneId, out var pane))
+            return System.Array.Empty<byte>();
+        long tail = pane.Ring.Tail;
+        long head = pane.Ring.Head;
+        long from = System.Math.Max(offset, tail);
+        long avail = head - from;
+        if (avail <= 0)
+            return System.Array.Empty<byte>();
+        int len = (int)System.Math.Min(maxBytes, avail);
         var buf = new byte[len];
         var res = pane.Ring.ReadInto(from, buf);
         return res.BytesCopied == len ? buf : buf[..res.BytesCopied];

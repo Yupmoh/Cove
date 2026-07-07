@@ -73,4 +73,31 @@ internal static class EngineCommands
         var matches = reg.Search(p.PaneId, p.Query, p.CaseSensitive);
         return Task.FromResult(ctx.Ok(new SearchResult(matches), CoveJsonContext.Default.SearchResult));
     }
+
+    [CoveCommand("cove://commands/pane.rename")]
+    public static Task<ControlResponse> PaneRename(EngineDispatchContext ctx)
+    {
+        if (ctx.Panes is not { } reg)
+            return Task.FromResult(ctx.Fail("not_ready", "pane registry unavailable"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.PaneRenameParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "rename params required"));
+        return Task.FromResult(reg.Rename(p.PaneId, p.Title)
+            ? ctx.Ok()
+            : ctx.Fail("not_found", $"unknown pane {p.PaneId}"));
+    }
+
+    [CoveCommand("cove://commands/pane.read")]
+    public static Task<ControlResponse> PaneRead(EngineDispatchContext ctx)
+    {
+        if (ctx.Panes is not { } reg)
+            return Task.FromResult(ctx.Fail("not_ready", "pane registry unavailable"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.PaneReadParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "read params required"));
+        byte[] bytes = reg.Read(p.PaneId, p.Offset, p.MaxBytes);
+        long head = 0;
+        if (reg.TryGet(p.PaneId, out var pane))
+            head = pane.Ring.Head;
+        long nextOffset = p.Offset + bytes.Length;
+        return Task.FromResult(ctx.Ok(new PaneReadResult(System.Convert.ToBase64String(bytes), nextOffset, head), CoveJsonContext.Default.PaneReadResult));
+    }
 }

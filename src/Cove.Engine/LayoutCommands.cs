@@ -19,6 +19,15 @@ internal static class LayoutCommands
         return Task.FromResult(ctx.Ok(snap, Cove.Persistence.CoveJsonContext.Default.WorkspaceSnapshot));
     }
 
+    [CoveCommand("cove://commands/layout.snapshot")]
+    public static Task<ControlResponse> LayoutSnapshot(EngineDispatchContext ctx)
+    {
+        if (ctx.Layout is not { } layout)
+            return Task.FromResult(ctx.Fail("not_ready", "layout service unavailable"));
+        var snap = layout.ToSnapshot("default", "default", Environment.CurrentDirectory);
+        return Task.FromResult(ctx.Ok(snap, Cove.Persistence.CoveJsonContext.Default.WorkspaceSnapshot));
+    }
+
     [CoveCommand("cove://commands/layout.mutate")]
     public static Task<ControlResponse> LayoutMutate(EngineDispatchContext ctx)
     {
