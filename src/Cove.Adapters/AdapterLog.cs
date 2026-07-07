@@ -73,4 +73,7 @@ internal static partial class AdapterLog
 
     [ZLoggerMessage(LogLevel.Warning, "manifest load failed adapter={adapter} error={error}")]
     public static partial void ManifestLoadFailed(this ILogger logger, string adapter, string error);
+
+    [ZLoggerMessage(LogLevel.Warning, "registry fetch failed url={url} error={error}")]
+    public static partial void RegistryFetchFailed(this ILogger logger, string url, string error);
 }

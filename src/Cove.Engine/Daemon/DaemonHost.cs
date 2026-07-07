@@ -41,6 +41,7 @@ public sealed class DaemonHost
     private Cove.Engine.Adapters.EnvPropagationService? _envPropagation;
     private Cove.Adapters.AdapterReloadWatcher? _adapterReloadWatcher;
     private Cove.Adapters.AdapterManifestStore? _manifestStore;
+    private Cove.Adapters.RegistryService? _registry;
     private Cove.Engine.Hooks.HookEnvelopeMatrix? _hookMatrix;
     private Cove.Engine.Hooks.ContextInjector? _hookInjector;
     private Cove.Engine.Hooks.HookHttpServer? _hookServer;
@@ -94,6 +95,13 @@ public sealed class DaemonHost
         _sessions = new Cove.Engine.Sessions.SessionResumeOrchestrator(logger);
         _lifecycle = new Cove.Engine.Lifecycle.AgentLifecycleController(logger);
         _manifestStore = new Cove.Adapters.AdapterManifestStore(System.IO.Path.Combine(dataDir, "adapters"), logger);
+        var registryCachePath = System.IO.Path.Combine(dataDir, "adapters", "registry.json");
+        var repoRoot = System.IO.Path.GetFullPath(System.IO.Path.Combine(System.AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        var devRegistryPath = System.IO.Path.Combine(repoRoot, "..", "atrium-adapters", "registry.json");
+        Cove.Adapters.IRegistryFetcher fetcher = System.IO.File.Exists(devRegistryPath)
+            ? new Cove.Adapters.FileRegistryFetcher(devRegistryPath, logger)
+            : new Cove.Adapters.HttpRegistryFetcher(Cove.Adapters.RegistryConstants.RegistryContentsUrl, logger);
+        _registry = new Cove.Adapters.RegistryService(registryCachePath, fetcher);
         _launcher = new Cove.Engine.Launch.LaunchOrchestrator(_manifestStore, new Cove.Adapters.MethodRunner(), new Cove.Adapters.BinaryDiscoveryService(), probedPath, overrideStore: new Cove.Engine.Launch.LauncherOverrideStore(System.IO.Path.Combine(dataDir, "launcher-overrides"), logger));
         _tasks = new Cove.Engine.Tasks.TaskStore(dataDir);
         _notes = new Cove.Engine.Knowledge.NoteStore(dataDir);
@@ -322,10 +330,10 @@ public sealed class DaemonHost
 
         if (!state.HelloDone)
         {
-            await WriteResponseAsync(conn, Fail(req.Id, "not_ready", "sys/hello required before other requests"), cancellationToken).ConfigureAwait(false);
+            await WriteResponseAsync(conn, Fail(req.Id, "not_ready", "sys/hello required before commands"), cancellationToken).ConfigureAwait(false);
             return false;
         }
-        ControlResponse? generated = await Cove.Engine.EngineCommandRouter.RouteAsync(req, _panes, _layout, _workspaces, _runCommands, _restoration, _snapshots, _skills, _agents, _launchProfiles, _adapterEnv, _hookServer, _hookRouter, _agentRouter, _activity, _sessions, _lifecycle, _launcher, _tasks, _notes, _timeline, _paneTypes, _browser, _config, _manifestStore, cancellationToken).ConfigureAwait(false);
+        ControlResponse? generated = await Cove.Engine.EngineCommandRouter.RouteAsync(req, _panes, _layout, _workspaces, _runCommands, _restoration, _snapshots, _skills, _agents, _launchProfiles, _adapterEnv, _hookServer, _hookRouter, _agentRouter, _activity, _sessions, _lifecycle, _launcher, _tasks, _notes, _timeline, _paneTypes, _browser, _config, _manifestStore, _registry, cancellationToken).ConfigureAwait(false);
 
         if (generated is not null)
         {

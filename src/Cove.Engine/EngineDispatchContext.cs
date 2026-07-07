@@ -43,7 +43,8 @@ public sealed class EngineDispatchContext
         PaneTypeRegistry? paneTypes = null,
         BrowserPaneManager? browser = null,
         ConfigService? config = null,
-        AdapterManifestStore? manifestStore = null)
+        AdapterManifestStore? manifestStore = null,
+        RegistryService? registry = null)
     {
         Request = request;
         Panes = panes;
@@ -70,6 +71,7 @@ public sealed class EngineDispatchContext
         Browser = browser;
         Config = config;
         ManifestStore = manifestStore;
+        Registry = registry;
     }
 
     public ControlRequest Request { get; }
@@ -97,6 +99,7 @@ public sealed class EngineDispatchContext
     public ConfigService? Config { get; }
     public BrowserPaneManager? Browser { get; }
     public AdapterManifestStore? ManifestStore { get; }
+    public RegistryService? Registry { get; }
 
     public ControlResponse Ok<T>(T data, JsonTypeInfo<T> typeInfo)
         => new ControlResponse(Request.Id, true, JsonSerializer.SerializeToElement(data, typeInfo));

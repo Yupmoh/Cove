@@ -4,6 +4,11 @@ using System.Text.Json.Serialization;
 
 namespace Cove.Adapters;
 
+public static class RegistryConstants
+{
+    public const string RegistryContentsUrl = "https://api.github.com/repos/jonnyasmar/atrium-adapters/contents/registry.json";
+    public const string DevSiblingDir = "../atrium-adapters";
+}
 public sealed record Registry
 {
     public int SchemaVersion { get; init; } = 1;
@@ -88,52 +93,57 @@ public sealed class RegistryService
 
         if (_fetcher is not null)
         {
+            string? fetchedJson = null;
+            bool fetchSucceeded = false;
             try
             {
-                var json = await _fetcher.FetchAsync(cancellationToken).ConfigureAwait(false);
-                if (json is not null)
-                {
-                    var reg = ParseRegistry(json);
-                    if (reg is not null)
-                    {
-                        SetCache(reg);
-                        if (_cachePath is not null)
-                        {
-                            try
-                            {
-                                var dir = Path.GetDirectoryName(_cachePath);
-                                if (dir is not null) Directory.CreateDirectory(dir);
-                                await File.WriteAllTextAsync(_cachePath, json, cancellationToken).ConfigureAwait(false);
-                            }
-                            catch (IOException) { }
-                        }
-                        return reg;
-                    }
-                }
+                fetchedJson = await _fetcher.FetchAsync(cancellationToken).ConfigureAwait(false);
+                fetchSucceeded = fetchedJson is not null;
             }
             catch (Exception)
             {
-                if (diskCached is not null)
-                    return diskCached;
-                if (_cachePath is not null && File.Exists(_cachePath))
-                {
-                    try
-                    {
-                        var staleJson = await File.ReadAllTextAsync(_cachePath, cancellationToken).ConfigureAwait(false);
-                        var staleReg = ParseRegistry(staleJson);
-                        if (staleReg is not null)
-                        {
-                            SetCache(staleReg);
-                            return staleReg;
-                        }
-                    }
-                    catch (IOException) { }
-                }
-                if (_cached is not null)
-                    return _cached;
+                fetchSucceeded = false;
             }
-        }
 
+            if (fetchSucceeded && fetchedJson is not null)
+            {
+                var reg = ParseRegistry(fetchedJson);
+                if (reg is not null)
+                {
+                    SetCache(reg);
+                    if (_cachePath is not null)
+                    {
+                        try
+                        {
+                            var dir = Path.GetDirectoryName(_cachePath);
+                            if (dir is not null) Directory.CreateDirectory(dir);
+                            await File.WriteAllTextAsync(_cachePath, fetchedJson, cancellationToken).ConfigureAwait(false);
+                        }
+                        catch (IOException) { }
+                    }
+                    return reg;
+                }
+            }
+
+            if (diskCached is not null)
+                return diskCached;
+            if (_cachePath is not null && File.Exists(_cachePath))
+            {
+                try
+                {
+                    var staleJson = await File.ReadAllTextAsync(_cachePath, cancellationToken).ConfigureAwait(false);
+                    var staleReg = ParseRegistry(staleJson);
+                    if (staleReg is not null)
+                    {
+                        SetCache(staleReg);
+                        return staleReg;
+                    }
+                }
+                catch (IOException) { }
+            }
+            if (_cached is not null)
+                return _cached;
+        }
         return diskCached ?? _cached;
     }
 
