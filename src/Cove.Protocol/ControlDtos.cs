@@ -57,6 +57,8 @@ public sealed record SearchMatch(int Line, string Text);
 public sealed record SearchResult(SearchMatch[] Matches);
 public sealed record SkillIndexItem(string Name, string Description, string Source, string Provenance, string? Adapter);
 public sealed record SkillsIndexResult(SkillIndexItem[] Skills);
+public sealed record ResolvedSigil(string Name, string? Scope, string Body);
+public sealed record SigilResolutionResult(ResolvedSigil[] Resolved, string[] Unresolved);
 
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
@@ -85,7 +87,9 @@ public sealed record SkillsIndexResult(SkillIndexItem[] Skills);
 [JsonSerializable(typeof(SearchParams))]
 [JsonSerializable(typeof(SearchMatch))]
 [JsonSerializable(typeof(SearchResult))]
-[JsonSerializable(typeof(SkillsIndexResult))]
 [JsonSerializable(typeof(SkillIndexItem))]
+[JsonSerializable(typeof(SkillsIndexResult))]
+[JsonSerializable(typeof(ResolvedSigil))]
+[JsonSerializable(typeof(SigilResolutionResult))]
 [JsonSerializable(typeof(JsonElement))]
 public sealed partial class CoveJsonContext : JsonSerializerContext;

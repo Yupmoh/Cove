@@ -38,6 +38,7 @@ public sealed class SkillsService : IDisposable
     public IReadOnlyList<SkillEntry> List() => _index.List();
     public IReadOnlyList<SkillEntry> Search(string query) => _index.Search(query);
     public SkillEntry? Resolve(string name) => _index.Resolve(name);
+    public SkillIndex Index => _index;
 
     public void Dispose()
     {

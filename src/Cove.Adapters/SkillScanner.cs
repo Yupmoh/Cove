@@ -122,6 +122,7 @@ public sealed class SkillIndex
 {
     private readonly List<(string root, SkillSource source, string? adapterName)> _roots = new();
     private Dictionary<string, SkillEntry> _byName = new(StringComparer.OrdinalIgnoreCase);
+    private Dictionary<(string name, SkillSource source, string? adapter), SkillEntry> _byScope = new(new ScopeKeyComparer());
     private List<SkillEntry> _all = new();
 
     public void AddRoot(string root, SkillSource source, string? adapterName = null)
@@ -132,6 +133,7 @@ public sealed class SkillIndex
     public IReadOnlyList<(string root, SkillSource source, string? adapterName)> GetRoots() => _roots;
     public void Rebuild()
     {
+        var byScope = new Dictionary<(string, SkillSource, string?), SkillEntry>(new ScopeKeyComparer());
         var byName = new Dictionary<string, SkillEntry>(StringComparer.OrdinalIgnoreCase);
         var all = new List<SkillEntry>();
         var scanner = new SkillScanner();
@@ -145,9 +147,11 @@ public sealed class SkillIndex
                     byName[skill.Name] = skill;
                     all.Add(skill);
                 }
+                byScope[(skill.Name, skill.Source, skill.AdapterName)] = skill;
             }
         }
         Volatile.Write(ref _byName, byName);
+        Volatile.Write(ref _byScope, byScope);
         Volatile.Write(ref _all, all);
     }
 
@@ -159,10 +163,24 @@ public sealed class SkillIndex
         var snapshot = Volatile.Read(ref _all);
         return snapshot.Where(s => s.Name.ToLowerInvariant().Contains(q) || s.Description.ToLowerInvariant().Contains(q)).ToList();
     }
-
     public SkillEntry? Resolve(string name)
     {
         var byName = Volatile.Read(ref _byName);
         return byName.TryGetValue(name, out var skill) ? skill : null;
+    }
+
+    public SkillEntry? ResolveInScope(string name, SkillSource source, string? adapterName = null)
+    {
+        var byScope = Volatile.Read(ref _byScope);
+        return byScope.TryGetValue((name, source, adapterName), out var skill) ? skill : null;
+    }
+
+    internal sealed class ScopeKeyComparer : IEqualityComparer<(string name, SkillSource source, string? adapter)>
+    {
+        public bool Equals((string name, SkillSource source, string? adapter) x, (string name, SkillSource source, string? adapter) y)
+            => string.Equals(x.name, y.name, StringComparison.OrdinalIgnoreCase) && x.source == y.source && string.Equals(x.adapter, y.adapter, StringComparison.OrdinalIgnoreCase);
+
+        public int GetHashCode((string name, SkillSource source, string? adapter) obj)
+            => StringComparer.OrdinalIgnoreCase.GetHashCode(obj.name) ^ obj.source.GetHashCode() ^ (obj.adapter is null ? 0 : StringComparer.OrdinalIgnoreCase.GetHashCode(obj.adapter));
     }
 }

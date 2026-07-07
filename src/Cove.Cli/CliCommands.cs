@@ -20,4 +20,8 @@ internal static class CliCommands
     [CoveCommand("skills list")]
     public static Task<int> SkillsList(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/skills.index");
+
+    [CoveCommand("skills resolve-prompt-sigils")]
+    public static Task<int> SkillsResolvePromptSigils(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/skills.resolve-prompt-sigils");
 }
