@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-session_id="${COVE_SESSION_ID:-}"
-cwd="${COVE_PANE_CWD:-$PWD}"
+SESSION_ID="${1:?Usage: build_resume_command.sh <session_id> [flags_json]}"
+FLAGS="${2:-"{}"}"
+
 cat <<EOF
-{"command":["test-v2","resume","${session_id}","--cwd","${cwd}"]}
+{"command":["test-v2","resume","${SESSION_ID}"]}
 EOF
