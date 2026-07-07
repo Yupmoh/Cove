@@ -64,4 +64,13 @@ internal static partial class AdapterLog
 
     [ZLoggerMessage(LogLevel.Warning, "adapter reload handler failed adapter={adapter} error={error}")]
     public static partial void AdapterReloadHandlerFailed(this ILogger logger, string adapter, string error);
+
+    [ZLoggerMessage(LogLevel.Warning, "manifest parsed to null adapter={adapter}")]
+    public static partial void ManifestParsedNull(this ILogger logger, string adapter);
+
+    [ZLoggerMessage(LogLevel.Warning, "manifest load rejected invalid adapter={adapter}")]
+    public static partial void ManifestLoadInvalidAdapter(this ILogger logger, string adapter);
+
+    [ZLoggerMessage(LogLevel.Warning, "manifest load failed adapter={adapter} error={error}")]
+    public static partial void ManifestLoadFailed(this ILogger logger, string adapter, string error);
 }

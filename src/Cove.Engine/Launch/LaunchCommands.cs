@@ -8,22 +8,29 @@ namespace Cove.Engine.Launch;
 public static class LaunchCommands
 {
     [CoveCommand("cove://commands/launch.build")]
-    public static Task<ControlResponse> Build(EngineDispatchContext ctx)
+    public static async Task<ControlResponse> Build(EngineDispatchContext ctx)
     {
         if (ctx.Launcher is not { } orch)
-            return Task.FromResult(ctx.Fail("not_ready", "launch orchestrator not available"));
+            return ctx.Fail("not_ready", "launch orchestrator not available");
         if (ctx.LaunchProfiles is not { } profiles)
-            return Task.FromResult(ctx.Fail("not_ready", "launch profile store not available"));
+            return ctx.Fail("not_ready", "launch profile store not available");
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.LaunchBuildParams) is not { } p)
-            return Task.FromResult(ctx.Fail("invalid_params", "launch build params required"));
+            return ctx.Fail("invalid_params", "launch build params required");
 
         var profile = profiles.Load(p.Adapter, p.ProfileSlug);
         if (profile is null)
-            return Task.FromResult(ctx.Fail("not_found", $"profile '{p.Adapter}/{p.ProfileSlug}' not found"));
+            return ctx.Fail("not_found", $"profile '{p.Adapter}/{p.ProfileSlug}' not found");
 
         var overrides = ToOverrides(p.Yolo, p.WorkingDir, p.ExtraFlags, p.Env);
-        var cmd = orch.BuildLaunchCommand(profile, overrides);
-        return Task.FromResult(ctx.Ok(ToDto(cmd), CoveJsonContext.Default.ResumeCommandDto));
+        try
+        {
+            var cmd = await orch.BuildLaunchCommandAsync(profile, overrides).ConfigureAwait(false);
+            return ctx.Ok(ToDto(cmd), CoveJsonContext.Default.ResumeCommandDto);
+        }
+        catch (Cove.Engine.Restart.ResumeFailedException ex)
+        {
+            return ctx.Fail("launch_failed", ex.Message);
+        }
     }
 
     [CoveCommand("cove://commands/launch.overrides.save")]

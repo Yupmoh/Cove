@@ -40,6 +40,7 @@ public sealed class DaemonHost
     private Cove.Adapters.AdapterEnvStore? _adapterEnv;
     private Cove.Engine.Adapters.EnvPropagationService? _envPropagation;
     private Cove.Adapters.AdapterReloadWatcher? _adapterReloadWatcher;
+    private Cove.Adapters.AdapterManifestStore? _manifestStore;
     private Cove.Engine.Hooks.HookEnvelopeMatrix? _hookMatrix;
     private Cove.Engine.Hooks.ContextInjector? _hookInjector;
     private Cove.Engine.Hooks.HookHttpServer? _hookServer;
@@ -92,7 +93,8 @@ public sealed class DaemonHost
         _activity = new Cove.Engine.Activity.ActivityAggregate(_hookRouter, _agentRouter);
         _sessions = new Cove.Engine.Sessions.SessionResumeOrchestrator(logger);
         _lifecycle = new Cove.Engine.Lifecycle.AgentLifecycleController(logger);
-        _launcher = new Cove.Engine.Launch.LaunchOrchestrator();
+        _manifestStore = new Cove.Adapters.AdapterManifestStore(System.IO.Path.Combine(dataDir, "adapters"), logger);
+        _launcher = new Cove.Engine.Launch.LaunchOrchestrator(_manifestStore, new Cove.Adapters.MethodRunner(), new Cove.Adapters.BinaryDiscoveryService(), probedPath);
         _tasks = new Cove.Engine.Tasks.TaskStore(dataDir);
         _notes = new Cove.Engine.Knowledge.NoteStore(dataDir);
         _timeline = new Cove.Engine.Knowledge.TimelineStore(dataDir);
