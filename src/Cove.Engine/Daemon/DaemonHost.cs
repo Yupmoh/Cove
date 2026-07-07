@@ -94,7 +94,7 @@ public sealed class DaemonHost
         _sessions = new Cove.Engine.Sessions.SessionResumeOrchestrator(logger);
         _lifecycle = new Cove.Engine.Lifecycle.AgentLifecycleController(logger);
         _manifestStore = new Cove.Adapters.AdapterManifestStore(System.IO.Path.Combine(dataDir, "adapters"), logger);
-        _launcher = new Cove.Engine.Launch.LaunchOrchestrator(_manifestStore, new Cove.Adapters.MethodRunner(), new Cove.Adapters.BinaryDiscoveryService(), probedPath);
+        _launcher = new Cove.Engine.Launch.LaunchOrchestrator(_manifestStore, new Cove.Adapters.MethodRunner(), new Cove.Adapters.BinaryDiscoveryService(), probedPath, overrideStore: new Cove.Engine.Launch.LauncherOverrideStore(System.IO.Path.Combine(dataDir, "launcher-overrides"), logger));
         _tasks = new Cove.Engine.Tasks.TaskStore(dataDir);
         _notes = new Cove.Engine.Knowledge.NoteStore(dataDir);
         _timeline = new Cove.Engine.Knowledge.TimelineStore(dataDir);

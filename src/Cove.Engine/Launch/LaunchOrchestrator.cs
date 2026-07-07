@@ -25,19 +25,22 @@ public sealed class LaunchOrchestrator
     private readonly BinaryDiscoveryService? _binaryDiscovery;
     private readonly string? _loginShellPath;
     private readonly Dictionary<string, LauncherOverrides> _paneOverrides = new();
+    private readonly LauncherOverrideStore? _overrideStore;
 
-    public LaunchOrchestrator(AgentResumeService? resumeService = null)
+    public LaunchOrchestrator(AgentResumeService? resumeService = null, LauncherOverrideStore? overrideStore = null)
     {
         _resumeService = resumeService;
+        _overrideStore = overrideStore;
     }
 
-    public LaunchOrchestrator(AdapterManifestStore manifestStore, MethodRunner methodRunner, BinaryDiscoveryService binaryDiscovery, string? loginShellPath = null, AgentResumeService? resumeService = null)
+    public LaunchOrchestrator(AdapterManifestStore manifestStore, MethodRunner methodRunner, BinaryDiscoveryService binaryDiscovery, string? loginShellPath = null, AgentResumeService? resumeService = null, LauncherOverrideStore? overrideStore = null)
     {
         _manifestStore = manifestStore;
         _methodRunner = methodRunner;
         _binaryDiscovery = binaryDiscovery;
         _loginShellPath = loginShellPath;
         _resumeService = resumeService;
+        _overrideStore = overrideStore;
     }
 
     public ResumeCommand BuildLaunchCommand(LaunchProfile profile, LauncherOverrides overrides)
@@ -155,15 +158,24 @@ public sealed class LaunchOrchestrator
     public void PersistOverrides(string paneId, LauncherOverrides overrides)
     {
         _paneOverrides[paneId] = overrides;
+        _overrideStore?.Save(paneId, overrides);
     }
 
     public LauncherOverrides? GetOverrides(string paneId)
     {
-        return _paneOverrides.TryGetValue(paneId, out var overrides) ? overrides : null;
+        if (_paneOverrides.TryGetValue(paneId, out var overrides))
+            return overrides;
+        if (_overrideStore is not null && _overrideStore.TryLoad(paneId, out var loaded) && loaded is not null)
+        {
+            _paneOverrides[paneId] = loaded;
+            return loaded;
+        }
+        return null;
     }
 
     public void ClearOverrides(string paneId)
     {
         _paneOverrides.Remove(paneId);
+        _overrideStore?.Delete(paneId);
     }
 }
