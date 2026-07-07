@@ -201,7 +201,11 @@ function makePane(paneId: string, since: number): PaneView {
     input.focus();
     input.select();
     const finish = (commit: boolean) => {
-      if (commit) pv.customTitle = input.value.trim();
+      const newTitle = commit ? input.value.trim() : pv.customTitle;
+      if (commit && newTitle !== pv.customTitle) {
+        pv.customTitle = newTitle;
+        void invoke("app.paneRename", { paneId, title: newTitle }).catch(() => void 0);
+      }
       input.replaceWith(titleSpan);
       setTitle();
     };
@@ -219,6 +223,7 @@ function makePane(paneId: string, since: number): PaneView {
     mk("Rename", startRename);
     mk("New subtab", () => void addSubtab(paneId));
     mk("Close", () => { focusPane(paneId); void closeFocused(); });
+    mk("Close Others", () => { void closeOthers(paneId); });
     header.appendChild(menu);
   });
   term.onTitleChange((t) => { pv.title = t; setTitle(); refreshTitles(); });
@@ -421,6 +426,13 @@ function refreshTitles(): void {
 
 async function reload(): Promise<WorkspaceSnapshot> {
   layout = await invoke<WorkspaceSnapshot>("app.layoutGet", {});
+  try {
+    const list = await invoke<{ panes: { paneId: string; title: string | null }[] }>("app.paneList", {});
+    for (const p of list.panes) {
+      const pv = panes.get(p.paneId);
+      if (pv && p.title) pv.customTitle = p.title;
+    }
+  } catch { void 0; }
   if (!activeRoomId) {
     activeRoomId = layout.activeRoomId ?? layout.rooms[0]?.id ?? null;
   }
@@ -454,6 +466,19 @@ async function closeFocused(): Promise<void> {
   if (!focusedPaneId || !activeRoomId) return;
   await invoke("app.paneKill", { paneId: focusedPaneId });
   await invoke("app.layoutMutate", { op: "close", roomId: activeRoomId, paneId: focusedPaneId, targetPaneId: "", newPaneId: "", orientation: "", name: "", dir: 0 });
+  await reload();
+}
+
+async function closeOthers(keepPaneId: string): Promise<void> {
+  if (!activeRoomId) return;
+  const room = activeRoom();
+  if (!room) return;
+  const others = collectLeafIds(room.layoutTree).filter((id) => id !== keepPaneId);
+  for (const id of others) {
+    try { await invoke("app.paneKill", { paneId: id }); } catch { void 0; }
+    try { await invoke("app.layoutMutate", { op: "close", roomId: activeRoomId, paneId: id, targetPaneId: "", newPaneId: "", orientation: "", name: "", dir: 0 }); } catch { void 0; }
+  }
+  focusPane(keepPaneId);
   await reload();
 }
 

@@ -36,6 +36,13 @@ public sealed class CoveGuiCommands
     public async ValueTask<string> PaneKill(string paneId, CancellationToken ct)
         => await Call("cove://commands/pane.kill", PaneIdParam(paneId), ct);
 
+    [RynCommand("app.paneRename")]
+    public async ValueTask<string> PaneRename(string paneId, string title, CancellationToken ct)
+    {
+        var p = JsonSerializer.SerializeToElement(new PaneRenameParams(paneId, title), CoveJsonContext.Default.PaneRenameParams);
+        return await Call("cove://commands/pane.rename", p, ct);
+    }
+
     [RynCommand("app.layoutGet")]
     public async ValueTask<string> LayoutGet(CancellationToken ct)
         => await Call("cove://commands/layout.get", null, ct);
