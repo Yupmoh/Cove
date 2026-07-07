@@ -31,10 +31,11 @@ public sealed class PaneRegistry : IDisposable
     private readonly ILogger _logger;
     private readonly SpawnEnvironment? _spawnEnv;
     private readonly string? _shellDir;
+    private string? _projectDir;
     private readonly object _sync = new();
     private readonly Dictionary<string, PaneSession> _panes = new();
 
-    public PaneRegistry(IPtyHost host, ILogger logger, SpawnEnvironment? spawnEnv = null, string? shellDir = null)
+    public PaneRegistry(IPtyHost host, ILogger logger, SpawnEnvironment? spawnEnv = null, string? shellDir = null, string? projectDir = null)
     {
         ArgumentNullException.ThrowIfNull(host);
         ArgumentNullException.ThrowIfNull(logger);
@@ -42,13 +43,15 @@ public sealed class PaneRegistry : IDisposable
         _logger = logger;
         _spawnEnv = spawnEnv;
         _shellDir = shellDir;
+        _projectDir = projectDir;
     }
 
+    public string? ProjectDir { get => _projectDir; set => _projectDir = value; }
     public PaneInfo Spawn(SpawnParams p)
     {
         string paneId = "pane-" + System.Guid.NewGuid().ToString("N");
         string? inherited = (!string.IsNullOrEmpty(p.InheritCwdFrom) && TryGet(p.InheritCwdFrom!, out var src)) ? src.Cwd : null;
-        string cwd = ResolveWorkingDirectory(inherited, p.Cwd);
+        string cwd = ResolveWorkingDirectory(inherited, p.Cwd, _projectDir);
         return SpawnCore(paneId, p.Command, p.Args ?? System.Array.Empty<string>(), cwd, p.Cols, p.Rows, p.Env);
     }
 
@@ -102,13 +105,12 @@ public sealed class PaneRegistry : IDisposable
             var arr = new PaneDescriptor[_panes.Count];
             int i = 0;
             foreach (var p in _panes.Values)
-                arr[i++] = new PaneDescriptor(p.PaneId, p.Command, p.Args, string.IsNullOrEmpty(p.Cwd) ? p.SpawnCwd : p.Cwd!);
+                arr[i++] = new PaneDescriptor(p.PaneId, p.Command, p.Args, string.IsNullOrEmpty(p.Cwd) ? p.SpawnCwd : p.Cwd!, p.Title);
             return arr;
         }
     }
-
-    public static string ResolveWorkingDirectory(string? inheritedCwd, string? explicitCwd) =>
-        !string.IsNullOrEmpty(inheritedCwd) ? inheritedCwd! : (!string.IsNullOrEmpty(explicitCwd) ? explicitCwd! : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
+    public static string ResolveWorkingDirectory(string? inheritedCwd, string? explicitCwd, string? projectDir = null) =>
+        !string.IsNullOrEmpty(inheritedCwd) ? inheritedCwd! : (!string.IsNullOrEmpty(explicitCwd) ? explicitCwd! : (!string.IsNullOrEmpty(projectDir) ? projectDir! : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)));
 
     internal bool TryGet(string paneId, out PaneSession pane)
     {
