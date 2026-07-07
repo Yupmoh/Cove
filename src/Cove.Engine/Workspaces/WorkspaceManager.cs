@@ -116,6 +116,80 @@ public sealed class WorkspaceManager : IAsyncDisposable
         return true;
     }
 
+    public async Task<Collection> CreateCollectionAsync(string name)
+    {
+        var collection = new Collection { Id = _newId(), Name = name };
+        await _registry.Mutate(r => r with { Collections = new List<Collection>(r.Collections) { collection } }).ConfigureAwait(false);
+        return collection;
+    }
+
+    public async Task<bool> RenameCollectionAsync(string id, string name)
+    {
+        if (id == WorkspaceModel.DefaultCollectionId || !_registry.State.Collections.Any(c => c.Id == id))
+            return false;
+        await _registry.Mutate(r => r with { Collections = r.Collections.Select(c => c.Id == id ? c with { Name = name } : c).ToList() }).ConfigureAwait(false);
+        return true;
+    }
+
+    public async Task<bool> RemoveCollectionAsync(string id)
+    {
+        if (id == WorkspaceModel.DefaultCollectionId || !_registry.State.Collections.Any(c => c.Id == id))
+            return false;
+
+        List<Actor<WorkspaceModel>> affected;
+        lock (_mapGate)
+            affected = _workspaces.Values.Where(a => a.State.CollectionId == id).ToList();
+        foreach (var actor in affected)
+            await actor.Mutate(m => m with { CollectionId = WorkspaceModel.DefaultCollectionId }).ConfigureAwait(false);
+
+        await _registry.Mutate(r => r with
+        {
+            Collections = r.Collections.Where(c => c.Id != id).ToList(),
+            ActiveCollectionId = r.ActiveCollectionId == id ? WorkspaceModel.DefaultCollectionId : r.ActiveCollectionId,
+        }).ConfigureAwait(false);
+        return true;
+    }
+
+    public async Task<bool> SwitchCollectionAsync(string id)
+    {
+        if (id != WorkspaceModel.DefaultCollectionId && !_registry.State.Collections.Any(c => c.Id == id))
+            return false;
+        await _registry.Mutate(r => r with { ActiveCollectionId = id }).ConfigureAwait(false);
+        return true;
+    }
+
+    public async Task<bool> MoveWorkspaceToCollectionAsync(string workspaceId, string collectionId)
+    {
+        if (Get(workspaceId) is not { } actor)
+            return false;
+        if (collectionId != WorkspaceModel.DefaultCollectionId && !_registry.State.Collections.Any(c => c.Id == collectionId))
+            return false;
+        await actor.Mutate(m => m with { CollectionId = collectionId }).ConfigureAwait(false);
+        return true;
+    }
+
+    public IReadOnlyList<CollectionSummary> ListCollections()
+    {
+        var registry = _registry.State;
+        var userIds = registry.Collections.Select(c => c.Id).ToHashSet(StringComparer.Ordinal);
+        var counts = new Dictionary<string, int>(StringComparer.Ordinal);
+        lock (_mapGate)
+            foreach (var actor in _workspaces.Values)
+            {
+                var cid = actor.State.CollectionId;
+                var bucket = userIds.Contains(cid) ? cid : WorkspaceModel.DefaultCollectionId;
+                counts[bucket] = counts.GetValueOrDefault(bucket) + 1;
+            }
+
+        var result = new List<CollectionSummary>
+        {
+            new(WorkspaceModel.DefaultCollectionId, "Default", counts.GetValueOrDefault(WorkspaceModel.DefaultCollectionId).ToString(), registry.ActiveCollectionId == WorkspaceModel.DefaultCollectionId),
+        };
+        foreach (var c in registry.Collections)
+            result.Add(new CollectionSummary(c.Id, c.Name, counts.GetValueOrDefault(c.Id).ToString(), registry.ActiveCollectionId == c.Id));
+        return result;
+    }
+
     private static IReadOnlyList<string> Append(IReadOnlyList<string> list, string item)
     {
         var next = new List<string>(list);
