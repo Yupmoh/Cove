@@ -75,6 +75,76 @@ public sealed class LayoutService
         OnChanged?.Invoke();
     }
 
+    public void PromoteSubtab(string roomId, string leafPaneId, int subtabIndex, string newPaneId)
+    {
+        lock (_sync)
+        {
+            var room = GetRoomOrThrow(roomId);
+            var leaf = MosaicOps.Find(room.Root, leafPaneId) ?? throw new KeyNotFoundException($"unknown pane {leafPaneId}");
+            if (leaf.Subtabs.Count <= 1)
+                throw new InvalidOperationException("cannot promote the only subtab");
+            var idx = Math.Clamp(subtabIndex, 0, leaf.Subtabs.Count - 1);
+            var promoted = leaf.Subtabs[idx];
+            var remaining = RemoveAt(leaf.Subtabs, idx);
+            var newLeaf = new PaneLeaf
+            {
+                PaneId = newPaneId,
+                Subtabs = new[] { promoted },
+                ActiveSubtab = 0,
+            };
+            room.Root = MosaicOps.ReplaceLeaf(room.Root, leafPaneId, _ => leaf with { Subtabs = remaining, ActiveSubtab = Math.Clamp(leaf.ActiveSubtab, 0, Math.Max(0, remaining.Length - 1)) });
+            room.Root = MosaicOps.Split(room.Root, leafPaneId, SplitOrientation.Row, newLeaf);
+            room.ActivePaneId = newPaneId;
+        }
+        OnChanged?.Invoke();
+    }
+
+    public void CenterDrop(string roomId, string sourceLeafPaneId, int subtabIndex, string targetLeafPaneId)
+    {
+        lock (_sync)
+        {
+            var room = GetRoomOrThrow(roomId);
+            if (sourceLeafPaneId == targetLeafPaneId)
+                throw new InvalidOperationException("cannot center-drop onto the same leaf");
+            var source = MosaicOps.Find(room.Root, sourceLeafPaneId) ?? throw new KeyNotFoundException($"unknown pane {sourceLeafPaneId}");
+            var target = MosaicOps.Find(room.Root, targetLeafPaneId) ?? throw new KeyNotFoundException($"unknown pane {targetLeafPaneId}");
+            var idx = Math.Clamp(subtabIndex, 0, source.Subtabs.Count - 1);
+            var moved = source.Subtabs[idx];
+            var targetMerged = Append(target.Subtabs, moved);
+            room.Root = MosaicOps.ReplaceLeaf(room.Root, targetLeafPaneId, _ => target with { Subtabs = targetMerged, ActiveSubtab = targetMerged.Length - 1 });
+            if (source.Subtabs.Count <= 1)
+            {
+                var collapsed = MosaicOps.Close(room.Root, sourceLeafPaneId);
+                if (collapsed is null)
+                {
+                    _rooms.Remove(roomId);
+                }
+                else
+                {
+                    room.Root = collapsed;
+                    if (room.ActivePaneId == sourceLeafPaneId)
+                        room.ActivePaneId = targetLeafPaneId;
+                }
+            }
+            else
+            {
+                var sourceRemaining = RemoveAt(source.Subtabs, idx);
+                room.Root = MosaicOps.ReplaceLeaf(room.Root, sourceLeafPaneId, _ => source with { Subtabs = sourceRemaining, ActiveSubtab = Math.Clamp(source.ActiveSubtab, 0, Math.Max(0, sourceRemaining.Length - 1)) });
+            }
+        }
+        OnChanged?.Invoke();
+    }
+
+    private static Subtab[] RemoveAt(IReadOnlyList<Subtab> list, int index)
+    {
+        var arr = new Subtab[list.Count - 1];
+        int j = 0;
+        for (int i = 0; i < list.Count; i++)
+            if (i != index)
+                arr[j++] = list[i];
+        return arr;
+    }
+
     private static Subtab[] Append(IReadOnlyList<Subtab> list, Subtab item)
     {
         var arr = new Subtab[list.Count + 1];
