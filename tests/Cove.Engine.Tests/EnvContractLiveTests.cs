@@ -26,16 +26,25 @@ public sealed class EnvContractLiveTests
         Assert.True(spawnResp.Ok, spawnResp.Error?.Message);
         string paneId = spawnResp.Data!.Value.Deserialize(CoveJsonContext.Default.PaneInfo)!.PaneId;
 
-        await Task.Delay(1500, ct);
-
         JsonElement rp = JsonSerializer.SerializeToElement(
             new PaneReadParams(paneId, 0, 65536),
             CoveJsonContext.Default.PaneReadParams);
-        ControlResponse readResp = await RequestAsync(ctl, "read", "cove://commands/pane.read", rp, ct);
-        Assert.True(readResp.Ok, readResp.Error?.Message);
-        var result = readResp.Data!.Value.Deserialize(CoveJsonContext.Default.PaneReadResult)!;
-        Assert.NotEmpty(result.DataBase64);
-        string output = Encoding.UTF8.GetString(System.Convert.FromBase64String(result.DataBase64));
+
+        string output = "";
+        var deadline = Task.Delay(System.TimeSpan.FromSeconds(60), ct);
+        while (!deadline.IsCompleted)
+        {
+            ControlResponse readResp = await RequestAsync(ctl, "read", "cove://commands/pane.read", rp, ct);
+            Assert.True(readResp.Ok, readResp.Error?.Message);
+            var result = readResp.Data!.Value.Deserialize(CoveJsonContext.Default.PaneReadResult)!;
+            if (!string.IsNullOrEmpty(result.DataBase64))
+            {
+                output = Encoding.UTF8.GetString(System.Convert.FromBase64String(result.DataBase64));
+                if (output.Contains("COVE=1"))
+                    break;
+            }
+            await Task.Delay(100, ct);
+        }
 
         Assert.Contains("COVE=1", output);
         Assert.Contains("COVE_CLI_PATH=", output);
