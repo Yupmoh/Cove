@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Cove.Adapters;
+using Cove.Engine.Hooks;
 using Cove.Engine.Pty;
 using Cove.Generated;
 using Cove.Protocol;
@@ -22,6 +23,7 @@ public static class EngineCommandRouter
         AgentDefinitionStore? agents = null,
         LaunchProfileStore? launchProfiles = null,
         AdapterEnvStore? adapterEnv = null,
+        HookHttpServer? hookServer = null,
         CancellationToken cancellationToken = default)
     {
         Func<EngineDispatchContext, Task<ControlResponse>> typed;
@@ -37,7 +39,7 @@ public static class EngineCommandRouter
         }
         try
         {
-            return await typed(new EngineDispatchContext(request, panes, layout, workspaces, runCommands, restoration, snapshots, skills, agents, launchProfiles, adapterEnv));
+            return await typed(new EngineDispatchContext(request, panes, layout, workspaces, runCommands, restoration, snapshots, skills, agents, launchProfiles, adapterEnv, hookServer));
         }
         catch (Exception ex)
         {

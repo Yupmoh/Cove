@@ -37,6 +37,8 @@ public sealed class DaemonHost
     private Cove.Adapters.AgentDefinitionStore? _agents;
     private Cove.Adapters.LaunchProfileStore? _launchProfiles;
     private Cove.Adapters.AdapterEnvStore? _adapterEnv;
+    private Cove.Engine.Hooks.HookHttpServer? _hookServer;
+
     public DaemonHost(DaemonPaths paths, IControlEndpoint endpoint, bool exitWhenIdle)
     {
         _paths = paths;
@@ -66,6 +68,8 @@ public sealed class DaemonHost
         _agents = new Cove.Adapters.AgentDefinitionStore(System.IO.Path.Combine(dataDir, "agents"), logger);
         _launchProfiles = new Cove.Adapters.LaunchProfileStore(System.IO.Path.Combine(dataDir, "launch-profiles"), logger);
         _adapterEnv = new Cove.Adapters.AdapterEnvStore(System.IO.Path.Combine(dataDir, "adapter-env"), logger);
+        _hookServer = new Cove.Engine.Hooks.HookHttpServer(dataDir, logger);
+        await _hookServer.StartAsync();
 
         var wsDir = System.IO.Path.Combine(dataDir, "workspaces", "default");
         var wasClean = _restoration.WasCleanShutdown();
@@ -148,6 +152,7 @@ public sealed class DaemonHost
             await _workspaces.DisposeAsync().ConfigureAwait(false);
         _panes?.Dispose();
         _skills?.Dispose();
+        _hookServer?.Dispose();
         if (!OperatingSystem.IsWindows())
         {
             try { File.Delete(_paths.SocketPath); } catch { }
@@ -270,7 +275,7 @@ public sealed class DaemonHost
             return false;
         }
 
-        ControlResponse? generated = await Cove.Engine.EngineCommandRouter.RouteAsync(req, _panes, _layout, _workspaces, _runCommands, _restoration, _snapshots, _skills, _agents, _launchProfiles, _adapterEnv, cancellationToken).ConfigureAwait(false);
+        ControlResponse? generated = await Cove.Engine.EngineCommandRouter.RouteAsync(req, _panes, _layout, _workspaces, _runCommands, _restoration, _snapshots, _skills, _agents, _launchProfiles, _adapterEnv, _hookServer, cancellationToken).ConfigureAwait(false);
 
         if (generated is not null)
         {

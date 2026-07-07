@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
 using Cove.Adapters;
+using Cove.Engine.Hooks;
 using Cove.Engine.Pty;
 using Cove.Protocol;
 
@@ -19,7 +20,8 @@ public sealed class EngineDispatchContext
         Cove.Engine.Skills.SkillsService? skills = null,
         AgentDefinitionStore? agents = null,
         LaunchProfileStore? launchProfiles = null,
-        AdapterEnvStore? adapterEnv = null)
+        AdapterEnvStore? adapterEnv = null,
+        HookHttpServer? hookServer = null)
     {
         Request = request;
         Panes = panes;
@@ -32,6 +34,7 @@ public sealed class EngineDispatchContext
         Agents = agents;
         LaunchProfiles = launchProfiles;
         AdapterEnv = adapterEnv;
+        HookServer = hookServer;
     }
 
     public ControlRequest Request { get; }
@@ -45,6 +48,7 @@ public sealed class EngineDispatchContext
     public AgentDefinitionStore? Agents { get; }
     public LaunchProfileStore? LaunchProfiles { get; }
     public AdapterEnvStore? AdapterEnv { get; }
+    public HookHttpServer? HookServer { get; }
 
     public ControlResponse Ok<T>(T data, JsonTypeInfo<T> typeInfo)
         => new ControlResponse(Request.Id, true, JsonSerializer.SerializeToElement(data, typeInfo));
