@@ -43,4 +43,10 @@ internal static partial class AdapterLog
 
     [ZLoggerMessage(LogLevel.Warning, "agent delete failed slug={slug} error={error}")]
     public static partial void AgentDeleteFailed(this ILogger logger, string slug, string error);
+
+    [ZLoggerMessage(LogLevel.Warning, "launch profile load rejected invalid slug={slug}")]
+    public static partial void LaunchProfileLoadInvalidSlug(this ILogger logger, string slug);
+
+    [ZLoggerMessage(LogLevel.Warning, "launch profile delete failed slug={slug} error={error}")]
+    public static partial void LaunchProfileDeleteFailed(this ILogger logger, string slug, string error);
 }

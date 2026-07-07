@@ -116,4 +116,5 @@ public sealed record HookEvent
 [JsonSerializable(typeof(RecentSession))]
 [JsonSerializable(typeof(List<RecentSession>))]
 [JsonSerializable(typeof(CanonicalEvent))]
+[JsonSerializable(typeof(LaunchProfile))]
 public sealed partial class AdaptersJsonContext : JsonSerializerContext { }

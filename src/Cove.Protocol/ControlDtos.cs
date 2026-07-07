@@ -62,6 +62,9 @@ public sealed record SigilResolutionResult(ResolvedSigil[] Resolved, string[] Un
 public sealed record AgentDefinitionListItem(string Slug, string Name, string Description, string Adapter, int SkillCount);
 public sealed record AgentDefinitionListResult(AgentDefinitionListItem[] Agents);
 public sealed record AgentDefinitionShowResult(string Slug, string Name, string Description, string Adapter, string Prompt, string[] AttachedSkills);
+public sealed record LaunchProfileListItem(string Slug, string Name, string Adapter, bool IsDefault, string? Model, string? Effort, int ArgCount, int EnvCount);
+public sealed record LaunchProfileListResult(LaunchProfileListItem[] Profiles);
+
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
@@ -96,5 +99,7 @@ public sealed record AgentDefinitionShowResult(string Slug, string Name, string 
 [JsonSerializable(typeof(AgentDefinitionListItem))]
 [JsonSerializable(typeof(AgentDefinitionListResult))]
 [JsonSerializable(typeof(AgentDefinitionShowResult))]
+[JsonSerializable(typeof(LaunchProfileListItem))]
+[JsonSerializable(typeof(LaunchProfileListResult))]
 [JsonSerializable(typeof(JsonElement))]
 public sealed partial class CoveJsonContext : JsonSerializerContext;
