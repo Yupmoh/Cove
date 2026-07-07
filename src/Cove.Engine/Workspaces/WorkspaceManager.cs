@@ -259,6 +259,68 @@ public sealed class WorkspaceManager : IAsyncDisposable
         return true;
     }
 
+    public async Task<string?> DockResidentAsync(string workspaceId, string? paneId, string scope, int slot)
+    {
+        if (Get(workspaceId) is not { } actor)
+            return null;
+        var id = paneId ?? _newId();
+        await actor.Mutate(m =>
+        {
+            var panes = new Dictionary<string, PaneRecord>(m.Panes);
+            var existing = panes.TryGetValue(id, out var record) ? record : new PaneRecord { PaneId = id };
+            panes[id] = existing with { ResidentScope = scope, ResidentSlot = slot };
+            return m with { Panes = panes };
+        }).ConfigureAwait(false);
+        _emit?.Invoke(new WorkspaceChange(WorkspaceChangeKind.Updated, workspaceId));
+        return id;
+    }
+
+    public async Task<bool> UndockResidentAsync(string workspaceId, string paneId)
+    {
+        if (Get(workspaceId) is not { } actor || !actor.State.Panes.ContainsKey(paneId))
+            return false;
+        await actor.Mutate(m =>
+        {
+            var panes = new Dictionary<string, PaneRecord>(m.Panes);
+            if (panes.TryGetValue(paneId, out var record))
+                panes[paneId] = record with { ResidentScope = "none", ResidentSlot = -1 };
+            return m with { Panes = panes };
+        }).ConfigureAwait(false);
+        _emit?.Invoke(new WorkspaceChange(WorkspaceChangeKind.Updated, workspaceId));
+        return true;
+    }
+
+    public async Task<bool> SetResidentCollapsedAsync(string workspaceId, string paneId, bool collapsed)
+    {
+        if (Get(workspaceId) is not { } actor || !actor.State.Panes.ContainsKey(paneId))
+            return false;
+        await actor.Mutate(m =>
+        {
+            var panes = new Dictionary<string, PaneRecord>(m.Panes);
+            if (panes.TryGetValue(paneId, out var record))
+                panes[paneId] = record with { ResidentCollapsed = collapsed };
+            return m with { Panes = panes };
+        }).ConfigureAwait(false);
+        return true;
+    }
+
+    public IReadOnlyList<ResidentSummary> ListResidents(string workspaceId)
+    {
+        var result = new List<ResidentSummary>();
+        lock (_mapGate)
+        {
+            if (_workspaces.TryGetValue(workspaceId, out var owner))
+                foreach (var p in owner.State.Panes.Values)
+                    if (p.ResidentScope == "workspace" && p.ResidentSlot >= 0)
+                        result.Add(new ResidentSummary(p.PaneId, workspaceId, "workspace", p.ResidentSlot, p.ResidentCollapsed));
+            foreach (var kv in _workspaces)
+                foreach (var p in kv.Value.State.Panes.Values)
+                    if (p.ResidentScope == "global" && p.ResidentSlot >= 0)
+                        result.Add(new ResidentSummary(p.PaneId, kv.Key, "global", p.ResidentSlot, p.ResidentCollapsed));
+        }
+        return result;
+    }
+
     private static IReadOnlyList<string> Append(IReadOnlyList<string> list, string item)
     {
         var next = new List<string>(list);

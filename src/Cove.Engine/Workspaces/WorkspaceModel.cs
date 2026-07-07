@@ -9,6 +9,10 @@ public sealed record PaneRecord
     public PaneType PaneType { get; init; } = PaneType.Terminal;
     public string Cwd { get; init; } = "";
     public string Name { get; init; } = "";
+    public string ResidentScope { get; init; } = "none";
+    public int ResidentSlot { get; init; } = -1;
+    public bool ResidentCollapsed { get; init; }
+    public int ResidentHeight { get; init; }
 }
 
 public sealed record Wing
