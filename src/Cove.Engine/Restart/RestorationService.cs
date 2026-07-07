@@ -13,7 +13,7 @@ public sealed class RestorationService
     private readonly string _stateDir;
     private readonly ILogger _logger;
     private readonly Action<RestoreProgressEvent>? _emitProgress;
-
+    public ILogger Logger => _logger;
     public RestorationService(string stateDir, ILogger logger, Action<RestoreProgressEvent>? emitProgress = null)
     {
         _stateDir = stateDir;

@@ -7,13 +7,15 @@ namespace Cove.Engine;
 
 public sealed class EngineDispatchContext
 {
-    public EngineDispatchContext(ControlRequest request, PaneRegistry? panes = null, Cove.Engine.Layout.LayoutService? layout = null, Cove.Engine.Workspaces.WorkspaceManager? workspaces = null, Cove.Engine.Workspaces.RunCommandService? runCommands = null)
+    public EngineDispatchContext(ControlRequest request, PaneRegistry? panes = null, Cove.Engine.Layout.LayoutService? layout = null, Cove.Engine.Workspaces.WorkspaceManager? workspaces = null, Cove.Engine.Workspaces.RunCommandService? runCommands = null, Cove.Engine.Restart.RestorationService? restoration = null, Cove.Engine.Snapshots.SnapshotService? snapshots = null)
     {
         Request = request;
         Panes = panes;
         Layout = layout;
         Workspaces = workspaces;
         RunCommands = runCommands;
+        Restoration = restoration;
+        Snapshots = snapshots;
     }
 
     public ControlRequest Request { get; }
@@ -21,7 +23,8 @@ public sealed class EngineDispatchContext
     public Cove.Engine.Layout.LayoutService? Layout { get; }
     public Cove.Engine.Workspaces.WorkspaceManager? Workspaces { get; }
     public Cove.Engine.Workspaces.RunCommandService? RunCommands { get; }
-
+    public Cove.Engine.Restart.RestorationService? Restoration { get; }
+    public Cove.Engine.Snapshots.SnapshotService? Snapshots { get; }
 
     public ControlResponse Ok<T>(T data, JsonTypeInfo<T> typeInfo)
         => new ControlResponse(Request.Id, true, JsonSerializer.SerializeToElement(data, typeInfo));

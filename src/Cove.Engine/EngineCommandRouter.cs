@@ -9,7 +9,7 @@ namespace Cove.Engine;
 
 public static class EngineCommandRouter
 {
-    public static async Task<ControlResponse?> RouteAsync(ControlRequest request, PaneRegistry? panes = null, Cove.Engine.Layout.LayoutService? layout = null, Cove.Engine.Workspaces.WorkspaceManager? workspaces = null, Cove.Engine.Workspaces.RunCommandService? runCommands = null, CancellationToken cancellationToken = default)
+    public static async Task<ControlResponse?> RouteAsync(ControlRequest request, PaneRegistry? panes = null, Cove.Engine.Layout.LayoutService? layout = null, Cove.Engine.Workspaces.WorkspaceManager? workspaces = null, Cove.Engine.Workspaces.RunCommandService? runCommands = null, Cove.Engine.Restart.RestorationService? restoration = null, Cove.Engine.Snapshots.SnapshotService? snapshots = null, CancellationToken cancellationToken = default)
     {
         Func<EngineDispatchContext, Task<ControlResponse>> typed;
         try
@@ -24,11 +24,12 @@ public static class EngineCommandRouter
         }
         try
         {
-            return await typed(new EngineDispatchContext(request, panes, layout, workspaces, runCommands));
+            return await typed(new EngineDispatchContext(request, panes, layout, workspaces, runCommands, restoration, snapshots));
         }
         catch (Exception ex)
         {
             return new ControlResponse(request.Id, false, null, new ControlError("handler_error", ex.Message));
         }
     }
+
 }
