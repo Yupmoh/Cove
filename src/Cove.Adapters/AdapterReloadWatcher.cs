@@ -9,13 +9,16 @@ public sealed class AdapterReloadWatcher : IDisposable
     private readonly int _debounceMs;
     private readonly Dictionary<string, Timer> _debounceTimers = new();
     private readonly object _lock = new();
+    private readonly ILogger? _logger;
     private bool _disposed;
 
     public event Action<string>? AdapterChanged;
+    public event Action? AdaptersChanged;
 
-    public AdapterReloadWatcher(string adaptersRoot, int debounceMs = 200)
+    public AdapterReloadWatcher(string adaptersRoot, int debounceMs = 200, ILogger? logger = null)
     {
         _debounceMs = debounceMs;
+        _logger = logger;
         _watcher = new FileSystemWatcher(adaptersRoot)
         {
             IncludeSubdirectories = true,
@@ -39,7 +42,10 @@ public sealed class AdapterReloadWatcher : IDisposable
             ScheduleReload(e.OldFullPath);
     }
 
-    private void OnError(object sender, ErrorEventArgs e) { }
+    private void OnError(object sender, ErrorEventArgs e)
+    {
+        _logger?.AdapterReloadWatcherError(e.GetException().Message);
+    }
 
     private void ScheduleReload(string fullPath)
     {
@@ -63,8 +69,16 @@ public sealed class AdapterReloadWatcher : IDisposable
         {
             _debounceTimers.Remove(adapterName);
         }
-        try { AdapterChanged?.Invoke(adapterName); }
-        catch { }
+        foreach (var handler in AdapterChanged?.GetInvocationList() ?? Array.Empty<Delegate>())
+        {
+            try { ((Action<string>)handler).Invoke(adapterName); }
+            catch (Exception ex) { _logger?.AdapterReloadHandlerFailed(adapterName, ex.Message); }
+        }
+        foreach (var handler in AdaptersChanged?.GetInvocationList() ?? Array.Empty<Delegate>())
+        {
+            try { ((Action)handler).Invoke(); }
+            catch (Exception ex) { _logger?.AdapterReloadHandlerFailed(adapterName, ex.Message); }
+        }
     }
 
     private string? ResolveAdapterName(string fullPath)

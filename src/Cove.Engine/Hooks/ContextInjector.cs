@@ -43,16 +43,20 @@ public sealed class HookEnvelopeMatrix
 
 public sealed class ContextInjector
 {
-    private readonly HookEnvelopeMatrix _matrix;
+    private HookEnvelopeMatrix _matrix;
 
     public ContextInjector(HookEnvelopeMatrix matrix)
     {
         _matrix = matrix;
     }
 
+    public void SwapMatrix(HookEnvelopeMatrix matrix)
+    {
+        System.Threading.Volatile.Write(ref _matrix, matrix);
+    }
     public string Render(string adapter, string eventName, JsonElement context)
     {
-        var cap = _matrix.GetCapability(adapter, eventName);
+        var cap = System.Threading.Volatile.Read(ref _matrix).GetCapability(adapter, eventName);
 
         if (context.ValueKind == JsonValueKind.Undefined)
             return "{}";

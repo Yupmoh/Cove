@@ -58,4 +58,10 @@ internal static partial class AdapterLog
 
     [ZLoggerMessage(LogLevel.Warning, "env store save rejected invalid adapter={adapter}")]
     public static partial void EnvStoreSaveRejectedInvalidAdapter(this ILogger logger, string adapter);
+
+    [ZLoggerMessage(LogLevel.Warning, "adapter reload watcher error error={error}")]
+    public static partial void AdapterReloadWatcherError(this ILogger logger, string error);
+
+    [ZLoggerMessage(LogLevel.Warning, "adapter reload handler failed adapter={adapter} error={error}")]
+    public static partial void AdapterReloadHandlerFailed(this ILogger logger, string adapter, string error);
 }

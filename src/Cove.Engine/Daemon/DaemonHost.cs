@@ -39,6 +39,9 @@ public sealed class DaemonHost
     private Cove.Adapters.LaunchProfileStore? _launchProfiles;
     private Cove.Adapters.AdapterEnvStore? _adapterEnv;
     private Cove.Engine.Adapters.EnvPropagationService? _envPropagation;
+    private Cove.Adapters.AdapterReloadWatcher? _adapterReloadWatcher;
+    private Cove.Engine.Hooks.HookEnvelopeMatrix? _hookMatrix;
+    private Cove.Engine.Hooks.ContextInjector? _hookInjector;
     private Cove.Engine.Hooks.HookHttpServer? _hookServer;
     private Cove.Engine.Hooks.HookEventRouter? _hookRouter;
     private Cove.Engine.Agents.AgentMessageRouter? _agentRouter;
@@ -97,10 +100,15 @@ public sealed class DaemonHost
         _config = new Cove.Engine.Config.ConfigService(dataDir, logger);
         _hookServer.OnEvent += _hookRouter.Route;
         _paneTypes = Cove.Engine.Panes.PaneTypeRegistry.CreateWithBuiltins();
-        var matrix = new Cove.Engine.Hooks.HookEnvelopeMatrix();
-        PopulateHookMatrix(matrix, System.IO.Path.Combine(dataDir, "adapters"), logger);
-        var injector = new Cove.Engine.Hooks.ContextInjector(matrix);
-        _hookServer.Injector = injector;
+        _hookMatrix = new Cove.Engine.Hooks.HookEnvelopeMatrix();
+        PopulateHookMatrix(_hookMatrix, System.IO.Path.Combine(dataDir, "adapters"), logger);
+        _hookInjector = new Cove.Engine.Hooks.ContextInjector(_hookMatrix);
+        _hookServer.Injector = _hookInjector;
+        var adaptersRoot = System.IO.Path.Combine(dataDir, "adapters");
+        System.IO.Directory.CreateDirectory(adaptersRoot);
+        _adapterReloadWatcher = new Cove.Adapters.AdapterReloadWatcher(adaptersRoot, logger: logger);
+        _adapterReloadWatcher.AdaptersChanged += () => OnAdaptersChanged(dataDir, logger);
+        _adapterReloadWatcher.Start();
         var aggregator = new Cove.Engine.Hooks.AmbientContextAggregator();
         _hookServer.Aggregator = aggregator;
         await _hookServer.StartAsync();
@@ -191,6 +199,8 @@ public sealed class DaemonHost
             await _workspaces.DisposeAsync().ConfigureAwait(false);
         _panes?.Dispose();
         _skills?.Dispose();
+        _adapterReloadWatcher?.Dispose();
+        _envPropagation?.Dispose();
         _hookServer?.Dispose();
         if (!OperatingSystem.IsWindows())
         {
@@ -526,6 +536,15 @@ public sealed class DaemonHost
         }
     }
 
+    private void OnAdaptersChanged(string dataDir, ILogger logger)
+    {
+        if (_hookInjector is null)
+            return;
+        var fresh = new Cove.Engine.Hooks.HookEnvelopeMatrix();
+        PopulateHookMatrix(fresh, System.IO.Path.Combine(dataDir, "adapters"), logger);
+        _hookInjector.SwapMatrix(fresh);
+        BroadcastEvent("state.changed", new Cove.Protocol.StateChangedEvent("cove://events/adapters.changed"), Cove.Protocol.CoveJsonContext.Default.StateChangedEvent);
+    }
     private void PopulateAmbientAggregator(Cove.Engine.Hooks.AmbientContextAggregator aggregator, string dataDir, ILogger logger)
     {
         var primerPath = System.IO.Path.Combine(dataDir, "cove-context.md");

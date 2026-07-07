@@ -154,4 +154,51 @@ public sealed class AdapterReloadWatcherTests
         Assert.True(AdapterReloadWatcher.IsWatchableDir(Path.Combine("x", "real-adapter")));
         Assert.False(AdapterReloadWatcher.IsWatchableDir(Path.Combine("x", ".DS_Store")));
     }
+
+    [Fact]
+    public async Task Reload_ThrowingHandler_DoesNotBreakSubsequentHandlers()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var dir = NewDir();
+        Directory.CreateDirectory(dir);
+        var adapterDir = Path.Combine(dir, "resilient-adapter");
+        WriteManifest(adapterDir);
+        try
+        {
+            var secondFired = false;
+            using var watcher = new AdapterReloadWatcher(dir);
+            watcher.AdapterChanged += _ => throw new InvalidOperationException("boom");
+            watcher.AdapterChanged += _ => secondFired = true;
+            watcher.Start();
+
+            WriteManifest(adapterDir, version: "2.0.0");
+
+            var ok = await WaitForAsync(() => secondFired, TimeSpan.FromSeconds(5));
+            Assert.True(ok, "second handler did not fire after first handler threw");
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
+
+    [Fact]
+    public async Task Reload_FiresAdaptersChangedAfterAdapterChanged()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var dir = NewDir();
+        Directory.CreateDirectory(dir);
+        var adapterDir = Path.Combine(dir, "broadcast-adapter");
+        WriteManifest(adapterDir);
+        try
+        {
+            var adaptersChangedFired = false;
+            using var watcher = new AdapterReloadWatcher(dir);
+            watcher.AdaptersChanged += () => adaptersChangedFired = true;
+            watcher.Start();
+
+            WriteManifest(adapterDir, version: "2.0.0");
+
+            var ok = await WaitForAsync(() => adaptersChangedFired, TimeSpan.FromSeconds(5));
+            Assert.True(ok, "AdaptersChanged did not fire after manifest change");
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
 }
