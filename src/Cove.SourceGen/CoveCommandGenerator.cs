@@ -35,7 +35,16 @@ public sealed class CoveCommandGenerator : IIncrementalGenerator
         var containing = method.ContainingType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
         var paramType = method.Parameters[0].Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
         var returnType = method.ReturnType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-        return new CommandModel(key, containing, method.Name, paramType, returnType);
+        string? description = null;
+        string? source = null;
+        foreach (var na in attr.NamedArguments)
+        {
+            if (na.Key == "Description" && na.Value.Value is string d) description = d;
+            else if (na.Key == "Source" && na.Value.Value is string s) source = s;
+        }
+        if (source is null)
+            source = key.StartsWith("cove://", System.StringComparison.Ordinal) ? "core" : "cli";
+        return new CommandModel(key, containing, method.Name, paramType, returnType, description, source);
     }
 
     private static void Emit(SourceProductionContext spc, ImmutableArray<CommandModel> items)
@@ -56,6 +65,12 @@ public sealed class CoveCommandGenerator : IIncrementalGenerator
         sb.Append("    public static readonly System.Collections.Generic.IReadOnlyList<string> Keys = new string[] { ");
         foreach (var c in ordered) sb.Append($"\"{c.Key}\", ");
         sb.AppendLine("};");
+        sb.AppendLine("    public sealed record CommandCatalogueEntry(string Command, string? Description, string Source);");
+        sb.AppendLine("    public static readonly System.Collections.Generic.IReadOnlyList<CommandCatalogueEntry> Catalogue = new CommandCatalogueEntry[]");
+        sb.AppendLine("    {");
+        foreach (var c in ordered)
+            sb.AppendLine($"        new CommandCatalogueEntry(\"{c.Key}\", {(c.Description is null ? "null" : $"\"{c.Description}\"")}, \"{c.Source}\"),");
+        sb.AppendLine("    };");
         sb.AppendLine("}");
         spc.AddSource("CoveCommandRegistry.g.cs", sb.ToString());
     }
@@ -67,13 +82,17 @@ public sealed class CoveCommandGenerator : IIncrementalGenerator
         public readonly string MethodName;
         public readonly string ParamType;
         public readonly string ReturnType;
-        public CommandModel(string key, string containingType, string methodName, string paramType, string returnType)
+        public readonly string? Description;
+        public readonly string? Source;
+        public CommandModel(string key, string containingType, string methodName, string paramType, string returnType, string? description, string? source)
         {
             Key = key;
             ContainingType = containingType;
             MethodName = methodName;
             ParamType = paramType;
             ReturnType = returnType;
+            Description = description;
+            Source = source;
         }
     }
 }

@@ -177,11 +177,34 @@ internal static class CliCommands
     [CoveCommand("commands")]
     public static async Task<int> Commands(CommandContext ctx)
     {
-        var registry = Cove.Generated.CoveCommandRegistry.Handlers;
-        ctx.Stdout.WriteLine("CLI:");
-        foreach (var cmd in registry.Keys.OrderBy(k => k))
-            ctx.Stdout.WriteLine($"  {cmd}");
-        ctx.Stdout.WriteLine($"Total: {registry.Count}");
+        var catalogue = Cove.Generated.CoveCommandRegistry.Catalogue;
+        if (ctx.IsJson)
+        {
+            using var buffer = new System.IO.MemoryStream();
+            using (var writer = new System.Text.Json.Utf8JsonWriter(buffer))
+            {
+                writer.WriteStartArray();
+                foreach (var entry in catalogue)
+                {
+                    writer.WriteStartObject();
+                    writer.WriteString("command", entry.Command);
+                    if (entry.Description is not null)
+                        writer.WriteString("description", entry.Description);
+                    writer.WriteString("source", entry.Source);
+                    writer.WriteEndObject();
+                }
+                writer.WriteEndArray();
+                writer.Flush();
+            }
+            ctx.Stdout.WriteLine(System.Text.Encoding.UTF8.GetString(buffer.ToArray()));
+        }
+        else
+        {
+            ctx.Stdout.WriteLine("Commands:");
+            foreach (var entry in catalogue.OrderBy(c => c.Source).ThenBy(c => c.Command))
+                ctx.Stdout.WriteLine($"  [{entry.Source}] {entry.Command}");
+            ctx.Stdout.WriteLine($"Total: {catalogue.Count}");
+        }
         await Task.CompletedTask;
         return 0;
     }
