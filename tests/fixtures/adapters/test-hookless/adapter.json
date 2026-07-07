@@ -1,0 +1,16 @@
+{
+  "sdkVersion": 2,
+  "name": "test-hookless",
+  "displayName": "Test Hookless",
+  "description": "Hookless fixture adapter — no hook port, for testing the hookless fallback path",
+  "accent": "#6b7280",
+  "binary": "test-hookless",
+  "version": "1.0.0",
+  "binaryDiscovery": {
+    "commands": ["test-hookless"],
+    "wellKnownPaths": ["/usr/local/bin/test-hookless"]
+  },
+  "methods": {
+    "build_launch_command": { "script": "build_launch_command.sh" }
+  }
+}

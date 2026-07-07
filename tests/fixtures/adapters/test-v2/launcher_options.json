@@ -1,0 +1,20 @@
+{
+  "options": [
+    {
+      "key": "model",
+      "label": "Model",
+      "type": "select",
+      "default": "default",
+      "choices": [
+        {"value": "default", "label": "Default"},
+        {"value": "fast", "label": "Fast"}
+      ]
+    },
+    {
+      "key": "verbose",
+      "label": "Verbose output",
+      "type": "toggle",
+      "default": false
+    }
+  ]
+}

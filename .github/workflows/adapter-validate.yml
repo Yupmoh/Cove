@@ -1,0 +1,45 @@
+name: adapter-validate
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'adapters/**'
+      - 'tests/fixtures/adapters/**'
+      - 'schemas/**'
+      - 'validate-adapter.sh'
+      - '.github/workflows/adapter-validate.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'adapters/**'
+      - 'tests/fixtures/adapters/**'
+      - 'schemas/**'
+      - 'validate-adapter.sh'
+      - '.github/workflows/adapter-validate.yml'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+      - name: Validate fixture adapters
+        run: |
+          set -e
+          fail=0
+          for dir in tests/fixtures/adapters/*/; do
+            if [[ -f "${dir}adapter.json" ]]; then
+              name=$(basename "$dir")
+              echo "::group::Validating $name"
+              if ./validate-adapter.sh --no-color "$dir"; then
+                echo "PASS $name"
+              else
+                echo "FAIL $name"
+                fail=1
+              fi
+              echo "::endgroup::"
+            fi
+          done
+          exit $fail

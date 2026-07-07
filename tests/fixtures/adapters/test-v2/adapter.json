@@ -1,0 +1,31 @@
+{
+  "sdkVersion": 2,
+  "name": "test-v2",
+  "displayName": "Test V2",
+  "description": "Full v2 fixture adapter for the Cove adapter test suite",
+  "accent": "#3b82f6",
+  "binary": "test-v2",
+  "version": "1.0.0",
+  "icon": "icon.svg",
+  "skillInstallPath": "~/.test-v2/skills/cove/SKILL.md",
+  "skillsDir": "~/.test-v2/skills",
+  "binaryDiscovery": {
+    "commands": ["test-v2"],
+    "wellKnownPaths": ["/usr/local/bin/test-v2", "/opt/homebrew/bin/test-v2"]
+  },
+  "hooks": {
+    "session-start": "cove://hooks/test-v2/session-start",
+    "session-end": "cove://hooks/test-v2/session-end",
+    "pre-tool-use": "cove://hooks/test-v2/pre-tool-use",
+    "post-tool-use": "cove://hooks/test-v2/post-tool-use",
+    "stop": "cove://hooks/test-v2/stop",
+    "user-prompt-submit": "cove://hooks/test-v2/user-prompt-submit",
+    "permission-request": "cove://hooks/test-v2/permission-request"
+  },
+  "methods": {
+    "list_recent_sessions": { "script": "list_recent_sessions.sh" },
+    "build_launch_command": { "script": "build_launch_command.sh" },
+    "build_resume_command": { "script": "build_resume_command.sh" },
+    "launcher_options": { "static": "launcher_options.json" }
+  }
+}

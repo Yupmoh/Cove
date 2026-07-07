@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "launcher_options output",
+  "description": "Output schema for the launcher_options method (static JSON).",
+  "type": "object",
+  "required": ["options"],
+  "properties": {
+    "options": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["key", "label", "type", "default"],
+        "properties": {
+          "key": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique key for this option, maps to AdapterFlags.extra."
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Human-readable label shown in the launcher UI."
+          },
+          "description": {
+            "type": "string",
+            "description": "Tooltip text shown on hover."
+          },
+          "type": {
+            "type": "string",
+            "enum": ["toggle", "select", "text"],
+            "description": "UI control type."
+          },
+          "default": {
+            "description": "Default value for this option."
+          },
+          "choices": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                { "type": "string" },
+                {
+                  "type": "object",
+                  "required": ["value"],
+                  "properties": {
+                    "value": { "type": "string", "minLength": 1 },
+                    "label": { "type": "string", "minLength": 1 }
+                  },
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "description": "Canonical set for 'select'; non-exhaustive suggestion hints for 'text'. A choice is a bare string or a {value,label} object (adapter-owned display label)."
+          }
+        },
+        "additionalProperties": false
+      },
+      "description": "List of configurable launcher options."
+    },
+    "suggestedFlags": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["flag"],
+        "properties": {
+          "flag": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The CLI flag, e.g. '--add-dir'."
+          },
+          "description": {
+            "type": "string",
+            "description": "The flag's --help description, shown in the picker."
+          },
+          "values": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Closed set of allowed values when the CLI advertises one."
+          }
+        },
+        "additionalProperties": false
+      },
+      "description": "Suggested CLI flags for the launch-profile '+ Add flag' picker."
+    }
+  },
+  "additionalProperties": false
+}

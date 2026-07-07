@@ -1,0 +1,13 @@
+{
+  "sdkVersion": 1,
+  "name": "test-v1",
+  "displayName": "Test V1",
+  "description": "Lean v1 fixture adapter for the Cove adapter test suite",
+  "accent": "#f59e0b",
+  "binary": "test-v1",
+  "version": "0.9.0",
+  "methods": {
+    "detect_binary": { "script": "detect_binary.sh" },
+    "build_launch_command": { "script": "build_launch_command.sh" }
+  }
+}
