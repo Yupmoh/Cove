@@ -92,6 +92,13 @@ public sealed record SessionListResult(System.Collections.Generic.IReadOnlyList<
 public sealed record ReplayInfoDto(string Command, int? ExitCode, int? Signal);
 public sealed record SpawnedPanesResult(System.Collections.Generic.IReadOnlyList<string> PaneIds);
 
+public sealed record LaunchBuildParams(string Adapter, string ProfileSlug, bool Yolo, string? WorkingDir, string[] ExtraFlags, Dictionary<string, string> Env);
+public sealed record LaunchResumeParams(string Adapter, string ProfileSlug, string SessionId, bool Yolo, string? WorkingDir, string[] ExtraFlags, Dictionary<string, string> Env);
+public sealed record LaunchOverrideSaveParams(string PaneId, bool Yolo, string? WorkingDir, string[] ExtraFlags, Dictionary<string, string> Env);
+public sealed record LaunchOverrideGetParams(string PaneId);
+public sealed record ResumeCommandDto(string Command, string[] Args, string Cwd);
+public sealed record LauncherOverridesDto(bool Yolo, string? WorkingDir, string[] ExtraFlags, Dictionary<string, string> Env);
+
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
@@ -146,5 +153,11 @@ public sealed record SpawnedPanesResult(System.Collections.Generic.IReadOnlyList
 [JsonSerializable(typeof(SessionListResult))]
 [JsonSerializable(typeof(ReplayInfoDto))]
 [JsonSerializable(typeof(SpawnedPanesResult))]
+[JsonSerializable(typeof(LaunchBuildParams))]
+[JsonSerializable(typeof(LaunchResumeParams))]
+[JsonSerializable(typeof(LaunchOverrideSaveParams))]
+[JsonSerializable(typeof(LaunchOverrideGetParams))]
+[JsonSerializable(typeof(ResumeCommandDto))]
+[JsonSerializable(typeof(LauncherOverridesDto))]
 [JsonSerializable(typeof(JsonElement))]
 public sealed partial class CoveJsonContext : JsonSerializerContext;
