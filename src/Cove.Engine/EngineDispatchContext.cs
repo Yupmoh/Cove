@@ -42,7 +42,8 @@ public sealed class EngineDispatchContext
         TimelineStore? timeline = null,
         PaneTypeRegistry? paneTypes = null,
         BrowserPaneManager? browser = null,
-        ConfigService? config = null)
+        ConfigService? config = null,
+        AdapterManifestStore? manifestStore = null)
     {
         Request = request;
         Panes = panes;
@@ -68,6 +69,7 @@ public sealed class EngineDispatchContext
         PaneTypes = paneTypes;
         Browser = browser;
         Config = config;
+        ManifestStore = manifestStore;
     }
 
     public ControlRequest Request { get; }
@@ -92,8 +94,9 @@ public sealed class EngineDispatchContext
     public NoteStore? Notes { get; }
     public TimelineStore? Timeline { get; }
     public PaneTypeRegistry? PaneTypes { get; }
-    public BrowserPaneManager? Browser { get; }
     public ConfigService? Config { get; }
+    public BrowserPaneManager? Browser { get; }
+    public AdapterManifestStore? ManifestStore { get; }
 
     public ControlResponse Ok<T>(T data, JsonTypeInfo<T> typeInfo)
         => new ControlResponse(Request.Id, true, JsonSerializer.SerializeToElement(data, typeInfo));

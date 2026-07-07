@@ -103,7 +103,7 @@ public sealed class DaemonHost
         _hookServer.OnEvent += _hookRouter.Route;
         _paneTypes = Cove.Engine.Panes.PaneTypeRegistry.CreateWithBuiltins();
         _hookMatrix = new Cove.Engine.Hooks.HookEnvelopeMatrix();
-        PopulateHookMatrix(_hookMatrix, System.IO.Path.Combine(dataDir, "adapters"), logger);
+        PopulateHookMatrix(_hookMatrix, _manifestStore!, logger);
         _hookInjector = new Cove.Engine.Hooks.ContextInjector(_hookMatrix);
         _hookServer.Injector = _hookInjector;
         var adaptersRoot = System.IO.Path.Combine(dataDir, "adapters");
@@ -325,7 +325,7 @@ public sealed class DaemonHost
             await WriteResponseAsync(conn, Fail(req.Id, "not_ready", "sys/hello required before other requests"), cancellationToken).ConfigureAwait(false);
             return false;
         }
-        ControlResponse? generated = await Cove.Engine.EngineCommandRouter.RouteAsync(req, _panes, _layout, _workspaces, _runCommands, _restoration, _snapshots, _skills, _agents, _launchProfiles, _adapterEnv, _hookServer, _hookRouter, _agentRouter, _activity, _sessions, _lifecycle, _launcher, _tasks, _notes, _timeline, _paneTypes, _browser, _config, cancellationToken).ConfigureAwait(false);
+        ControlResponse? generated = await Cove.Engine.EngineCommandRouter.RouteAsync(req, _panes, _layout, _workspaces, _runCommands, _restoration, _snapshots, _skills, _agents, _launchProfiles, _adapterEnv, _hookServer, _hookRouter, _agentRouter, _activity, _sessions, _lifecycle, _launcher, _tasks, _notes, _timeline, _paneTypes, _browser, _config, _manifestStore, cancellationToken).ConfigureAwait(false);
 
         if (generated is not null)
         {
@@ -477,20 +477,7 @@ public sealed class DaemonHost
 
     private string? ResolveAdapterBinary(string adapter, ILogger logger)
     {
-        var manifestPath = System.IO.Path.Combine(_paths.DataDir.Root, "adapters", adapter, "adapter.json");
-        if (!System.IO.File.Exists(manifestPath))
-            return null;
-        try
-        {
-            var json = System.IO.File.ReadAllText(manifestPath);
-            var manifest = System.Text.Json.JsonSerializer.Deserialize(json, Cove.Adapters.AdaptersJsonContext.Default.AdapterManifest);
-            return manifest?.Binary;
-        }
-        catch (System.Text.Json.JsonException ex)
-        {
-            logger.EnvPropagationManifestParseFailed(adapter, ex.Message);
-            return null;
-        }
+        return _manifestStore?.Load(adapter)?.Binary;
     }
     private void BroadcastEvent<T>(string channel, T payload, System.Text.Json.Serialization.Metadata.JsonTypeInfo<T> typeInfo)
     {
@@ -515,27 +502,10 @@ public sealed class DaemonHost
             || uri.StartsWith("cove://commands/worktree.", System.StringComparison.Ordinal)
             || uri.StartsWith("cove://commands/workspace-command.", System.StringComparison.Ordinal);
     }
-    private static void PopulateHookMatrix(Cove.Engine.Hooks.HookEnvelopeMatrix matrix, string adaptersRoot, ILogger logger)
+    private static void PopulateHookMatrix(Cove.Engine.Hooks.HookEnvelopeMatrix matrix, Cove.Adapters.AdapterManifestStore manifestStore, ILogger logger)
     {
-        if (!System.IO.Directory.Exists(adaptersRoot))
-            return;
-        foreach (var dir in System.IO.Directory.EnumerateDirectories(adaptersRoot))
-        {
-            var manifestPath = System.IO.Path.Combine(dir, "adapter.json");
-            if (!System.IO.File.Exists(manifestPath))
-                continue;
-            try
-            {
-                var json = System.IO.File.ReadAllText(manifestPath);
-                var manifest = System.Text.Json.JsonSerializer.Deserialize(json, Cove.Adapters.AdaptersJsonContext.Default.AdapterManifest);
-                if (manifest is not null)
-                    matrix.RegisterFromManifest(manifest);
-            }
-            catch (System.Exception ex)
-            {
-                logger.HookMatrixManifestLoadFailed(manifestPath, ex.Message);
-            }
-        }
+        foreach (var manifest in manifestStore.LoadAll())
+            matrix.RegisterFromManifest(manifest);
     }
 
     private void OnAdaptersChanged(string dataDir, ILogger logger)
@@ -543,7 +513,7 @@ public sealed class DaemonHost
         if (_hookInjector is null)
             return;
         var fresh = new Cove.Engine.Hooks.HookEnvelopeMatrix();
-        PopulateHookMatrix(fresh, System.IO.Path.Combine(dataDir, "adapters"), logger);
+        PopulateHookMatrix(fresh, _manifestStore!, logger);
         _hookInjector.SwapMatrix(fresh);
         BroadcastEvent("state.changed", new Cove.Protocol.StateChangedEvent("cove://events/adapters.changed"), Cove.Protocol.CoveJsonContext.Default.StateChangedEvent);
     }
