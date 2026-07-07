@@ -80,8 +80,8 @@ public sealed record SearchResult(SearchMatch[] Matches);
 [JsonSerializable(typeof(LayoutMutateParams))]
 [JsonSerializable(typeof(LayoutMutateResult))]
 [JsonSerializable(typeof(SessionStateResult))]
- [JsonSerializable(typeof(SearchParams))]
+[JsonSerializable(typeof(SearchParams))]
 [JsonSerializable(typeof(SearchMatch))]
 [JsonSerializable(typeof(SearchResult))]
- [JsonSerializable(typeof(JsonElement))]
+[JsonSerializable(typeof(JsonElement))]
 public sealed partial class CoveJsonContext : JsonSerializerContext;

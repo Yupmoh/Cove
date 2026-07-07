@@ -72,4 +72,4 @@ internal static class EngineCommands
         var matches = reg.Search(p.PaneId, p.Query, p.CaseSensitive);
         return Task.FromResult(ctx.Ok(new SearchResult(matches), CoveJsonContext.Default.SearchResult));
     }
- }
+}

@@ -1,10 +1,10 @@
-using Cove.Engine.Daemon;
-using Cove.Engine.Restart;
-using Microsoft.Extensions.Logging;
 using System.Text;
 using System.Text.Json;
+using Cove.Engine.Daemon;
+using Cove.Engine.Restart;
 using Cove.Platform.Ipc;
 using Cove.Protocol;
+using Microsoft.Extensions.Logging;
 using Xunit;
 
 namespace Cove.Engine.Tests;

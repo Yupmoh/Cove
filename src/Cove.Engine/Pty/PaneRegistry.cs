@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
-using Cove.Platform.Pty;
 using Cove.Persistence;
+using Cove.Platform.Pty;
 using Cove.Protocol;
 using Microsoft.Extensions.Logging;
 
