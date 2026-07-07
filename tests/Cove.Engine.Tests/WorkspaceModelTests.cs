@@ -131,4 +131,29 @@ public sealed class WorkspaceModelTests
         Assert.Equal("client-a", back.Collections[0].Name);
         Assert.Equal("c1", back.ActiveCollectionId);
     }
+    [Fact]
+    public async Task Actor_ConcurrentMutations_NeverLosesUpdates_NeverCorrupts()
+    {
+        var model = Ws([MakeRoom("r1", "p1"), MakeRoom("r2", "p2"), MakeRoom("r3", "p3")]);
+        var actor = new Actor<WorkspaceModel>(model);
+        var rng = new Random(42);
+        var tasks = new List<Task>();
+        for (int i = 0; i < 200; i++)
+        {
+            int n = i;
+            tasks.Add(actor.Mutate(m =>
+            {
+                var rid = m.Rooms[n % m.Rooms.Count].Id;
+                return WorkspaceInvariants.RenameRoom(m, rid, $"room-{n}");
+            }));
+        }
+        await Task.WhenAll(tasks);
+        await actor.DisposeAsync();
+
+        var final = actor.State;
+        Assert.Equal(3, final.Rooms.Count);
+        Assert.All(final.Rooms, r => Assert.StartsWith("room-", r.Name));
+        var names = final.Rooms.Select(r => r.Name).ToHashSet();
+        Assert.Equal(3, names.Count);
+    }
 }
