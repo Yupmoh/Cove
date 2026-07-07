@@ -102,6 +102,9 @@ public sealed record LauncherOverridesDto(bool Yolo, string? WorkingDir, string[
 public sealed record AdapterListItemDto(string Name, string DisplayName, string Accent, string Binary);
 public sealed record AdapterListResult(System.Collections.Generic.IReadOnlyList<AdapterListItemDto> Adapters);
 
+public sealed record ProtocolResolveParams(string Uri, string? FocusedPaneId, string? ActiveRoomId);
+public sealed record ProtocolResolveResult(string Uri, System.Text.Json.JsonElement? Params);
+
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
@@ -162,7 +165,8 @@ public sealed record AdapterListResult(System.Collections.Generic.IReadOnlyList<
 [JsonSerializable(typeof(LaunchOverrideGetParams))]
 [JsonSerializable(typeof(ResumeCommandDto))]
 [JsonSerializable(typeof(LauncherOverridesDto))]
-[JsonSerializable(typeof(AdapterListItemDto))]
 [JsonSerializable(typeof(AdapterListResult))]
+[JsonSerializable(typeof(ProtocolResolveParams))]
+[JsonSerializable(typeof(ProtocolResolveResult))]
 [JsonSerializable(typeof(JsonElement))]
 public sealed partial class CoveJsonContext : JsonSerializerContext;

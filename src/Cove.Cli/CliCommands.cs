@@ -205,4 +205,16 @@ internal static class CliCommands
         var uri = "cove://commands/" + args[0].Replace(".", "/");
         return ctx.RouteCoreAsync(uri);
     }
+
+    [CoveCommand("protocol resolve")]
+    public static Task<int> ProtocolResolve(CommandContext ctx, string[] args)
+    {
+        if (args.Length < 1)
+        {
+            ctx.Stderr.WriteLine("usage: cove protocol resolve <uri>");
+            return Task.FromResult(1);
+        }
+        var uri = args[0];
+        return ctx.RouteCoreAsync($"cove://commands/protocol.resolve?uri={uri}");
+    }
 }
