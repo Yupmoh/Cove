@@ -36,7 +36,7 @@ public sealed class DaemonHost
     private Cove.Engine.Skills.SkillsService? _skills;
     private Cove.Adapters.AgentDefinitionStore? _agents;
     private Cove.Adapters.LaunchProfileStore? _launchProfiles;
-
+    private Cove.Adapters.AdapterEnvStore? _adapterEnv;
     public DaemonHost(DaemonPaths paths, IControlEndpoint endpoint, bool exitWhenIdle)
     {
         _paths = paths;
@@ -65,7 +65,7 @@ public sealed class DaemonHost
         _skills = new Cove.Engine.Skills.SkillsService(dataDir, logger: logger);
         _agents = new Cove.Adapters.AgentDefinitionStore(System.IO.Path.Combine(dataDir, "agents"), logger);
         _launchProfiles = new Cove.Adapters.LaunchProfileStore(System.IO.Path.Combine(dataDir, "launch-profiles"), logger);
-
+        _adapterEnv = new Cove.Adapters.AdapterEnvStore(System.IO.Path.Combine(dataDir, "adapter-env"), logger);
 
         var wsDir = System.IO.Path.Combine(dataDir, "workspaces", "default");
         var wasClean = _restoration.WasCleanShutdown();
@@ -270,7 +270,7 @@ public sealed class DaemonHost
             return false;
         }
 
-        ControlResponse? generated = await Cove.Engine.EngineCommandRouter.RouteAsync(req, _panes, _layout, _workspaces, _runCommands, _restoration, _snapshots, _skills, _agents, _launchProfiles, cancellationToken).ConfigureAwait(false);
+        ControlResponse? generated = await Cove.Engine.EngineCommandRouter.RouteAsync(req, _panes, _layout, _workspaces, _runCommands, _restoration, _snapshots, _skills, _agents, _launchProfiles, _adapterEnv, cancellationToken).ConfigureAwait(false);
 
         if (generated is not null)
         {

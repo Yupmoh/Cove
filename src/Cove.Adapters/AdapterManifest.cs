@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Cove.Protocol;
 
 namespace Cove.Adapters;
 
@@ -115,6 +116,7 @@ public sealed record HookEvent
 [JsonSerializable(typeof(HookEvent))]
 [JsonSerializable(typeof(RecentSession))]
 [JsonSerializable(typeof(List<RecentSession>))]
-[JsonSerializable(typeof(CanonicalEvent))]
 [JsonSerializable(typeof(LaunchProfile))]
+[JsonSerializable(typeof(AdapterEnvVar))]
+[JsonSerializable(typeof(List<AdapterEnvVar>))]
 public sealed partial class AdaptersJsonContext : JsonSerializerContext { }

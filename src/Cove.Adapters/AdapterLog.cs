@@ -49,4 +49,10 @@ internal static partial class AdapterLog
 
     [ZLoggerMessage(LogLevel.Warning, "launch profile delete failed slug={slug} error={error}")]
     public static partial void LaunchProfileDeleteFailed(this ILogger logger, string slug, string error);
+
+    [ZLoggerMessage(LogLevel.Warning, "env store load failed adapter={adapter} error={error}")]
+    public static partial void EnvStoreLoadFailed(this ILogger logger, string adapter, string error);
+
+    [ZLoggerMessage(LogLevel.Warning, "env store delete failed adapter={adapter} error={error}")]
+    public static partial void EnvStoreDeleteFailed(this ILogger logger, string adapter, string error);
 }

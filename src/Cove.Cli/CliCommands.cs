@@ -48,4 +48,16 @@ internal static class CliCommands
     [CoveCommand("launch-profile delete")]
     public static Task<int> LaunchProfileDelete(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/launch-profile.delete");
+
+    [CoveCommand("adapter-env list")]
+    public static Task<int> AdapterEnvList(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/adapter-env.list");
+
+    [CoveCommand("adapter-env save")]
+    public static Task<int> AdapterEnvSave(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/adapter-env.save");
+
+    [CoveCommand("adapter-env resolve")]
+    public static Task<int> AdapterEnvResolve(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/adapter-env.resolve");
 }

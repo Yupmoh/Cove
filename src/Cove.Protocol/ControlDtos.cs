@@ -64,6 +64,11 @@ public sealed record AgentDefinitionListResult(AgentDefinitionListItem[] Agents)
 public sealed record AgentDefinitionShowResult(string Slug, string Name, string Description, string Adapter, string Prompt, string[] AttachedSkills);
 public sealed record LaunchProfileListItem(string Slug, string Name, string Adapter, bool IsDefault, string? Model, string? Effort, int ArgCount, int EnvCount);
 public sealed record LaunchProfileListResult(LaunchProfileListItem[] Profiles);
+public sealed record AdapterEnvVarItem(string Key, string Value, bool Enabled, string? Id);
+public sealed record AdapterEnvListResult(AdapterEnvVarItem[] Entries);
+public sealed record ResolvedEnvVar(string Key, string Value);
+public sealed record AdapterEnvResolveResult(ResolvedEnvVar[] Vars);
+public sealed record AdapterEnvVar(string Key, string Value, bool Enabled = true, string? Id = null);
 
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
@@ -101,5 +106,11 @@ public sealed record LaunchProfileListResult(LaunchProfileListItem[] Profiles);
 [JsonSerializable(typeof(AgentDefinitionShowResult))]
 [JsonSerializable(typeof(LaunchProfileListItem))]
 [JsonSerializable(typeof(LaunchProfileListResult))]
+[JsonSerializable(typeof(AdapterEnvVar))]
+[JsonSerializable(typeof(List<AdapterEnvVar>))]
+[JsonSerializable(typeof(AdapterEnvVarItem))]
+[JsonSerializable(typeof(AdapterEnvListResult))]
+[JsonSerializable(typeof(ResolvedEnvVar))]
+[JsonSerializable(typeof(AdapterEnvResolveResult))]
 [JsonSerializable(typeof(JsonElement))]
 public sealed partial class CoveJsonContext : JsonSerializerContext;
