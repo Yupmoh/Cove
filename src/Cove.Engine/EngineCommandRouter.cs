@@ -6,6 +6,7 @@ using Cove.Engine.Knowledge;
 using Cove.Engine.Launch;
 using Cove.Engine.Lifecycle;
 using Cove.Engine.Panes;
+using Cove.Engine.Protocol;
 using Cove.Engine.Pty;
 using Cove.Engine.Sessions;
 using Cove.Engine.Tasks;
@@ -62,6 +63,12 @@ public static class EngineCommandRouter
         }
         try
         {
+            if (paneScopes is not null && ScopeEnforcement.IsPaneTargetingVerb(request.Uri))
+            {
+                var denied = ScopeEnforcement.Check(request, paneScopes!, workspaces, layout);
+                if (denied is not null)
+                    return denied;
+            }
             var dispatchCtx = new EngineDispatchContext(request, panes, layout, workspaces, runCommands, restoration, snapshots, skills, agents, launchProfiles, adapterEnv, hookServer, hookRouter, agentRouter, activity, sessions, lifecycle, launcher, tasks, notes, timeline, paneTypes, browser, config, manifestStore, registry, omniChat, paneScopes, stateBus, extensions);
             dispatchCtx.Redrive = subReq => RouteAsync(subReq, panes, layout, workspaces, runCommands, restoration, snapshots, skills, agents, launchProfiles, adapterEnv, hookServer, hookRouter, agentRouter, activity, sessions, lifecycle, launcher, tasks, notes, timeline, paneTypes, browser, config, manifestStore, registry, omniChat, paneScopes, stateBus, extensions, cancellationToken);
             return await typed(dispatchCtx);

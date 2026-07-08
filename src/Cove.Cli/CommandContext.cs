@@ -67,7 +67,7 @@ public sealed class CommandContext
         await using (conn)
         {
             await conn.WriteFrameAsync(FrameType.Request, 0,
-                ControlCodec.Encode(new ControlRequest("1", uri, Params: parsedParams, Source: Source)), System.Threading.CancellationToken.None);
+                ControlCodec.Encode(new ControlRequest("1", uri, Params: parsedParams, Source: Source, CallerPaneId: ResolveCallerPaneId())), System.Threading.CancellationToken.None);
             Frame? resp = await conn.ReadFrameAsync(System.Threading.CancellationToken.None);
             if (resp is not { } f)
             {
@@ -86,6 +86,12 @@ public sealed class CommandContext
                 Stdout.WriteLine("{}");
             return 0;
         }
+    }
+
+    private static string? ResolveCallerPaneId()
+    {
+        var paneId = System.Environment.GetEnvironmentVariable("COVE_PANE_ID");
+        return string.IsNullOrEmpty(paneId) ? null : paneId;
     }
 
     private JsonElement ApplyFilter(JsonElement data)
