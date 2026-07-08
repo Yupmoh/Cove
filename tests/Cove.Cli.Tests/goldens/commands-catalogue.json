@@ -1,0 +1,178 @@
+[
+  {
+    "command": "adapter-env list",
+    "source": "cli"
+  },
+  {
+    "command": "adapter-env resolve",
+    "source": "cli"
+  },
+  {
+    "command": "adapter-env save",
+    "source": "cli"
+  },
+  {
+    "command": "agent definition delete",
+    "source": "cli"
+  },
+  {
+    "command": "agent definition list",
+    "source": "cli"
+  },
+  {
+    "command": "agent definition show",
+    "source": "cli"
+  },
+  {
+    "command": "attach",
+    "source": "cli"
+  },
+  {
+    "command": "browser back",
+    "source": "cli"
+  },
+  {
+    "command": "browser close",
+    "source": "cli"
+  },
+  {
+    "command": "browser forward",
+    "source": "cli"
+  },
+  {
+    "command": "browser navigate",
+    "source": "cli"
+  },
+  {
+    "command": "browser open",
+    "source": "cli"
+  },
+  {
+    "command": "browser reload",
+    "source": "cli"
+  },
+  {
+    "command": "commands",
+    "source": "cli"
+  },
+  {
+    "command": "config get",
+    "source": "cli"
+  },
+  {
+    "command": "config set",
+    "source": "cli"
+  },
+  {
+    "command": "context",
+    "source": "cli"
+  },
+  {
+    "command": "docs generate",
+    "source": "cli"
+  },
+  {
+    "command": "exec",
+    "source": "cli"
+  },
+  {
+    "command": "extension list",
+    "source": "cli"
+  },
+  {
+    "command": "extension run",
+    "source": "cli"
+  },
+  {
+    "command": "hook emit",
+    "source": "cli"
+  },
+  {
+    "command": "launch-profile delete",
+    "source": "cli"
+  },
+  {
+    "command": "launch-profile list",
+    "source": "cli"
+  },
+  {
+    "command": "launch-profile set-default",
+    "source": "cli"
+  },
+  {
+    "command": "migrate",
+    "source": "cli"
+  },
+  {
+    "command": "note create",
+    "source": "cli"
+  },
+  {
+    "command": "note delete",
+    "source": "cli"
+  },
+  {
+    "command": "note get",
+    "source": "cli"
+  },
+  {
+    "command": "note list",
+    "source": "cli"
+  },
+  {
+    "command": "note update",
+    "source": "cli"
+  },
+  {
+    "command": "pane list",
+    "source": "cli"
+  },
+  {
+    "command": "pane-types list",
+    "source": "cli"
+  },
+  {
+    "command": "protocol resolve",
+    "source": "cli"
+  },
+  {
+    "command": "skills list",
+    "source": "cli"
+  },
+  {
+    "command": "skills resolve-prompt-sigils",
+    "source": "cli"
+  },
+  {
+    "command": "task create",
+    "source": "cli"
+  },
+  {
+    "command": "task delete",
+    "source": "cli"
+  },
+  {
+    "command": "task get",
+    "source": "cli"
+  },
+  {
+    "command": "task list",
+    "source": "cli"
+  },
+  {
+    "command": "task update",
+    "source": "cli"
+  },
+  {
+    "command": "timeline append",
+    "source": "cli"
+  },
+  {
+    "command": "timeline list",
+    "source": "cli"
+  },
+  {
+    "command": "version",
+    "source": "cli"
+  }
+]

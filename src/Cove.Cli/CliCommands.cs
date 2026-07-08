@@ -48,6 +48,18 @@ internal static class CliCommands
     public static Task<int> PaneList(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/pane.list");
 
+    [CoveCommand("docs generate")]
+    public static Task<int> DocsGenerate(CommandContext ctx)
+    {
+        var args = ctx.Args;
+        var outPath = args.Length > 0 ? args[0] : "docs/cli-reference.md";
+        var dir = System.IO.Path.GetDirectoryName(outPath);
+        if (!string.IsNullOrEmpty(dir)) System.IO.Directory.CreateDirectory(dir);
+        CliReferenceDoc.WriteTo(outPath);
+        ctx.Stdout.WriteLine($"wrote {outPath}");
+        return Task.FromResult(0);
+    }
+
     [CoveCommand("attach")]
     public static Task<int> Attach(CommandContext ctx)
     {

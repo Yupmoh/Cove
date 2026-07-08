@@ -139,6 +139,21 @@ public sealed class CommandContext
         return false;
     }
 
+    public static string[] SliceVerbArgs(string matchedVerb, string[] cliArgs)
+    {
+        var verbWordCount = matchedVerb.Split(' ').Length;
+        var positional = new System.Collections.Generic.List<string>();
+        for (int i = 0; i < cliArgs.Length; i++)
+        {
+            if (cliArgs[i] == "--channel" && i + 1 < cliArgs.Length) { i++; continue; }
+            if (cliArgs[i] == "--filter" && i + 1 < cliArgs.Length) { i++; continue; }
+            if (cliArgs[i] == "--source" && i + 1 < cliArgs.Length) { i++; continue; }
+            if (cliArgs[i] == "--json") continue;
+            positional.Add(cliArgs[i]);
+        }
+        return positional.Skip(verbWordCount).ToArray();
+    }
+
     private static string? FlagValue(string[] args, string flag)
     {
         for (int i = 0; i < args.Length; i++)
