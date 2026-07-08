@@ -69,6 +69,14 @@ public sealed class RunSegmentRepository
             new { RunId = runId }).AsList();
     }
 
+    public RunSegmentRow? GetByPaneId(string paneId)
+    {
+        using var conn = _factory.Open();
+        return conn.QuerySingleOrDefault<RunSegmentRow>(
+            $"SELECT {SelectColumns} FROM task_run_segments WHERE pane_id = @PaneId AND ended_at IS NULL ORDER BY started_at DESC LIMIT 1",
+            new { PaneId = paneId });
+    }
+
     public System.Threading.Tasks.Task EndAsync(string segmentId)
     {
         if (_channel is null)

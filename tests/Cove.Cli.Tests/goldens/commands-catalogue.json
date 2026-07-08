@@ -531,6 +531,10 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/task.claim",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/task.comment.add",
     "source": "core"
   },
@@ -605,6 +609,14 @@
   {
     "command": "cove://commands/task.ping",
     "description": "echo back params as pong (smoke)",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/task.set-done",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/task.set-in-review",
     "source": "core"
   },
   {
@@ -884,6 +896,10 @@
     "source": "cli"
   },
   {
+    "command": "task claim",
+    "source": "cli"
+  },
+  {
     "command": "task comment add",
     "source": "cli"
   },
@@ -953,6 +969,14 @@
   },
   {
     "command": "task list",
+    "source": "cli"
+  },
+  {
+    "command": "task set-done",
+    "source": "cli"
+  },
+  {
+    "command": "task set-in-review",
     "source": "cli"
   },
   {

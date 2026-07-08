@@ -194,6 +194,19 @@ public sealed class TaskService
     }
 
     public Runs.RunRow? GetRun(string id) => _runs.GetById(id);
+    public Runs.RunRow? FindRunByPrefix(string prefix) => _runs.FindByPrefix(prefix);
+    public Runs.RunRow? GetRunByPane(string paneId)
+    {
+        var segment = _segments.GetByPaneId(paneId);
+        return segment is not null ? _runs.GetById(segment.RunId) : null;
+    }
+    public Runs.RunRow? GetActiveRunForCard(string cardId)
+    {
+        var active = _runs.ListByCardAndState(cardId, "active");
+        if (active.Count > 0) return active[0];
+        var interrupted = _runs.ListByCardAndState(cardId, "interrupted");
+        return interrupted.Count > 0 ? interrupted[0] : null;
+    }
     public System.Collections.Generic.IReadOnlyList<Runs.RunRow> ListRuns(string? taskId, string? workspaceId, string? state)
     {
         if (taskId is not null && state is not null) return _runs.ListByCardAndState(taskId, state);
@@ -205,7 +218,7 @@ public sealed class TaskService
     }
     public System.Collections.Generic.IReadOnlyList<Runs.RunSegmentRow> ListRunSegments(string runId) => _segments.ListByRun(runId);
     public bool HasActiveRun(string cardId) => _runs.HasActiveRun(cardId);
-    public System.Threading.Tasks.Task<Runs.RunRow?> CreateRunAsync(string cardId, string workspaceId, string? launchProfileJson, string? runFamilyId = null, bool backgrounded = false) => _runs.CreateAsync(cardId, workspaceId, launchProfileJson, runFamilyId, backgrounded);
+    public System.Threading.Tasks.Task<Runs.RunRow?> CreateRunAsync(string cardId, string workspaceId, string? launchProfileJson, string? runFamilyId = null, bool backgrounded = false, string? reviewStatusId = null, string? completionStatusId = null) => _runs.CreateAsync(cardId, workspaceId, launchProfileJson, runFamilyId, backgrounded, reviewStatusId, completionStatusId);
     public System.Threading.Tasks.Task TransitionRunAsync(string runId, Runs.RunState newState) => _runs.TransitionAsync(runId, newState);
     public System.Threading.Tasks.Task<Runs.RunSegmentRow?> AddRunSegmentAsync(string runId, string? paneId, string? adapterSessionId) => _segments.AddAsync(runId, paneId, adapterSessionId);
     public System.Threading.Tasks.Task EndRunSegmentAsync(string segmentId) => _segments.EndAsync(segmentId);

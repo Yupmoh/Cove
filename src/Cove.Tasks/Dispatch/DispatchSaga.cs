@@ -62,7 +62,7 @@ public sealed class DispatchSaga
             step = DispatchStep.MintRun;
 
             var launchProfileJson = config is not null ? Cove.Tasks.LaunchConfig.LaunchConfigSerializer.Serialize(config) : null;
-            var run = await _tasks.CreateRunAsync(cardId, workspaceId, launchProfileJson);
+            var run = await _tasks.CreateRunAsync(cardId, workspaceId, launchProfileJson, reviewStatusId: config?.ReviewStatusId, completionStatusId: config?.CompletionStatusId);
             if (run is null)
                 return new DispatchResult(false, null, "failed to create run", step);
 

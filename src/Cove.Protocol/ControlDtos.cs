@@ -207,6 +207,10 @@ public sealed record RunSegmentInfo(string Id, string RunId, string? PaneId, str
 public sealed record RunSegmentListResult(System.Collections.Generic.IReadOnlyList<RunSegmentInfo> Segments);
 public sealed record TaskLaunchParams(string CardId, string? ExecutionModeOverride);
 public sealed record TaskLaunchResult(bool Success, string? RunId, string? Error, string ReachedStep);
+public sealed record TaskSetInReviewParams(string? RunId, string? PaneId, string? WorkspaceId);
+public sealed record TaskSetDoneParams(string? RunId, string? PaneId, string? WorkspaceId);
+public sealed record TaskClaimParams(string CardId, string? PaneId);
+public sealed record TaskClaimResult(bool Success, string? RunId, string? Error);
 public sealed record StatusSetHiddenParams(string WorkspaceId, string Id, bool Hidden);
 
 public sealed record Note
@@ -371,6 +375,10 @@ public sealed record BrowserPaneDto(string PaneId, string CurrentUrl, System.Col
 [JsonSerializable(typeof(RunInfo))]
 [JsonSerializable(typeof(RunListResult))]
 [JsonSerializable(typeof(RunListParams))]
+[JsonSerializable(typeof(TaskSetInReviewParams))]
+[JsonSerializable(typeof(TaskSetDoneParams))]
+[JsonSerializable(typeof(TaskClaimParams))]
+[JsonSerializable(typeof(TaskClaimResult))]
 [JsonSerializable(typeof(RunRefParams))]
 [JsonSerializable(typeof(RunCompleteParams))]
 [JsonSerializable(typeof(TaskLaunchParams))]

@@ -134,6 +134,7 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/task.binding.get` | core |  |
 | `cove://commands/task.binding.resolve-profile` | core |  |
 | `cove://commands/task.binding.set` | core |  |
+| `cove://commands/task.claim` | core |  |
 | `cove://commands/task.comment.add` | core |  |
 | `cove://commands/task.comment.count` | core |  |
 | `cove://commands/task.comment.delete` | core |  |
@@ -153,6 +154,8 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/task.launch-config.set` | core |  |
 | `cove://commands/task.list` | core |  |
 | `cove://commands/task.ping` | core | echo back params as pong (smoke) |
+| `cove://commands/task.set-done` | core |  |
+| `cove://commands/task.set-in-review` | core |  |
 | `cove://commands/task.status.create` | core |  |
 | `cove://commands/task.status.delete` | core |  |
 | `cove://commands/task.status.list` | core |  |
@@ -222,6 +225,7 @@ Generated from the command registry. Do not edit by hand.
 | `task binding get` | cli |  |
 | `task binding resolve-profile` | cli |  |
 | `task binding set` | cli |  |
+| `task claim` | cli |  |
 | `task comment add` | cli |  |
 | `task comment count` | cli |  |
 | `task comment delete` | cli |  |
@@ -240,6 +244,8 @@ Generated from the command registry. Do not edit by hand.
 | `task launch-config get` | cli |  |
 | `task launch-config set` | cli |  |
 | `task list` | cli |  |
+| `task set-done` | cli |  |
+| `task set-in-review` | cli |  |
 | `task status create` | cli |  |
 | `task status delete` | cli |  |
 | `task status hide` | cli |  |
@@ -250,4 +256,4 @@ Generated from the command registry. Do not edit by hand.
 | `timeline list` | cli |  |
 | `version` | cli |  |
 
-Total: 245 commands
+Total: 251 commands

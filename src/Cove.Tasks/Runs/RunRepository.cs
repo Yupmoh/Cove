@@ -35,7 +35,7 @@ public sealed class RunRepository
         _channel = channel;
     }
 
-    public System.Threading.Tasks.Task<RunRow?> CreateAsync(string cardId, string workspaceId, string? launchProfileJson, string? runFamilyId = null, bool backgrounded = false)
+    public System.Threading.Tasks.Task<RunRow?> CreateAsync(string cardId, string workspaceId, string? launchProfileJson, string? runFamilyId = null, bool backgrounded = false, string? reviewStatusId = null, string? completionStatusId = null)
     {
         var id = System.Guid.NewGuid().ToString("N");
         var row = new RunRow
@@ -47,6 +47,8 @@ public sealed class RunRepository
             State = "active",
             Backgrounded = backgrounded,
             LaunchProfileJson = launchProfileJson,
+            ReviewStatusId = reviewStatusId,
+            CompletionStatusId = completionStatusId,
             StartedAt = System.DateTimeOffset.UtcNow.ToString("o"),
             CreatedAt = System.DateTimeOffset.UtcNow.ToString("o"),
         };
@@ -67,7 +69,7 @@ public sealed class RunRepository
     private static void CreateInternal(SqliteConnection conn, RunRow row)
     {
         conn.Execute(
-            "INSERT INTO task_runs (id, card_id, workspace_id, run_family_id, state, backgrounded, launch_profile_json, started_at, ended_at, created_at, updated_at) VALUES (@Id, @CardId, @WorkspaceId, @RunFamilyId, @State, @Backgrounded, @LaunchProfileJson, @StartedAt, @EndedAt, @CreatedAt, @UpdatedAt)",
+            "INSERT INTO task_runs (id, card_id, workspace_id, run_family_id, state, backgrounded, launch_profile_json, review_status_id, completion_status_id, started_at, ended_at, created_at, updated_at) VALUES (@Id, @CardId, @WorkspaceId, @RunFamilyId, @State, @Backgrounded, @LaunchProfileJson, @ReviewStatusId, @CompletionStatusId, @StartedAt, @EndedAt, @CreatedAt, @UpdatedAt)",
             row);
     }
 
@@ -75,6 +77,14 @@ public sealed class RunRepository
     {
         using var conn = _factory.Open();
         return conn.QueryFirstOrDefault<RunRow>($"SELECT {SelectColumns} FROM task_runs WHERE id = @Id", new { Id = id });
+    }
+
+    public RunRow? FindByPrefix(string prefix)
+    {
+        if (prefix.Length < 4) return null;
+        using var conn = _factory.Open();
+        var matches = conn.Query<RunRow>($"SELECT {SelectColumns} FROM task_runs WHERE id LIKE @Prefix || '%'", new { Prefix = prefix }).AsList();
+        return matches.Count == 1 ? matches[0] : null;
     }
 
     public IReadOnlyList<RunRow> ListByCard(string cardId)

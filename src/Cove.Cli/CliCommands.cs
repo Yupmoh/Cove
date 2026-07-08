@@ -544,6 +544,18 @@ internal static class CliCommands
     public static Task<int> TaskLaunch(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/task.launch");
 
+    [CoveCommand("task set-in-review")]
+    public static Task<int> TaskSetInReview(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/task.set-in-review");
+
+    [CoveCommand("task set-done")]
+    public static Task<int> TaskSetDone(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/task.set-done");
+
+    [CoveCommand("task claim")]
+    public static Task<int> TaskClaim(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/task.claim");
+
     [CoveCommand("run list")]
     public static Task<int> RunList(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/run.list");
