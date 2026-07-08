@@ -17,6 +17,7 @@ import { renderSessionPicker } from "./session-picker";
 import { renderLibraryPopover } from "./library-popover";
 import { renderSnapshotInspector } from "./snapshot-inspector";
 import { renderDiffReviewPane } from "./diff-review-pane";
+import { renderEditorPane } from "./editor-pane";
 
 const CREDIT_THRESHOLD = 131072;
 
@@ -565,6 +566,47 @@ function renderDiffReviewPaneWrapper(paneId: string): HTMLElement {
   });
   return placeholder;
 }
+function renderEditorPaneWrapper(paneId: string): HTMLElement {
+  const placeholder = document.createElement("div");
+  placeholder.className = "editor-pane-placeholder";
+  placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
+  renderEditorPane(paneId, paneId).then(el => {
+    placeholder.replaceWith(el);
+  }).catch(e => {
+    placeholder.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to load editor: ${(e as Error).message}</div>`;
+  });
+  return placeholder;
+}
+
+function renderImagePane(paneId: string): HTMLElement {
+  const el = document.createElement("div");
+  el.className = "image-pane";
+  el.style.cssText = "display:flex;align-items:center;justify-content:center;height:100%;background:#0d1117;overflow:hidden;position:relative;";
+  const img = document.createElement("img");
+  img.style.cssText = "max-width:100%;max-height:100%;object-fit:contain;transition:transform 0.1s;";
+  img.alt = paneId;
+  const controls = document.createElement("div");
+  controls.style.cssText = "position:absolute;bottom:8px;right:8px;display:flex;gap:4px;background:#21262d;padding:4px;border-radius:4px;";
+  const fitBtn = document.createElement("button");
+  fitBtn.textContent = "Fit";
+  fitBtn.style.cssText = "padding:2px 8px;background:#30363d;border:none;color:#e6edf3;border-radius:3px;cursor:pointer;font-size:11px;";
+  const zoomInBtn = document.createElement("button");
+  zoomInBtn.textContent = "+";
+  zoomInBtn.style.cssText = "padding:2px 8px;background:#30363d;border:none;color:#e6edf3;border-radius:3px;cursor:pointer;font-size:11px;";
+  const zoomOutBtn = document.createElement("button");
+  zoomOutBtn.textContent = "-";
+  zoomOutBtn.style.cssText = "padding:2px 8px;background:#30363d;border:none;color:#e6edf3;border-radius:3px;cursor:pointer;font-size:11px;";
+  let zoom = 1;
+  fitBtn.addEventListener("click", () => { img.style.transform = "scale(1)"; zoom = 1; });
+  zoomInBtn.addEventListener("click", () => { zoom = Math.min(zoom * 1.25, 10); img.style.transform = `scale(${zoom})`; });
+  zoomOutBtn.addEventListener("click", () => { zoom = Math.max(zoom / 1.25, 0.1); img.style.transform = `scale(${zoom})`; });
+  controls.appendChild(fitBtn);
+  controls.appendChild(zoomOutBtn);
+  controls.appendChild(zoomInBtn);
+  el.appendChild(img);
+  el.appendChild(controls);
+  return el;
+}
 function renderNode(node: MosaicNode): HTMLElement {
   if (node.kind === "leaf") {
     const subs = node.subtabs.length > 0 ? node.subtabs : [{ documentId: node.paneId, paneType: "terminal", title: null }];
@@ -585,6 +627,8 @@ function renderNode(node: MosaicNode): HTMLElement {
     if (active.paneType === "library") return renderLibraryPane(active.documentId);
     if (active.paneType === "snapshot-inspector") return renderSnapshotInspectorPane(active.documentId);
     if (active.paneType === "diff-review") return renderDiffReviewPaneWrapper(active.documentId);
+    if (active.paneType === "editor") return renderEditorPaneWrapper(active.documentId);
+    if (active.paneType === "image") return renderImagePane(active.documentId);
     if (isEmpty) return emptyPaneStrip(node.paneId);
     const activeEl = getPane(subs[activeIdx].documentId).el;
     if (subs.length <= 1) return activeEl;
