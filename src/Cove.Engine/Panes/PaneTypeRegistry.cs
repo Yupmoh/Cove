@@ -48,6 +48,7 @@ public sealed class PaneTypeRegistry
         registry.Register(new PaneTypeDefinition("library", "Library", "library", IsDockable: true));
         registry.Register(new PaneTypeDefinition("snapshot-inspector", "Snapshots", "snapshot", IsDockable: true));
         registry.Register(new PaneTypeDefinition("diff-review", "Diff Review", "review", IsDockable: true));
+        registry.Register(new PaneTypeDefinition("search", "Search", "search", IsDockable: true));
         return registry;
     }
 }

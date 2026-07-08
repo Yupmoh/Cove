@@ -18,6 +18,8 @@ import { renderLibraryPopover } from "./library-popover";
 import { renderSnapshotInspector } from "./snapshot-inspector";
 import { renderDiffReviewPane } from "./diff-review-pane";
 import { renderEditorPane } from "./editor-pane";
+import { renderSourceControlPane } from "./source-control-pane";
+import { renderSearchPane } from "./search-pane";
 
 const CREDIT_THRESHOLD = 131072;
 
@@ -607,6 +609,28 @@ function renderImagePane(paneId: string): HTMLElement {
   el.appendChild(controls);
   return el;
 }
+function renderGitPaneWrapper(paneId: string): HTMLElement {
+  const placeholder = document.createElement("div");
+  placeholder.className = "git-pane-placeholder";
+  placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
+  renderSourceControlPane("default").then(el => {
+    placeholder.replaceWith(el);
+  }).catch(e => {
+    placeholder.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to load source control: ${(e as Error).message}</div>`;
+  });
+  return placeholder;
+}
+function renderSearchPaneWrapper(paneId: string): HTMLElement {
+  const placeholder = document.createElement("div");
+  placeholder.className = "search-pane-placeholder";
+  placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
+  renderSearchPane("default").then(el => {
+    placeholder.replaceWith(el);
+  }).catch(e => {
+    placeholder.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to load search: ${(e as Error).message}</div>`;
+  });
+  return placeholder;
+}
 function renderNode(node: MosaicNode): HTMLElement {
   if (node.kind === "leaf") {
     const subs = node.subtabs.length > 0 ? node.subtabs : [{ documentId: node.paneId, paneType: "terminal", title: null }];
@@ -629,6 +653,8 @@ function renderNode(node: MosaicNode): HTMLElement {
     if (active.paneType === "diff-review") return renderDiffReviewPaneWrapper(active.documentId);
     if (active.paneType === "editor") return renderEditorPaneWrapper(active.documentId);
     if (active.paneType === "image") return renderImagePane(active.documentId);
+    if (active.paneType === "git") return renderGitPaneWrapper(active.documentId);
+    if (active.paneType === "search") return renderSearchPaneWrapper(active.documentId);
     if (isEmpty) return emptyPaneStrip(node.paneId);
     const activeEl = getPane(subs[activeIdx].documentId).el;
     if (subs.length <= 1) return activeEl;
