@@ -42,6 +42,7 @@ public sealed class PaneTypeRegistry
         registry.Register(new PaneTypeDefinition("note-markdown", "Markdown Note", "note", IsDockable: true));
         registry.Register(new PaneTypeDefinition("note-sketch", "Sketch Note", "note", IsDockable: true));
         registry.Register(new PaneTypeDefinition("note-canvas", "Canvas Note", "note", IsDockable: true));
+        registry.Register(new PaneTypeDefinition("note-html", "HTML Note", "note", IsDockable: true));
         return registry;
     }
 }

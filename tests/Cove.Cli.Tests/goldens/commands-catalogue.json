@@ -313,6 +313,10 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/note.get-state",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/note.history",
     "source": "core"
   },
@@ -326,6 +330,10 @@
   },
   {
     "command": "cove://commands/note.read",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/note.save-state",
     "source": "core"
   },
   {
@@ -932,6 +940,10 @@
     "source": "cli"
   },
   {
+    "command": "note get-state",
+    "source": "cli"
+  },
+  {
     "command": "note history",
     "source": "cli"
   },
@@ -945,6 +957,10 @@
   },
   {
     "command": "note read",
+    "source": "cli"
+  },
+  {
+    "command": "note save-state",
     "source": "cli"
   },
   {

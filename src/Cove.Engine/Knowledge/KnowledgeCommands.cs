@@ -172,6 +172,30 @@ public static class KnowledgeCommands
         return Task.FromResult(ctx.Ok(new NoteMediaSaveResult(mediaPath), CoveJsonContext.Default.NoteMediaSaveResult));
     }
 
+    [CoveCommand("cove://commands/note.get-state")]
+    public static Task<ControlResponse> NoteGetState(EngineDispatchContext ctx)
+    {
+        if (ctx.NoteFiles is not { } store)
+            return Task.FromResult(ctx.Fail("not_ready", "note store not available"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.NoteGetStateParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "note get-state params required"));
+
+        var state = store.LoadState(p.WorkspaceId, p.Id);
+        return Task.FromResult(ctx.Ok(new NoteGetStateResult(state), CoveJsonContext.Default.NoteGetStateResult));
+    }
+
+    [CoveCommand("cove://commands/note.save-state")]
+    public static Task<ControlResponse> NoteSaveState(EngineDispatchContext ctx)
+    {
+        if (ctx.NoteFiles is not { } store)
+            return Task.FromResult(ctx.Fail("not_ready", "note store not available"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.NoteSaveStateParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "note save-state params required"));
+
+        store.SaveState(p.WorkspaceId, p.Id, p.StateJson);
+        return Task.FromResult(ctx.Ok());
+    }
+
     [CoveCommand("cove://commands/timeline.append")]
     public static Task<ControlResponse> TimelineAppend(EngineDispatchContext ctx)
     {
