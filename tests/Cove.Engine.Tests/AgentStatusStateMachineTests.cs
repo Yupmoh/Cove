@@ -32,7 +32,7 @@ public sealed class AgentStatusStateMachineTests
     }
 
     [Fact]
-    public void Compute_AllSubagentsIdle_AdapterWorking_ReturnsWaitingForInput()
+    public void Compute_AllSubagentsIdle_AdapterWorking_ReturnsWorking()
     {
         var sm = new AgentStatusStateMachine(NullLogger.Instance);
         var subs = new List<SubagentState>
@@ -40,7 +40,7 @@ public sealed class AgentStatusStateMachineTests
             new("s1", true, AgentStatus.Idle),
             new("s2", true, AgentStatus.Idle),
         };
-        Assert.Equal(AgentStatus.WaitingForInput, sm.ComputeAggregateStatus(AgentStatus.Working, subs));
+        Assert.Equal(AgentStatus.Working, sm.ComputeAggregateStatus(AgentStatus.Working, subs));
     }
 
     [Fact]
@@ -99,6 +99,17 @@ public sealed class AgentStatusStateMachineTests
         {
             new("s1", true, AgentStatus.Idle),
             new("s2", true, AgentStatus.Idle),
+        };
+        Assert.Equal(AgentStatus.WaitingForInput, sm.ComputeAggregateStatus(AgentStatus.Idle, subs));
+    }
+    [Fact]
+    public void Compute_AdapterIdle_SubagentRunning_ReturnsIdle()
+    {
+        var sm = new AgentStatusStateMachine(NullLogger.Instance);
+        var subs = new List<SubagentState>
+        {
+            new("s1", true, AgentStatus.Idle),
+            new("s2", false, AgentStatus.Working),
         };
         Assert.Equal(AgentStatus.Idle, sm.ComputeAggregateStatus(AgentStatus.Idle, subs));
     }
