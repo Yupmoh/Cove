@@ -28,42 +28,40 @@ public sealed class KnowledgePersistenceKernel
         var path = System.IO.Path.Combine(_dataDir, "timeline.db");
         using var conn = new SqliteConnection($"Data Source={path}");
         conn.Open();
-        using (var cmd = conn.CreateCommand())
-        {
-            cmd.CommandText = "PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;";
-            cmd.ExecuteNonQuery();
-            cmd.CommandText = """
-                CREATE TABLE IF NOT EXISTS timeline (
-                    id TEXT PRIMARY KEY,
-                    workspace_id TEXT NOT NULL,
-                    kind TEXT NOT NULL,
-                    scope TEXT NOT NULL,
-                    title TEXT,
-                    body TEXT,
-                    metadata_json TEXT,
-                    tags_json TEXT,
-                    pane_id TEXT,
-                    created_at TEXT NOT NULL,
-                    backfill_key TEXT
-                );
-                CREATE INDEX IF NOT EXISTS idx_timeline_workspace ON timeline (workspace_id, created_at);
-                CREATE INDEX IF NOT EXISTS idx_timeline_kind ON timeline (kind);
-                CREATE INDEX IF NOT EXISTS idx_timeline_scope ON timeline (scope);
-                CREATE UNIQUE INDEX IF NOT EXISTS idx_timeline_backfill ON timeline (backfill_key) WHERE backfill_key IS NOT NULL;
-                CREATE VIRTUAL TABLE IF NOT EXISTS timeline_fts USING fts5(title, body, content='timeline', content_rowid='rowid');
-                CREATE TRIGGER IF NOT EXISTS timeline_ai AFTER INSERT ON timeline BEGIN
-                    INSERT INTO timeline_fts(rowid, title, body) VALUES (new.rowid, new.title, new.body);
-                END;
-                CREATE TRIGGER IF NOT EXISTS timeline_ad AFTER DELETE ON timeline BEGIN
-                    INSERT INTO timeline_fts(timeline_fts, rowid, title, body) VALUES('delete', old.rowid, old.title, old.body);
-                END;
-                CREATE TRIGGER IF NOT EXISTS timeline_au AFTER UPDATE ON timeline BEGIN
-                    INSERT INTO timeline_fts(timeline_fts, rowid, title, body) VALUES('delete', old.rowid, old.title, old.body);
-                    INSERT INTO timeline_fts(rowid, title, body) VALUES (new.rowid, new.title, new.body);
-                END;
-                """;
-            cmd.ExecuteNonQuery();
-        }
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;";
+        cmd.ExecuteNonQuery();
+        cmd.CommandText = """
+            CREATE TABLE IF NOT EXISTS timeline (
+                id TEXT PRIMARY KEY,
+                workspace_id TEXT NOT NULL,
+                kind TEXT NOT NULL,
+                scope TEXT,
+                title TEXT,
+                body TEXT,
+                metadata_json TEXT,
+                tags_json TEXT,
+                pane_id TEXT,
+                created_at TEXT NOT NULL,
+                backfill_key TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_timeline_workspace ON timeline (workspace_id, created_at);
+            CREATE INDEX IF NOT EXISTS idx_timeline_kind ON timeline (kind);
+            CREATE INDEX IF NOT EXISTS idx_timeline_scope ON timeline (scope);
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_timeline_backfill ON timeline (backfill_key) WHERE backfill_key IS NOT NULL;
+            CREATE VIRTUAL TABLE IF NOT EXISTS timeline_fts USING fts5(title, body, content='timeline', content_rowid='rowid');
+            CREATE TRIGGER IF NOT EXISTS timeline_ai AFTER INSERT ON timeline BEGIN
+                INSERT INTO timeline_fts(rowid, title, body) VALUES (new.rowid, new.title, new.body);
+            END;
+            CREATE TRIGGER IF NOT EXISTS timeline_ad AFTER DELETE ON timeline BEGIN
+                INSERT INTO timeline_fts(timeline_fts, rowid, title, body) VALUES('delete', old.rowid, old.title, old.body);
+            END;
+            CREATE TRIGGER IF NOT EXISTS timeline_au AFTER UPDATE ON timeline BEGIN
+                INSERT INTO timeline_fts(timeline_fts, rowid, title, body) VALUES('delete', old.rowid, old.title, old.body);
+                INSERT INTO timeline_fts(rowid, title, body) VALUES (new.rowid, new.title, new.body);
+            END;
+            """;
+        cmd.ExecuteNonQuery();
         _logger.LogWarning("knowledge: timeline.db schema ensured at {path}", path);
     }
 

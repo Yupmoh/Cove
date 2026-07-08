@@ -135,7 +135,7 @@ public sealed class DaemonHost
         _extensions.Index();
         _paneScopes = new Cove.Engine.Protocol.PaneScopeStore(dataDir, logger);
         _notes = new Cove.Engine.Knowledge.NoteStore(dataDir);
-        _timeline = new Cove.Engine.Knowledge.TimelineStore(dataDir);
+        _timeline = new Cove.Engine.Knowledge.TimelineStore(dataDir, logger);
         _omniChat = new Cove.Engine.Activity.OmniChatStore(System.IO.Path.Combine(dataDir, "omni-chat"), logger);
         _browser = new Cove.Engine.Browser.BrowserPaneManager();
         _config = new Cove.Engine.Config.ConfigService(dataDir, logger);
