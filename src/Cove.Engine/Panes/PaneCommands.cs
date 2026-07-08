@@ -45,12 +45,18 @@ public static class PaneEditorCommands
 public static class PaneSearchCommands
 {
     [CoveCommand("cove://commands/search.query")]
-    public static Task<ControlResponse> Query(EngineDispatchContext ctx)
+    public static async Task<ControlResponse> Query(EngineDispatchContext ctx)
     {
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(PaneSearchJsonContext.Default.SearchQueryParams) is not { } p)
-            return Task.FromResult(ctx.Fail("invalid_params", "search query params required"));
-        var result = new SearchResult(p.Query, [], p.Regex ?? false, p.WholeWord ?? false, p.CaseInsensitive ?? true);
-        return Task.FromResult(ctx.Ok(result, PaneSearchJsonContext.Default.SearchResult));
+            return ctx.Fail("invalid_params", "search query params required");
+        if (ctx.SearchService is not { } search)
+            return ctx.Fail("not_ready", "search service not available");
+
+        var searchParams = new Cove.Engine.Search.SearchParams(p.Query, p.Path, p.Regex, p.WholeWord, p.CaseInsensitive, p.IncludeGlob, p.ExcludeGlob);
+        var searchResult = await search.SearchAsync(searchParams);
+        var matches = searchResult.Matches.Select(m => new SearchMatch(m.FilePath, m.Line, m.Column, m.Text, m.ContextBefore)).ToList();
+        var result = new SearchResult(searchResult.Query, matches, searchResult.UseRegex, searchResult.WholeWord, searchResult.CaseInsensitive);
+        return ctx.Ok(result, PaneSearchJsonContext.Default.SearchResult);
     }
 
     [CoveCommand("cove://commands/search.get-state")]

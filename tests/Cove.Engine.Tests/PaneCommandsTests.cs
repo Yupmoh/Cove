@@ -36,9 +36,17 @@ public sealed class PaneCommandsTests
     [Fact]
     public async Task SearchQuery_ReturnsResult()
     {
-        var prm = JsonDocument.Parse("""{"query":"TODO","path":"src","regex":false,"wholeWord":true,"caseInsensitive":true}""").RootElement.Clone();
-        var resp = await EngineCommandRouter.RouteAsync(new ControlRequest("r1", "cove://commands/search.query", prm));
-        Assert.True(resp!.Ok);
+        var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"cove-search-route-{System.Guid.NewGuid():N}");
+        System.IO.Directory.CreateDirectory(dir);
+        System.IO.File.WriteAllText(System.IO.Path.Combine(dir, "test.txt"), "hello world\n");
+        try
+        {
+            var search = new Cove.Engine.Search.SearchService(Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
+            var prm = JsonDocument.Parse($$"""{"query":"hello","path":"{{dir.Replace("\\","\\\\")}}","regex":false,"wholeWord":false,"caseInsensitive":true}""").RootElement.Clone();
+            var resp = await EngineCommandRouter.RouteAsync(new ControlRequest("r1", "cove://commands/search.query", prm), searchService: search);
+            Assert.True(resp!.Ok);
+        }
+        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
     }
 
     [Fact]

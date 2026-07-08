@@ -67,7 +67,8 @@ public sealed class EngineDispatchContext
         Cove.Engine.Protocol.StateBus? stateBus = null,
         ExtensionRegistry? extensions = null,
         CaptureStore? captures = null,
-        Cove.Engine.Workspaces.GitReadModel? gitReadModel = null)
+        Cove.Engine.Workspaces.GitReadModel? gitReadModel = null,
+        Cove.Engine.Search.SearchService? searchService = null)
     {
         Request = request;
         Panes = panes;
@@ -115,6 +116,7 @@ public sealed class EngineDispatchContext
         Extensions = extensions;
         Captures = captures;
         GitReadModel = gitReadModel;
+        SearchService = searchService;
     }
 
     public ControlRequest Request { get; }
@@ -163,6 +165,7 @@ public sealed class EngineDispatchContext
     public Cove.Engine.Protocol.ExtensionRegistry? Extensions { get; }
     public CaptureStore? Captures { get; }
     public Cove.Engine.Workspaces.GitReadModel? GitReadModel { get; }
+    public Cove.Engine.Search.SearchService? SearchService { get; }
     public System.Func<ControlRequest, System.Threading.Tasks.Task<ControlResponse?>>? Redrive { get; set; }
 
     public ControlResponse Ok<T>(T data, JsonTypeInfo<T> typeInfo)
