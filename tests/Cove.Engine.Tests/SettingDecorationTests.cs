@@ -94,4 +94,39 @@ public sealed class SettingDecorationTests
         var doc = ConfigSchemaGenerator.GenerateReferenceDoc();
         Assert.Contains("Theme", doc);
     }
+    [Fact]
+    public void Schema_IncludesAll13ConfigDomains()
+    {
+        var entries = ConfigSchemaGenerator.Generate();
+        var tabs = entries.Select(e => e.Tab).Distinct().ToList();
+        Assert.Contains("appearance", tabs);
+        Assert.Contains("terminal", tabs);
+        Assert.Contains("updates", tabs);
+        Assert.Contains("diagnostics", tabs);
+        Assert.Contains("workspace", tabs);
+        Assert.Contains("privacy", tabs);
+        Assert.Contains("keyboard", tabs);
+        Assert.Contains("audio", tabs);
+        Assert.Contains("tools", tabs);
+    }
+
+    [Fact]
+    public void Schema_IncludesLspServersAndAdapterCommands()
+    {
+        var entries = ConfigSchemaGenerator.Generate();
+        Assert.Contains(entries, e => e.Key == "lspServers");
+        Assert.Contains(entries, e => e.Key == "adapterCommands");
+    }
+
+    [Fact]
+    public void Schema_EveryEntryHasNonEmptyLabelAndTab()
+    {
+        var entries = ConfigSchemaGenerator.Generate();
+        foreach (var entry in entries)
+        {
+            Assert.False(string.IsNullOrEmpty(entry.Label), $"entry {entry.Key} has empty label");
+            Assert.False(string.IsNullOrEmpty(entry.Tab), $"entry {entry.Key} has empty tab");
+            Assert.False(string.IsNullOrEmpty(entry.Control), $"entry {entry.Key} has empty control");
+        }
+    }
 }

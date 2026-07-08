@@ -29,21 +29,35 @@ internal static class ConfigValueCoercion
         return fallback;
     }
 }
-internal sealed class CoveConfig
+
+public sealed class CoveConfig
 {
+    [Setting("Theme", "appearance", "select", "Active theme name")]
     public string Theme { get; set; } = "cove";
 
+    [Setting("Terminal", "terminal", "section", "Terminal settings")]
     public TerminalSection Terminal { get; set; } = new();
+    [Setting("Markdown Editor", "terminal", "section", "Markdown editor settings")]
     public MarkdownEditorSection MarkdownEditor { get; set; } = new();
+    [Setting("Updates", "updates", "section", "Update settings")]
     public UpdatesSection Updates { get; set; } = new();
+    [Setting("Diagnostics", "diagnostics", "section", "Diagnostics settings")]
     public DiagnosticsSection Diagnostics { get; set; } = new();
+    [Setting("Worktree", "workspace", "section", "Worktree settings")]
     public WorktreeSection Worktree { get; set; } = new();
+    [Setting("Telemetry", "privacy", "section", "Telemetry settings")]
     public TelemetrySection Telemetry { get; set; } = new();
+    [Setting("Remote Config", "privacy", "section", "Remote config settings")]
     public RemoteConfigSection RemoteConfig { get; set; } = new();
+    [Setting("Keybindings", "keyboard", "section", "Keybinding overrides")]
     public KeybindingsSection Keybindings { get; set; } = new();
+    [Setting("Push To Talk", "audio", "section", "Push to talk settings")]
     public PushToTalkSection PushToTalk { get; set; } = new();
+    [Setting("Speech", "audio", "section", "Speech recognition settings")]
     public SpeechSection Speech { get; set; } = new();
+    [Setting("LSP Servers", "tools", "section", "Language server configurations")]
     public LspServersSection LspServers { get; set; } = new();
+    [Setting("Adapter Commands", "tools", "section", "Custom adapter commands")]
     public AdapterCommandsSection AdapterCommands { get; set; } = new();
 
     public Dictionary<string, JsonElement> Extra { get; } = new();
@@ -236,17 +250,27 @@ internal sealed class CoveConfig
     }
 }
 
-internal sealed class TerminalSection
+public sealed class TerminalSection
 {
+    [Setting("Font Family", "terminal", "text", "Terminal font family")]
     public string FontFamily { get; set; } = "Menlo, monospace";
+    [Setting("Font Size", "terminal", "number", "Terminal font size in pixels")]
     public int FontSize { get; set; } = 11;
+    [Setting("Line Height", "terminal", "number", "Terminal line height")]
     public double LineHeight { get; set; } = 1.2;
+    [Setting("Letter Spacing", "terminal", "number", "Terminal letter spacing")]
     public double LetterSpacing { get; set; } = 0.0;
+    [Setting("Font Ligatures", "terminal", "toggle", "Enable font ligatures")]
     public bool FontLigatures { get; set; } = false;
+    [Setting("Cursor Style", "terminal", "select", "Cursor style")]
     public string CursorStyle { get; set; } = "block";
+    [Setting("Cursor Blink", "terminal", "toggle", "Cursor blink")]
     public bool CursorBlink { get; set; } = true;
+    [Setting("Scrollback Lines", "terminal", "number", "Scrollback line count")]
     public int ScrollbackLines { get; set; } = 10000;
+    [Setting("Padding", "terminal", "number", "Terminal padding in pixels")]
     public int Padding { get; set; } = 8;
+    [Setting("Background Opacity", "terminal", "number", "Background opacity 0-1")]
     public double BackgroundOpacity { get; set; } = 1.0;
 
     public static TerminalSection Read(JsonElement el)
@@ -289,15 +313,23 @@ internal sealed class TerminalSection
     }
 }
 
-internal sealed class MarkdownEditorSection
+public sealed class MarkdownEditorSection
 {
+    [Setting("Default Font", "terminal", "text", "Default markdown editor font")]
     public string DefaultFont { get; set; } = "Default";
+    [Setting("Font Size", "terminal", "number", "Markdown editor font size")]
     public int FontSize { get; set; } = 14;
+    [Setting("Text Align", "terminal", "select", "Text alignment")]
     public string TextAlign { get; set; } = "left";
+    [Setting("Book View", "terminal", "toggle", "Enable book view")]
     public bool BookView { get; set; } = false;
+    [Setting("Book View Width", "terminal", "text", "Book view width")]
     public string BookViewWidth { get; set; } = "5.5in";
+    [Setting("Book View Margin", "terminal", "text", "Book view margin")]
     public string BookViewMargin { get; set; } = "0.5in";
+    [Setting("Default View Mode", "terminal", "select", "Default view mode")]
     public string DefaultViewMode { get; set; } = "rte";
+    [Setting("Image Paste Folder", "terminal", "text", "Folder for pasted images")]
     public string ImagePasteFolder { get; set; } = "media";
 
     public static MarkdownEditorSection Read(JsonElement el)
@@ -336,12 +368,17 @@ internal sealed class MarkdownEditorSection
     }
 }
 
-internal sealed class UpdatesSection
+public sealed class UpdatesSection
 {
+    [Setting("Check On Launch", "updates", "toggle", "Check for updates on launch")]
     public bool CheckOnLaunch { get; set; } = true;
+    [Setting("Auto Install", "updates", "toggle", "Automatically install updates")]
     public bool AutoInstall { get; set; } = false;
+    [Setting("Auto Update Adapters", "updates", "toggle", "Automatically update adapters")]
     public bool AutoUpdateAdapters { get; set; } = true;
+    [Setting("Channel", "updates", "select", "Update channel")]
     public string Channel { get; set; } = "stable";
+    [Setting("Check Interval", "updates", "number", "Check interval in hours")]
     public int CheckIntervalHours { get; set; } = 24;
 
     public static UpdatesSection Read(JsonElement el)
@@ -374,14 +411,21 @@ internal sealed class UpdatesSection
     }
 }
 
-internal sealed class DiagnosticsSection
+public sealed class DiagnosticsSection
 {
+    [Setting("Diagnostics Enabled", "diagnostics", "toggle", "Enable diagnostics")]
     public bool Enabled { get; set; } = false;
+    [Setting("Capture Long Tasks", "diagnostics", "toggle", "Capture long-running tasks")]
     public bool CaptureLongTasks { get; set; } = true;
+    [Setting("Capture Render Stats", "diagnostics", "toggle", "Capture render statistics")]
     public bool CaptureRenderStats { get; set; } = true;
+    [Setting("Capture IPC Timings", "diagnostics", "toggle", "Capture IPC timings")]
     public bool CaptureIpcTimings { get; set; } = true;
+    [Setting("Capture Terminal Stats", "diagnostics", "toggle", "Capture terminal statistics")]
     public bool CaptureTerminalStats { get; set; } = true;
+    [Setting("Capture Memory Stats", "diagnostics", "toggle", "Capture memory statistics")]
     public bool CaptureMemoryStats { get; set; } = true;
+    [Setting("Flush Interval", "diagnostics", "number", "Flush interval in milliseconds")]
     public int FlushIntervalMs { get; set; } = 2000;
 
     public static DiagnosticsSection Read(JsonElement el)
@@ -418,9 +462,11 @@ internal sealed class DiagnosticsSection
     }
 }
 
-internal sealed class WorktreeSection
+public sealed class WorktreeSection
 {
+    [Setting("Default Location Pattern", "workspace", "text", "Worktree default location pattern")]
     public string DefaultLocationPattern { get; set; } = "../{repo}-worktrees/{branch}";
+    [Setting("Post-Create Commands", "workspace", "text", "Commands to run after worktree creation")]
     public List<string> PostCreateCommands { get; set; } = new();
 
     public static WorktreeSection Read(JsonElement el)
@@ -458,10 +504,13 @@ internal sealed class WorktreeSection
     }
 }
 
-internal sealed class TelemetrySection
+public sealed class TelemetrySection
 {
+    [Setting("Analytics Opt-In", "privacy", "toggle", "Opt in to analytics")]
     public bool AnalyticsOptIn { get; set; } = false;
+    [Setting("Core Telemetry Disclosed", "privacy", "toggle", "Core telemetry disclosure acknowledged")]
     public bool CoreTelemetryDisclosed { get; set; } = false;
+    [Setting("Telemetry Enabled", "privacy", "toggle", "Enable anonymous telemetry")]
     public bool Enabled { get; set; } = true;
 
     public static TelemetrySection Read(JsonElement el)
@@ -490,8 +539,9 @@ internal sealed class TelemetrySection
     }
 }
 
-internal sealed class RemoteConfigSection
+public sealed class RemoteConfigSection
 {
+    [Setting("Dismissed Banners", "privacy", "text", "Dismissed remote config banner IDs")]
     public List<string> DismissedBannerIds { get; set; } = new();
 
     public static RemoteConfigSection Read(JsonElement el)
@@ -522,8 +572,9 @@ internal sealed class RemoteConfigSection
     }
 }
 
-internal sealed class KeybindingsSection
+public sealed class KeybindingsSection
 {
+    [Setting("Keybindings", "keyboard", "text", "Custom keybinding overrides")]
     public Dictionary<string, JsonElement> Bindings { get; set; } = new();
 
     public static KeybindingsSection Read(JsonElement el)
@@ -547,12 +598,17 @@ internal sealed class KeybindingsSection
     }
 }
 
-internal sealed class PushToTalkSection
+public sealed class PushToTalkSection
 {
+    [Setting("Push To Talk Enabled", "audio", "toggle", "Enable push to talk")]
     public bool Enabled { get; set; } = true;
+    [Setting("Key Code", "audio", "number", "Push to talk key code")]
     public int KeyCode { get; set; } = 61;
+    [Setting("Is Modifier", "audio", "toggle", "Whether the key is a modifier")]
     public bool IsModifier { get; set; } = true;
+    [Setting("Required Flags", "audio", "number", "Required modifier flags")]
     public int RequiredFlags { get; set; } = 0;
+    [Setting("Label", "audio", "text", "Push to talk label")]
     public string Label { get; set; } = "Right Option";
 
     public static PushToTalkSection Read(JsonElement el)
@@ -585,10 +641,13 @@ internal sealed class PushToTalkSection
     }
 }
 
-internal sealed class SpeechSection
+public sealed class SpeechSection
 {
+    [Setting("Speech Gain", "audio", "number", "Speech gain")]
     public double Gain { get; set; } = 1.0;
+    [Setting("Input Device", "audio", "text", "Speech input device")]
     public string? InputDevice { get; set; } = null;
+    [Setting("On-Device Recognition", "audio", "toggle", "Enable on-device speech recognition")]
     public bool OnDeviceRecognition { get; set; } = true;
 
     public static SpeechSection Read(JsonElement el)
@@ -620,8 +679,9 @@ internal sealed class SpeechSection
     }
 }
 
-internal sealed class LspServersSection
+public sealed class LspServersSection
 {
+    [Setting("LSP Servers", "tools", "text", "Language server configurations")]
     public Dictionary<string, JsonElement> Servers { get; set; } = new();
 
     public static LspServersSection Read(JsonElement el)
@@ -645,8 +705,9 @@ internal sealed class LspServersSection
     }
 }
 
-internal sealed class AdapterCommandsSection
+public sealed class AdapterCommandsSection
 {
+    [Setting("Adapter Commands", "tools", "text", "Custom adapter commands")]
     public Dictionary<string, JsonElement> Commands { get; set; } = new();
 
     public static AdapterCommandsSection Read(JsonElement el)
