@@ -127,6 +127,14 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/restore.chooser` | core |  |
 | `cove://commands/restore.confirm` | core |  |
 | `cove://commands/restore.undo` | core |  |
+| `cove://commands/review.add-comment` | core |  |
+| `cove://commands/review.audit` | core |  |
+| `cove://commands/review.close` | core |  |
+| `cove://commands/review.list-comments` | core |  |
+| `cove://commands/review.re-anchor` | core |  |
+| `cove://commands/review.reopen` | core |  |
+| `cove://commands/review.resolve` | core |  |
+| `cove://commands/review.telemetry` | core |  |
 | `cove://commands/room.close` | core |  |
 | `cove://commands/room.create` | core |  |
 | `cove://commands/room.list` | core |  |
@@ -279,6 +287,14 @@ Generated from the command registry. Do not edit by hand.
 | `pane list` | cli |  |
 | `pane-types list` | cli |  |
 | `protocol resolve` | cli |  |
+| `review add-comment` | cli |  |
+| `review audit` | cli |  |
+| `review close` | cli |  |
+| `review list-comments` | cli |  |
+| `review re-anchor` | cli |  |
+| `review reopen` | cli |  |
+| `review resolve` | cli |  |
+| `review telemetry` | cli |  |
 | `run cancel` | cli |  |
 | `run complete` | cli |  |
 | `run list` | cli |  |
@@ -337,4 +353,4 @@ Generated from the command registry. Do not edit by hand.
 | `vault set-setting` | cli |  |
 | `version` | cli |  |
 
-Total: 332 commands
+Total: 348 commands

@@ -342,6 +342,17 @@ public sealed record BrowserOpenParams(string PaneId, string Url);
 public sealed record BrowserNavigateParams(string PaneId, string Url);
 public sealed record BrowserPaneRefParams(string PaneId);
 public sealed record BrowserPaneDto(string PaneId, string CurrentUrl, System.Collections.Generic.IReadOnlyList<string> History, int HistoryIndex, bool CanGoBack, bool CanGoForward);
+public sealed record ReviewAddCommentParams(string CommitSha, string FilePath, int Line, string Author, string Body, string? ParentId);
+public sealed record ReviewListCommentsParams(string CommitSha, string? FilePath, string? State);
+public sealed record ReviewTransitionParams(string CommentId, string Actor);
+public sealed record ReviewReAnchorParams(string CommentId, int NewLine);
+public sealed record ReviewTelemetryParams(string CommitSha, string SessionId, string Adapter, int FilesTouched);
+public sealed record ReviewCommentDto(string Id, string RootId, string? ParentId, string CommitSha, string FilePath, int Line, string Author, string Body, string State, string CreatedAt, string? OrphanedAt, string? HunkId, string? ContextHash);
+public sealed record ReviewListCommentsResult(System.Collections.Generic.IReadOnlyList<ReviewCommentDto> Comments);
+public sealed record ReviewAuditDto(string Id, string CommentId, string FromState, string ToState, string Actor, string At, string? Note);
+public sealed record ReviewAuditResult(System.Collections.Generic.IReadOnlyList<ReviewAuditDto> Entries);
+public sealed record ReviewTelemetryDto(string SessionId, string Adapter, int FilesTouched);
+public sealed record ReviewTelemetryResult(System.Collections.Generic.IReadOnlyList<ReviewTelemetryDto> Entries);
 
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
@@ -578,5 +589,16 @@ public sealed record BrowserPaneDto(string PaneId, string CurrentUrl, System.Col
 [JsonSerializable(typeof(BrowserNavigateParams))]
 [JsonSerializable(typeof(BrowserPaneRefParams))]
 [JsonSerializable(typeof(BrowserPaneDto))]
+[JsonSerializable(typeof(ReviewAddCommentParams))]
+[JsonSerializable(typeof(ReviewListCommentsParams))]
+[JsonSerializable(typeof(ReviewTransitionParams))]
+[JsonSerializable(typeof(ReviewReAnchorParams))]
+[JsonSerializable(typeof(ReviewTelemetryParams))]
+[JsonSerializable(typeof(ReviewCommentDto))]
+[JsonSerializable(typeof(ReviewListCommentsResult))]
+[JsonSerializable(typeof(ReviewAuditDto))]
+[JsonSerializable(typeof(ReviewAuditResult))]
+[JsonSerializable(typeof(ReviewTelemetryDto))]
+[JsonSerializable(typeof(ReviewTelemetryResult))]
 [JsonSerializable(typeof(JsonElement))]
 public sealed partial class CoveJsonContext : JsonSerializerContext;

@@ -790,4 +790,36 @@ internal static class CliCommands
     [CoveCommand("browser close")]
     public static Task<int> BrowserClose(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/browser.close");
+
+    [CoveCommand("review add-comment")]
+    public static Task<int> ReviewAddComment(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/review.add-comment");
+
+    [CoveCommand("review list-comments")]
+    public static Task<int> ReviewListComments(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/review.list-comments");
+
+    [CoveCommand("review resolve")]
+    public static Task<int> ReviewResolve(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/review.resolve");
+
+    [CoveCommand("review reopen")]
+    public static Task<int> ReviewReopen(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/review.reopen");
+
+    [CoveCommand("review close")]
+    public static Task<int> ReviewClose(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/review.close");
+
+    [CoveCommand("review re-anchor")]
+    public static Task<int> ReviewReAnchor(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/review.re-anchor");
+
+    [CoveCommand("review audit")]
+    public static Task<int> ReviewAudit(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/review.audit");
+
+    [CoveCommand("review telemetry")]
+    public static Task<int> ReviewTelemetry(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/review.telemetry");
 }

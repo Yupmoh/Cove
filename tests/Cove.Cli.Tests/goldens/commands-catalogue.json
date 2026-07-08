@@ -501,6 +501,38 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/review.add-comment",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/review.audit",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/review.close",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/review.list-comments",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/review.re-anchor",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/review.reopen",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/review.resolve",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/review.telemetry",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/room.close",
     "source": "core"
   },
@@ -1109,6 +1141,38 @@
   },
   {
     "command": "protocol resolve",
+    "source": "cli"
+  },
+  {
+    "command": "review add-comment",
+    "source": "cli"
+  },
+  {
+    "command": "review audit",
+    "source": "cli"
+  },
+  {
+    "command": "review close",
+    "source": "cli"
+  },
+  {
+    "command": "review list-comments",
+    "source": "cli"
+  },
+  {
+    "command": "review re-anchor",
+    "source": "cli"
+  },
+  {
+    "command": "review reopen",
+    "source": "cli"
+  },
+  {
+    "command": "review resolve",
+    "source": "cli"
+  },
+  {
+    "command": "review telemetry",
     "source": "cli"
   },
   {

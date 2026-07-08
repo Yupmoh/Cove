@@ -478,4 +478,89 @@ public static class KnowledgeCommands
             return Task.FromResult(ctx.Fail("invalid_params", "library materialize params required"));
         return Task.FromResult(ctx.Ok());
     }
+    [CoveCommand("cove://commands/review.add-comment")]
+    public static Task<ControlResponse> ReviewAddComment(EngineDispatchContext ctx)
+    {
+        if (ctx.Reviews is not { } store)
+            return Task.FromResult(ctx.Fail("not_ready", "review store not available"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.ReviewAddCommentParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "review add-comment params required"));
+        var comment = store.AddComment(p.CommitSha, p.FilePath, p.Line, p.Author, p.Body, p.ParentId);
+        var dto = new ReviewCommentDto(comment.Id, comment.RootId, comment.ParentId, comment.CommitSha, comment.FilePath, comment.Line, comment.Author, comment.Body, comment.State, comment.CreatedAt.ToString("o"), comment.OrphanedAt?.ToString("o"), comment.HunkId, comment.ContextHash);
+        return Task.FromResult(ctx.Ok(dto, CoveJsonContext.Default.ReviewCommentDto));
+    }
+    [CoveCommand("cove://commands/review.list-comments")]
+    public static Task<ControlResponse> ReviewListComments(EngineDispatchContext ctx)
+    {
+        if (ctx.Reviews is not { } store)
+            return Task.FromResult(ctx.Fail("not_ready", "review store not available"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.ReviewListCommentsParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "review list-comments params required"));
+        var comments = store.ListComments(p.CommitSha, p.FilePath, p.State);
+        var dtos = comments.Select(c => new ReviewCommentDto(c.Id, c.RootId, c.ParentId, c.CommitSha, c.FilePath, c.Line, c.Author, c.Body, c.State, c.CreatedAt.ToString("o"), c.OrphanedAt?.ToString("o"), c.HunkId, c.ContextHash)).ToList();
+        return Task.FromResult(ctx.Ok(new ReviewListCommentsResult(dtos), CoveJsonContext.Default.ReviewListCommentsResult));
+    }
+    [CoveCommand("cove://commands/review.resolve")]
+    public static Task<ControlResponse> ReviewResolve(EngineDispatchContext ctx)
+    {
+        if (ctx.Reviews is not { } store)
+            return Task.FromResult(ctx.Fail("not_ready", "review store not available"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.ReviewTransitionParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "review transition params required"));
+        store.ResolveComment(p.CommentId, p.Actor);
+        return Task.FromResult(ctx.Ok());
+    }
+    [CoveCommand("cove://commands/review.reopen")]
+    public static Task<ControlResponse> ReviewReopen(EngineDispatchContext ctx)
+    {
+        if (ctx.Reviews is not { } store)
+            return Task.FromResult(ctx.Fail("not_ready", "review store not available"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.ReviewTransitionParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "review transition params required"));
+        store.ReopenComment(p.CommentId, p.Actor);
+        return Task.FromResult(ctx.Ok());
+    }
+    [CoveCommand("cove://commands/review.close")]
+    public static Task<ControlResponse> ReviewClose(EngineDispatchContext ctx)
+    {
+        if (ctx.Reviews is not { } store)
+            return Task.FromResult(ctx.Fail("not_ready", "review store not available"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.ReviewTransitionParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "review transition params required"));
+        store.CloseComment(p.CommentId, p.Actor);
+        return Task.FromResult(ctx.Ok());
+    }
+    [CoveCommand("cove://commands/review.re-anchor")]
+    public static Task<ControlResponse> ReviewReAnchor(EngineDispatchContext ctx)
+    {
+        if (ctx.Reviews is not { } store)
+            return Task.FromResult(ctx.Fail("not_ready", "review store not available"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.ReviewReAnchorParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "review re-anchor params required"));
+        store.ReAnchorComment(p.CommentId, p.NewLine);
+        return Task.FromResult(ctx.Ok());
+    }
+    [CoveCommand("cove://commands/review.audit")]
+    public static Task<ControlResponse> ReviewAudit(EngineDispatchContext ctx)
+    {
+        if (ctx.Reviews is not { } store)
+            return Task.FromResult(ctx.Fail("not_ready", "review store not available"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.ReviewTransitionParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "review transition params required"));
+        var audit = store.GetAuditTrail(p.CommentId);
+        var dtos = audit.Select(a => new ReviewAuditDto(a.Id, a.CommentId, a.FromState, a.ToState, a.Actor, a.At.ToString("o"), a.Note)).ToList();
+        return Task.FromResult(ctx.Ok(new ReviewAuditResult(dtos), CoveJsonContext.Default.ReviewAuditResult));
+    }
+    [CoveCommand("cove://commands/review.telemetry")]
+    public static Task<ControlResponse> ReviewTelemetry(EngineDispatchContext ctx)
+    {
+        if (ctx.Reviews is not { } store)
+            return Task.FromResult(ctx.Fail("not_ready", "review store not available"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.ReviewTelemetryParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "review telemetry params required"));
+        store.AddTelemetry(p.CommitSha, p.SessionId, p.Adapter, p.FilesTouched);
+        var telemetry = store.GetTelemetry(p.CommitSha);
+        var dtos = telemetry.Select(t => new ReviewTelemetryDto(t.SessionId, t.Adapter, t.FilesTouched)).ToList();
+        return Task.FromResult(ctx.Ok(new ReviewTelemetryResult(dtos), CoveJsonContext.Default.ReviewTelemetryResult));
+    }
 }

@@ -53,6 +53,7 @@ public sealed class EngineDispatchContext
         SessionCorpusIndexer? corpus = null,
         VaultSettingsStore? vaultSettings = null,
         LibraryStore? library = null,
+        ReviewStore? reviews = null,
         PaneTypeRegistry? paneTypes = null,
         BrowserPaneManager? browser = null,
         ConfigService? config = null,
@@ -95,6 +96,7 @@ public sealed class EngineDispatchContext
         Corpus = corpus;
         VaultSettings = vaultSettings;
         Library = library;
+        Reviews = reviews;
         PaneTypes = paneTypes;
         Browser = browser;
         Config = config;
@@ -138,6 +140,7 @@ public sealed class EngineDispatchContext
     public SessionCorpusIndexer? Corpus { get; }
     public VaultSettingsStore? VaultSettings { get; }
     public LibraryStore? Library { get; }
+    public ReviewStore? Reviews { get; }
     public PaneTypeRegistry? PaneTypes { get; }
     public ConfigService? Config { get; }
     public BrowserPaneManager? Browser { get; }
