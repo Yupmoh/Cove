@@ -84,8 +84,15 @@ public static class KnowledgeCommands
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.TimelineAppendParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "timeline append params required"));
 
-        var entry = store.Append(new TimelineEntry { WorkspaceId = p.WorkspaceId, Kind = p.Kind, Source = p.Source, Scope = p.Scope, Summary = p.Summary });
-        return Task.FromResult(ctx.Ok(entry, CoveJsonContext.Default.TimelineEntry));
+        try
+        {
+            var entry = store.Append(new TimelineEntry { WorkspaceId = p.WorkspaceId, Kind = p.Kind, Source = p.Source, Scope = p.Scope, Summary = p.Summary, Tags = p.Tags });
+            return Task.FromResult(ctx.Ok(entry, CoveJsonContext.Default.TimelineEntry));
+        }
+        catch (TimelineValidationException ex)
+        {
+            return Task.FromResult(ctx.Fail(ex.Code, ex.Message));
+        }
     }
 
     [CoveCommand("cove://commands/timeline.list")]

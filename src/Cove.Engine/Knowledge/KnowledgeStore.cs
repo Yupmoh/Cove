@@ -68,6 +68,7 @@ public sealed class TimelineStore
 {
     private readonly string _dbPath;
     private readonly ILogger _logger;
+    private readonly TimelineValidator _validator = new();
 
     public TimelineStore(string dataDir, ILogger logger)
     {
@@ -77,11 +78,17 @@ public sealed class TimelineStore
 
     public TimelineEntry Append(TimelineEntry entry)
     {
+        _validator.Validate(entry);
+
         var created = entry with
         {
             Id = string.IsNullOrEmpty(entry.Id) ? System.Guid.NewGuid().ToString("N") : entry.Id,
             Timestamp = entry.Timestamp == default ? System.DateTimeOffset.UtcNow : entry.Timestamp,
         };
+
+        var tagsJson = created.Tags is { } tags && tags.Count > 0
+            ? JsonSerializer.Serialize(new System.Collections.Generic.List<string>(tags), KnowledgeJsonContext.Default.ListString)
+            : null;
 
         using var conn = new SqliteConnection($"Data Source={_dbPath}");
         conn.Open();
@@ -98,7 +105,7 @@ public sealed class TimelineStore
         cmd.Parameters.AddWithValue("@title", (object?)created.Summary ?? System.DBNull.Value);
         cmd.Parameters.AddWithValue("@body", System.DBNull.Value);
         cmd.Parameters.AddWithValue("@meta", (object?)created.JsonPayload ?? System.DBNull.Value);
-        cmd.Parameters.AddWithValue("@tags", System.DBNull.Value);
+        cmd.Parameters.AddWithValue("@tags", (object?)tagsJson ?? System.DBNull.Value);
         cmd.Parameters.AddWithValue("@pane", System.DBNull.Value);
         cmd.Parameters.AddWithValue("@ts", created.Timestamp.ToString("o"));
         cmd.Parameters.AddWithValue("@bf", (object?)ComputeBackfillKey(created) ?? System.DBNull.Value);
@@ -113,23 +120,13 @@ public sealed class TimelineStore
         using var conn = new SqliteConnection($"Data Source={_dbPath}");
         conn.Open();
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT id, workspace_id, kind, scope, title, body, metadata_json, created_at FROM timeline WHERE workspace_id = @ws ORDER BY created_at DESC LIMIT @limit";
+        cmd.CommandText = "SELECT id, workspace_id, kind, scope, title, body, metadata_json, tags_json, created_at FROM timeline WHERE workspace_id = @ws ORDER BY created_at DESC LIMIT @limit";
         cmd.Parameters.AddWithValue("@ws", workspaceId);
         cmd.Parameters.AddWithValue("@limit", limit);
         using var reader = cmd.ExecuteReader();
         while (reader.Read())
         {
-            result.Add(new TimelineEntry
-            {
-                Id = reader.GetString(0),
-                WorkspaceId = reader.GetString(1),
-                Kind = reader.GetString(2),
-                Source = "timeline.db",
-                Scope = reader.IsDBNull(3) ? null : reader.GetString(3),
-                Summary = reader.IsDBNull(4) ? null : reader.GetString(4),
-                JsonPayload = reader.IsDBNull(6) ? null : reader.GetString(6),
-                Timestamp = System.DateTimeOffset.Parse(reader.GetString(7), null, System.Globalization.DateTimeStyles.RoundtripKind),
-            });
+            result.Add(ReadEntry(reader));
         }
         return result;
     }
@@ -141,7 +138,7 @@ public sealed class TimelineStore
         conn.Open();
         using var cmd = conn.CreateCommand();
         cmd.CommandText = """
-            SELECT t.id, t.workspace_id, t.kind, t.scope, t.title, t.body, t.metadata_json, t.created_at
+            SELECT t.id, t.workspace_id, t.kind, t.scope, t.title, t.body, t.metadata_json, t.tags_json, t.created_at
             FROM timeline_fts f
             JOIN timeline t ON t.rowid = f.rowid
             WHERE t.workspace_id = @ws AND timeline_fts MATCH @query
@@ -154,19 +151,33 @@ public sealed class TimelineStore
         using var reader = cmd.ExecuteReader();
         while (reader.Read())
         {
-            result.Add(new TimelineEntry
-            {
-                Id = reader.GetString(0),
-                WorkspaceId = reader.GetString(1),
-                Kind = reader.GetString(2),
-                Source = "timeline.db",
-                Scope = reader.IsDBNull(3) ? null : reader.GetString(3),
-                Summary = reader.IsDBNull(4) ? null : reader.GetString(4),
-                JsonPayload = reader.IsDBNull(6) ? null : reader.GetString(6),
-                Timestamp = System.DateTimeOffset.Parse(reader.GetString(7), null, System.Globalization.DateTimeStyles.RoundtripKind),
-            });
+            result.Add(ReadEntry(reader));
         }
         return result;
+    }
+
+    private static TimelineEntry ReadEntry(SqliteDataReader reader)
+    {
+        System.Collections.Generic.IReadOnlyList<string>? tags = null;
+        if (!reader.IsDBNull(7))
+        {
+            var tagsJson = reader.GetString(7);
+            if (!string.IsNullOrEmpty(tagsJson))
+                tags = JsonSerializer.Deserialize(tagsJson, KnowledgeJsonContext.Default.ListString);
+        }
+
+        return new TimelineEntry
+        {
+            Id = reader.GetString(0),
+            WorkspaceId = reader.GetString(1),
+            Kind = reader.GetString(2),
+            Source = "timeline.db",
+            Scope = reader.IsDBNull(3) ? null : reader.GetString(3),
+            Summary = reader.IsDBNull(4) ? null : reader.GetString(4),
+            JsonPayload = reader.IsDBNull(6) ? null : reader.GetString(6),
+            Tags = tags,
+            Timestamp = System.DateTimeOffset.Parse(reader.GetString(8), null, System.Globalization.DateTimeStyles.RoundtripKind),
+        };
     }
 
     private static string? ComputeBackfillKey(TimelineEntry entry)
@@ -181,4 +192,5 @@ public sealed class TimelineStore
 [JsonSerializable(typeof(TimelineEntry))]
 [JsonSerializable(typeof(System.Collections.Generic.List<Note>))]
 [JsonSerializable(typeof(System.Collections.Generic.List<TimelineEntry>))]
+[JsonSerializable(typeof(System.Collections.Generic.List<string>))]
 public sealed partial class KnowledgeJsonContext : JsonSerializerContext { }

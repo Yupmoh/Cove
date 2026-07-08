@@ -109,4 +109,75 @@ public sealed class TimelineStoreTests
         Assert.Equal("a", ws1[0].Kind);
         Assert.Equal("b", ws2[0].Kind);
     }
+
+    [Fact]
+    public void InvalidTag_ThrowsTypedError()
+    {
+        var (_, store) = NewStore();
+        var ex = Assert.Throws<TimelineValidationException>(() => store.Append(new TimelineEntry
+        {
+            WorkspaceId = "ws1",
+            Kind = "note.created",
+            Source = "manual",
+            Summary = "test",
+            Tags = ["invalid-tag-no-colon"],
+        }));
+        Assert.Equal("invalid_tag", ex.Code);
+        Assert.Contains("invalid-tag-no-colon", ex.Message);
+    }
+
+    [Fact]
+    public void ValidTag_IsPersisted()
+    {
+        var (_, store) = NewStore();
+        store.Append(new TimelineEntry
+        {
+            WorkspaceId = "ws1",
+            Kind = "note.created",
+            Source = "manual",
+            Summary = "test",
+            Tags = ["kind:feature", "team:cove"],
+        });
+
+        var list = store.ListByWorkspace("ws1");
+        Assert.Single(list);
+        Assert.NotNull(list[0].Tags);
+        Assert.Equal(2, list[0].Tags!.Count);
+        Assert.Contains("kind:feature", list[0].Tags!);
+        Assert.Contains("team:cove", list[0].Tags!);
+    }
+
+    [Fact]
+    public void InvalidScope_ThrowsTypedError()
+    {
+        var (_, store) = NewStore();
+        var ex = Assert.Throws<TimelineValidationException>(() => store.Append(new TimelineEntry
+        {
+            WorkspaceId = "ws1",
+            Kind = "note.created",
+            Source = "manual",
+            Scope = "galaxy",
+            Summary = "test",
+        }));
+        Assert.Equal("invalid_scope", ex.Code);
+        Assert.Contains("galaxy", ex.Message);
+    }
+
+    [Fact]
+    public void ValidScopeWithId_IsAccepted()
+    {
+        var (_, store) = NewStore();
+        store.Append(new TimelineEntry
+        {
+            WorkspaceId = "ws1",
+            Kind = "note.created",
+            Source = "manual",
+            Scope = "room:abc123",
+            Summary = "test",
+        });
+
+        var list = store.ListByWorkspace("ws1");
+        Assert.Single(list);
+        Assert.Equal("room:abc123", list[0].Scope);
+    }
 }

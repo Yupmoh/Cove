@@ -249,14 +249,15 @@ public sealed record TimelineEntry
     public string? Scope { get; init; }
     public string? Summary { get; init; }
     public string? JsonPayload { get; init; }
+    public System.Collections.Generic.IReadOnlyList<string>? Tags { get; init; }
     public System.DateTimeOffset Timestamp { get; init; }
 }
 public sealed record NoteCreateParams(string Title, string WorkspaceId, string Source, string? Content, string? Kind);
+public sealed record TimelineAppendParams(string WorkspaceId, string Kind, string Source, string? Scope, string? Summary, System.Collections.Generic.IReadOnlyList<string>? Tags);
 public sealed record NoteRefParams(string Id);
 public sealed record NoteListParams(string WorkspaceId);
 public sealed record NoteUpdateParams(string Id, string? Title, string? Content);
 public sealed record NoteListResult(System.Collections.Generic.IReadOnlyList<Note> Notes);
-public sealed record TimelineAppendParams(string WorkspaceId, string Kind, string Source, string? Scope, string? Summary);
 public sealed record TimelineListParams(string WorkspaceId);
 public sealed record TimelineListResult(System.Collections.Generic.IReadOnlyList<TimelineEntry> Entries);
 public sealed record KnowledgePingParams(string? Echo);
