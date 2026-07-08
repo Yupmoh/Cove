@@ -154,7 +154,7 @@ function buildEntryRow(entry: LibraryEntry, workspaceId: string): HTMLElement {
   return row;
 }
 
-function fuzzyScore(title: string, paneType: string, query: string, isActiveWorkspace: boolean): number {
+export function _testFuzzyScore(title: string, paneType: string, query: string, isActiveWorkspace: boolean): number {
   let score = 0;
   let qi = 0;
   for (let i = 0; i < title.length && qi < query.length; i++) {
@@ -174,4 +174,8 @@ function fuzzyScore(title: string, paneType: string, query: string, isActiveWork
   if (qi < query.length) return 0;
   if (isActiveWorkspace) score += 50;
   return score;
+}
+
+function fuzzyScore(title: string, paneType: string, query: string, isActiveWorkspace: boolean): number {
+  return _testFuzzyScore(title, paneType, query, isActiveWorkspace);
 }
