@@ -114,6 +114,7 @@ public sealed class EngineDispatchContext
     public PaneScopeStore? PaneScopes { get; }
     public StateBus? StateBus { get; }
     public ExtensionRegistry? Extensions { get; }
+    public System.Func<ControlRequest, System.Threading.Tasks.Task<ControlResponse?>>? Redrive { get; set; }
 
     public ControlResponse Ok<T>(T data, JsonTypeInfo<T> typeInfo)
         => new ControlResponse(Request.Id, true, JsonSerializer.SerializeToElement(data, typeInfo));

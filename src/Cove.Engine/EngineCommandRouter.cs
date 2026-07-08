@@ -62,7 +62,9 @@ public static class EngineCommandRouter
         }
         try
         {
-            return await typed(new EngineDispatchContext(request, panes, layout, workspaces, runCommands, restoration, snapshots, skills, agents, launchProfiles, adapterEnv, hookServer, hookRouter, agentRouter, activity, sessions, lifecycle, launcher, tasks, notes, timeline, paneTypes, browser, config, manifestStore, registry, omniChat, paneScopes, stateBus, extensions));
+            var dispatchCtx = new EngineDispatchContext(request, panes, layout, workspaces, runCommands, restoration, snapshots, skills, agents, launchProfiles, adapterEnv, hookServer, hookRouter, agentRouter, activity, sessions, lifecycle, launcher, tasks, notes, timeline, paneTypes, browser, config, manifestStore, registry, omniChat, paneScopes, stateBus, extensions);
+            dispatchCtx.Redrive = subReq => RouteAsync(subReq, panes, layout, workspaces, runCommands, restoration, snapshots, skills, agents, launchProfiles, adapterEnv, hookServer, hookRouter, agentRouter, activity, sessions, lifecycle, launcher, tasks, notes, timeline, paneTypes, browser, config, manifestStore, registry, omniChat, paneScopes, stateBus, extensions, cancellationToken);
+            return await typed(dispatchCtx);
         }
         catch (System.Exception ex)
         {
