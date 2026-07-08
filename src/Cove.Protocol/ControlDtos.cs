@@ -259,6 +259,8 @@ public sealed record NoteListResult(System.Collections.Generic.IReadOnlyList<Not
 public sealed record TimelineAppendParams(string WorkspaceId, string Kind, string Source, string? Scope, string? Summary);
 public sealed record TimelineListParams(string WorkspaceId);
 public sealed record TimelineListResult(System.Collections.Generic.IReadOnlyList<TimelineEntry> Entries);
+public sealed record KnowledgePingParams(string? Echo);
+public sealed record KnowledgePingResult(string Pong, string? Echo);
 
 public sealed record PaneTypeDto(string Name, string DisplayName, string ContentSource, bool IsDockable);
 public sealed record PaneTypeListResult(System.Collections.Generic.IReadOnlyList<PaneTypeDto> PaneTypes);
@@ -442,6 +444,8 @@ public sealed record BrowserPaneDto(string PaneId, string CurrentUrl, System.Col
 [JsonSerializable(typeof(NoteListResult))]
 [JsonSerializable(typeof(TimelineEntry))]
 [JsonSerializable(typeof(TimelineAppendParams))]
+[JsonSerializable(typeof(KnowledgePingParams))]
+[JsonSerializable(typeof(KnowledgePingResult))]
 [JsonSerializable(typeof(TimelineListParams))]
 [JsonSerializable(typeof(TimelineListResult))]
 [JsonSerializable(typeof(PaneTypeDto))]

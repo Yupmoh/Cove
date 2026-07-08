@@ -60,6 +60,7 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/get_backend_state` | core | mcp-bridge get_backend_state (PL-30, headless-safe) |
 | `cove://commands/get_ipc_events` | core | mcp-bridge get_ipc_events (PL-30, headless-safe) |
 | `cove://commands/get_window_info` | core | mcp-bridge get_window_info (PL-30, render-bound) |
+| `cove://commands/knowledge.ping` | core |  |
 | `cove://commands/launch-profile.delete` | core |  |
 | `cove://commands/launch-profile.list` | core |  |
 | `cove://commands/launch-profile.set-default` | core |  |
@@ -216,6 +217,7 @@ Generated from the command registry. Do not edit by hand.
 | `extension list` | cli |  |
 | `extension run` | cli |  |
 | `hook emit` | cli |  |
+| `knowledge ping` | cli |  |
 | `launch-profile delete` | cli |  |
 | `launch-profile list` | cli |  |
 | `launch-profile set-default` | cli |  |
@@ -282,4 +284,4 @@ Generated from the command registry. Do not edit by hand.
 | `timeline list` | cli |  |
 | `version` | cli |  |
 
-Total: 277 commands
+Total: 279 commands

@@ -232,6 +232,10 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/knowledge.ping",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/launch-profile.delete",
     "source": "core"
   },
@@ -857,6 +861,10 @@
   },
   {
     "command": "hook emit",
+    "source": "cli"
+  },
+  {
+    "command": "knowledge ping",
     "source": "cli"
   },
   {

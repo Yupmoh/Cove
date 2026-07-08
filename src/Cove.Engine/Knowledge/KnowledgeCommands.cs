@@ -6,6 +6,14 @@ namespace Cove.Engine.Knowledge;
 
 public static class KnowledgeCommands
 {
+    [CoveCommand("cove://commands/knowledge.ping")]
+    public static Task<ControlResponse> Ping(EngineDispatchContext ctx)
+    {
+        string? echo = null;
+        if (ctx.Request.Params is JsonElement el && el.Deserialize(CoveJsonContext.Default.KnowledgePingParams) is { } p)
+            echo = p.Echo;
+        return Task.FromResult(ctx.Ok(new KnowledgePingResult("pong", echo), CoveJsonContext.Default.KnowledgePingResult));
+    }
     [CoveCommand("cove://commands/note.create")]
     public static Task<ControlResponse> NoteCreate(EngineDispatchContext ctx)
     {
