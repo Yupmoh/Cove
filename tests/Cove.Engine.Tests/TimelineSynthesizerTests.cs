@@ -10,14 +10,14 @@ public sealed class TimelineSynthesizerTests
 {
     private static string NewDir() => System.IO.Path.Combine(System.IO.Path.GetTempPath(), "cove-synth-" + System.Guid.NewGuid().ToString("N"));
 
-    private static (string dir, TimelineStore timeline, NoteStore notes, TimelineSynthesizer synth) NewStack()
+    private static (string dir, TimelineStore timeline, NoteFileStore notes, TimelineSynthesizer synth) NewStack()
     {
         var dir = NewDir();
         System.IO.Directory.CreateDirectory(dir);
         var kernel = new KnowledgePersistenceKernel(dir, NullLogger.Instance);
         kernel.EnsureAllSchemas();
         var timeline = new TimelineStore(dir, NullLogger.Instance);
-        var notes = new NoteStore(dir);
+        var notes = new NoteFileStore(dir, NullLogger.Instance);
         var synth = new TimelineSynthesizer(timeline, notes, NullLogger.Instance);
         return (dir, timeline, notes, synth);
     }
@@ -37,7 +37,7 @@ public sealed class TimelineSynthesizerTests
         Assert.Equal("last-week", meta!.Window);
         Assert.Equal(result.BackingNoteId, meta.BackingNoteId);
 
-        var backingNote = notes.Get(result.BackingNoteId);
+        var backingNote = notes.Get("ws1", result.BackingNoteId);
         Assert.NotNull(backingNote);
         Assert.Contains("Full prose", backingNote!.Content);
         Assert.Equal("markdown", backingNote.Kind);

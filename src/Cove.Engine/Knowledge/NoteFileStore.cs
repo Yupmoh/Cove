@@ -11,13 +11,15 @@ public sealed class NoteFileStore
     private readonly string _notesRoot;
     private readonly string _indexPath;
     private readonly ILogger _logger;
+    private readonly NoteSnapshotService? _snapshots;
 
-    public NoteFileStore(string dataDir, ILogger logger)
+    public NoteFileStore(string dataDir, ILogger logger, NoteSnapshotService? snapshots = null)
     {
         _notesRoot = System.IO.Path.Combine(dataDir, "notes");
         _indexPath = System.IO.Path.Combine(dataDir, "notes", "index.db");
         System.IO.Directory.CreateDirectory(_notesRoot);
         _logger = logger;
+        _snapshots = snapshots;
     }
 
     public Note Create(Note note)
@@ -44,6 +46,7 @@ public sealed class NoteFileStore
         UpsertFtsIndex(note);
 
         _logger.LogWarning("notes: created {id} ({kind}) in {ws}", note.Id, note.Kind, note.WorkspaceId);
+        _snapshots?.Snapshot(note.WorkspaceId, note.Id, $"create: {note.Title}");
         return note;
     }
 
@@ -105,6 +108,7 @@ public sealed class NoteFileStore
         WriteBody(noteDir, updated.Kind, updated.Content);
         UpsertFtsIndex(updated);
         _logger.LogWarning("notes: updated {id} in {ws}", id, workspaceId);
+        _snapshots?.Snapshot(workspaceId, id, $"update: {updated.Title}");
     }
 
     public void Delete(string workspaceId, string id)
@@ -114,6 +118,16 @@ public sealed class NoteFileStore
         RemoveFromFtsIndex(id);
         System.IO.Directory.Delete(noteDir, true);
         _logger.LogWarning("notes: deleted {id} in {ws}", id, workspaceId);
+    }
+
+    public System.Collections.Generic.IReadOnlyList<NoteHistoryEntry> GetHistory(string workspaceId, string id)
+    {
+        if (_snapshots is null)
+        {
+            _logger.LogWarning("notes: snapshot service not available, cannot get history for {id}", id);
+            return [];
+        }
+        return _snapshots.GetHistory(workspaceId, id);
     }
 
     public System.Collections.Generic.IReadOnlyList<Note> Search(string workspaceId, string query, int limit = 20)

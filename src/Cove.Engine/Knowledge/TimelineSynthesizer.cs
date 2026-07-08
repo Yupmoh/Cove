@@ -14,10 +14,10 @@ public sealed class SynthesisResult(TimelineEntry Entry, string BackingNoteId, s
 public sealed class TimelineSynthesizer
 {
     private readonly TimelineStore _timeline;
-    private readonly NoteStore _notes;
+    private readonly NoteFileStore _notes;
     private readonly ILogger _logger;
 
-    public TimelineSynthesizer(TimelineStore timeline, NoteStore notes, ILogger logger)
+    public TimelineSynthesizer(TimelineStore timeline, NoteFileStore notes, ILogger logger)
     {
         _timeline = timeline;
         _notes = notes;

@@ -258,6 +258,14 @@ public sealed record NoteRefParams(string Id);
 public sealed record NoteListParams(string WorkspaceId);
 public sealed record NoteUpdateParams(string Id, string? Title, string? Content);
 public sealed record NoteListResult(System.Collections.Generic.IReadOnlyList<Note> Notes);
+public sealed record NoteSearchParams(string WorkspaceId, string Query, int? Limit);
+public sealed record NoteSearchResult(System.Collections.Generic.IReadOnlyList<Note> Notes);
+public sealed record NoteReadParams(string WorkspaceId, string Id, string? Format);
+public sealed record NoteReadResult(string Id, string Title, string Content, string Kind, string? Format);
+public sealed record NoteWriteParams(string WorkspaceId, string Id, string? Title, string? Content, string? Kind);
+public sealed record NoteHistoryParams(string WorkspaceId, string Id);
+public sealed record NoteHistoryEntry(string Sha, string Message, System.DateTimeOffset Timestamp);
+public sealed record NoteHistoryResult(System.Collections.Generic.IReadOnlyList<NoteHistoryEntry> Entries);
 public sealed record TimelineListParams(string WorkspaceId);
 public sealed record TimelineListResult(System.Collections.Generic.IReadOnlyList<TimelineEntry> Entries);
 public sealed record KnowledgePingParams(string? Echo);
@@ -457,6 +465,14 @@ public sealed record BrowserPaneDto(string PaneId, string CurrentUrl, System.Col
 [JsonSerializable(typeof(NoteListParams))]
 [JsonSerializable(typeof(NoteUpdateParams))]
 [JsonSerializable(typeof(NoteListResult))]
+[JsonSerializable(typeof(NoteSearchParams))]
+[JsonSerializable(typeof(NoteSearchResult))]
+[JsonSerializable(typeof(NoteReadParams))]
+[JsonSerializable(typeof(NoteReadResult))]
+[JsonSerializable(typeof(NoteWriteParams))]
+[JsonSerializable(typeof(NoteHistoryParams))]
+[JsonSerializable(typeof(NoteHistoryEntry))]
+[JsonSerializable(typeof(NoteHistoryResult))]
 [JsonSerializable(typeof(TimelineEntry))]
 [JsonSerializable(typeof(TimelineAppendParams))]
 [JsonSerializable(typeof(KnowledgePingParams))]

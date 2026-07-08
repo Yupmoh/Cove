@@ -42,9 +42,9 @@ public sealed class EngineDispatchContext
         Cove.Tasks.TaskService? taskService = null,
         Cove.Tasks.Dispatch.DispatchSaga? dispatchSaga = null,
         Cove.Tasks.Dispatch.ResumeSaga? resumeSaga = null,
-        NoteStore? notes = null,
         TimelineStore? timeline = null,
         BlackboardStore? blackboard = null,
+        NoteFileStore? noteFiles = null,
         PaneTypeRegistry? paneTypes = null,
         BrowserPaneManager? browser = null,
         ConfigService? config = null,
@@ -76,9 +76,9 @@ public sealed class EngineDispatchContext
         TaskService = taskService;
         DispatchSaga = dispatchSaga;
         ResumeSaga = resumeSaga;
-        Notes = notes;
         Timeline = timeline;
         Blackboard = blackboard;
+        NoteFiles = noteFiles;
         PaneTypes = paneTypes;
         Browser = browser;
         Config = config;
@@ -111,9 +111,9 @@ public sealed class EngineDispatchContext
     public Cove.Tasks.Dispatch.ResumeSaga? ResumeSaga { get; }
     public Cove.Tasks.TaskService? TaskService { get; }
     public Cove.Tasks.Dispatch.DispatchSaga? DispatchSaga { get; }
-    public NoteStore? Notes { get; }
     public TimelineStore? Timeline { get; }
     public BlackboardStore? Blackboard { get; }
+    public NoteFileStore? NoteFiles { get; }
     public PaneTypeRegistry? PaneTypes { get; }
     public ConfigService? Config { get; }
     public BrowserPaneManager? Browser { get; }

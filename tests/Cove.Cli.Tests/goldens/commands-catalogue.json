@@ -313,11 +313,27 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/note.history",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/note.list",
     "source": "core"
   },
   {
+    "command": "cove://commands/note.read",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/note.search",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/note.update",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/note.write",
     "source": "core"
   },
   {
@@ -912,11 +928,27 @@
     "source": "cli"
   },
   {
+    "command": "note history",
+    "source": "cli"
+  },
+  {
     "command": "note list",
     "source": "cli"
   },
   {
+    "command": "note read",
+    "source": "cli"
+  },
+  {
+    "command": "note search",
+    "source": "cli"
+  },
+  {
     "command": "note update",
+    "source": "cli"
+  },
+  {
+    "command": "note write",
     "source": "cli"
   },
   {

@@ -80,8 +80,12 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/note.create` | core |  |
 | `cove://commands/note.delete` | core |  |
 | `cove://commands/note.get` | core |  |
+| `cove://commands/note.history` | core |  |
 | `cove://commands/note.list` | core |  |
+| `cove://commands/note.read` | core |  |
+| `cove://commands/note.search` | core |  |
 | `cove://commands/note.update` | core |  |
+| `cove://commands/note.write` | core |  |
 | `cove://commands/omni-chat.append` | core |  |
 | `cove://commands/omni-chat.clear` | core |  |
 | `cove://commands/omni-chat.history` | core |  |
@@ -229,8 +233,12 @@ Generated from the command registry. Do not edit by hand.
 | `note create` | cli |  |
 | `note delete` | cli |  |
 | `note get` | cli |  |
+| `note history` | cli |  |
 | `note list` | cli |  |
+| `note read` | cli |  |
+| `note search` | cli |  |
 | `note update` | cli |  |
+| `note write` | cli |  |
 | `pane list` | cli |  |
 | `pane-types list` | cli |  |
 | `protocol resolve` | cli |  |
@@ -288,4 +296,4 @@ Generated from the command registry. Do not edit by hand.
 | `timeline list` | cli |  |
 | `version` | cli |  |
 
-Total: 283 commands
+Total: 291 commands

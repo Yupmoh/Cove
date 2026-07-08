@@ -628,6 +628,22 @@ internal static class CliCommands
     public static Task<int> NoteDelete(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/note.delete");
 
+    [CoveCommand("note search")]
+    public static Task<int> NoteSearch(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/note.search");
+
+    [CoveCommand("note read")]
+    public static Task<int> NoteRead(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/note.read");
+
+    [CoveCommand("note write")]
+    public static Task<int> NoteWrite(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/note.write");
+
+    [CoveCommand("note history")]
+    public static Task<int> NoteHistory(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/note.history");
+
     [CoveCommand("timeline list")]
     public static Task<int> TimelineList(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/timeline.list");

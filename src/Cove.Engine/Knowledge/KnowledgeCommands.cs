@@ -14,10 +14,11 @@ public static class KnowledgeCommands
             echo = p.Echo;
         return Task.FromResult(ctx.Ok(new KnowledgePingResult("pong", echo), CoveJsonContext.Default.KnowledgePingResult));
     }
+
     [CoveCommand("cove://commands/note.create")]
     public static Task<ControlResponse> NoteCreate(EngineDispatchContext ctx)
     {
-        if (ctx.Notes is not { } store)
+        if (ctx.NoteFiles is not { } store)
             return Task.FromResult(ctx.Fail("not_ready", "note store not available"));
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.NoteCreateParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "note create params required"));
@@ -29,12 +30,12 @@ public static class KnowledgeCommands
     [CoveCommand("cove://commands/note.get")]
     public static Task<ControlResponse> NoteGet(EngineDispatchContext ctx)
     {
-        if (ctx.Notes is not { } store)
+        if (ctx.NoteFiles is not { } store)
             return Task.FromResult(ctx.Fail("not_ready", "note store not available"));
-        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.NoteRefParams) is not { } p)
-            return Task.FromResult(ctx.Fail("invalid_params", "note ref params required"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.NoteReadParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "note read params required"));
 
-        var note = store.Get(p.Id);
+        var note = store.Get(p.WorkspaceId, p.Id);
         if (note is null)
             return Task.FromResult(ctx.Fail("not_found", "note not found"));
         return Task.FromResult(ctx.Ok(note, CoveJsonContext.Default.Note));
@@ -43,37 +44,103 @@ public static class KnowledgeCommands
     [CoveCommand("cove://commands/note.list")]
     public static Task<ControlResponse> NoteList(EngineDispatchContext ctx)
     {
-        if (ctx.Notes is not { } store)
+        if (ctx.NoteFiles is not { } store)
             return Task.FromResult(ctx.Fail("not_ready", "note store not available"));
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.NoteListParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "note list params required"));
 
-        var notes = store.ListByWorkspace(p.WorkspaceId);
+        var metas = store.ListByWorkspace(p.WorkspaceId);
+        var notes = new System.Collections.Generic.List<Note>(metas.Count);
+        foreach (var m in metas)
+        {
+            var full = store.Get(m.WorkspaceId, m.Id);
+            if (full is not null)
+                notes.Add(full);
+        }
         return Task.FromResult(ctx.Ok(new NoteListResult(notes), CoveJsonContext.Default.NoteListResult));
     }
 
     [CoveCommand("cove://commands/note.update")]
     public static Task<ControlResponse> NoteUpdate(EngineDispatchContext ctx)
     {
-        if (ctx.Notes is not { } store)
+        if (ctx.NoteFiles is not { } store)
             return Task.FromResult(ctx.Fail("not_ready", "note store not available"));
-        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.NoteUpdateParams) is not { } p)
-            return Task.FromResult(ctx.Fail("invalid_params", "note update params required"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.NoteWriteParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "note write params required"));
 
-        store.Update(p.Id, n => n with { Title = p.Title ?? n.Title, Content = p.Content ?? n.Content });
+        store.Update(p.WorkspaceId, p.Id, n => n with { Title = p.Title ?? n.Title, Content = p.Content ?? n.Content, Kind = p.Kind ?? n.Kind });
         return Task.FromResult(ctx.Ok());
     }
 
     [CoveCommand("cove://commands/note.delete")]
     public static Task<ControlResponse> NoteDelete(EngineDispatchContext ctx)
     {
-        if (ctx.Notes is not { } store)
+        if (ctx.NoteFiles is not { } store)
             return Task.FromResult(ctx.Fail("not_ready", "note store not available"));
-        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.NoteRefParams) is not { } p)
-            return Task.FromResult(ctx.Fail("invalid_params", "note ref params required"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.NoteReadParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "note read params required"));
 
-        store.Delete(p.Id);
+        store.Delete(p.WorkspaceId, p.Id);
         return Task.FromResult(ctx.Ok());
+    }
+
+    [CoveCommand("cove://commands/note.search")]
+    public static Task<ControlResponse> NoteSearch(EngineDispatchContext ctx)
+    {
+        if (ctx.NoteFiles is not { } store)
+            return Task.FromResult(ctx.Fail("not_ready", "note store not available"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.NoteSearchParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "note search params required"));
+
+        var results = store.Search(p.WorkspaceId, p.Query, p.Limit ?? 20);
+        return Task.FromResult(ctx.Ok(new NoteSearchResult(results), CoveJsonContext.Default.NoteSearchResult));
+    }
+
+    [CoveCommand("cove://commands/note.read")]
+    public static Task<ControlResponse> NoteRead(EngineDispatchContext ctx)
+    {
+        if (ctx.NoteFiles is not { } store)
+            return Task.FromResult(ctx.Fail("not_ready", "note store not available"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.NoteReadParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "note read params required"));
+
+        var note = store.Get(p.WorkspaceId, p.Id);
+        if (note is null)
+            return Task.FromResult(ctx.Fail("not_found", "note not found"));
+
+        var format = p.Format;
+        if (format == "svg" || format == "png")
+        {
+            if (note.Kind != "sketch")
+                return Task.FromResult(ctx.Fail("invalid_format", $"--{format} is only valid for sketch notes"));
+            return Task.FromResult(ctx.Ok(new NoteReadResult(note.Id, note.Title, note.Content, note.Kind, format), CoveJsonContext.Default.NoteReadResult));
+        }
+
+        return Task.FromResult(ctx.Ok(new NoteReadResult(note.Id, note.Title, note.Content, note.Kind, null), CoveJsonContext.Default.NoteReadResult));
+    }
+
+    [CoveCommand("cove://commands/note.write")]
+    public static Task<ControlResponse> NoteWrite(EngineDispatchContext ctx)
+    {
+        if (ctx.NoteFiles is not { } store)
+            return Task.FromResult(ctx.Fail("not_ready", "note store not available"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.NoteWriteParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "note write params required"));
+
+        store.Update(p.WorkspaceId, p.Id, n => n with { Title = p.Title ?? n.Title, Content = p.Content ?? n.Content, Kind = p.Kind ?? n.Kind });
+        return Task.FromResult(ctx.Ok());
+    }
+
+    [CoveCommand("cove://commands/note.history")]
+    public static Task<ControlResponse> NoteHistory(EngineDispatchContext ctx)
+    {
+        if (ctx.NoteFiles is not { } store)
+            return Task.FromResult(ctx.Fail("not_ready", "note store not available"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.NoteHistoryParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "note history params required"));
+
+        var history = store.GetHistory(p.WorkspaceId, p.Id);
+        return Task.FromResult(ctx.Ok(new NoteHistoryResult(history), CoveJsonContext.Default.NoteHistoryResult));
     }
 
     [CoveCommand("cove://commands/timeline.append")]
@@ -106,6 +173,7 @@ public static class KnowledgeCommands
         var entries = store.ListByWorkspace(p.WorkspaceId);
         return Task.FromResult(ctx.Ok(new TimelineListResult(entries), CoveJsonContext.Default.TimelineListResult));
     }
+
     [CoveCommand("cove://commands/blackboard.post")]
     public static Task<ControlResponse> BlackboardPost(EngineDispatchContext ctx)
     {

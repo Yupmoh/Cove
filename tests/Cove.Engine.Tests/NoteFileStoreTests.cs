@@ -15,7 +15,8 @@ public sealed class NoteFileStoreTests
         System.IO.Directory.CreateDirectory(dir);
         var kernel = new KnowledgePersistenceKernel(dir, NullLogger.Instance);
         kernel.EnsureAllSchemas();
-        return (dir, new NoteFileStore(dir, NullLogger.Instance));
+        var snapshots = new NoteSnapshotService(dir, NullLogger.Instance);
+        return (dir, new NoteFileStore(dir, NullLogger.Instance, snapshots));
     }
 
     [Fact]
@@ -144,5 +145,20 @@ public sealed class NoteFileStoreTests
         var ws2 = store.ListByWorkspace("ws2");
         Assert.Equal(2, ws1.Count);
         Assert.Single(ws2);
+    }
+
+    [Fact]
+    public void GetHistory_ShowsSnapshotHistoryAfterCreateAndUpdate()
+    {
+        var (_, store) = NewStore();
+        var note = store.Create(new Note { Title = "Original", WorkspaceId = "ws1", Content = "v1", Source = "manual", Kind = "markdown" });
+
+        store.Update("ws1", note.Id, n => n with { Title = "Updated", Content = "v2" });
+        store.Update("ws1", note.Id, n => n with { Title = "Final", Content = "v3" });
+
+        var history = store.GetHistory("ws1", note.Id);
+        Assert.True(history.Count >= 3);
+        Assert.Contains(history, h => h.Message.Contains("create"));
+        Assert.Contains(history, h => h.Message.Contains("update"));
     }
 }

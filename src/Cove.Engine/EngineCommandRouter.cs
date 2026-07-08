@@ -39,9 +39,9 @@ public static class EngineCommandRouter
         Cove.Tasks.TaskService? taskService = null,
         Cove.Tasks.Dispatch.DispatchSaga? dispatchSaga = null,
         Cove.Tasks.Dispatch.ResumeSaga? resumeSaga = null,
-        NoteStore? notes = null,
         TimelineStore? timeline = null,
         BlackboardStore? blackboard = null,
+        NoteFileStore? noteFiles = null,
         PaneTypeRegistry? paneTypes = null,
         BrowserPaneManager? browser = null,
         ConfigService? config = null,
@@ -72,8 +72,8 @@ public static class EngineCommandRouter
                 if (denied is not null)
                     return denied;
             }
-            var dispatchCtx = new EngineDispatchContext(request, panes, layout, workspaces, runCommands, restoration, snapshots, skills, agents, launchProfiles, adapterEnv, hookServer, hookRouter, agentRouter, activity, sessions, lifecycle, launcher, taskService, dispatchSaga, resumeSaga, notes, timeline, blackboard, paneTypes, browser, config, manifestStore, registry, omniChat, paneScopes, stateBus, extensions);
-            dispatchCtx.Redrive = subReq => RouteAsync(subReq, panes, layout, workspaces, runCommands, restoration, snapshots, skills, agents, launchProfiles, adapterEnv, hookServer, hookRouter, agentRouter, activity, sessions, lifecycle, launcher, taskService, dispatchSaga, resumeSaga, notes, timeline, blackboard, paneTypes, browser, config, manifestStore, registry, omniChat, paneScopes, stateBus, extensions, cancellationToken);
+            var dispatchCtx = new EngineDispatchContext(request, panes, layout, workspaces, runCommands, restoration, snapshots, skills, agents, launchProfiles, adapterEnv, hookServer, hookRouter, agentRouter, activity, sessions, lifecycle, launcher, taskService, dispatchSaga, resumeSaga, timeline, blackboard, noteFiles, paneTypes, browser, config, manifestStore, registry, omniChat, paneScopes, stateBus, extensions);
+            dispatchCtx.Redrive = subReq => RouteAsync(subReq, panes, layout, workspaces, runCommands, restoration, snapshots, skills, agents, launchProfiles, adapterEnv, hookServer, hookRouter, agentRouter, activity, sessions, lifecycle, launcher, taskService, dispatchSaga, resumeSaga, timeline, blackboard, noteFiles, paneTypes, browser, config, manifestStore, registry, omniChat, paneScopes, stateBus, extensions, cancellationToken);
             return await typed(dispatchCtx);
         }
         catch (System.Exception ex)
