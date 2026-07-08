@@ -65,12 +65,13 @@ CREATE TABLE IF NOT EXISTS comments (
 );
 
 CREATE TABLE IF NOT EXISTS labels (
-    id TEXT PRIMARY KEY,
     workspace_id TEXT NOT NULL,
+    id TEXT NOT NULL,
     name TEXT NOT NULL,
     hex_color TEXT NOT NULL DEFAULT '6e6e6e',
     position REAL NOT NULL,
     created_at TEXT NOT NULL,
+    PRIMARY KEY (workspace_id, id),
     UNIQUE (workspace_id, name)
 );
 
@@ -78,8 +79,7 @@ CREATE TABLE IF NOT EXISTS card_labels (
     card_id TEXT NOT NULL,
     label_id TEXT NOT NULL,
     PRIMARY KEY (card_id, label_id),
-    FOREIGN KEY (card_id) REFERENCES cards (id) ON DELETE CASCADE,
-    FOREIGN KEY (label_id) REFERENCES labels (id) ON DELETE CASCADE
+    FOREIGN KEY (card_id) REFERENCES cards (id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS task_counter (

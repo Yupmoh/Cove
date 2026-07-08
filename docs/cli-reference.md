@@ -129,6 +129,13 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/task.create` | core |  |
 | `cove://commands/task.delete` | core |  |
 | `cove://commands/task.get` | core |  |
+| `cove://commands/task.label.assign` | core |  |
+| `cove://commands/task.label.create` | core |  |
+| `cove://commands/task.label.delete` | core |  |
+| `cove://commands/task.label.filter` | core |  |
+| `cove://commands/task.label.list` | core |  |
+| `cove://commands/task.label.reorder` | core |  |
+| `cove://commands/task.label.unassign` | core |  |
 | `cove://commands/task.list` | core |  |
 | `cove://commands/task.ping` | core | echo back params as pong (smoke) |
 | `cove://commands/task.status.create` | core |  |
@@ -195,6 +202,13 @@ Generated from the command registry. Do not edit by hand.
 | `task create` | cli |  |
 | `task delete` | cli |  |
 | `task get` | cli |  |
+| `task label assign` | cli |  |
+| `task label create` | cli |  |
+| `task label delete` | cli |  |
+| `task label filter` | cli |  |
+| `task label list` | cli |  |
+| `task label reorder` | cli |  |
+| `task label unassign` | cli |  |
 | `task list` | cli |  |
 | `task status create` | cli |  |
 | `task status delete` | cli |  |
@@ -206,4 +220,4 @@ Generated from the command registry. Do not edit by hand.
 | `timeline list` | cli |  |
 | `version` | cli |  |
 
-Total: 201 commands
+Total: 215 commands

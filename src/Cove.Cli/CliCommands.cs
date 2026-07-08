@@ -476,6 +476,34 @@ internal static class CliCommands
     public static Task<int> TaskStatusHide(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/task.status.set-hidden");
 
+    [CoveCommand("task label list")]
+    public static Task<int> TaskLabelList(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/task.label.list");
+
+    [CoveCommand("task label create")]
+    public static Task<int> TaskLabelCreate(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/task.label.create");
+
+    [CoveCommand("task label delete")]
+    public static Task<int> TaskLabelDelete(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/task.label.delete");
+
+    [CoveCommand("task label assign")]
+    public static Task<int> TaskLabelAssign(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/task.label.assign");
+
+    [CoveCommand("task label unassign")]
+    public static Task<int> TaskLabelUnassign(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/task.label.unassign");
+
+    [CoveCommand("task label reorder")]
+    public static Task<int> TaskLabelReorder(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/task.label.reorder");
+
+    [CoveCommand("task label filter")]
+    public static Task<int> TaskLabelFilter(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/task.label.filter");
+
     [CoveCommand("note list")]
     public static Task<int> NoteList(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/note.list");

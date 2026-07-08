@@ -11,8 +11,9 @@ public sealed class TaskService
     private readonly TasksWriteChannel _channel;
     private readonly CardRepository _cards;
     private readonly TaskCounterRepository _counter;
-    private readonly TasksStore _store;
     private readonly StatusRepository _statuses;
+    private readonly LabelRepository _labels;
+    private readonly TasksStore _store;
 
     public TaskService(string dataDir, ILogger logger)
     {
@@ -24,17 +25,10 @@ public sealed class TaskService
         _cards = new CardRepository(_factory, _channel);
         _counter = new TaskCounterRepository(_factory, _channel);
         _statuses = new StatusRepository(_factory, _channel);
+        _labels = new LabelRepository(_factory, _channel);
     }
 
-    public TaskService(SqliteConnectionFactory factory, TasksWriteChannel channel, TasksStore store, CardRepository cards, TaskCounterRepository counter, StatusRepository statuses)
-    {
-        _factory = factory;
-        _channel = channel;
-        _store = store;
-        _cards = cards;
-        _counter = counter;
-        _statuses = statuses;
-    }
+
 
     public System.Threading.Tasks.Task StartAsync() => _channel.StartAsync();
 
@@ -124,4 +118,27 @@ public sealed class TaskService
 
     public System.Threading.Tasks.Task SetStatusHiddenAsync(string workspaceId, string id, bool hidden)
         => _statuses.SetHiddenAsync(workspaceId, id, hidden);
+    public System.Threading.Tasks.Task<Cove.Tasks.Store.LabelRow?> CreateLabelAsync(string workspaceId, string id, string name, string hexColor, double position)
+        => _labels.CreateAsync(workspaceId, id, name, hexColor, position);
+
+    public System.Collections.Generic.IReadOnlyList<Cove.Tasks.Store.LabelRow> ListLabels(string workspaceId)
+        => _labels.ListByWorkspace(workspaceId);
+
+    public System.Threading.Tasks.Task DeleteLabelAsync(string workspaceId, string id)
+        => _labels.DeleteAsync(workspaceId, id);
+
+    public System.Threading.Tasks.Task AssignLabelAsync(string cardId, string labelId)
+        => _labels.AssignToCardAsync(cardId, labelId);
+
+    public System.Threading.Tasks.Task UnassignLabelAsync(string cardId, string labelId)
+        => _labels.UnassignFromCardAsync(cardId, labelId);
+
+    public System.Collections.Generic.IReadOnlyList<Cove.Tasks.Store.LabelRow> GetLabelsForCard(string cardId)
+        => _labels.GetLabelsForCard(cardId);
+
+    public System.Collections.Generic.IReadOnlyList<string> FilterCardsByLabel(string workspaceId, string labelId)
+        => _labels.FilterCardsByLabel(workspaceId, labelId);
+
+    public System.Threading.Tasks.Task ReorderLabelsAsync(string workspaceId, string[] orderedIds)
+        => _labels.ReorderAsync(workspaceId, orderedIds);
 }

@@ -173,6 +173,15 @@ public sealed record StatusCreateParams(string WorkspaceId, string Id, string Na
 public sealed record StatusRefParams(string WorkspaceId, string Id);
 public sealed record StatusDeleteParams(string WorkspaceId, string Id, string? RehomeToStatusId);
 public sealed record StatusReorderParams(string WorkspaceId, string[] OrderedIds);
+public sealed record LabelInfo(string WorkspaceId, string Id, string Name, string HexColor, double Position);
+public sealed record LabelListResult(System.Collections.Generic.IReadOnlyList<LabelInfo> Labels);
+public sealed record LabelListParams(string WorkspaceId);
+public sealed record LabelCreateParams(string WorkspaceId, string Id, string Name, string HexColor, double Position);
+public sealed record LabelRefParams(string WorkspaceId, string Id);
+public sealed record LabelAssignParams(string CardId, string LabelId);
+public sealed record LabelReorderParams(string WorkspaceId, string[] OrderedIds);
+public sealed record LabelFilterParams(string WorkspaceId, string LabelId);
+public sealed record LabelFilterResult(System.Collections.Generic.IReadOnlyList<string> CardIds);
 public sealed record StatusSetHiddenParams(string WorkspaceId, string Id, bool Hidden);
 
 public sealed record Note
@@ -326,6 +335,15 @@ public sealed record BrowserPaneDto(string PaneId, string CurrentUrl, System.Col
 [JsonSerializable(typeof(StatusDeleteParams))]
 [JsonSerializable(typeof(StatusReorderParams))]
 [JsonSerializable(typeof(StatusSetHiddenParams))]
+[JsonSerializable(typeof(LabelInfo))]
+[JsonSerializable(typeof(LabelListParams))]
+[JsonSerializable(typeof(LabelListResult))]
+[JsonSerializable(typeof(LabelCreateParams))]
+[JsonSerializable(typeof(LabelRefParams))]
+[JsonSerializable(typeof(LabelAssignParams))]
+[JsonSerializable(typeof(LabelReorderParams))]
+[JsonSerializable(typeof(LabelFilterParams))]
+[JsonSerializable(typeof(LabelFilterResult))]
 [JsonSerializable(typeof(Note))]
 [JsonSerializable(typeof(NoteCreateParams))]
 [JsonSerializable(typeof(NoteRefParams))]

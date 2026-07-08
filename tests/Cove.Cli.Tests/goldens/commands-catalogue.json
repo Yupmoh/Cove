@@ -511,6 +511,34 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/task.label.assign",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/task.label.create",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/task.label.delete",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/task.label.filter",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/task.label.list",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/task.label.reorder",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/task.label.unassign",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/task.list",
     "source": "core"
   },
@@ -773,6 +801,34 @@
   },
   {
     "command": "task get",
+    "source": "cli"
+  },
+  {
+    "command": "task label assign",
+    "source": "cli"
+  },
+  {
+    "command": "task label create",
+    "source": "cli"
+  },
+  {
+    "command": "task label delete",
+    "source": "cli"
+  },
+  {
+    "command": "task label filter",
+    "source": "cli"
+  },
+  {
+    "command": "task label list",
+    "source": "cli"
+  },
+  {
+    "command": "task label reorder",
+    "source": "cli"
+  },
+  {
+    "command": "task label unassign",
     "source": "cli"
   },
   {
