@@ -129,4 +129,21 @@ public sealed class SettingDecorationTests
             Assert.False(string.IsNullOrEmpty(entry.Control), $"entry {entry.Key} has empty control");
         }
     }
+    [Fact]
+    public void WriteReferenceDoc_WritesFileToDisk()
+    {
+        var tempPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"cove-config-ref-{System.Guid.NewGuid():N}.md");
+        try
+        {
+            ConfigSchemaGenerator.WriteReferenceDoc(tempPath);
+            var content = System.IO.File.ReadAllText(tempPath);
+            Assert.Contains("# Configuration Reference", content);
+            Assert.Contains("theme", content);
+            Assert.Contains("## appearance", content);
+        }
+        finally
+        {
+            if (System.IO.File.Exists(tempPath)) System.IO.File.Delete(tempPath);
+        }
+    }
 }
