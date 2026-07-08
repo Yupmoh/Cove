@@ -921,4 +921,61 @@ internal static class CliCommands
     [CoveCommand("viewer get-state")]
     public static Task<int> ViewerGetState(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/viewer.get-state");
+    [CoveCommand("capture start")]
+    public static Task<int> CaptureStart(CommandContext ctx)
+    {
+        var args = ctx.Args;
+        var region = ArgValue(args, "--region") ?? "fullscreen";
+        var workspaceId = ArgValue(args, "--workspace") ?? "";
+        var audio = args.Contains("--audio");
+        var mic = args.Contains("--mic");
+        var cursor = args.Contains("--cursor");
+        return ctx.RouteCoreWithParamsAsync("cove://commands/capture.start", $$"""{"workspaceId":"{{workspaceId}}","region":"{{region}}","audio":{{audio.ToString().ToLowerInvariant()}},"mic":{{mic.ToString().ToLowerInvariant()}},"cursor":{{cursor.ToString().ToLowerInvariant()}}}""");
+    }
+
+    [CoveCommand("capture stop")]
+    public static Task<int> CaptureStop(CommandContext ctx)
+    {
+        var args = ctx.Args;
+        var id = ArgValue(args, "--id") ?? (args.Length > 0 ? args[0] : "");
+        return ctx.RouteCoreWithParamsAsync("cove://commands/capture.stop", $$"""{"id":"{{id}}"}""");
+    }
+
+    [CoveCommand("capture list")]
+    public static Task<int> CaptureList(CommandContext ctx)
+        => ctx.RouteCoreWithParamsAsync("cove://commands/capture.list", null);
+
+    [CoveCommand("capture delete")]
+    public static Task<int> CaptureDelete(CommandContext ctx)
+    {
+        var args = ctx.Args;
+        var id = ArgValue(args, "--id") ?? (args.Length > 0 ? args[0] : "");
+        return ctx.RouteCoreWithParamsAsync("cove://commands/capture.delete", $$"""{"id":"{{id}}"}""");
+    }
+
+    [CoveCommand("capture flag")]
+    public static Task<int> CaptureFlag(CommandContext ctx)
+    {
+        var args = ctx.Args;
+        var id = ArgValue(args, "--id") ?? (args.Length > 0 ? args[0] : "");
+        var label = ArgValue(args, "--label") ?? "";
+        return ctx.RouteCoreWithParamsAsync("cove://commands/capture.flag", $$"""{"id":"{{id}}","label":"{{label}}"}""");
+    }
+
+    [CoveCommand("capture show")]
+    public static Task<int> CaptureShow(CommandContext ctx)
+    {
+        var args = ctx.Args;
+        var id = ArgValue(args, "--id") ?? (args.Length > 0 ? args[0] : "");
+        return ctx.RouteCoreWithParamsAsync("cove://commands/capture.show", $$"""{"id":"{{id}}"}""");
+    }
+
+    [CoveCommand("capture attach")]
+    public static Task<int> CaptureAttach(CommandContext ctx)
+    {
+        var args = ctx.Args;
+        var captureId = ArgValue(args, "--capture") ?? "";
+        var taskId = ArgValue(args, "--task") ?? "";
+        return ctx.RouteCoreWithParamsAsync("cove://commands/capture.attach", $$"""{"captureId":"{{captureId}}","taskId":"{{taskId}}"}""");
+    }
 }

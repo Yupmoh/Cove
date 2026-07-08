@@ -4,6 +4,7 @@ using Cove.Adapters;
 using Cove.Engine.Activity;
 using Cove.Engine.Agents;
 using Cove.Engine.Browser;
+using Cove.Engine.Captures;
 using Cove.Engine.Config;
 using Cove.Engine.Hooks;
 using Cove.Engine.Knowledge;
@@ -63,8 +64,9 @@ public sealed class EngineDispatchContext
         RegistryService? registry = null,
         Cove.Engine.Activity.OmniChatStore? omniChat = null,
         PaneScopeStore? paneScopes = null,
-        StateBus? stateBus = null,
-        ExtensionRegistry? extensions = null)
+        Cove.Engine.Protocol.StateBus? stateBus = null,
+        ExtensionRegistry? extensions = null,
+        CaptureStore? captures = null)
     {
         Request = request;
         Panes = panes;
@@ -110,6 +112,7 @@ public sealed class EngineDispatchContext
         PaneScopes = paneScopes;
         StateBus = stateBus;
         Extensions = extensions;
+        Captures = captures;
     }
 
     public ControlRequest Request { get; }
@@ -151,11 +154,12 @@ public sealed class EngineDispatchContext
     public ConfigService? Config { get; }
     public BrowserPaneManager? Browser { get; }
     public AdapterManifestStore? ManifestStore { get; }
-    public OmniChatStore? OmniChat { get; }
     public RegistryService? Registry { get; }
+    public OmniChatStore? OmniChat { get; }
     public PaneScopeStore? PaneScopes { get; }
-    public StateBus? StateBus { get; }
+    public Cove.Engine.Protocol.StateBus? StateBus { get; }
     public ExtensionRegistry? Extensions { get; }
+    public CaptureStore? Captures { get; }
     public System.Func<ControlRequest, System.Threading.Tasks.Task<ControlResponse?>>? Redrive { get; set; }
 
     public ControlResponse Ok<T>(T data, JsonTypeInfo<T> typeInfo)
