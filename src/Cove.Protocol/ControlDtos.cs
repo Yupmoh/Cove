@@ -214,6 +214,11 @@ public sealed record TaskClaimResult(bool Success, string? RunId, string? Error)
 public sealed record RunResumeParams(string Id, string? PaneId, string? AdapterOverride);
 public sealed record RunResumeResult(bool Success, string? NewSegmentId, string? Error, string Outcome);
 public sealed record RunSetPendingPromptParams(string Id, string? Prompt);
+public sealed record ScheduleSetRouteParams(string CardId, string TriggerKind, string? Cron, string? Tz, string? At, string? CompletionRule, string? MarkDoneBy, bool? BlockOverlap, string? HomeStatusId);
+public sealed record ScheduleGetParams(string CardId);
+public sealed record ScheduleInfo(string CardId, string TriggerKind, string? Cron, string? Tz, string? At, string CompletionRule, string MarkDoneBy, bool BlockOverlap, string? HomeStatusId, bool Paused, bool SkipNext, string? NextFireAt, string? LastFiredAt, string Mode);
+public sealed record ScheduleUpdateStateParams(string CardId, bool? Paused, bool? SkipNext);
+public sealed record ScheduleValidationResultDto(bool IsValid, string[] Errors, string? NextFireAt);
 public sealed record StatusSetHiddenParams(string WorkspaceId, string Id, bool Hidden);
 
 public sealed record Note
@@ -381,6 +386,11 @@ public sealed record BrowserPaneDto(string PaneId, string CurrentUrl, System.Col
 [JsonSerializable(typeof(TaskSetInReviewParams))]
 [JsonSerializable(typeof(TaskSetDoneParams))]
 [JsonSerializable(typeof(RunResumeParams))]
+[JsonSerializable(typeof(ScheduleSetRouteParams))]
+[JsonSerializable(typeof(ScheduleGetParams))]
+[JsonSerializable(typeof(ScheduleInfo))]
+[JsonSerializable(typeof(ScheduleUpdateStateParams))]
+[JsonSerializable(typeof(ScheduleValidationResultDto))]
 [JsonSerializable(typeof(RunSetPendingPromptParams))]
 [JsonSerializable(typeof(RunResumeResult))]
 [JsonSerializable(typeof(TaskClaimParams))]

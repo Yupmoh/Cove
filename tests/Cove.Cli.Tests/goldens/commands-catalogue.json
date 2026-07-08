@@ -620,6 +620,30 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/task.repeat.get",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/task.repeat.pause",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/task.repeat.resume",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/task.repeat.set",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/task.repeat.skip-next",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/task.repeat.stop",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/task.set-done",
     "source": "core"
   },
@@ -985,6 +1009,30 @@
   },
   {
     "command": "task list",
+    "source": "cli"
+  },
+  {
+    "command": "task repeat get",
+    "source": "cli"
+  },
+  {
+    "command": "task repeat pause",
+    "source": "cli"
+  },
+  {
+    "command": "task repeat resume",
+    "source": "cli"
+  },
+  {
+    "command": "task repeat set",
+    "source": "cli"
+  },
+  {
+    "command": "task repeat skip-next",
+    "source": "cli"
+  },
+  {
+    "command": "task repeat stop",
     "source": "cli"
   },
   {

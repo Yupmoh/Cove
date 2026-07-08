@@ -16,6 +16,7 @@ public sealed class TaskService
     private readonly Runs.RunRepository _runs;
     private readonly Runs.RunSegmentRepository _segments;
     private readonly CommentRepository _comments;
+    private readonly Schedules.ScheduleRepository _schedules;
     private readonly TasksStore _store;
 
     public TaskService(string dataDir, ILogger logger)
@@ -32,6 +33,7 @@ public sealed class TaskService
         _labels = new LabelRepository(_factory, _channel);
         _runs = new Runs.RunRepository(_factory, _channel);
         _segments = new Runs.RunSegmentRepository(_factory, _channel);
+        _schedules = new Schedules.ScheduleRepository(_factory, _channel);
     }
 
 
@@ -223,4 +225,10 @@ public sealed class TaskService
     public System.Threading.Tasks.Task<Runs.RunRow?> CreateRunAsync(string cardId, string workspaceId, string? launchProfileJson, string? runFamilyId = null, bool backgrounded = false, string? reviewStatusId = null, string? completionStatusId = null) => _runs.CreateAsync(cardId, workspaceId, launchProfileJson, runFamilyId, backgrounded, reviewStatusId, completionStatusId);
     public System.Threading.Tasks.Task<Runs.RunSegmentRow?> AddRunSegmentAsync(string runId, string? paneId, string? adapterSessionId) => _segments.AddAsync(runId, paneId, adapterSessionId);
     public System.Threading.Tasks.Task EndRunSegmentAsync(string segmentId) => _segments.EndAsync(segmentId);
+
+    public Schedules.ScheduleRow? GetSchedule(string cardId) => _schedules.GetByCard(cardId);
+    public System.Threading.Tasks.Task UpsertScheduleAsync(Schedules.ScheduleRow row) => _schedules.UpsertAsync(row);
+    public System.Threading.Tasks.Task UpdateScheduleAsync(string cardId, bool? paused, bool? skipNext, string? nextFireAt, string? lastFiredAt) => _schedules.UpdateAsync(cardId, paused, skipNext, nextFireAt, lastFiredAt);
+    public System.Threading.Tasks.Task DeleteScheduleAsync(string cardId) => _schedules.DeleteAsync(cardId);
+    public System.Collections.Generic.IReadOnlyList<Schedules.ScheduleRow> ListDueSchedules(System.DateTimeOffset now) => _schedules.ListDue(now);
 }

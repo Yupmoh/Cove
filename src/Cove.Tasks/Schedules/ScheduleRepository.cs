@@ -1,0 +1,112 @@
+using Cove.Persistence;
+using Cove.Tasks.Store;
+using Dapper;
+using Microsoft.Data.Sqlite;
+
+namespace Cove.Tasks.Schedules;
+
+public sealed class ScheduleRow
+{
+    public string CardId { get; set; } = "";
+    public string TriggerKind { get; set; } = "immediate";
+    public string? Cron { get; set; }
+    public string? Tz { get; set; }
+    public string? At { get; set; }
+    public string CompletionRule { get; set; } = "loop";
+    public string MarkDoneBy { get; set; } = "agent";
+    public bool BlockOverlap { get; set; } = true;
+    public string? HomeStatusId { get; set; }
+    public bool Paused { get; set; }
+    public bool SkipNext { get; set; }
+    public string? NextFireAt { get; set; }
+    public string? LastFiredAt { get; set; }
+    public string CreatedAt { get; set; } = "";
+    public string UpdatedAt { get; set; } = "";
+}
+
+public sealed class ScheduleRepository
+{
+    private readonly SqliteConnectionFactory _factory;
+    private readonly TasksWriteChannel? _channel;
+
+    private const string SelectColumns = "card_id AS CardId, trigger_kind AS TriggerKind, cron AS Cron, tz AS Tz, at AS At, completion_rule AS CompletionRule, mark_done_by AS MarkDoneBy, block_overlap AS BlockOverlap, home_status_id AS HomeStatusId, paused AS Paused, skip_next AS SkipNext, next_fire_at AS NextFireAt, last_fired_at AS LastFiredAt, created_at AS CreatedAt, updated_at AS UpdatedAt";
+
+    public ScheduleRepository(SqliteConnectionFactory factory, TasksWriteChannel? channel = null)
+    {
+        _factory = factory;
+        _channel = channel;
+    }
+
+    public System.Threading.Tasks.Task UpsertAsync(ScheduleRow row)
+    {
+        row.CreatedAt = System.DateTimeOffset.UtcNow.ToString("o");
+        row.UpdatedAt = System.DateTimeOffset.UtcNow.ToString("o");
+        if (_channel is null)
+        {
+            using var conn = _factory.Open();
+            UpsertInternal(conn, row);
+            return System.Threading.Tasks.Task.CompletedTask;
+        }
+        return _channel.ExecuteAsync(conn => { UpsertInternal(conn, row); return System.Threading.Tasks.Task.CompletedTask; });
+    }
+
+    private static void UpsertInternal(SqliteConnection conn, ScheduleRow row)
+    {
+        conn.Execute(
+            "INSERT INTO card_schedules (card_id, trigger_kind, cron, tz, at, completion_rule, mark_done_by, block_overlap, home_status_id, paused, skip_next, next_fire_at, last_fired_at, created_at, updated_at) VALUES (@CardId, @TriggerKind, @Cron, @Tz, @At, @CompletionRule, @MarkDoneBy, @BlockOverlap, @HomeStatusId, @Paused, @SkipNext, @NextFireAt, @LastFiredAt, @CreatedAt, @UpdatedAt) ON CONFLICT(card_id) DO UPDATE SET trigger_kind=@TriggerKind, cron=@Cron, tz=@Tz, at=@At, completion_rule=@CompletionRule, mark_done_by=@MarkDoneBy, block_overlap=@BlockOverlap, home_status_id=@HomeStatusId, paused=@Paused, skip_next=@SkipNext, next_fire_at=@NextFireAt, last_fired_at=@LastFiredAt, updated_at=@UpdatedAt",
+            row);
+    }
+
+    public ScheduleRow? GetByCard(string cardId)
+    {
+        using var conn = _factory.Open();
+        return conn.QueryFirstOrDefault<ScheduleRow>(
+            $"SELECT {SelectColumns} FROM card_schedules WHERE card_id = @CardId",
+            new { CardId = cardId });
+    }
+
+    public System.Collections.Generic.IReadOnlyList<ScheduleRow> ListDue(System.DateTimeOffset now)
+    {
+        using var conn = _factory.Open();
+        var nowStr = now.ToString("o");
+        return conn.Query<ScheduleRow>(
+            $"SELECT {SelectColumns} FROM card_schedules WHERE paused = 0 AND next_fire_at IS NOT NULL AND next_fire_at <= @Now ORDER BY next_fire_at",
+            new { Now = nowStr }).AsList();
+    }
+
+    public System.Threading.Tasks.Task UpdateAsync(string cardId, bool? paused, bool? skipNext, string? nextFireAt, string? lastFiredAt)
+    {
+        if (_channel is null)
+        {
+            using var conn = _factory.Open();
+            UpdateInternal(conn, cardId, paused, skipNext, nextFireAt, lastFiredAt);
+            return System.Threading.Tasks.Task.CompletedTask;
+        }
+        return _channel.ExecuteAsync(conn => { UpdateInternal(conn, cardId, paused, skipNext, nextFireAt, lastFiredAt); return System.Threading.Tasks.Task.CompletedTask; });
+    }
+
+    private static void UpdateInternal(SqliteConnection conn, string cardId, bool? paused, bool? skipNext, string? nextFireAt, string? lastFiredAt)
+    {
+        var sets = new System.Collections.Generic.List<string>();
+        var p = new DynamicParameters();
+        p.Add("CardId", cardId);
+        p.Add("Now", System.DateTimeOffset.UtcNow.ToString("o"));
+        if (paused is not null) { sets.Add("paused = @Paused"); p.Add("Paused", paused.Value ? 1 : 0); }
+        if (skipNext is not null) { sets.Add("skip_next = @SkipNext"); p.Add("SkipNext", skipNext.Value ? 1 : 0); }
+        if (nextFireAt is not null) { sets.Add("next_fire_at = @NextFireAt"); p.Add("NextFireAt", nextFireAt); }
+        if (lastFiredAt is not null) { sets.Add("last_fired_at = @LastFiredAt"); p.Add("LastFiredAt", lastFiredAt); }
+        sets.Add("updated_at = @Now");
+        conn.Execute($"UPDATE card_schedules SET {string.Join(", ", sets)} WHERE card_id = @CardId", p);
+    }
+
+    public System.Threading.Tasks.Task DeleteAsync(string cardId)
+    {
+        if (_channel is null)
+        {
+            using var conn = _factory.Open();
+            conn.Execute("DELETE FROM card_schedules WHERE card_id = @CardId", new { CardId = cardId });
+            return System.Threading.Tasks.Task.CompletedTask;
+        }
+        return _channel.ExecuteAsync(conn => { conn.Execute("DELETE FROM card_schedules WHERE card_id = @CardId", new { CardId = cardId }); return System.Threading.Tasks.Task.CompletedTask; });
+    }
+}

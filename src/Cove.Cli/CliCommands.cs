@@ -584,6 +584,30 @@ internal static class CliCommands
     public static Task<int> RunSetPendingPrompt(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/run.set-pending-prompt");
 
+    [CoveCommand("task repeat set")]
+    public static Task<int> TaskRepeatSet(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/task.repeat.set");
+
+    [CoveCommand("task repeat get")]
+    public static Task<int> TaskRepeatGet(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/task.repeat.get");
+
+    [CoveCommand("task repeat pause")]
+    public static Task<int> TaskRepeatPause(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/task.repeat.pause");
+
+    [CoveCommand("task repeat resume")]
+    public static Task<int> TaskRepeatResume(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/task.repeat.resume");
+
+    [CoveCommand("task repeat skip-next")]
+    public static Task<int> TaskRepeatSkipNext(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/task.repeat.skip-next");
+
+    [CoveCommand("task repeat stop")]
+    public static Task<int> TaskRepeatStop(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/task.repeat.stop");
+
     [CoveCommand("note list")]
     public static Task<int> NoteList(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/note.list");
