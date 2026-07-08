@@ -66,13 +66,18 @@ public sealed class DaemonHost
     private Cove.Engine.Browser.BrowserPaneManager? _browser;
     private Cove.Engine.Config.ConfigService? _config;
 
-    public DaemonHost(DaemonPaths paths, IControlEndpoint endpoint, bool exitWhenIdle)
+    public DaemonHost(DaemonPaths paths, IControlEndpoint endpoint, bool exitWhenIdle, Cove.Tasks.Dispatch.DispatchSaga? dispatchSaga = null, Cove.Tasks.Dispatch.ResumeSaga? resumeSaga = null)
     {
         _paths = paths;
         _endpoint = endpoint;
         _exitWhenIdle = exitWhenIdle;
-        _dispatchSaga = null;
-        _resumeSaga = null;
+        _dispatchSaga = dispatchSaga;
+        _resumeSaga = resumeSaga;
+    }
+    public void SetSagas(Cove.Tasks.Dispatch.DispatchSaga? dispatchSaga, Cove.Tasks.Dispatch.ResumeSaga? resumeSaga)
+    {
+        _dispatchSaga = dispatchSaga;
+        _resumeSaga = resumeSaga;
     }
 
     public async Task<int> RunAsync(CancellationToken externalCancellation)

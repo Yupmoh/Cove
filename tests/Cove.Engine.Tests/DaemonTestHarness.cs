@@ -19,21 +19,31 @@ public sealed class DaemonTestHarness : IAsyncDisposable
     private string? _prev;
     private CancellationTokenSource _cts = new();
     private DaemonHost? _host;
+    private Cove.Tasks.Dispatch.DispatchSaga? _dispatchSaga;
+    private Cove.Tasks.Dispatch.ResumeSaga? _resumeSaga;
 
     public IControlEndpoint Endpoint { get; private set; } = null!;
+    public void SetSagas(Cove.Tasks.Dispatch.DispatchSaga? dispatchSaga, Cove.Tasks.Dispatch.ResumeSaga? resumeSaga)
+    {
+        _dispatchSaga = dispatchSaga;
+        _resumeSaga = resumeSaga;
+        _host?.SetSagas(dispatchSaga, resumeSaga);
+    }
     public Task Run => _run;
     public string DataDir => _parent;
-    public static async Task<DaemonTestHarness> StartAsync()
+    public static async Task<DaemonTestHarness> StartAsync(Cove.Tasks.Dispatch.DispatchSaga? dispatchSaga = null, Cove.Tasks.Dispatch.ResumeSaga? resumeSaga = null, string? dataDir = null)
     {
         var h = new DaemonTestHarness();
-        h._parent = Path.Combine(Path.GetTempPath(), "cove-daemon-" + Guid.NewGuid().ToString("N").Substring(0, 8));
+        h._dispatchSaga = dispatchSaga;
+        h._resumeSaga = resumeSaga;
+        h._parent = dataDir ?? Path.Combine(Path.GetTempPath(), "cove-daemon-" + Guid.NewGuid().ToString("N").Substring(0, 8));
         h._prev = Environment.GetEnvironmentVariable("COVE_DATA_DIR");
         Environment.SetEnvironmentVariable("COVE_DATA_DIR", h._parent);
 
         CoveDataDir dd = CoveDataDir.Resolve(CoveChannel.Dev);
         h._paths = new DaemonPaths(dd);
         h.Endpoint = ControlEndpointFactory.FromSocketPath(dd.SocketPath);
-        var host = new DaemonHost(h._paths, h.Endpoint, exitWhenIdle: false);
+        var host = new DaemonHost(h._paths, h.Endpoint, exitWhenIdle: false, dispatchSaga, resumeSaga);
         h._host = host;
         h._run = Task.Run(() => host.RunAsync(h._cts.Token));
 
@@ -66,7 +76,7 @@ public sealed class DaemonTestHarness : IAsyncDisposable
         try { await _run.WaitAsync(TimeSpan.FromSeconds(5)); } catch { }
         _cts.Dispose();
         _cts = new CancellationTokenSource();
-        _host = new DaemonHost(_paths, Endpoint, exitWhenIdle: false);
+        _host = new DaemonHost(_paths, Endpoint, exitWhenIdle: false, _dispatchSaga, _resumeSaga);
         var runHost = _host;
         var runCts = _cts;
         _run = Task.Run(() => runHost.RunAsync(runCts.Token));
