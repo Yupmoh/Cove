@@ -180,6 +180,33 @@ public sealed class RunRepositoryTests
     }
 
     [Fact]
+    public async System.Threading.Tasks.Task ListByWorkspace_ReturnsWorkspaceRuns()
+    {
+        var (_, runs, _, cards, _) = await NewAsync();
+        var cardId = await SeedCardAsync(cards, "ws1", 1);
+        await runs.CreateAsync(cardId, "ws1", null);
+
+        var list = runs.ListByWorkspace("ws1");
+        Assert.Single(list);
+        Assert.Empty(runs.ListByWorkspace("ws2"));
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task ListByCardAndState_ComposesFilters()
+    {
+        var (_, runs, _, cards, _) = await NewAsync();
+        var cardId = await SeedCardAsync(cards, "ws1", 1);
+        var r1 = await runs.CreateAsync(cardId, "ws1", null);
+        var r2 = await runs.CreateAsync(cardId, "ws1", null);
+        await runs.TransitionAsync(r1!.Id, RunState.Completed);
+
+        var active = runs.ListByCardAndState(cardId, "active");
+        var completed = runs.ListByCardAndState(cardId, "completed");
+        Assert.Single(active);
+        Assert.Single(completed);
+    }
+
+    [Fact]
     public async System.Threading.Tasks.Task HasActiveRun_DetectsActiveOrInterrupted()
     {
         var (_, runs, _, cards, _) = await NewAsync();

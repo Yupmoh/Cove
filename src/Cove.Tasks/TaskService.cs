@@ -11,8 +11,10 @@ public sealed class TaskService
     private readonly TasksWriteChannel _channel;
     private readonly CardRepository _cards;
     private readonly TaskCounterRepository _counter;
-    private readonly StatusRepository _statuses;
     private readonly LabelRepository _labels;
+    private readonly StatusRepository _statuses;
+    private readonly Runs.RunRepository _runs;
+    private readonly Runs.RunSegmentRepository _segments;
     private readonly CommentRepository _comments;
     private readonly TasksStore _store;
 
@@ -28,6 +30,8 @@ public sealed class TaskService
         _statuses = new StatusRepository(_factory, _channel);
         _comments = new CommentRepository(_factory, _channel, _cards);
         _labels = new LabelRepository(_factory, _channel);
+        _runs = new Runs.RunRepository(_factory, _channel);
+        _segments = new Runs.RunSegmentRepository(_factory, _channel);
     }
 
 
@@ -188,4 +192,21 @@ public sealed class TaskService
         var card = _cards.GetById(cardId);
         return card is null ? new TaskProfilePayload(null, null, []) : SkillsBinder.ResolveTaskProfile(card);
     }
+
+    public Runs.RunRow? GetRun(string id) => _runs.GetById(id);
+    public System.Collections.Generic.IReadOnlyList<Runs.RunRow> ListRuns(string? taskId, string? workspaceId, string? state)
+    {
+        if (taskId is not null && state is not null) return _runs.ListByCardAndState(taskId, state);
+        if (taskId is not null) return _runs.ListByCard(taskId);
+        if (workspaceId is not null && state is not null) return _runs.ListByWorkspaceAndState(workspaceId, state);
+        if (workspaceId is not null) return _runs.ListByWorkspace(workspaceId);
+        if (state is not null) return _runs.ListByState(state);
+        return [];
+    }
+    public System.Collections.Generic.IReadOnlyList<Runs.RunSegmentRow> ListRunSegments(string runId) => _segments.ListByRun(runId);
+    public bool HasActiveRun(string cardId) => _runs.HasActiveRun(cardId);
+    public System.Threading.Tasks.Task<Runs.RunRow?> CreateRunAsync(string cardId, string workspaceId, string? launchProfileJson, string? runFamilyId = null, bool backgrounded = false) => _runs.CreateAsync(cardId, workspaceId, launchProfileJson, runFamilyId, backgrounded);
+    public System.Threading.Tasks.Task TransitionRunAsync(string runId, Runs.RunState newState) => _runs.TransitionAsync(runId, newState);
+    public System.Threading.Tasks.Task<Runs.RunSegmentRow?> AddRunSegmentAsync(string runId, string? paneId, string? adapterSessionId) => _segments.AddAsync(runId, paneId, adapterSessionId);
+    public System.Threading.Tasks.Task EndRunSegmentAsync(string segmentId) => _segments.EndAsync(segmentId);
 }

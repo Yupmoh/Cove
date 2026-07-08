@@ -425,6 +425,26 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/run.cancel",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/run.complete",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/run.list",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/run.segments",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/run.show",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/session.background",
     "source": "core"
   },
@@ -817,6 +837,26 @@
   },
   {
     "command": "protocol resolve",
+    "source": "cli"
+  },
+  {
+    "command": "run cancel",
+    "source": "cli"
+  },
+  {
+    "command": "run complete",
+    "source": "cli"
+  },
+  {
+    "command": "run list",
+    "source": "cli"
+  },
+  {
+    "command": "run segments",
+    "source": "cli"
+  },
+  {
+    "command": "run show",
     "source": "cli"
   },
   {

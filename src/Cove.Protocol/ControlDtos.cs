@@ -198,6 +198,13 @@ public sealed record TaskBindingSetParams(string CardId, string? AgentRef, strin
 public sealed record TaskBindingGetParams(string CardId);
 public sealed record TaskProfileResolveParams(string CardId);
 public sealed record TaskProfilePayloadDto(string? AgentRef, string? ProfileSlug, SkillSelectionDto[] Skills);
+public sealed record RunInfo(string Id, string CardId, string WorkspaceId, string RunFamilyId, string State, bool Backgrounded, string? LaunchProfileJson, string StartedAt, string? EndedAt, string CreatedAt);
+public sealed record RunListResult(System.Collections.Generic.IReadOnlyList<RunInfo> Runs);
+public sealed record RunListParams(string? TaskId, string? WorkspaceId, string? State);
+public sealed record RunRefParams(string Id);
+public sealed record RunCompleteParams(string Id, string? Source);
+public sealed record RunSegmentInfo(string Id, string RunId, string? PaneId, string? AdapterSessionId, string StartedAt, string? EndedAt);
+public sealed record RunSegmentListResult(System.Collections.Generic.IReadOnlyList<RunSegmentInfo> Segments);
 public sealed record StatusSetHiddenParams(string WorkspaceId, string Id, bool Hidden);
 
 public sealed record Note
@@ -359,6 +366,13 @@ public sealed record BrowserPaneDto(string PaneId, string CurrentUrl, System.Col
 [JsonSerializable(typeof(LabelAssignParams))]
 [JsonSerializable(typeof(LabelReorderParams))]
 [JsonSerializable(typeof(LabelFilterParams))]
+[JsonSerializable(typeof(RunInfo))]
+[JsonSerializable(typeof(RunListResult))]
+[JsonSerializable(typeof(RunListParams))]
+[JsonSerializable(typeof(RunRefParams))]
+[JsonSerializable(typeof(RunCompleteParams))]
+[JsonSerializable(typeof(RunSegmentInfo))]
+[JsonSerializable(typeof(RunSegmentListResult))]
 [JsonSerializable(typeof(LabelFilterResult))]
 [JsonSerializable(typeof(SkillSelectionDto))]
 [JsonSerializable(typeof(TaskBindingInfo))]

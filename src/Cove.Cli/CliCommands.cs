@@ -540,6 +540,26 @@ internal static class CliCommands
     public static Task<int> TaskBindingResolveProfile(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/task.binding.resolve-profile");
 
+    [CoveCommand("run list")]
+    public static Task<int> RunList(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/run.list");
+
+    [CoveCommand("run show")]
+    public static Task<int> RunShow(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/run.show");
+
+    [CoveCommand("run segments")]
+    public static Task<int> RunSegments(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/run.segments");
+
+    [CoveCommand("run cancel")]
+    public static Task<int> RunCancel(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/run.cancel");
+
+    [CoveCommand("run complete")]
+    public static Task<int> RunComplete(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/run.complete");
+
     [CoveCommand("note list")]
     public static Task<int> NoteList(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/note.list");

@@ -95,6 +95,24 @@ public sealed class RunRepository
         return conn.Query<RunRow>($"SELECT {SelectColumns} FROM task_runs WHERE state = @State ORDER BY created_at", new { State = state }).AsList();
     }
 
+    public IReadOnlyList<RunRow> ListByWorkspace(string workspaceId)
+    {
+        using var conn = _factory.Open();
+        return conn.Query<RunRow>($"SELECT {SelectColumns} FROM task_runs WHERE workspace_id = @WorkspaceId ORDER BY created_at", new { WorkspaceId = workspaceId }).AsList();
+    }
+
+    public IReadOnlyList<RunRow> ListByCardAndState(string cardId, string state)
+    {
+        using var conn = _factory.Open();
+        return conn.Query<RunRow>($"SELECT {SelectColumns} FROM task_runs WHERE card_id = @CardId AND state = @State ORDER BY created_at", new { CardId = cardId, State = state }).AsList();
+    }
+
+    public IReadOnlyList<RunRow> ListByWorkspaceAndState(string workspaceId, string state)
+    {
+        using var conn = _factory.Open();
+        return conn.Query<RunRow>($"SELECT {SelectColumns} FROM task_runs WHERE workspace_id = @WorkspaceId AND state = @State ORDER BY created_at", new { WorkspaceId = workspaceId, State = state }).AsList();
+    }
+
     public bool HasActiveRun(string cardId)
     {
         using var conn = _factory.Open();

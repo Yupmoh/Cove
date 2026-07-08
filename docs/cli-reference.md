@@ -108,6 +108,11 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/room.pin` | core |  |
 | `cove://commands/room.rename` | core |  |
 | `cove://commands/room.switch` | core |  |
+| `cove://commands/run.cancel` | core |  |
+| `cove://commands/run.complete` | core |  |
+| `cove://commands/run.list` | core |  |
+| `cove://commands/run.segments` | core |  |
+| `cove://commands/run.show` | core |  |
 | `cove://commands/session.background` | core |  |
 | `cove://commands/session.dismiss` | core |  |
 | `cove://commands/session.foreground` | core |  |
@@ -206,6 +211,11 @@ Generated from the command registry. Do not edit by hand.
 | `pane list` | cli |  |
 | `pane-types list` | cli |  |
 | `protocol resolve` | cli |  |
+| `run cancel` | cli |  |
+| `run complete` | cli |  |
+| `run list` | cli |  |
+| `run segments` | cli |  |
+| `run show` | cli |  |
 | `skills list` | cli |  |
 | `skills resolve-prompt-sigils` | cli |  |
 | `task binding get` | cli |  |
@@ -238,4 +248,4 @@ Generated from the command registry. Do not edit by hand.
 | `timeline list` | cli |  |
 | `version` | cli |  |
 
-Total: 233 commands
+Total: 243 commands
