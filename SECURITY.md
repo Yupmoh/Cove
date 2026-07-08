@@ -1,16 +1,24 @@
 # Security Policy
 
-## Supported versions
-
-Cove is in early development. Security fixes are made against the `main` branch
-and the most recent tagged release.
-
 ## Reporting a vulnerability
 
-Please report security vulnerabilities privately using GitHub Security
-Advisories:
+If you discover a security vulnerability in Cove, please report it responsibly:
 
-https://github.com/Yupmoh/Cove/security/advisories/new
+1. **Do not** open a public GitHub issue.
+2. Email the maintainer at the address listed on the GitHub profile.
+3. Include a description of the vulnerability, steps to reproduce, and any relevant logs.
 
-Do not open a public issue for a security vulnerability. You will receive an
-acknowledgement, and we will work with you on a fix and coordinated disclosure.
+You will receive a response within 72 hours. If the vulnerability is confirmed, a fix will be prioritized and disclosed after a coordinated release.
+
+## Scope
+
+Cove is a local-first terminal workspace. The daemon listens on a local control socket (`cove://`) and does not expose network endpoints by default. Telemetry is opt-in and off by default. Crash reports are local-only with zero network egress.
+
+## Supported versions
+
+Only the latest release line receives security fixes.
+
+## Disclosure policy
+
+- Vulnerabilities are disclosed after a fix is released.
+- We credit reporters unless they prefer to remain anonymous.

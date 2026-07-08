@@ -1,47 +1,43 @@
 # Contributing to Cove
 
-Thanks for your interest in Cove.
+Cove is a free, open-source, AI-native terminal workspace. We welcome contributions.
 
-## Building
+## Getting started
 
-Cove targets the .NET SDK pinned in `global.json`. Build the whole solution:
+1. Clone the repository.
+2. Install the .NET 10 SDK.
+3. Run `dotnet build Cove.slnx` from the repo root.
+4. Run `dotnet test Cove.slnx` to verify the full suite.
 
-```
-dotnet build Cove.slnx
-```
+## Architecture overview
 
-Run the tests:
+Cove is a **headless-first** terminal workspace: a `cove daemon` engine owns PTYs, sessions, and SQLite state; the Ryn GUI, the TUI, and the `cove` CLI are all thin clients of one `cove://` control socket.
 
-```
-dotnet test Cove.slnx
-```
+Read `docs/architecture.md` for the subsystem map, and `AGENTS.md` for executor rules if you are working from a plan packet.
 
-## Branches and pull requests
+## Engineering standards
 
-- Work on a topic branch and open a pull request against `main`.
-- Keep each pull request focused. Small, reviewable changes merge fastest.
-- Every change ships with its tests. New behavior without tests will be asked
-  to add them.
+- **Native-AOT safe**: zero reflection. Source-generate all JSON serialization (`JsonSerializerContext`), regex (`[GeneratedRegex]`), and logging (ZLogger).
+- **Zero warnings**: the build treats warnings as errors. No CS8019/CS8933/IL2026/IL3050.
+- **Tests first**: write the test, watch it fail, then implement.
+- **No silent swallows**: log a Warning before any early return on missing/invalid data. `catch {}` is forbidden.
+- **Self-documenting names**: no comments (`//`, `///`, `TODO`, `FIXME`).
+- **Central Package Management**: package versions live only in `Directory.Packages.props`.
+- **Vertical slices**: keep handlers + state + tests together. No horizontal `Services/` layers.
 
-## Commit style
+## Commit conventions
 
-Commit titles are type-prefixed, imperative, and describe the change:
+- Title-only, type-prefixed: `feat:`, `fix:`, `chore:`, `docs:`, `test:`, `refactor:`, `style:`.
+- No body, no scope, no trailer.
+- No AI attribution in commit messages or committed files.
 
-```
-feat: add framed control protocol codec
-fix: reclaim stale control socket after crash
-chore: bump SDK pin
-```
+## Pull requests
 
-Use one of: `feat`, `fix`, `chore`, `docs`, `refactor`, `style`, `test`, `ci`,
-`perf`, `build`. No parenthetical scopes.
+- Branch from `main`, target `main`.
+- One logical change per PR.
+- Include tests for new behavior.
+- Ensure `dotnet build Cove.slnx` and `dotnet test Cove.slnx` pass.
 
-## Code style
+## License
 
-Formatting is enforced by `dotnet format`. Before pushing:
-
-```
-dotnet format Cove.slnx --verify-no-changes
-```
-
-Warnings are treated as errors. A green build has zero warnings.
+By contributing, you agree your contributions are licensed under Apache-2.0.
