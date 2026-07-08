@@ -20,6 +20,7 @@ public sealed record ControlError(string Code, string Message);
 
 public sealed record ControlEvent(string Channel, JsonElement Payload);
 public sealed record StateChangedEvent(string Uri);
+public sealed record ConfigChangedEvent(string Key);
 
 public sealed record ControlErrorFrame(string Code, string Message, ulong? StreamId = null);
 
@@ -370,10 +371,11 @@ public sealed record ReviewDispatchResultDto(string DispatchId, string TargetPan
 [JsonSerializable(typeof(ControlResponse))]
 [JsonSerializable(typeof(ControlEvent))]
 [JsonSerializable(typeof(StateChangedEvent))]
+[JsonSerializable(typeof(ConfigChangedEvent))]
 [JsonSerializable(typeof(ControlErrorFrame))]
+[JsonSerializable(typeof(DaemonStatusResult))]
 [JsonSerializable(typeof(HelloParams))]
 [JsonSerializable(typeof(HelloResult))]
-[JsonSerializable(typeof(DaemonStatusResult))]
 [JsonSerializable(typeof(PaneInfo[]))]
 [JsonSerializable(typeof(PaneListResult))]
 [JsonSerializable(typeof(SpawnParams))]

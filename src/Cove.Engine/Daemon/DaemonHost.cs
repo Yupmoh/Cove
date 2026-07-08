@@ -172,6 +172,7 @@ public sealed class DaemonHost
         _captures = new Cove.Engine.Captures.CaptureStore(dataDir, logger);
         _gitReadModel = new Cove.Engine.Workspaces.GitReadModel(new Cove.Engine.Workspaces.ProcessGitRunner(), logger);
         _searchService = new Cove.Engine.Search.SearchService(logger);
+        _config!.SettingsChanged += key => BroadcastEvent("config.changed", new ConfigChangedEvent(key), Cove.Protocol.CoveJsonContext.Default.ConfigChangedEvent);
         _hookServer.OnEvent += _hookRouter.Route;
         _paneTypes = Cove.Engine.Panes.PaneTypeRegistry.CreateWithBuiltins();
         _needsInputSignaler = new Cove.Engine.Hooks.NeedsInputSignaler(_activity!, new DaemonNotificationBus(this), () => GetFocusedPane());

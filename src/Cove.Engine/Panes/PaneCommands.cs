@@ -58,6 +58,19 @@ public static class PaneSearchCommands
         var result = new SearchResult(searchResult.Query, matches, searchResult.UseRegex, searchResult.WholeWord, searchResult.CaseInsensitive);
         return ctx.Ok(result, PaneSearchJsonContext.Default.SearchResult);
     }
+    [CoveCommand("cove://commands/search.replace")]
+    public static async Task<ControlResponse> Replace(EngineDispatchContext ctx)
+    {
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(PaneSearchJsonContext.Default.SearchReplaceParams) is not { } p)
+            return ctx.Fail("invalid_params", "search replace params required");
+        if (ctx.SearchService is not { } search)
+            return ctx.Fail("not_ready", "search service not available");
+
+        var replaceService = new Cove.Engine.Search.ReplaceService();
+        var results = replaceService.ReplaceInFiles(p.Search, p.Replacement, p.Files, p.Regex ?? false, p.CaseInsensitive ?? true, p.WholeWord ?? false);
+        var dtos = results.Select(r => new SearchReplaceResult(r.FilePath, r.Replacements, r.Saved)).ToList();
+        return ctx.Ok(new SearchReplaceResponse(dtos), PaneSearchJsonContext.Default.SearchReplaceResponse);
+    }
 
     [CoveCommand("cove://commands/search.get-state")]
     public static Task<ControlResponse> GetState(EngineDispatchContext ctx)
@@ -168,6 +181,9 @@ public static class PaneViewerCommands
         return Task.FromResult(ctx.Ok(state, PaneViewerJsonContext.Default.ViewerState));
     }
 }
+public sealed record SearchReplaceParams(string Search, string Replacement, IReadOnlyList<string> Files, bool? Regex, bool? WholeWord, bool? CaseInsensitive);
+public sealed record SearchReplaceResponse(IReadOnlyList<SearchReplaceResult> Results);
+public sealed record SearchReplaceResult(string FilePath, int Replacements, bool Saved);
 
 public sealed record EditorOpenParams(string FilePath, bool? ReadOnly);
 public sealed record EditorOpenResult(string FilePath, EditorState State);
@@ -207,6 +223,9 @@ public sealed partial class PaneEditorJsonContext : JsonSerializerContext { }
 
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase, DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
 [JsonSerializable(typeof(SearchQueryParams))]
+[JsonSerializable(typeof(SearchReplaceParams))]
+[JsonSerializable(typeof(SearchReplaceResponse))]
+[JsonSerializable(typeof(SearchReplaceResult))]
 [JsonSerializable(typeof(SearchResult))]
 [JsonSerializable(typeof(SearchMatch))]
 [JsonSerializable(typeof(SearchStateParams))]

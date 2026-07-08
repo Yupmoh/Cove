@@ -48,6 +48,25 @@ public sealed class PaneCommandsTests
         }
         finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
     }
+    [Fact]
+    public async Task SearchReplace_ReplacesInFiles()
+    {
+        var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"cove-replace-route-{System.Guid.NewGuid():N}");
+        System.IO.Directory.CreateDirectory(dir);
+        var filePath = System.IO.Path.Combine(dir, "test.txt");
+        System.IO.File.WriteAllText(filePath, "hello world\nhello again\n");
+        try
+        {
+            var search = new Cove.Engine.Search.SearchService(Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
+            var escapedPath = filePath.Replace("\\", "\\\\");
+            var prm = JsonDocument.Parse($$"""{"search":"hello","replacement":"hi","files":["{{escapedPath}}"],"regex":false,"wholeWord":false,"caseInsensitive":true}""").RootElement.Clone();
+            var resp = await EngineCommandRouter.RouteAsync(new ControlRequest("r1", "cove://commands/search.replace", prm), searchService: search);
+            Assert.True(resp!.Ok);
+            var content = System.IO.File.ReadAllText(filePath);
+            Assert.Equal("hi world\nhi again\n", content);
+        }
+        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+    }
 
     [Fact]
     public async Task SearchSetState_RoundTrips()
