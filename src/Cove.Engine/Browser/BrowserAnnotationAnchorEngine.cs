@@ -4,7 +4,9 @@ using Microsoft.Extensions.Logging;
 
 namespace Cove.Engine.Browser;
 
-public sealed record BrowserAnnotationAnchor(string Selector, int TextOffset, string SnapshotText, int ViewportTop, int ViewportLeft);
+public sealed record BrowserAnnotationAnchor(string Selector, int TextOffset, string SnapshotText, int ElementTop, int ElementLeft);
+
+public sealed record ViewportPosition(int Top, int Left);
 
 public sealed class BrowserAnnotationAnchorEngine
 {
@@ -38,44 +40,53 @@ public sealed class BrowserAnnotationAnchorEngine
         }
     }
 
-    public BrowserAnnotationAnchor? ReAnchor(BrowserAnnotationAnchor? oldAnchor, int newViewportTop, int newViewportLeft)
+    public ViewportPosition ComputeViewportPosition(BrowserAnnotationAnchor anchor, int scrollY, int scrollX)
     {
-        if (oldAnchor is null)
-        {
-            _logger.LogWarning("browser-anchor: cannot re-anchor null anchor");
-            return null;
-        }
-
-        var deltaTop = newViewportTop - oldAnchor.ViewportTop;
-        var deltaLeft = newViewportLeft - oldAnchor.ViewportLeft;
-
-        if (deltaTop == 0 && deltaLeft == 0)
-            return oldAnchor;
-
-        return oldAnchor with { ViewportTop = newViewportTop, ViewportLeft = newViewportLeft };
+        return new ViewportPosition(anchor.ElementTop - scrollY, anchor.ElementLeft - scrollX);
     }
 
-    public bool IsAnchorVisible(BrowserAnnotationAnchor anchor, int viewportHeight, int viewportWidth)
+    public bool IsAnchorVisible(BrowserAnnotationAnchor anchor, int scrollY, int scrollX, int viewportHeight, int viewportWidth)
     {
         if (viewportHeight <= 0 || viewportWidth <= 0)
         {
             _logger.LogWarning("browser-anchor: invalid viewport dimensions {h}x{w}", viewportHeight, viewportWidth);
             return false;
         }
-        return anchor.ViewportTop >= 0 && anchor.ViewportTop < viewportHeight
-            && anchor.ViewportLeft >= 0 && anchor.ViewportLeft < viewportWidth;
+        var pos = ComputeViewportPosition(anchor, scrollY, scrollX);
+        return pos.Top >= 0 && pos.Top < viewportHeight
+            && pos.Left >= 0 && pos.Left < viewportWidth;
     }
 
-    public double DistanceFromViewport(BrowserAnnotationAnchor anchor, int viewportTop, int viewportHeight)
+    public double DistanceFromViewport(BrowserAnnotationAnchor anchor, int scrollY, int viewportHeight)
     {
-        var anchorBottom = anchor.ViewportTop;
-        var viewportBottom = viewportTop + viewportHeight;
+        if (viewportHeight <= 0)
+        {
+            _logger.LogWarning("browser-anchor: invalid viewport height {h}", viewportHeight);
+            return double.MaxValue;
+        }
+        var viewportTop = anchor.ElementTop - scrollY;
+        var viewportBottom = viewportTop;
+        var visibleTop = 0;
+        var visibleBottom = viewportHeight;
 
-        if (anchorBottom < viewportTop)
-            return viewportTop - anchorBottom;
-        if (anchorBottom > viewportBottom)
-            return anchorBottom - viewportBottom;
+        if (viewportBottom < visibleTop)
+            return visibleTop - viewportBottom;
+        if (viewportTop > visibleBottom)
+            return viewportTop - visibleBottom;
         return 0;
+    }
+
+    public bool VerifyAnchorText(BrowserAnnotationAnchor anchor, string currentElementText)
+    {
+        if (string.IsNullOrEmpty(anchor.SnapshotText))
+            return true;
+        if (currentElementText.Length < anchor.TextOffset + anchor.SnapshotText.Length)
+        {
+            _logger.LogWarning("browser-anchor: element text shorter than anchor offset+snapshot");
+            return false;
+        }
+        var slice = currentElementText.Substring(anchor.TextOffset, anchor.SnapshotText.Length);
+        return slice == anchor.SnapshotText;
     }
 }
 
