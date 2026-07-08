@@ -109,11 +109,19 @@ public static class KnowledgeCommands
             return Task.FromResult(ctx.Fail("not_found", "note not found"));
 
         var format = p.Format;
-        if (format == "svg" || format == "png")
+        if (format == "svg")
         {
             if (note.Kind != "sketch")
-                return Task.FromResult(ctx.Fail("invalid_format", $"--{format} is only valid for sketch notes"));
-            return Task.FromResult(ctx.Ok(new NoteReadResult(note.Id, note.Title, note.Content, note.Kind, format), CoveJsonContext.Default.NoteReadResult));
+                return Task.FromResult(ctx.Fail("invalid_format", "--svg is only valid for sketch notes"));
+            var svgSerializer = new SketchSvgSerializer(Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
+            var svg = svgSerializer.Serialize(note.Content);
+            return Task.FromResult(ctx.Ok(new NoteReadResult(note.Id, note.Title, svg, note.Kind, "svg"), CoveJsonContext.Default.NoteReadResult));
+        }
+        if (format == "png")
+        {
+            if (note.Kind != "sketch")
+                return Task.FromResult(ctx.Fail("invalid_format", "--png is only valid for sketch notes"));
+            return Task.FromResult(ctx.Fail("not_supported", "PNG rasterization requires an image package not yet added — use --svg instead"));
         }
 
         return Task.FromResult(ctx.Ok(new NoteReadResult(note.Id, note.Title, note.Content, note.Kind, null), CoveJsonContext.Default.NoteReadResult));
