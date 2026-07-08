@@ -88,6 +88,34 @@
     "source": "cli"
   },
   {
+    "command": "capture attach",
+    "source": "cli"
+  },
+  {
+    "command": "capture delete",
+    "source": "cli"
+  },
+  {
+    "command": "capture flag",
+    "source": "cli"
+  },
+  {
+    "command": "capture list",
+    "source": "cli"
+  },
+  {
+    "command": "capture show",
+    "source": "cli"
+  },
+  {
+    "command": "capture start",
+    "source": "cli"
+  },
+  {
+    "command": "capture stop",
+    "source": "cli"
+  },
+  {
     "command": "commands",
     "source": "cli"
   },
@@ -218,6 +246,34 @@
   },
   {
     "command": "cove://commands/canvas.action",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/capture.attach",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/capture.delete",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/capture.flag",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/capture.list",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/capture.show",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/capture.start",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/capture.stop",
     "source": "core"
   },
   {
