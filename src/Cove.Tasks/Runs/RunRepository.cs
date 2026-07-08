@@ -16,6 +16,7 @@ public sealed class RunRow
     public string? LaunchProfileJson { get; set; }
     public string? ReviewStatusId { get; set; }
     public string? CompletionStatusId { get; set; }
+    public string? PendingPrompt { get; set; }
     public string StartedAt { get; set; } = "";
     public string? EndedAt { get; set; }
     public string CreatedAt { get; set; } = "";
@@ -26,8 +27,7 @@ public sealed class RunRepository
 {
     private readonly SqliteConnectionFactory _factory;
     private readonly TasksWriteChannel? _channel;
-
-    private const string SelectColumns = "id AS Id, card_id AS CardId, workspace_id AS WorkspaceId, run_family_id AS RunFamilyId, state AS State, backgrounded AS Backgrounded, launch_profile_json AS LaunchProfileJson, review_status_id AS ReviewStatusId, completion_status_id AS CompletionStatusId, started_at AS StartedAt, ended_at AS EndedAt, created_at AS CreatedAt, updated_at AS UpdatedAt";
+    private const string SelectColumns = "id AS Id, card_id AS CardId, workspace_id AS WorkspaceId, run_family_id AS RunFamilyId, state AS State, backgrounded AS Backgrounded, launch_profile_json AS LaunchProfileJson, review_status_id AS ReviewStatusId, completion_status_id AS CompletionStatusId, pending_prompt AS PendingPrompt, started_at AS StartedAt, ended_at AS EndedAt, created_at AS CreatedAt, updated_at AS UpdatedAt";
 
     public RunRepository(SqliteConnectionFactory factory, TasksWriteChannel? channel = null)
     {
@@ -69,7 +69,7 @@ public sealed class RunRepository
     private static void CreateInternal(SqliteConnection conn, RunRow row)
     {
         conn.Execute(
-            "INSERT INTO task_runs (id, card_id, workspace_id, run_family_id, state, backgrounded, launch_profile_json, review_status_id, completion_status_id, started_at, ended_at, created_at, updated_at) VALUES (@Id, @CardId, @WorkspaceId, @RunFamilyId, @State, @Backgrounded, @LaunchProfileJson, @ReviewStatusId, @CompletionStatusId, @StartedAt, @EndedAt, @CreatedAt, @UpdatedAt)",
+            "INSERT INTO task_runs (id, card_id, workspace_id, run_family_id, state, backgrounded, launch_profile_json, review_status_id, completion_status_id, pending_prompt, started_at, ended_at, created_at, updated_at) VALUES (@Id, @CardId, @WorkspaceId, @RunFamilyId, @State, @Backgrounded, @LaunchProfileJson, @ReviewStatusId, @CompletionStatusId, @PendingPrompt, @StartedAt, @EndedAt, @CreatedAt, @UpdatedAt)",
             row);
     }
 
@@ -166,6 +166,23 @@ public sealed class RunRepository
             new { State = newState.ToString().ToLowerInvariant(), EndedAt = endedAt, Now = System.DateTimeOffset.UtcNow.ToString("o"), Id = runId });
     }
 
+    public System.Threading.Tasks.Task SetPendingPromptAsync(string runId, string? prompt)
+    {
+        if (_channel is null)
+        {
+            using var conn = _factory.Open();
+            SetPendingPromptInternal(conn, runId, prompt);
+            return System.Threading.Tasks.Task.CompletedTask;
+        }
+        return _channel.ExecuteAsync(conn => { SetPendingPromptInternal(conn, runId, prompt); return System.Threading.Tasks.Task.CompletedTask; });
+    }
+
+    private static void SetPendingPromptInternal(SqliteConnection conn, string runId, string? prompt)
+    {
+        conn.Execute(
+            "UPDATE task_runs SET pending_prompt = @Prompt, updated_at = @Now WHERE id = @Id",
+            new { Prompt = prompt, Now = System.DateTimeOffset.UtcNow.ToString("o"), Id = runId });
+    }
     public System.Threading.Tasks.Task SetCardPrimaryRunAsync(string cardId, string? runId, CardRepository cards)
     {
         if (_channel is null)

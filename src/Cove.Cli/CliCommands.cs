@@ -580,6 +580,10 @@ internal static class CliCommands
     public static Task<int> RunResume(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/run.resume");
 
+    [CoveCommand("run set-pending-prompt")]
+    public static Task<int> RunSetPendingPrompt(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/run.set-pending-prompt");
+
     [CoveCommand("note list")]
     public static Task<int> NoteList(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/note.list");

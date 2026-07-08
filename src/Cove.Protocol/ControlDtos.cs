@@ -198,7 +198,7 @@ public sealed record TaskBindingSetParams(string CardId, string? AgentRef, strin
 public sealed record TaskBindingGetParams(string CardId);
 public sealed record TaskProfileResolveParams(string CardId);
 public sealed record TaskProfilePayloadDto(string? AgentRef, string? ProfileSlug, SkillSelectionDto[] Skills);
-public sealed record RunInfo(string Id, string CardId, string WorkspaceId, string RunFamilyId, string State, bool Backgrounded, string? LaunchProfileJson, string StartedAt, string? EndedAt, string CreatedAt);
+public sealed record RunInfo(string Id, string CardId, string WorkspaceId, string RunFamilyId, string State, bool Backgrounded, string? LaunchProfileJson, string? PendingPrompt, string StartedAt, string? EndedAt, string CreatedAt);
 public sealed record RunListResult(System.Collections.Generic.IReadOnlyList<RunInfo> Runs);
 public sealed record RunListParams(string? TaskId, string? WorkspaceId, string? State);
 public sealed record RunRefParams(string Id);
@@ -213,6 +213,7 @@ public sealed record TaskClaimParams(string CardId, string? PaneId);
 public sealed record TaskClaimResult(bool Success, string? RunId, string? Error);
 public sealed record RunResumeParams(string Id, string? PaneId, string? AdapterOverride);
 public sealed record RunResumeResult(bool Success, string? NewSegmentId, string? Error, string Outcome);
+public sealed record RunSetPendingPromptParams(string Id, string? Prompt);
 public sealed record StatusSetHiddenParams(string WorkspaceId, string Id, bool Hidden);
 
 public sealed record Note
@@ -380,6 +381,7 @@ public sealed record BrowserPaneDto(string PaneId, string CurrentUrl, System.Col
 [JsonSerializable(typeof(TaskSetInReviewParams))]
 [JsonSerializable(typeof(TaskSetDoneParams))]
 [JsonSerializable(typeof(RunResumeParams))]
+[JsonSerializable(typeof(RunSetPendingPromptParams))]
 [JsonSerializable(typeof(RunResumeResult))]
 [JsonSerializable(typeof(TaskClaimParams))]
 [JsonSerializable(typeof(TaskClaimResult))]

@@ -445,6 +445,10 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/run.set-pending-prompt",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/run.show",
     "source": "core"
   },
@@ -877,6 +881,10 @@
   },
   {
     "command": "run segments",
+    "source": "cli"
+  },
+  {
+    "command": "run set-pending-prompt",
     "source": "cli"
   },
   {

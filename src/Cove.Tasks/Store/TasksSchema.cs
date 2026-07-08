@@ -97,6 +97,7 @@ CREATE TABLE IF NOT EXISTS task_runs (
     launch_profile_json TEXT,
     review_status_id TEXT,
     completion_status_id TEXT,
+    pending_prompt TEXT,
     started_at TEXT NOT NULL,
     ended_at TEXT,
     created_at TEXT NOT NULL,

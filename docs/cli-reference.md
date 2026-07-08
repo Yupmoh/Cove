@@ -113,6 +113,7 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/run.list` | core |  |
 | `cove://commands/run.resume` | core |  |
 | `cove://commands/run.segments` | core |  |
+| `cove://commands/run.set-pending-prompt` | core |  |
 | `cove://commands/run.show` | core |  |
 | `cove://commands/session.background` | core |  |
 | `cove://commands/session.dismiss` | core |  |
@@ -221,6 +222,7 @@ Generated from the command registry. Do not edit by hand.
 | `run list` | cli |  |
 | `run resume` | cli |  |
 | `run segments` | cli |  |
+| `run set-pending-prompt` | cli |  |
 | `run show` | cli |  |
 | `skills list` | cli |  |
 | `skills resolve-prompt-sigils` | cli |  |
@@ -258,4 +260,4 @@ Generated from the command registry. Do not edit by hand.
 | `timeline list` | cli |  |
 | `version` | cli |  |
 
-Total: 253 commands
+Total: 255 commands

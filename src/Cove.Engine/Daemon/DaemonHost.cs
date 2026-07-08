@@ -116,6 +116,10 @@ public sealed class DaemonHost
         _launcher = new Cove.Engine.Launch.LaunchOrchestrator(_manifestStore, new Cove.Adapters.MethodRunner(), new Cove.Adapters.BinaryDiscoveryService(), probedPath, resumeService, new Cove.Engine.Launch.LauncherOverrideStore(System.IO.Path.Combine(dataDir, "launcher-overrides"), logger), logger);
         _taskService = new Cove.Tasks.TaskService(dataDir, logger);
         _ = _taskService.StartAsync();
+        var restoration = new Cove.Tasks.Restart.RunRestorationService(_taskService, logger);
+        var restoredSummary = restoration.RestoreOnStartup();
+        if (restoredSummary.RestoredRuns.Count > 0)
+            logger.LogWarning("restore: {count} non-terminal runs rehydrated as interrupted", restoredSummary.RestoredRuns.Count);
         _stateBus = new Cove.Engine.Protocol.StateBus(dataDir, logger);
         _extensions = new Cove.Engine.Protocol.ExtensionRegistry(_manifestStore!);
         _extensions.Index();

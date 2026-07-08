@@ -207,6 +207,8 @@ public sealed class TaskService
         var interrupted = _runs.ListByCardAndState(cardId, "interrupted");
         return interrupted.Count > 0 ? interrupted[0] : null;
     }
+    public System.Threading.Tasks.Task TransitionRunAsync(string runId, Runs.RunState newState) => _runs.TransitionAsync(runId, newState);
+    public System.Threading.Tasks.Task SetPendingPromptAsync(string runId, string? prompt) => _runs.SetPendingPromptAsync(runId, prompt);
     public System.Collections.Generic.IReadOnlyList<Runs.RunRow> ListRuns(string? taskId, string? workspaceId, string? state)
     {
         if (taskId is not null && state is not null) return _runs.ListByCardAndState(taskId, state);
@@ -219,7 +221,6 @@ public sealed class TaskService
     public System.Collections.Generic.IReadOnlyList<Runs.RunSegmentRow> ListRunSegments(string runId) => _segments.ListByRun(runId);
     public bool HasActiveRun(string cardId) => _runs.HasActiveRun(cardId);
     public System.Threading.Tasks.Task<Runs.RunRow?> CreateRunAsync(string cardId, string workspaceId, string? launchProfileJson, string? runFamilyId = null, bool backgrounded = false, string? reviewStatusId = null, string? completionStatusId = null) => _runs.CreateAsync(cardId, workspaceId, launchProfileJson, runFamilyId, backgrounded, reviewStatusId, completionStatusId);
-    public System.Threading.Tasks.Task TransitionRunAsync(string runId, Runs.RunState newState) => _runs.TransitionAsync(runId, newState);
     public System.Threading.Tasks.Task<Runs.RunSegmentRow?> AddRunSegmentAsync(string runId, string? paneId, string? adapterSessionId) => _segments.AddAsync(runId, paneId, adapterSessionId);
     public System.Threading.Tasks.Task EndRunSegmentAsync(string segmentId) => _segments.EndAsync(segmentId);
 }

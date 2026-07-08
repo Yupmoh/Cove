@@ -56,7 +56,7 @@ internal static class ExpectedColumns
             new ExpectedColumn("workspace_id", "TEXT"), new ExpectedColumn("run_family_id", "TEXT"),
             new ExpectedColumn("state", "TEXT"), new ExpectedColumn("backgrounded", "INTEGER"),
             new ExpectedColumn("launch_profile_json", "TEXT"), new ExpectedColumn("review_status_id", "TEXT"),
-            new ExpectedColumn("completion_status_id", "TEXT"), new ExpectedColumn("started_at", "TEXT"),
+            new ExpectedColumn("completion_status_id", "TEXT"), new ExpectedColumn("pending_prompt", "TEXT"), new ExpectedColumn("started_at", "TEXT"),
             new ExpectedColumn("ended_at", "TEXT"), new ExpectedColumn("created_at", "TEXT"),
             new ExpectedColumn("updated_at", "TEXT"),
         ],

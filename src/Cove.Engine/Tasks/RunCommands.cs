@@ -79,6 +79,22 @@ public static class RunCommands
         }
     }
 
+    [CoveCommand("cove://commands/run.set-pending-prompt")]
+    public static async Task<ControlResponse> SetPendingPrompt(EngineDispatchContext ctx)
+    {
+        if (ctx.TaskService is not { } svc)
+            return ctx.Fail("not_ready", "task store not available");
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.RunSetPendingPromptParams) is not { } p)
+            return ctx.Fail("invalid_params", "run set-pending-prompt params required (id, prompt)");
+        if (string.IsNullOrEmpty(p.Id))
+            return ctx.Fail("invalid_params", "run id is required");
+        var run = svc.GetRun(p.Id);
+        if (run is null)
+            return ctx.Fail("not_found", "run not found");
+        await svc.SetPendingPromptAsync(p.Id, p.Prompt);
+        return ctx.Ok();
+    }
+
     private static RunInfo ToInfo(Cove.Tasks.Runs.RunRow row) =>
-        new(row.Id, row.CardId, row.WorkspaceId, row.RunFamilyId, row.State, row.Backgrounded, row.LaunchProfileJson, row.StartedAt, row.EndedAt, row.CreatedAt);
+        new(row.Id, row.CardId, row.WorkspaceId, row.RunFamilyId, row.State, row.Backgrounded, row.LaunchProfileJson, row.PendingPrompt, row.StartedAt, row.EndedAt, row.CreatedAt);
 }
