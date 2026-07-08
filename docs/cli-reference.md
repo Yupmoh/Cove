@@ -4,6 +4,8 @@ Generated from the command registry. Do not edit by hand.
 
 | Command | Source | Description |
 |---------|--------|-------------|
+| `--version` | cli |  |
+| `-V` | cli |  |
 | `adapter-env list` | cli |  |
 | `adapter-env resolve` | cli |  |
 | `adapter-env save` | cli |  |
@@ -391,4 +393,4 @@ Generated from the command registry. Do not edit by hand.
 | `viewer get-state` | cli |  |
 | `viewer open` | cli |  |
 
-Total: 386 commands
+Total: 388 commands

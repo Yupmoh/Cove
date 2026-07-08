@@ -1,5 +1,13 @@
 [
   {
+    "command": "--version",
+    "source": "cli"
+  },
+  {
+    "command": "-V",
+    "source": "cli"
+  },
+  {
     "command": "adapter-env list",
     "source": "cli"
   },
