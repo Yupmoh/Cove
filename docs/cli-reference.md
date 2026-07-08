@@ -66,6 +66,10 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/collection.switch` | core |  |
 | `cove://commands/config.get` | core |  |
 | `cove://commands/config.set` | core |  |
+| `cove://commands/editor.get-state` | core |  |
+| `cove://commands/editor.open` | core |  |
+| `cove://commands/editor.save` | core |  |
+| `cove://commands/editor.set-state` | core |  |
 | `cove://commands/edits.find` | core |  |
 | `cove://commands/emit_event` | core | mcp-bridge emit_event (PL-30, headless-safe) |
 | `cove://commands/execute_command` | core | mcp-bridge execute_command (PL-30, headless-safe) |
@@ -158,6 +162,14 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/run.segments` | core |  |
 | `cove://commands/run.set-pending-prompt` | core |  |
 | `cove://commands/run.show` | core |  |
+| `cove://commands/scm.blame` | core |  |
+| `cove://commands/scm.commit` | core |  |
+| `cove://commands/scm.diff` | core |  |
+| `cove://commands/scm.stage` | core |  |
+| `cove://commands/scm.status` | core |  |
+| `cove://commands/search.get-state` | core |  |
+| `cove://commands/search.query` | core |  |
+| `cove://commands/search.set-state` | core |  |
 | `cove://commands/session.background` | core |  |
 | `cove://commands/session.dismiss` | core |  |
 | `cove://commands/session.foreground` | core |  |
@@ -225,6 +237,8 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/vault.resume` | core |  |
 | `cove://commands/vault.search` | core |  |
 | `cove://commands/vault.set-setting` | core |  |
+| `cove://commands/viewer.get-state` | core |  |
+| `cove://commands/viewer.open` | core |  |
 | `cove://commands/wing.create` | core |  |
 | `cove://commands/wing.list` | core |  |
 | `cove://commands/wing.remove` | core |  |
@@ -260,6 +274,10 @@ Generated from the command registry. Do not edit by hand.
 | `cove://hooks/_state` | core |  |
 | `cove://hooks/pane-states` | core |  |
 | `docs generate` | cli |  |
+| `editor get-state` | cli |  |
+| `editor open` | cli |  |
+| `editor save` | cli |  |
+| `editor set-state` | cli |  |
 | `edits find` | cli |  |
 | `exec` | cli |  |
 | `extension list` | cli |  |
@@ -312,6 +330,14 @@ Generated from the command registry. Do not edit by hand.
 | `run segments` | cli |  |
 | `run set-pending-prompt` | cli |  |
 | `run show` | cli |  |
+| `scm blame` | cli |  |
+| `scm commit` | cli |  |
+| `scm diff` | cli |  |
+| `scm stage` | cli |  |
+| `scm status` | cli |  |
+| `search get-state` | cli |  |
+| `search query` | cli |  |
+| `search set-state` | cli |  |
 | `skills list` | cli |  |
 | `skills resolve-prompt-sigils` | cli |  |
 | `task binding get` | cli |  |
@@ -362,5 +388,7 @@ Generated from the command registry. Do not edit by hand.
 | `vault search` | cli |  |
 | `vault set-setting` | cli |  |
 | `version` | cli |  |
+| `viewer get-state` | cli |  |
+| `viewer open` | cli |  |
 
-Total: 358 commands
+Total: 386 commands

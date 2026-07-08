@@ -250,6 +250,22 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/editor.get-state",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/editor.open",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/editor.save",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/editor.set-state",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/edits.find",
     "source": "core"
   },
@@ -625,6 +641,38 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/scm.blame",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/scm.commit",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/scm.diff",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/scm.stage",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/scm.status",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/search.get-state",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/search.query",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/search.set-state",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/session.background",
     "source": "core"
   },
@@ -896,6 +944,14 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/viewer.get-state",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/viewer.open",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/wing.create",
     "source": "core"
   },
@@ -1033,6 +1089,22 @@
   },
   {
     "command": "docs generate",
+    "source": "cli"
+  },
+  {
+    "command": "editor get-state",
+    "source": "cli"
+  },
+  {
+    "command": "editor open",
+    "source": "cli"
+  },
+  {
+    "command": "editor save",
+    "source": "cli"
+  },
+  {
+    "command": "editor set-state",
     "source": "cli"
   },
   {
@@ -1244,6 +1316,38 @@
     "source": "cli"
   },
   {
+    "command": "scm blame",
+    "source": "cli"
+  },
+  {
+    "command": "scm commit",
+    "source": "cli"
+  },
+  {
+    "command": "scm diff",
+    "source": "cli"
+  },
+  {
+    "command": "scm stage",
+    "source": "cli"
+  },
+  {
+    "command": "scm status",
+    "source": "cli"
+  },
+  {
+    "command": "search get-state",
+    "source": "cli"
+  },
+  {
+    "command": "search query",
+    "source": "cli"
+  },
+  {
+    "command": "search set-state",
+    "source": "cli"
+  },
+  {
     "command": "skills list",
     "source": "cli"
   },
@@ -1441,6 +1545,14 @@
   },
   {
     "command": "version",
+    "source": "cli"
+  },
+  {
+    "command": "viewer get-state",
+    "source": "cli"
+  },
+  {
+    "command": "viewer open",
     "source": "cli"
   }
 ]
