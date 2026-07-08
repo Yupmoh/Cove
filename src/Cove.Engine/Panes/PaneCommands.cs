@@ -74,29 +74,45 @@ public static class PaneSearchCommands
 public static class PaneScmCommands
 {
     [CoveCommand("cove://commands/scm.status")]
-    public static Task<ControlResponse> Status(EngineDispatchContext ctx)
+    public static async Task<ControlResponse> Status(EngineDispatchContext ctx)
     {
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(PaneScmJsonContext.Default.ScmStatusParams) is not { } p)
-            return Task.FromResult(ctx.Fail("invalid_params", "scm status params required"));
-        var result = new ScmStatusResult(p.RepoRoot, [], []);
-        return Task.FromResult(ctx.Ok(result, PaneScmJsonContext.Default.ScmStatusResult));
+            return ctx.Fail("invalid_params", "scm status params required");
+        if (ctx.GitReadModel is not { } git)
+            return ctx.Fail("not_ready", "git read model not available");
+
+        var status = await git.GetStatusAsync(p.RepoRoot, default);
+        var staged = status.Entries.Where(e => e.IsStaged).Select(e => new ScmFileStatus(e.FilePath, e.StatusCode, e.OldFilePath ?? "")).ToList();
+        var unstaged = status.Entries.Where(e => !e.IsStaged).Select(e => new ScmFileStatus(e.FilePath, e.StatusCode, e.OldFilePath ?? "")).ToList();
+        var result = new ScmStatusResult(p.RepoRoot, staged, unstaged);
+        return ctx.Ok(result, PaneScmJsonContext.Default.ScmStatusResult);
     }
 
     [CoveCommand("cove://commands/scm.diff")]
-    public static Task<ControlResponse> Diff(EngineDispatchContext ctx)
+    public static async Task<ControlResponse> Diff(EngineDispatchContext ctx)
     {
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(PaneScmJsonContext.Default.ScmDiffParams) is not { } p)
-            return Task.FromResult(ctx.Fail("invalid_params", "scm diff params required"));
-        var result = new ScmDiffResult(p.FilePath, OldContent: null, NewContent: null, OldRef: p.Ref);
-        return Task.FromResult(ctx.Ok(result, PaneScmJsonContext.Default.ScmDiffResult));
-    }
+            return ctx.Fail("invalid_params", "scm diff params required");
+        if (ctx.GitReadModel is not { } git)
+            return ctx.Fail("not_ready", "git read model not available");
 
+        var fileDiff = await git.GetFileDiffAsync(p.RepoRoot, p.FilePath, p.Ref, default);
+        var result = new ScmDiffResult(p.FilePath, OldContent: null, NewContent: fileDiff.Patch, OldRef: p.Ref);
+        return ctx.Ok(result, PaneScmJsonContext.Default.ScmDiffResult);
+    }
     [CoveCommand("cove://commands/scm.stage")]
-    public static Task<ControlResponse> Stage(EngineDispatchContext ctx)
+    public static async Task<ControlResponse> Stage(EngineDispatchContext ctx)
     {
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(PaneScmJsonContext.Default.ScmStageParams) is not { } p)
-            return Task.FromResult(ctx.Fail("invalid_params", "scm stage params required"));
-        return Task.FromResult(ctx.Ok());
+            return ctx.Fail("invalid_params", "scm stage params required");
+        if (ctx.GitReadModel is not { } git)
+            return ctx.Fail("not_ready", "git read model not available");
+
+        if (p.Unstage)
+            await git.UnstageAsync(p.RepoRoot, p.FilePath, default);
+        else
+            await git.StageAsync(p.RepoRoot, p.FilePath, default);
+        return ctx.Ok();
     }
 
     [CoveCommand("cove://commands/scm.commit")]
@@ -108,12 +124,17 @@ public static class PaneScmCommands
     }
 
     [CoveCommand("cove://commands/scm.blame")]
-    public static Task<ControlResponse> Blame(EngineDispatchContext ctx)
+    public static async Task<ControlResponse> Blame(EngineDispatchContext ctx)
     {
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(PaneScmJsonContext.Default.ScmBlameParams) is not { } p)
-            return Task.FromResult(ctx.Fail("invalid_params", "scm blame params required"));
-        var result = new ScmBlameResult(p.FilePath, []);
-        return Task.FromResult(ctx.Ok(result, PaneScmJsonContext.Default.ScmBlameResult));
+            return ctx.Fail("invalid_params", "scm blame params required");
+        if (ctx.GitReadModel is not { } git)
+            return ctx.Fail("not_ready", "git read model not available");
+
+        var blame = await git.GetBlameAsync(p.RepoRoot, p.FilePath, default);
+        var lines = blame.Lines.Select(l => new ScmBlameLine(l.LineNumber, l.Commit, l.Author, "")).ToList();
+        var result = new ScmBlameResult(p.FilePath, lines);
+        return ctx.Ok(result, PaneScmJsonContext.Default.ScmBlameResult);
     }
 }
 
@@ -153,12 +174,12 @@ public sealed record SearchState(string Query, bool Regex, bool WholeWord, bool 
 public sealed record ScmStatusParams(string RepoRoot);
 public sealed record ScmStatusResult(string RepoRoot, IReadOnlyList<ScmFileStatus> Staged, IReadOnlyList<ScmFileStatus> Unstaged);
 public sealed record ScmFileStatus(string FilePath, string Status, string OldPath);
-public sealed record ScmDiffParams(string FilePath, string Ref);
+public sealed record ScmDiffParams(string RepoRoot, string FilePath, string? Ref);
 public sealed record ScmDiffResult(string FilePath, string? OldContent, string? NewContent, string? OldRef);
 public sealed record ScmStageParams(string RepoRoot, string FilePath, bool Unstage);
 public sealed record ScmCommitParams(string RepoRoot, string Message, bool? Amend, bool? Sign);
 public sealed record ScmCommitResult(string Message, bool Success);
-public sealed record ScmBlameParams(string FilePath, string? Ref);
+public sealed record ScmBlameParams(string RepoRoot, string FilePath, string? Ref);
 public sealed record ScmBlameResult(string FilePath, IReadOnlyList<ScmBlameLine> Lines);
 public sealed record ScmBlameLine(int Line, string Commit, string Author, string RelativeTime);
 

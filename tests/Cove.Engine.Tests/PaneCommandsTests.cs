@@ -1,6 +1,8 @@
 using System.Text.Json;
 using Cove.Engine.Panes;
+using Cove.Engine.Workspaces;
 using Cove.Protocol;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace Cove.Engine.Tests;
@@ -48,19 +50,34 @@ public sealed class PaneCommandsTests
     }
 
     [Fact]
-    public async Task ScmStatus_ReturnsEmpty()
+    public async Task ScmStatus_ReturnsEntries()
     {
-        var prm = JsonDocument.Parse("""{"repoRoot":"/repo"}""").RootElement.Clone();
-        var resp = await EngineCommandRouter.RouteAsync(new ControlRequest("r1", "cove://commands/scm.status", prm));
+        var (repoDir, git) = SetupTestRepo();
+        var prm = JsonDocument.Parse($$"""{"repoRoot":"{{repoDir.Replace("\\", "\\\\")}}"}""").RootElement.Clone();
+        var resp = await EngineCommandRouter.RouteAsync(new ControlRequest("r1", "cove://commands/scm.status", prm), gitReadModel: git);
         Assert.True(resp!.Ok);
     }
 
     [Fact]
     public async Task ScmStage_ReturnsOk()
     {
-        var prm = JsonDocument.Parse("""{"repoRoot":"/repo","filePath":"src/file.cs","unstage":false}""").RootElement.Clone();
-        var resp = await EngineCommandRouter.RouteAsync(new ControlRequest("r1", "cove://commands/scm.stage", prm));
+        var (repoDir, git) = SetupTestRepo();
+        var prm = JsonDocument.Parse($$"""{"repoRoot":"{{repoDir.Replace("\\", "\\\\")}}","filePath":"test.txt","unstage":false}""").RootElement.Clone();
+        var resp = await EngineCommandRouter.RouteAsync(new ControlRequest("r1", "cove://commands/scm.stage", prm), gitReadModel: git);
         Assert.True(resp!.Ok);
+    }
+    [Fact]
+    public async Task ScmDiff_ReturnsPatchContent()
+    {
+        var (repoDir, git) = SetupTestRepo();
+        System.IO.File.WriteAllText(System.IO.Path.Combine(repoDir, "test.txt"), "line1\nline2 modified\n");
+        var prm = JsonDocument.Parse($$"""{"repoRoot":"{{repoDir.Replace("\\", "\\\\")}}","filePath":"test.txt","ref":null}""").RootElement.Clone();
+        var resp = await EngineCommandRouter.RouteAsync(new ControlRequest("r1", "cove://commands/scm.diff", prm), gitReadModel: git);
+        Assert.True(resp!.Ok);
+        var json = resp.Data!.Value.GetRawText();
+        Assert.Contains("test.txt", json);
+        Assert.Contains("line2 modified", json);
+        Assert.Contains("diff --git", json);
     }
 
     [Fact]
@@ -74,8 +91,9 @@ public sealed class PaneCommandsTests
     [Fact]
     public async Task ScmBlame_ReturnsResult()
     {
-        var prm = JsonDocument.Parse("""{"filePath":"src/file.cs","ref":"HEAD"}""").RootElement.Clone();
-        var resp = await EngineCommandRouter.RouteAsync(new ControlRequest("r1", "cove://commands/scm.blame", prm));
+        var (repoDir, git) = SetupTestRepo();
+        var prm = JsonDocument.Parse($$"""{"repoRoot":"{{repoDir.Replace("\\", "\\\\")}}","filePath":"test.txt","ref":"HEAD"}""").RootElement.Clone();
+        var resp = await EngineCommandRouter.RouteAsync(new ControlRequest("r1", "cove://commands/scm.blame", prm), gitReadModel: git);
         Assert.True(resp!.Ok);
     }
 
@@ -109,5 +127,26 @@ public sealed class PaneCommandsTests
         var prm = JsonDocument.Parse("""{"filePath":"image.png"}""").RootElement.Clone();
         var resp = await EngineCommandRouter.RouteAsync(new ControlRequest("r1", "cove://commands/viewer.get-state", prm));
         Assert.True(resp!.Ok);
+    }
+    private static (string repoDir, GitReadModel git) SetupTestRepo()
+    {
+        var repoDir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"cove-scm-test-{System.Guid.NewGuid():N}");
+        System.IO.Directory.CreateDirectory(repoDir);
+        RunGit(repoDir, "init", "-q");
+        RunGit(repoDir, "config", "user.email", "test@cove.dev");
+        RunGit(repoDir, "config", "user.name", "Test");
+        System.IO.File.WriteAllText(System.IO.Path.Combine(repoDir, "test.txt"), "line1\nline2\n");
+        RunGit(repoDir, "add", "test.txt");
+        RunGit(repoDir, "commit", "-q", "-m", "initial");
+        var git = new GitReadModel(new ProcessGitRunner(), NullLogger.Instance);
+        return (repoDir, git);
+    }
+
+    private static void RunGit(string workingDir, params string[] args)
+    {
+        var psi = new System.Diagnostics.ProcessStartInfo("git") { WorkingDirectory = workingDir, RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
+        foreach (var a in args) psi.ArgumentList.Add(a);
+        var p = System.Diagnostics.Process.Start(psi)!;
+        p.WaitForExit();
     }
 }

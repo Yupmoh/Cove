@@ -66,7 +66,8 @@ public sealed class EngineDispatchContext
         PaneScopeStore? paneScopes = null,
         Cove.Engine.Protocol.StateBus? stateBus = null,
         ExtensionRegistry? extensions = null,
-        CaptureStore? captures = null)
+        CaptureStore? captures = null,
+        Cove.Engine.Workspaces.GitReadModel? gitReadModel = null)
     {
         Request = request;
         Panes = panes;
@@ -113,6 +114,7 @@ public sealed class EngineDispatchContext
         StateBus = stateBus;
         Extensions = extensions;
         Captures = captures;
+        GitReadModel = gitReadModel;
     }
 
     public ControlRequest Request { get; }
@@ -158,8 +160,9 @@ public sealed class EngineDispatchContext
     public OmniChatStore? OmniChat { get; }
     public PaneScopeStore? PaneScopes { get; }
     public Cove.Engine.Protocol.StateBus? StateBus { get; }
-    public ExtensionRegistry? Extensions { get; }
+    public Cove.Engine.Protocol.ExtensionRegistry? Extensions { get; }
     public CaptureStore? Captures { get; }
+    public Cove.Engine.Workspaces.GitReadModel? GitReadModel { get; }
     public System.Func<ControlRequest, System.Threading.Tasks.Task<ControlResponse?>>? Redrive { get; set; }
 
     public ControlResponse Ok<T>(T data, JsonTypeInfo<T> typeInfo)

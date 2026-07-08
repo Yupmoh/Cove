@@ -98,6 +98,30 @@ public sealed class GitReadModel
         return new GitDiff(files);
     }
 
+    public async Task<GitDiffFile> GetFileDiffAsync(string repoDir, string filePath, string? refSpec = null, CancellationToken ct = default)
+    {
+        var args = new System.Collections.Generic.List<string> { "diff", "--no-color", "-U3" };
+        if (refSpec is not null)
+            args.Add(refSpec);
+        args.Add("--");
+        args.Add(filePath);
+        var result = await _git.RunAsync(repoDir, [.. args], ct);
+        if (!result.Ok)
+        {
+            _logger.LogWarning("git diff for {file} failed: {err}", filePath, result.Stderr);
+            return new GitDiffFile(filePath, 0, 0, null);
+        }
+        var patch = result.Stdout;
+        var adds = 0;
+        var dels = 0;
+        foreach (var line in patch.Split('\n'))
+        {
+            if (line.StartsWith("+") && !line.StartsWith("+++")) adds++;
+            else if (line.StartsWith("-") && !line.StartsWith("---")) dels++;
+        }
+        return new GitDiffFile(filePath, adds, dels, patch);
+    }
+
     public async Task<GitBlame> GetBlameAsync(string repoDir, string filePath, CancellationToken ct = default)
     {
         var result = await _git.RunAsync(repoDir, ["blame", "--porcelain", filePath], ct);
