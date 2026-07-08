@@ -130,6 +130,7 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/task.delete` | core |  |
 | `cove://commands/task.get` | core |  |
 | `cove://commands/task.list` | core |  |
+| `cove://commands/task.ping` | core | echo back params as pong (smoke) |
 | `cove://commands/task.update` | core |  |
 | `cove://commands/timeline.append` | core |  |
 | `cove://commands/timeline.list` | core |  |
@@ -195,4 +196,4 @@ Generated from the command registry. Do not edit by hand.
 | `timeline list` | cli |  |
 | `version` | cli |  |
 
-Total: 190 commands
+Total: 191 commands

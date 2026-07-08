@@ -515,6 +515,11 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/task.ping",
+    "description": "echo back params as pong (smoke)",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/task.update",
     "source": "core"
   },

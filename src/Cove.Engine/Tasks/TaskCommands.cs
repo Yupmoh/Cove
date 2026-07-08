@@ -83,6 +83,15 @@ public static class TaskCommands
         return Task.FromResult(ctx.Ok());
     }
 
+    [CoveCommand("cove://commands/task.ping", Description = "echo back params as pong (smoke)")]
+    public static Task<ControlResponse> Ping(EngineDispatchContext ctx)
+    {
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.TaskPingParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "task ping params required"));
+        var result = new TaskPingResult(p.Echo, p.Kind, "pong");
+        return Task.FromResult(ctx.Ok(result, CoveJsonContext.Default.TaskPingResult));
+    }
+
     private static TaskPriority ParsePriority(string? p) => p?.ToLowerInvariant() switch
     {
         "critical" => TaskPriority.Critical,

@@ -164,6 +164,8 @@ public sealed record TaskRefParams(string? Id, string? HumanId);
 public sealed record TaskListParams(string WorkspaceId);
 public sealed record TaskUpdateParams(string Id, string? Title, string? StatusId, string? Description, string? Assignee);
 public sealed record TaskListResult(System.Collections.Generic.IReadOnlyList<TaskCard> Cards);
+public sealed record TaskPingParams(string Echo, string? Kind);
+public sealed record TaskPingResult(string Echo, string? Kind, string Status);
 
 public sealed record Note
 {
@@ -306,6 +308,8 @@ public sealed record BrowserPaneDto(string PaneId, string CurrentUrl, System.Col
 [JsonSerializable(typeof(TaskListParams))]
 [JsonSerializable(typeof(TaskUpdateParams))]
 [JsonSerializable(typeof(TaskListResult))]
+[JsonSerializable(typeof(TaskPingParams))]
+[JsonSerializable(typeof(TaskPingResult))]
 [JsonSerializable(typeof(Note))]
 [JsonSerializable(typeof(NoteCreateParams))]
 [JsonSerializable(typeof(NoteRefParams))]
