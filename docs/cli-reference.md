@@ -82,6 +82,7 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/note.get` | core |  |
 | `cove://commands/note.history` | core |  |
 | `cove://commands/note.list` | core |  |
+| `cove://commands/note.media.save` | core |  |
 | `cove://commands/note.read` | core |  |
 | `cove://commands/note.search` | core |  |
 | `cove://commands/note.update` | core |  |
@@ -235,6 +236,7 @@ Generated from the command registry. Do not edit by hand.
 | `note get` | cli |  |
 | `note history` | cli |  |
 | `note list` | cli |  |
+| `note media save` | cli |  |
 | `note read` | cli |  |
 | `note search` | cli |  |
 | `note update` | cli |  |
@@ -296,4 +298,4 @@ Generated from the command registry. Do not edit by hand.
 | `timeline list` | cli |  |
 | `version` | cli |  |
 
-Total: 291 commands
+Total: 293 commands

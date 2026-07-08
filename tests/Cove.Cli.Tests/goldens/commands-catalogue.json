@@ -321,6 +321,10 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/note.media.save",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/note.read",
     "source": "core"
   },
@@ -933,6 +937,10 @@
   },
   {
     "command": "note list",
+    "source": "cli"
+  },
+  {
+    "command": "note media save",
     "source": "cli"
   },
   {

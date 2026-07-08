@@ -266,6 +266,8 @@ public sealed record NoteWriteParams(string WorkspaceId, string Id, string? Titl
 public sealed record NoteHistoryParams(string WorkspaceId, string Id);
 public sealed record NoteHistoryEntry(string Sha, string Message, System.DateTimeOffset Timestamp);
 public sealed record NoteHistoryResult(System.Collections.Generic.IReadOnlyList<NoteHistoryEntry> Entries);
+public sealed record NoteMediaSaveParams(string WorkspaceId, string Id, string FileName, string Base64Data);
+public sealed record NoteMediaSaveResult(string MediaPath);
 public sealed record TimelineListParams(string WorkspaceId);
 public sealed record TimelineListResult(System.Collections.Generic.IReadOnlyList<TimelineEntry> Entries);
 public sealed record KnowledgePingParams(string? Echo);
@@ -473,6 +475,8 @@ public sealed record BrowserPaneDto(string PaneId, string CurrentUrl, System.Col
 [JsonSerializable(typeof(NoteHistoryParams))]
 [JsonSerializable(typeof(NoteHistoryEntry))]
 [JsonSerializable(typeof(NoteHistoryResult))]
+[JsonSerializable(typeof(NoteMediaSaveParams))]
+[JsonSerializable(typeof(NoteMediaSaveResult))]
 [JsonSerializable(typeof(TimelineEntry))]
 [JsonSerializable(typeof(TimelineAppendParams))]
 [JsonSerializable(typeof(KnowledgePingParams))]

@@ -143,6 +143,19 @@ public static class KnowledgeCommands
         return Task.FromResult(ctx.Ok(new NoteHistoryResult(history), CoveJsonContext.Default.NoteHistoryResult));
     }
 
+    [CoveCommand("cove://commands/note.media.save")]
+    public static Task<ControlResponse> NoteMediaSave(EngineDispatchContext ctx)
+    {
+        if (ctx.NoteFiles is not { } store)
+            return Task.FromResult(ctx.Fail("not_ready", "note store not available"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.NoteMediaSaveParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "note media save params required"));
+
+        var bytes = System.Convert.FromBase64String(p.Base64Data);
+        var mediaPath = store.SaveMedia(p.WorkspaceId, p.Id, p.FileName, bytes);
+        return Task.FromResult(ctx.Ok(new NoteMediaSaveResult(mediaPath), CoveJsonContext.Default.NoteMediaSaveResult));
+    }
+
     [CoveCommand("cove://commands/timeline.append")]
     public static Task<ControlResponse> TimelineAppend(EngineDispatchContext ctx)
     {

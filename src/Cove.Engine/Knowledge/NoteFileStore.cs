@@ -224,6 +224,18 @@ public sealed class NoteFileStore
         return System.IO.File.Exists(path) ? System.IO.File.ReadAllText(path) : null;
     }
 
+    public string SaveMedia(string workspaceId, string id, string fileName, byte[] data)
+    {
+        var noteDir = ResolveNoteDir(workspaceId, id);
+        var mediaDir = System.IO.Path.Combine(noteDir, "media");
+        System.IO.Directory.CreateDirectory(mediaDir);
+        var mediaId = $"img-{System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}-{fileName}";
+        var mediaPath = System.IO.Path.Combine(mediaDir, mediaId);
+        System.IO.File.WriteAllBytes(mediaPath, data);
+        _logger.LogWarning("notes: saved media {mediaId} for note {id} in {ws}", mediaId, id, workspaceId);
+        return System.IO.Path.Combine(workspaceId, id, "media", mediaId);
+    }
+
     private string ResolveNoteDir(string workspaceId, string noteId)
         => System.IO.Path.Combine(_notesRoot, workspaceId, noteId);
 

@@ -208,22 +208,28 @@ function refreshCommentsPanel(): void {
 async function handleImagePaste(file: File, workspaceId: string, editor: HTMLTextAreaElement): Promise<void> {
   const reader = new FileReader();
   reader.onload = async () => {
-    const base64 = reader.result as string;
-    const mediaId = `img-${Date.now()}`;
-    const mediaDir = `${workspaceId}/${currentNote?.id || "unknown"}/media`;
-    const mediaPath = `${mediaDir}/${mediaId}-${file.name}`;
+    const dataUrl = reader.result as string;
+    const base64 = dataUrl.split(",")[1] || "";
+    if (!base64 || !currentNote) return;
 
     try {
-      await invoke("cove://commands/note.write", {
+      const result = await invoke<{ mediaPath: string }>("cove://commands/note.media.save", {
         workspaceId,
-        id: currentNote?.id,
-        content: editor.value + `\n\n![${file.name}](${mediaPath})\n`,
+        id: currentNote.id,
+        fileName: file.name,
+        base64Data: base64,
       });
 
-      const insertText = `\n\n![${file.name}](${mediaPath})\n`;
+      const insertText = `\n\n![${file.name}](${result.mediaPath})\n`;
       const pos = editor.selectionStart;
       editor.value = editor.value.slice(0, pos) + insertText + editor.value.slice(pos);
-      if (currentNote) currentNote.content = editor.value;
+      currentNote.content = editor.value;
+
+      await invoke("cove://commands/note.write", {
+        workspaceId,
+        id: currentNote.id,
+        content: currentNote.content,
+      });
     } catch (e) {
       console.error("Image paste failed:", e);
     }

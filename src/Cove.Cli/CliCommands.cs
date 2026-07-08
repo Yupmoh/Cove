@@ -644,6 +644,10 @@ internal static class CliCommands
     public static Task<int> NoteHistory(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/note.history");
 
+    [CoveCommand("note media save")]
+    public static Task<int> NoteMediaSave(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/note.media.save");
+
     [CoveCommand("timeline list")]
     public static Task<int> TimelineList(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/timeline.list");

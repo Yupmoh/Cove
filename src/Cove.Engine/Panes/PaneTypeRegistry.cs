@@ -40,6 +40,7 @@ public sealed class PaneTypeRegistry
         registry.Register(new PaneTypeDefinition("tasks-detail", "Task Detail", "tasks", IsDockable: true));
         registry.Register(new PaneTypeDefinition("timeline-feed", "Timeline", "timeline", IsDockable: true));
         registry.Register(new PaneTypeDefinition("note-markdown", "Markdown Note", "note", IsDockable: true));
+        registry.Register(new PaneTypeDefinition("note-sketch", "Sketch Note", "note", IsDockable: true));
         return registry;
     }
 }
