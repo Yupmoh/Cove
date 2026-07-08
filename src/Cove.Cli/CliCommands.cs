@@ -715,6 +715,14 @@ internal static class CliCommands
     [CoveCommand("vault reindex")]
     public static Task<int> VaultReindex(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/vault.reindex");
+
+    [CoveCommand("library list")]
+    public static Task<int> LibraryList(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/library.list");
+
+    [CoveCommand("library materialize")]
+    public static Task<int> LibraryMaterialize(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/library.materialize");
     [CoveCommand("timeline list")]
     public static Task<int> TimelineList(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/timeline.list");

@@ -14,6 +14,7 @@ import { renderHtmlNote } from "./html-note";
 import { renderNotepadPane } from "./notepad-pane";
 import { renderMermaidNote } from "./mermaid-note";
 import { renderSessionPicker } from "./session-picker";
+import { renderLibraryPopover } from "./library-popover";
 
 const CREDIT_THRESHOLD = 131072;
 
@@ -529,6 +530,17 @@ function renderSessionPickerPane(paneId: string): HTMLElement {
   });
   return placeholder;
 }
+function renderLibraryPane(paneId: string): HTMLElement {
+  const placeholder = document.createElement("div");
+  placeholder.className = "library-pane-placeholder";
+  placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
+  renderLibraryPopover("default").then(el => {
+    placeholder.replaceWith(el);
+  }).catch(e => {
+    placeholder.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to load library: ${(e as Error).message}</div>`;
+  });
+  return placeholder;
+}
 function renderNode(node: MosaicNode): HTMLElement {
   if (node.kind === "leaf") {
     const subs = node.subtabs.length > 0 ? node.subtabs : [{ documentId: node.paneId, paneType: "terminal", title: null }];
@@ -546,6 +558,7 @@ function renderNode(node: MosaicNode): HTMLElement {
     if (active.paneType === "notepad") return renderNotepadPaneWrapper(active.documentId);
     if (active.paneType === "note-mermaid") return renderMermaidNotePane(active.documentId);
     if (active.paneType === "session-picker") return renderSessionPickerPane(active.documentId);
+    if (active.paneType === "library") return renderLibraryPane(active.documentId);
     if (isEmpty) return emptyPaneStrip(node.paneId);
     const activeEl = getPane(subs[activeIdx].documentId).el;
     if (subs.length <= 1) return activeEl;

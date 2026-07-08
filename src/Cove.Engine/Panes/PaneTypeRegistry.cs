@@ -45,6 +45,7 @@ public sealed class PaneTypeRegistry
         registry.Register(new PaneTypeDefinition("note-html", "HTML Note", "note", IsDockable: true));
         registry.Register(new PaneTypeDefinition("note-mermaid", "Mermaid Note", "note", IsDockable: true));
         registry.Register(new PaneTypeDefinition("session-picker", "Session Picker", "vault", IsDockable: true));
+        registry.Register(new PaneTypeDefinition("library", "Library", "library", IsDockable: true));
         return registry;
     }
 }

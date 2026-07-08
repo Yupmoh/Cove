@@ -458,4 +458,24 @@ public static class KnowledgeCommands
         corpus.ReindexIfVersionChanged(p.WorkspaceId, version);
         return Task.FromResult(ctx.Ok());
     }
+
+    [CoveCommand("cove://commands/library.list")]
+    public static Task<ControlResponse> LibraryList(EngineDispatchContext ctx)
+    {
+        if (ctx.Library is not { } store)
+            return Task.FromResult(ctx.Fail("not_ready", "library store not available"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.LibraryListParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "library list params required"));
+        var entries = store.ListByWorkspace(p.WorkspaceId, p.Kind);
+        var dtos = entries.Select(e => new LibraryEntryDto(e.Id, e.WorkspaceId, e.PaneId, e.PaneType, e.Title, e.StateJson, e.Scrollback, e.Kind, e.CapturedAt.ToString("o"))).ToList();
+        return Task.FromResult(ctx.Ok(new LibraryListResult(dtos), CoveJsonContext.Default.LibraryListResult));
+    }
+
+    [CoveCommand("cove://commands/library.materialize")]
+    public static Task<ControlResponse> LibraryMaterialize(EngineDispatchContext ctx)
+    {
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.LibraryMaterializeParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "library materialize params required"));
+        return Task.FromResult(ctx.Ok());
+    }
 }

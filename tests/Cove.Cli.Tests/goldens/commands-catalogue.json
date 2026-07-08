@@ -308,6 +308,14 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/library.list",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/library.materialize",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/list_windows",
     "description": "mcp-bridge list_windows (PL-30, render-bound)",
     "source": "core"
@@ -989,6 +997,14 @@
   },
   {
     "command": "launch-profile set-default",
+    "source": "cli"
+  },
+  {
+    "command": "library list",
+    "source": "cli"
+  },
+  {
+    "command": "library materialize",
     "source": "cli"
   },
   {

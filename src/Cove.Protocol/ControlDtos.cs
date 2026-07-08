@@ -296,6 +296,10 @@ public sealed record SessionCorpusEntryDto(string Id, string WorkspaceId, string
 public sealed record VaultResumeParams(string WorkspaceId, string SessionId);
 public sealed record VaultSetSettingParams(string WorkspaceId, string Key, string Value);
 public sealed record VaultReindexParams(string WorkspaceId);
+public sealed record LibraryListParams(string WorkspaceId, string? Kind);
+public sealed record LibraryListResult(System.Collections.Generic.IReadOnlyList<LibraryEntryDto> Entries);
+public sealed record LibraryEntryDto(string Id, string WorkspaceId, string PaneId, string PaneType, string? Title, string? StateJson, string? Scrollback, string Kind, string CapturedAt);
+public sealed record LibraryMaterializeParams(string WorkspaceId, string EntryId);
 public sealed record Fact
 {
     public string Id { get; init; } = "";
@@ -551,6 +555,10 @@ public sealed record BrowserPaneDto(string PaneId, string CurrentUrl, System.Col
 [JsonSerializable(typeof(VaultResumeParams))]
 [JsonSerializable(typeof(VaultSetSettingParams))]
 [JsonSerializable(typeof(VaultReindexParams))]
+[JsonSerializable(typeof(LibraryListParams))]
+[JsonSerializable(typeof(LibraryListResult))]
+[JsonSerializable(typeof(LibraryEntryDto))]
+[JsonSerializable(typeof(LibraryMaterializeParams))]
 [JsonSerializable(typeof(TimelineEntry))]
 [JsonSerializable(typeof(TimelineAppendParams))]
 [JsonSerializable(typeof(KnowledgePingParams))]

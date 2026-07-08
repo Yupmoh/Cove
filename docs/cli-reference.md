@@ -79,6 +79,8 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/layout.get` | core |  |
 | `cove://commands/layout.mutate` | core |  |
 | `cove://commands/layout.snapshot` | core |  |
+| `cove://commands/library.list` | core |  |
+| `cove://commands/library.materialize` | core |  |
 | `cove://commands/list_windows` | core | mcp-bridge list_windows (PL-30, render-bound) |
 | `cove://commands/memory.add` | core |  |
 | `cove://commands/memory.consolidate` | core |  |
@@ -249,6 +251,8 @@ Generated from the command registry. Do not edit by hand.
 | `launch-profile delete` | cli |  |
 | `launch-profile list` | cli |  |
 | `launch-profile set-default` | cli |  |
+| `library list` | cli |  |
+| `library materialize` | cli |  |
 | `memory add` | cli |  |
 | `memory consolidate` | cli |  |
 | `memory proposal transition` | cli |  |
@@ -332,4 +336,4 @@ Generated from the command registry. Do not edit by hand.
 | `vault set-setting` | cli |  |
 | `version` | cli |  |
 
-Total: 327 commands
+Total: 331 commands

@@ -52,6 +52,7 @@ public sealed class EngineDispatchContext
         EditsIndex? edits = null,
         SessionCorpusIndexer? corpus = null,
         VaultSettingsStore? vaultSettings = null,
+        LibraryStore? library = null,
         PaneTypeRegistry? paneTypes = null,
         BrowserPaneManager? browser = null,
         ConfigService? config = null,
@@ -93,6 +94,7 @@ public sealed class EngineDispatchContext
         Edits = edits;
         Corpus = corpus;
         VaultSettings = vaultSettings;
+        Library = library;
         PaneTypes = paneTypes;
         Browser = browser;
         Config = config;
@@ -135,6 +137,7 @@ public sealed class EngineDispatchContext
     public EditsIndex? Edits { get; }
     public SessionCorpusIndexer? Corpus { get; }
     public VaultSettingsStore? VaultSettings { get; }
+    public LibraryStore? Library { get; }
     public PaneTypeRegistry? PaneTypes { get; }
     public ConfigService? Config { get; }
     public BrowserPaneManager? Browser { get; }
