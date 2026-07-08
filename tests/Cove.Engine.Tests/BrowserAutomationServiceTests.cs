@@ -263,4 +263,125 @@ public sealed class BrowserAutomationServiceTests : IAsyncLifetime
         var result = await _service.EvalAsync(_client, "document.querySelector('#i').value", true);
         Assert.Equal("a", result.GetProperty("result").GetProperty("value").GetString());
     }
+    [Fact]
+    public async Task GetTextAsync_ReturnsElementText()
+    {
+        if (_service is null || _client is null) return;
+
+        var html = "data:text/html,<div id='d'>hello text</div>";
+        await _service.NavigateAsync(_client, html);
+        await Task.Delay(500);
+        var result = await _service.GetTextAsync(_client, "#d");
+        Assert.Equal("hello text", result.GetProperty("result").GetProperty("value").GetString());
+    }
+
+    [Fact]
+    public async Task IsVisibleAsync_TrueForVisibleElement()
+    {
+        if (_service is null || _client is null) return;
+
+        var html = "data:text/html,<div id='v' style='width:100px;height:50px'>vis</div>";
+        await _service.NavigateAsync(_client, html);
+        await Task.Delay(500);
+        Assert.True(await _service.IsVisibleAsync(_client, "#v"));
+        Assert.False(await _service.IsVisibleAsync(_client, "#nonexistent"));
+    }
+
+    [Fact]
+    public async Task ListElementsAsync_ReturnsMatchingElements()
+    {
+        if (_service is null || _client is null) return;
+
+        var html = "data:text/html,<div id='a' class='x'>A</div><div id='b' class='y'>B</div>";
+        await _service.NavigateAsync(_client, html);
+        await Task.Delay(500);
+        var list = await _service.ListElementsAsync(_client, "div");
+        Assert.Equal(2, list.Count);
+        Assert.Contains(list, s => s.StartsWith("div#"));
+    }
+
+    [Fact]
+    public async Task GetCookiesAsync_ReturnsCookieArray()
+    {
+        if (_service is null || _client is null) return;
+
+        await _service.NavigateAsync(_client, "data:text/html,<h1>cookies</h1>");
+        await Task.Delay(500);
+        var result = await _service.GetCookiesAsync(_client);
+        Assert.True(result.TryGetProperty("cookies", out var cookies));
+        Assert.Equal(JsonValueKind.Array, cookies.ValueKind);
+    }
+
+    [Fact]
+    public async Task SetCookieAsync_CreatesCookie()
+    {
+        if (_service is null || _client is null) return;
+
+        await _service.NavigateAsync(_client, "https://example.com");
+        await Task.Delay(500);
+        await _service.SetCookieAsync(_client, "testcookie", "testvalue", "https://example.com");
+        var cookiesResult = await _service.GetCookiesAsync(_client);
+        var cookies = cookiesResult.GetProperty("cookies").EnumerateArray();
+        Assert.Contains(cookies, c => c.GetProperty("name").GetString() == "testcookie" && c.GetProperty("value").GetString() == "testvalue");
+    }
+
+    [Fact]
+    public async Task ClearCookiesAsync_RemovesAllCookies()
+    {
+        if (_service is null || _client is null) return;
+
+        await _service.NavigateAsync(_client, "https://example.com");
+        await Task.Delay(500);
+        await _service.SetCookieAsync(_client, "c1", "v1", "https://example.com");
+        await _service.ClearCookiesAsync(_client);
+        var cookiesResult = await _service.GetCookiesAsync(_client);
+        var cookies = cookiesResult.GetProperty("cookies").EnumerateArray();
+        Assert.Empty(cookies);
+    }
+
+    [Fact]
+    public async Task GetConsoleEntriesAsync_CapturesConsoleLog()
+    {
+        if (_service is null || _client is null) return;
+
+        var html = "data:text/html,<script>console.log('test-entry')</script>";
+        await _service.NavigateAsync(_client, html);
+        await Task.Delay(500);
+        var entries = await _service.GetConsoleEntriesAsync(_client, 2000);
+        Assert.Contains(entries, e => e.Text.Contains("test-entry"));
+    }
+
+    [Fact]
+    public async Task PassthroughAsync_SendsRawCdpCommand()
+    {
+        if (_service is null || _client is null) return;
+
+        using var doc = System.Text.Json.JsonDocument.Parse("""{"expression":"1+1","returnByValue":true}""");
+        var result = await _service.PassthroughAsync(_client, "Runtime.evaluate", doc.RootElement.Clone());
+        Assert.Equal(2, result.GetProperty("result").GetProperty("value").GetInt32());
+    }
+
+    [Fact]
+    public async Task AssignRefsAsync_ClickRefTargetsCorrectElement()
+    {
+        if (_service is null || _client is null) return;
+
+        var html = "data:text/html,<button id='b1' onclick='this.textContent=\"one-clicked\"'>one</button><button id='b2' onclick='this.textContent=\"two-clicked\"'>two</button>";
+        await _service.NavigateAsync(_client, html);
+        await Task.Delay(500);
+
+        var refs = await _service.AssignRefsAsync(_client);
+        var buttonRefs = refs.Where(r => r.Role == "button").ToList();
+        Assert.True(buttonRefs.Count >= 2, $"expected >=2 button refs, got {buttonRefs.Count}");
+
+        var secondRef = buttonRefs[1];
+        await _service.ClickRefAsync(_client, secondRef.Id);
+        await Task.Delay(300);
+
+        var b1Text = (await _service.EvalAsync(_client, "document.querySelector('#b1').textContent", true)).GetProperty("result").GetProperty("value").GetString();
+        var b2Text = (await _service.EvalAsync(_client, "document.querySelector('#b2').textContent", true)).GetProperty("result").GetProperty("value").GetString();
+
+        Assert.Equal("two-clicked", b2Text);
+        Assert.Equal("one", b1Text);
+    }
 }
