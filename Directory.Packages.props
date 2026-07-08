@@ -26,6 +26,7 @@
     <PackageVersion Include="SQLitePCLRaw.core" Version="2.1.11" />
     <PackageVersion Include="Dapper" Version="2.1.35" />
     <PackageVersion Include="Dapper.AOT" Version="1.0.52" />
+    <PackageVersion Include="Cronos" Version="0.8.4" />
   </ItemGroup>
 
 </Project>

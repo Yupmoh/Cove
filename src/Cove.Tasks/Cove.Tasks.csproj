@@ -18,6 +18,7 @@
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" />
     <PackageReference Include="Dapper" />
     <PackageReference Include="Dapper.AOT" />
+    <PackageReference Include="Cronos" />
   </ItemGroup>
 
   <ItemGroup>
