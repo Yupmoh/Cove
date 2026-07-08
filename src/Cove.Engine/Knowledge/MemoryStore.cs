@@ -171,7 +171,7 @@ public sealed class MemoryStore
         {
             try
             {
-                var fact = JsonSerializer.Deserialize(System.IO.File.ReadAllText(file), MemoryJsonContext.Default.Fact);
+                var fact = JsonSerializer.Deserialize(System.IO.File.ReadAllText(file), CoveJsonContext.Default.Fact);
                 if (fact is null) continue;
                 using var cmd = conn.CreateCommand();
                 cmd.CommandText = """
@@ -220,7 +220,7 @@ public sealed class MemoryStore
         System.IO.Directory.CreateDirectory(wsDir);
         var path = System.IO.Path.Combine(wsDir, fact.Id + ".json");
         fact = fact with { FilePath = path };
-        System.IO.File.WriteAllText(path, JsonSerializer.Serialize(fact, MemoryJsonContext.Default.Fact));
+        System.IO.File.WriteAllText(path, JsonSerializer.Serialize(fact, CoveJsonContext.Default.Fact));
     }
 
 
@@ -244,23 +244,3 @@ public sealed class MemoryStore
     }
 }
 
-public sealed record Fact
-{
-    public string Id { get; init; } = "";
-    public required string WorkspaceId { get; init; }
-    public required string Kind { get; init; }
-    public required string Content { get; init; }
-    public double Confidence { get; init; } = 0.5;
-    public int AccessCount { get; init; }
-    public string? Audience { get; init; }
-    public string? Locus { get; init; }
-    public string? FilePath { get; init; }
-    public string? SupersededBy { get; init; }
-    public System.DateTimeOffset CreatedAt { get; init; }
-    public System.DateTimeOffset UpdatedAt { get; init; }
-}
-
-[JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase, WriteIndented = true, DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
-[JsonSerializable(typeof(Fact))]
-[JsonSerializable(typeof(System.Collections.Generic.List<Fact>))]
-public sealed partial class MemoryJsonContext : JsonSerializerContext { }

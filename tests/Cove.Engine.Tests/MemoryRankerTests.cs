@@ -1,4 +1,5 @@
 using Cove.Engine.Knowledge;
+using Cove.Protocol;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 

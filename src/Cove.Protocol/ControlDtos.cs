@@ -273,6 +273,36 @@ public sealed record NoteGetStateResult(string? State);
 public sealed record NoteSaveStateParams(string WorkspaceId, string Id, string StateJson);
 public sealed record CanvasActionParams(string Action, string? TargetPane, string? Uri, string ActionId, string? Payload, System.Text.Json.JsonElement? State);
 public sealed record CanvasActionResult(bool Dispatched, string? TargetPaneId, string? ResolvedUri);
+public sealed record MemoryAddParams(string WorkspaceId, string Kind, string Content, double? Confidence, string? Audience);
+public sealed record MemorySearchParams(string WorkspaceId, string Query, int? Limit);
+public sealed record MemorySearchResult(System.Collections.Generic.IReadOnlyList<RankedFactDto> Facts);
+public sealed record RankedFactDto(string Id, string Kind, string Content, double Score, string? Snippet);
+public sealed record MemoryRecallParams(string WorkspaceId, string Query, int? Limit);
+public sealed record MemoryRecallResult(System.Collections.Generic.IReadOnlyList<RecallPreviewDto> Previews);
+public sealed record RecallPreviewDto(string Id, string Kind, string Preview, double Score, string HowLongAgo);
+public sealed record MemoryShowParams(string WorkspaceId, string Id);
+public sealed record MemorySupersedeParams(string WorkspaceId, string OldFactId, string Kind, string Content, double? Confidence);
+public sealed record MemoryReindexParams(string WorkspaceId);
+public sealed record MemoryConsolidateParams(string WorkspaceId, bool DryRun);
+public sealed record MemoryConsolidateResult(int Candidates);
+public sealed record MemoryProposeParams(string WorkspaceId, string Kind, string Content);
+public sealed record MemoryProposalTransitionParams(string ProposalId, string State);
+public sealed record Fact
+{
+    public string Id { get; init; } = "";
+    public required string WorkspaceId { get; init; }
+    public required string Kind { get; init; }
+    public required string Content { get; init; }
+    public double Confidence { get; init; } = 0.5;
+    public int AccessCount { get; init; }
+    public string? Audience { get; init; }
+    public string? Locus { get; init; }
+    public string? FilePath { get; init; }
+    public string? SupersededBy { get; init; }
+    public System.DateTimeOffset CreatedAt { get; init; }
+    public System.DateTimeOffset UpdatedAt { get; init; }
+}
+public sealed record Proposal(string Id, string WorkspaceId, string Kind, string Content, string State, System.DateTimeOffset CreatedAt);
 public sealed record TimelineListParams(string WorkspaceId);
 public sealed record TimelineListResult(System.Collections.Generic.IReadOnlyList<TimelineEntry> Entries);
 public sealed record KnowledgePingParams(string? Echo);
@@ -485,8 +515,24 @@ public sealed record BrowserPaneDto(string PaneId, string CurrentUrl, System.Col
 [JsonSerializable(typeof(NoteGetStateParams))]
 [JsonSerializable(typeof(NoteGetStateResult))]
 [JsonSerializable(typeof(NoteSaveStateParams))]
+[JsonSerializable(typeof(MemoryAddParams))]
+[JsonSerializable(typeof(MemorySearchParams))]
+[JsonSerializable(typeof(MemorySearchResult))]
+[JsonSerializable(typeof(RankedFactDto))]
+[JsonSerializable(typeof(MemoryRecallParams))]
+[JsonSerializable(typeof(MemoryRecallResult))]
+[JsonSerializable(typeof(RecallPreviewDto))]
+[JsonSerializable(typeof(MemoryShowParams))]
+[JsonSerializable(typeof(MemorySupersedeParams))]
+[JsonSerializable(typeof(MemoryReindexParams))]
+[JsonSerializable(typeof(MemoryConsolidateParams))]
+[JsonSerializable(typeof(MemoryConsolidateResult))]
+[JsonSerializable(typeof(MemoryProposeParams))]
+[JsonSerializable(typeof(MemoryProposalTransitionParams))]
 [JsonSerializable(typeof(CanvasActionParams))]
 [JsonSerializable(typeof(CanvasActionResult))]
+[JsonSerializable(typeof(Fact))]
+[JsonSerializable(typeof(Proposal))]
 [JsonSerializable(typeof(TimelineEntry))]
 [JsonSerializable(typeof(TimelineAppendParams))]
 [JsonSerializable(typeof(KnowledgePingParams))]

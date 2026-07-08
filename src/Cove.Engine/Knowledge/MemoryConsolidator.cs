@@ -1,10 +1,10 @@
 using System.Threading;
+using Cove.Protocol;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 
 namespace Cove.Engine.Knowledge;
 
-public sealed record Proposal(string Id, string WorkspaceId, string Kind, string Content, string State, System.DateTimeOffset CreatedAt);
 
 public sealed class ProposalStore
 {

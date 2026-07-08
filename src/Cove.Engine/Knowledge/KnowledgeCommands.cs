@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Text.Json;
 using Cove.Generated;
 using Cove.Protocol;
@@ -285,5 +286,118 @@ public static class KnowledgeCommands
 
         var posts = store.Show(p.WorkspaceId, p.Audience);
         return Task.FromResult(ctx.Ok(new BlackboardShowResult(posts), CoveJsonContext.Default.BlackboardShowResult));
+    }
+    [CoveCommand("cove://commands/memory.add")]
+    public static Task<ControlResponse> MemoryAdd(EngineDispatchContext ctx)
+    {
+        if (ctx.Memory is not { } store)
+            return Task.FromResult(ctx.Fail("not_ready", "memory store not available"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.MemoryAddParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "memory add params required"));
+
+        var fact = store.AddFact(new Fact { WorkspaceId = p.WorkspaceId, Kind = p.Kind, Content = p.Content, Confidence = p.Confidence ?? 0.5, Audience = p.Audience });
+        return Task.FromResult(ctx.Ok(fact, CoveJsonContext.Default.Fact));
+    }
+
+    [CoveCommand("cove://commands/memory.search")]
+    public static Task<ControlResponse> MemorySearch(EngineDispatchContext ctx)
+    {
+        if (ctx.MemoryRanker is not { } ranker)
+            return Task.FromResult(ctx.Fail("not_ready", "memory ranker not available"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.MemorySearchParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "memory search params required"));
+
+        var results = ranker.SearchRanked(p.WorkspaceId, p.Query, p.Limit ?? 20);
+        var dtos = results.Select(r => new RankedFactDto(r.Fact.Id, r.Fact.Kind, r.Fact.Content, r.Score, r.Snippet)).ToList();
+        return Task.FromResult(ctx.Ok(new MemorySearchResult(dtos), CoveJsonContext.Default.MemorySearchResult));
+    }
+
+    [CoveCommand("cove://commands/memory.recall")]
+    public static Task<ControlResponse> MemoryRecall(EngineDispatchContext ctx)
+    {
+        if (ctx.MemoryRanker is not { } ranker)
+            return Task.FromResult(ctx.Fail("not_ready", "memory ranker not available"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.MemoryRecallParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "memory recall params required"));
+
+        var previews = ranker.Recall(p.WorkspaceId, p.Query, p.Limit ?? 10);
+        var dtos = previews.Select(p => new RecallPreviewDto(p.Id, p.Kind, p.Preview, p.Score, p.HowLongAgo)).ToList();
+        return Task.FromResult(ctx.Ok(new MemoryRecallResult(dtos), CoveJsonContext.Default.MemoryRecallResult));
+    }
+
+    [CoveCommand("cove://commands/memory.show")]
+    public static Task<ControlResponse> MemoryShow(EngineDispatchContext ctx)
+    {
+        if (ctx.Memory is not { } store)
+            return Task.FromResult(ctx.Fail("not_ready", "memory store not available"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.MemoryShowParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "memory show params required"));
+
+        var fact = store.GetFact(p.WorkspaceId, p.Id);
+        if (fact is null)
+            return Task.FromResult(ctx.Fail("not_found", "fact not found"));
+        return Task.FromResult(ctx.Ok(fact, CoveJsonContext.Default.Fact));
+    }
+
+    [CoveCommand("cove://commands/memory.supersede")]
+    public static Task<ControlResponse> MemorySupersede(EngineDispatchContext ctx)
+    {
+        if (ctx.Memory is not { } store)
+            return Task.FromResult(ctx.Fail("not_ready", "memory store not available"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.MemorySupersedeParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "memory supersede params required"));
+
+        var newFact = store.Supersede(p.WorkspaceId, p.OldFactId, new Fact { WorkspaceId = p.WorkspaceId, Kind = p.Kind, Content = p.Content, Confidence = p.Confidence ?? 0.5 });
+        if (newFact is null)
+            return Task.FromResult(ctx.Fail("not_found", "old fact not found"));
+        return Task.FromResult(ctx.Ok(newFact, CoveJsonContext.Default.Fact));
+    }
+
+    [CoveCommand("cove://commands/memory.reindex")]
+    public static Task<ControlResponse> MemoryReindex(EngineDispatchContext ctx)
+    {
+        if (ctx.Memory is not { } store)
+            return Task.FromResult(ctx.Fail("not_ready", "memory store not available"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.MemoryReindexParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "memory reindex params required"));
+
+        store.ReindexFromDisk(p.WorkspaceId);
+        return Task.FromResult(ctx.Ok());
+    }
+
+    [CoveCommand("cove://commands/memory.consolidate")]
+    public static async Task<ControlResponse> MemoryConsolidate(EngineDispatchContext ctx)
+    {
+        if (ctx.Consolidator is not { } consolidator)
+            return ctx.Fail("not_ready", "consolidator not available");
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.MemoryConsolidateParams) is not { } p)
+            return ctx.Fail("invalid_params", "memory consolidate params required");
+
+        var count = await consolidator.ConsolidateAsync(p.WorkspaceId, p.DryRun);
+        return ctx.Ok(new MemoryConsolidateResult(count), CoveJsonContext.Default.MemoryConsolidateResult);
+    }
+
+    [CoveCommand("cove://commands/memory.propose")]
+    public static Task<ControlResponse> MemoryPropose(EngineDispatchContext ctx)
+    {
+        if (ctx.Proposals is not { } proposals)
+            return Task.FromResult(ctx.Fail("not_ready", "proposal store not available"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.MemoryProposeParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "memory propose params required"));
+
+        var proposal = proposals.Create(p.WorkspaceId, p.Kind, p.Content);
+        return Task.FromResult(ctx.Ok(proposal, CoveJsonContext.Default.Proposal));
+    }
+
+    [CoveCommand("cove://commands/memory.proposal.transition")]
+    public static Task<ControlResponse> MemoryProposalTransition(EngineDispatchContext ctx)
+    {
+        if (ctx.Proposals is not { } proposals)
+            return Task.FromResult(ctx.Fail("not_ready", "proposal store not available"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.MemoryProposalTransitionParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "memory proposal transition params required"));
+
+        var ok = proposals.Transition(p.ProposalId, p.State);
+        return Task.FromResult(ok ? ctx.Ok() : ctx.Fail("not_found", "proposal not found or already in target state"));
     }
 }

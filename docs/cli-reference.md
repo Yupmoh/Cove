@@ -79,6 +79,15 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/layout.mutate` | core |  |
 | `cove://commands/layout.snapshot` | core |  |
 | `cove://commands/list_windows` | core | mcp-bridge list_windows (PL-30, render-bound) |
+| `cove://commands/memory.add` | core |  |
+| `cove://commands/memory.consolidate` | core |  |
+| `cove://commands/memory.proposal.transition` | core |  |
+| `cove://commands/memory.propose` | core |  |
+| `cove://commands/memory.recall` | core |  |
+| `cove://commands/memory.reindex` | core |  |
+| `cove://commands/memory.search` | core |  |
+| `cove://commands/memory.show` | core |  |
+| `cove://commands/memory.supersede` | core |  |
 | `cove://commands/note.create` | core |  |
 | `cove://commands/note.delete` | core |  |
 | `cove://commands/note.get` | core |  |
@@ -234,6 +243,15 @@ Generated from the command registry. Do not edit by hand.
 | `launch-profile delete` | cli |  |
 | `launch-profile list` | cli |  |
 | `launch-profile set-default` | cli |  |
+| `memory add` | cli |  |
+| `memory consolidate` | cli |  |
+| `memory proposal transition` | cli |  |
+| `memory propose` | cli |  |
+| `memory recall` | cli |  |
+| `memory reindex` | cli |  |
+| `memory search` | cli |  |
+| `memory show` | cli |  |
+| `memory supersede` | cli |  |
 | `migrate` | cli |  |
 | `note create` | cli |  |
 | `note delete` | cli |  |
@@ -304,4 +322,4 @@ Generated from the command registry. Do not edit by hand.
 | `timeline list` | cli |  |
 | `version` | cli |  |
 
-Total: 299 commands
+Total: 317 commands

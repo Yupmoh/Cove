@@ -45,6 +45,10 @@ public sealed class EngineDispatchContext
         TimelineStore? timeline = null,
         BlackboardStore? blackboard = null,
         NoteFileStore? noteFiles = null,
+        MemoryStore? memory = null,
+        MemoryRanker? memoryRanker = null,
+        ProposalStore? proposals = null,
+        MemoryConsolidator? consolidator = null,
         PaneTypeRegistry? paneTypes = null,
         BrowserPaneManager? browser = null,
         ConfigService? config = null,
@@ -79,6 +83,10 @@ public sealed class EngineDispatchContext
         Timeline = timeline;
         Blackboard = blackboard;
         NoteFiles = noteFiles;
+        Memory = memory;
+        MemoryRanker = memoryRanker;
+        Proposals = proposals;
+        Consolidator = consolidator;
         PaneTypes = paneTypes;
         Browser = browser;
         Config = config;
@@ -114,6 +122,10 @@ public sealed class EngineDispatchContext
     public TimelineStore? Timeline { get; }
     public BlackboardStore? Blackboard { get; }
     public NoteFileStore? NoteFiles { get; }
+    public MemoryStore? Memory { get; }
+    public MemoryRanker? MemoryRanker { get; }
+    public ProposalStore? Proposals { get; }
+    public MemoryConsolidator? Consolidator { get; }
     public PaneTypeRegistry? PaneTypes { get; }
     public ConfigService? Config { get; }
     public BrowserPaneManager? Browser { get; }

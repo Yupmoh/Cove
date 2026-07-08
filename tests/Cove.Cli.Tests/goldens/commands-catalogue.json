@@ -309,6 +309,42 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/memory.add",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/memory.consolidate",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/memory.proposal.transition",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/memory.propose",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/memory.recall",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/memory.reindex",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/memory.search",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/memory.show",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/memory.supersede",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/note.create",
     "source": "core"
   },
@@ -929,6 +965,42 @@
   },
   {
     "command": "launch-profile set-default",
+    "source": "cli"
+  },
+  {
+    "command": "memory add",
+    "source": "cli"
+  },
+  {
+    "command": "memory consolidate",
+    "source": "cli"
+  },
+  {
+    "command": "memory proposal transition",
+    "source": "cli"
+  },
+  {
+    "command": "memory propose",
+    "source": "cli"
+  },
+  {
+    "command": "memory recall",
+    "source": "cli"
+  },
+  {
+    "command": "memory reindex",
+    "source": "cli"
+  },
+  {
+    "command": "memory search",
+    "source": "cli"
+  },
+  {
+    "command": "memory show",
+    "source": "cli"
+  },
+  {
+    "command": "memory supersede",
     "source": "cli"
   },
   {

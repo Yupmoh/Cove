@@ -1,6 +1,6 @@
 using Cove.Engine.Knowledge;
-using Microsoft.Extensions.Logging.Abstractions;
 using Cove.Protocol;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace Cove.Engine.Tests;
