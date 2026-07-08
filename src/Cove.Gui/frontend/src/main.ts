@@ -4,6 +4,7 @@ import { WebglAddon } from "@xterm/addon-webgl";
 import { SearchAddon } from "@xterm/addon-search";
 import "@xterm/xterm/css/xterm.css";
 import { toBase64Utf8, parseRelayText } from "./wsproto";
+import { renderKanbanBoard } from "./tasks-kanban";
 
 const CREDIT_THRESHOLD = 131072;
 
@@ -398,12 +399,26 @@ async function spawnIntoPane(paneId: string): Promise<void> {
   await invoke("app.layoutMutate", { op: "addSubtab", roomId: activeRoomId, paneId: paneId, newPaneId: sp, targetPaneId: "", orientation: "", name: "", dir: 0 });
   await reload();
 }
+
+function renderKanbanPane(paneId: string): HTMLElement {
+  const placeholder = document.createElement("div");
+  placeholder.className = "kanban-pane-placeholder";
+  placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
+  const workspaceId = "default";
+  renderKanbanBoard(workspaceId).then(el => {
+    placeholder.replaceWith(el);
+  }).catch(e => {
+    placeholder.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to load kanban: ${(e as Error).message}</div>`;
+  });
+  return placeholder;
+}
 function renderNode(node: MosaicNode): HTMLElement {
   if (node.kind === "leaf") {
     const subs = node.subtabs.length > 0 ? node.subtabs : [{ documentId: node.paneId, paneType: "terminal", title: null }];
     const activeIdx = Math.min(Math.max(0, node.activeSubtab), subs.length - 1);
     const active = subs[activeIdx];
     const isEmpty = active.paneType === "empty" || node.subtabs.length === 0;
+    if (active.paneType === "tasks-kanban") return renderKanbanPane(active.documentId);
     if (isEmpty) return emptyPaneStrip(node.paneId);
     const activeEl = getPane(subs[activeIdx].documentId).el;
     if (subs.length <= 1) return activeEl;

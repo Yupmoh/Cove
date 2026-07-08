@@ -35,6 +35,9 @@ public sealed class PaneTypeRegistry
         registry.Register(new PaneTypeDefinition("git", "Git", "source-control", IsDockable: true));
         registry.Register(new PaneTypeDefinition("browser", "Browser", "webview", IsDockable: false));
         registry.Register(new PaneTypeDefinition("notepad", "Notepad", "note", IsDockable: true));
+        registry.Register(new PaneTypeDefinition("tasks-kanban", "Tasks Board", "tasks", IsDockable: false));
+        registry.Register(new PaneTypeDefinition("tasks-list", "Tasks List", "tasks", IsDockable: true));
+        registry.Register(new PaneTypeDefinition("tasks-detail", "Task Detail", "tasks", IsDockable: true));
         return registry;
     }
 }
