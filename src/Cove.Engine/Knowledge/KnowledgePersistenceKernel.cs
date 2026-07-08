@@ -110,6 +110,16 @@ public sealed class KnowledgePersistenceKernel
                 created_at TEXT NOT NULL
             );
             CREATE VIRTUAL TABLE IF NOT EXISTS facts_fts USING fts5(content, content='facts', content_rowid='rowid', tokenize='porter unicode61 remove_diacritics 1');
+            CREATE TRIGGER IF NOT EXISTS facts_ai AFTER INSERT ON facts BEGIN
+                INSERT INTO facts_fts(rowid, content) VALUES (new.rowid, new.content);
+            END;
+            CREATE TRIGGER IF NOT EXISTS facts_ad AFTER DELETE ON facts BEGIN
+                INSERT INTO facts_fts(facts_fts, rowid, content) VALUES('delete', old.rowid, old.content);
+            END;
+            CREATE TRIGGER IF NOT EXISTS facts_au AFTER UPDATE ON facts BEGIN
+                INSERT INTO facts_fts(facts_fts, rowid, content) VALUES('delete', old.rowid, old.content);
+                INSERT INTO facts_fts(rowid, content) VALUES (new.rowid, new.content);
+            END;
             CREATE VIRTUAL TABLE IF NOT EXISTS episodes_fts USING fts5(summary_l0, content='episodes', content_rowid='rowid', tokenize='porter unicode61 remove_diacritics 1');
             """;
         cmd.ExecuteNonQuery();

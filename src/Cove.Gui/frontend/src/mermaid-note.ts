@@ -83,6 +83,27 @@ function renderPreview(source: string, preview: HTMLElement): void {
   preview.innerHTML = svg;
 }
 
+function parseNodeToken(token: string): { id: string; label: string; shape: string } | null {
+  const trimmed = token.trim();
+  if (!trimmed) return null;
+
+  const rectMatch = trimmed.match(/^(\w+)\[([^\]]*)\]/);
+  if (rectMatch) return { id: rectMatch[1], label: rectMatch[2], shape: "rect" };
+
+  const roundMatch = trimmed.match(/^(\w+)\(([^)]*)\)/);
+  if (roundMatch) return { id: roundMatch[1], label: roundMatch[2], shape: "round" };
+
+  const diamondMatch = trimmed.match(/^(\w+)\{([^}]*)\}/);
+  if (diamondMatch) return { id: diamondMatch[1], label: diamondMatch[2], shape: "diamond" };
+
+  const circleMatch = trimmed.match(/^(\w+)\(\(([^)]*)\)\)/);
+  if (circleMatch) return { id: circleMatch[1], label: circleMatch[2], shape: "circle" };
+
+  const plainMatch = trimmed.match(/^(\w+)/);
+  if (plainMatch) return { id: plainMatch[1], label: plainMatch[1], shape: "rect" };
+
+  return null;
+}
 function renderMermaidSvg(lines: string[]): string {
   const diagramType = lines[0]?.trim() || "graph TD";
   const parts = diagramType.split(/\s+/);
@@ -95,17 +116,29 @@ function renderMermaidSvg(lines: string[]): string {
     const line = lines[i].trim();
     if (!line) continue;
 
-    const arrowMatch = line.match(/^(\w+)(\[([^\]]*)\]|\(([^)]*)\)|\{([^}]*)\})?-->\|?([^|]*)\|?(\w+)/);
-    if (arrowMatch) {
-      const from = arrowMatch[1];
-      const fromLabel = arrowMatch[3] || arrowMatch[4] || arrowMatch[5] || arrowMatch[6] || from;
-      const fromShape = arrowMatch[3] ? "rect" : arrowMatch[4] ? "round" : arrowMatch[5] ? "diamond" : arrowMatch[6] ? "circle" : "rect";
-      const edgeLabel = arrowMatch[7]?.trim() || "";
-      const to = arrowMatch[8];
+    const arrowIdx = line.indexOf("-->");
+    if (arrowIdx < 0) continue;
 
-      if (!nodes.has(from)) nodes.set(from, { label: fromLabel, shape: fromShape });
-      edges.push({ from, to, label: edgeLabel });
+    const leftPart = line.substring(0, arrowIdx).trim();
+    const rightPart = line.substring(arrowIdx + 3).trim();
+
+    const fromNode = parseNodeToken(leftPart);
+    if (!fromNode) continue;
+    if (!nodes.has(fromNode.id)) nodes.set(fromNode.id, fromNode);
+
+    let edgeLabel = "";
+    let restAfterLabel = rightPart;
+    const labelMatch = rightPart.match(/^\|([^|]*)\|\s*(.*)/);
+    if (labelMatch) {
+      edgeLabel = labelMatch[1].trim();
+      restAfterLabel = labelMatch[2];
     }
+
+    const toNode = parseNodeToken(restAfterLabel);
+    if (!toNode) continue;
+    if (!nodes.has(toNode.id)) nodes.set(toNode.id, toNode);
+
+    edges.push({ from: fromNode.id, to: toNode.id, label: edgeLabel });
   }
 
   const nodeArray = Array.from(nodes.entries());
@@ -164,4 +197,9 @@ async function saveMermaid(): Promise<void> {
   } catch (e) {
     console.error("Save failed:", e);
   }
+}
+
+
+export function _testRenderMermaidSvg(lines: string[]): string {
+  return renderMermaidSvg(lines);
 }
