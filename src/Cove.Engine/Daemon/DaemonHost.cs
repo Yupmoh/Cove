@@ -368,7 +368,12 @@ public sealed class DaemonHost
         if (generated is not null)
         {
             if (generated.Ok && IsMutatingVerb(req.Uri))
+            {
                 BroadcastEvent("state.changed", new StateChangedEvent(req.Uri), Cove.Protocol.CoveJsonContext.Default.StateChangedEvent);
+                var taskChannel = ResolveTaskEventChannel(req.Uri);
+                if (taskChannel is not null)
+                    BroadcastEvent(taskChannel, new StateChangedEvent(req.Uri), Cove.Protocol.CoveJsonContext.Default.StateChangedEvent);
+            }
             await WriteResponseAsync(conn, generated, cancellationToken).ConfigureAwait(false);
             return false;
         }
@@ -613,7 +618,22 @@ public sealed class DaemonHost
             || uri.StartsWith("cove://commands/collection.", System.StringComparison.Ordinal)
             || uri.StartsWith("cove://commands/resident.", System.StringComparison.Ordinal)
             || uri.StartsWith("cove://commands/worktree.", System.StringComparison.Ordinal)
-            || uri.StartsWith("cove://commands/workspace-command.", System.StringComparison.Ordinal);
+            || uri.StartsWith("cove://commands/workspace-command.", System.StringComparison.Ordinal)
+            || uri.StartsWith("cove://commands/task.", System.StringComparison.Ordinal)
+            || uri.StartsWith("cove://commands/run.", System.StringComparison.Ordinal);
+    }
+
+    private static string? ResolveTaskEventChannel(string uri)
+    {
+        if (uri.StartsWith("cove://commands/task.", System.StringComparison.Ordinal))
+        {
+            if (uri.Contains("status.") || uri.Contains("label."))
+                return "task.board.invalidated";
+            return "task.card.changed";
+        }
+        if (uri.StartsWith("cove://commands/run.", System.StringComparison.Ordinal))
+            return "task.run.changed";
+        return null;
     }
     private static void PopulateHookMatrix(Cove.Engine.Hooks.HookEnvelopeMatrix matrix, Cove.Adapters.AdapterManifestStore manifestStore, ILogger logger)
     {
