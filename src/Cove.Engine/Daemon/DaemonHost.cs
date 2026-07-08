@@ -122,6 +122,8 @@ public sealed class DaemonHost
         _launcher = new Cove.Engine.Launch.LaunchOrchestrator(_manifestStore, new Cove.Adapters.MethodRunner(), new Cove.Adapters.BinaryDiscoveryService(), probedPath, resumeService, new Cove.Engine.Launch.LauncherOverrideStore(System.IO.Path.Combine(dataDir, "launcher-overrides"), logger), logger);
         _taskService = new Cove.Tasks.TaskService(dataDir, logger);
         _ = _taskService.StartAsync();
+        var knowledgeKernel = new Knowledge.KnowledgePersistenceKernel(dataDir, logger);
+        knowledgeKernel.EnsureAllSchemas();
         var restoration = new Cove.Tasks.Restart.RunRestorationService(_taskService, logger);
         var restoredSummary = restoration.RestoreOnStartup();
         if (restoredSummary.RestoredRuns.Count > 0)
