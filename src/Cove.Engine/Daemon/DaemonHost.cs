@@ -73,6 +73,7 @@ public sealed class DaemonHost
     private Cove.Engine.Knowledge.VaultSettingsStore? _vaultSettings;
     private Cove.Engine.Knowledge.LibraryStore? _library;
     private Cove.Engine.Knowledge.ReviewStore? _reviews;
+    private Cove.Engine.Knowledge.AttributionIndex? _attribution;
     private Cove.Engine.Panes.PaneTypeRegistry? _paneTypes;
     private Cove.Engine.Browser.BrowserPaneManager? _browser;
     private Cove.Engine.Config.ConfigService? _config;
@@ -159,6 +160,7 @@ public sealed class DaemonHost
         _library = new Cove.Engine.Knowledge.LibraryStore(dataDir, logger);
         _library.EnsureSchema();
         _reviews = new Cove.Engine.Knowledge.ReviewStore(dataDir, logger);
+        _attribution = new Cove.Engine.Knowledge.AttributionIndex(dataDir, logger);
         _omniChat = new Cove.Engine.Activity.OmniChatStore(System.IO.Path.Combine(dataDir, "omni-chat"), logger);
         _browser = new Cove.Engine.Browser.BrowserPaneManager();
         _config = new Cove.Engine.Config.ConfigService(dataDir, logger);
@@ -394,7 +396,7 @@ public sealed class DaemonHost
             return false;
         }
 
-        ControlResponse? generated = await Cove.Engine.EngineCommandRouter.RouteAsync(req, _panes, _layout, _workspaces, _runCommands, _restoration, _snapshots, _skills, _agents, _launchProfiles, _adapterEnv, _hookServer, _hookRouter, _agentRouter, _activity, _sessions, _lifecycle, _launcher, _taskService, _dispatchSaga, _resumeSaga, _timeline, _blackboard, _noteFiles, _memory, _memoryRanker, _proposals, _consolidator, _edits, _corpus, _vaultSettings, _library, _reviews, _paneTypes, _browser, _config, _manifestStore, _registry, _omniChat, _paneScopes, _stateBus, _extensions, cancellationToken).ConfigureAwait(false);
+        ControlResponse? generated = await Cove.Engine.EngineCommandRouter.RouteAsync(req, _panes, _layout, _workspaces, _runCommands, _restoration, _snapshots, _skills, _agents, _launchProfiles, _adapterEnv, _hookServer, _hookRouter, _agentRouter, _activity, _sessions, _lifecycle, _launcher, _taskService, _dispatchSaga, _resumeSaga, _timeline, _blackboard, _noteFiles, _memory, _memoryRanker, _proposals, _consolidator, _edits, _corpus, _vaultSettings, _library, _reviews, _attribution, _paneTypes, _browser, _config, _manifestStore, _registry, _omniChat, _paneScopes, _stateBus, _extensions, cancellationToken).ConfigureAwait(false);
         if (generated is not null)
         {
             if (generated.Ok && IsMutatingVerb(req.Uri))

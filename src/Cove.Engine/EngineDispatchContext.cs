@@ -54,6 +54,7 @@ public sealed class EngineDispatchContext
         VaultSettingsStore? vaultSettings = null,
         LibraryStore? library = null,
         ReviewStore? reviews = null,
+        AttributionIndex? attribution = null,
         PaneTypeRegistry? paneTypes = null,
         BrowserPaneManager? browser = null,
         ConfigService? config = null,
@@ -97,6 +98,7 @@ public sealed class EngineDispatchContext
         VaultSettings = vaultSettings;
         Library = library;
         Reviews = reviews;
+        Attribution = attribution;
         PaneTypes = paneTypes;
         Browser = browser;
         Config = config;
@@ -141,6 +143,7 @@ public sealed class EngineDispatchContext
     public VaultSettingsStore? VaultSettings { get; }
     public LibraryStore? Library { get; }
     public ReviewStore? Reviews { get; }
+    public AttributionIndex? Attribution { get; }
     public PaneTypeRegistry? PaneTypes { get; }
     public ConfigService? Config { get; }
     public BrowserPaneManager? Browser { get; }

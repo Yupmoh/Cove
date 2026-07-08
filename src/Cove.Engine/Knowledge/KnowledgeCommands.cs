@@ -563,4 +563,53 @@ public static class KnowledgeCommands
         var dtos = telemetry.Select(t => new ReviewTelemetryDto(t.SessionId, t.Adapter, t.FilesTouched)).ToList();
         return Task.FromResult(ctx.Ok(new ReviewTelemetryResult(dtos), CoveJsonContext.Default.ReviewTelemetryResult));
     }
+    [CoveCommand("cove://commands/attribution.record")]
+    public static Task<ControlResponse> AttributionRecord(EngineDispatchContext ctx)
+    {
+        if (ctx.Attribution is not { } idx)
+            return Task.FromResult(ctx.Fail("not_ready", "attribution index not available"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.AttributionRecordParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "attribution record params required"));
+        var entry = idx.Record(p.SessionId, p.ToolUseId, p.FilePath, p.StartLine, p.EndLine);
+        var dto = new AttributionEntryDto(entry.Id, entry.SessionId, entry.ToolUseId, entry.FilePath, entry.StartLine, entry.EndLine, entry.At.ToString("o"));
+        return Task.FromResult(ctx.Ok(dto, CoveJsonContext.Default.AttributionEntryDto));
+    }
+
+    [CoveCommand("cove://commands/attribution.find-by-line")]
+    public static Task<ControlResponse> AttributionFindByLine(EngineDispatchContext ctx)
+    {
+        if (ctx.Attribution is not { } idx)
+            return Task.FromResult(ctx.Fail("not_ready", "attribution index not available"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.AttributionFindByLineParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "attribution find-by-line params required"));
+        var entry = idx.FindByLine(p.FilePath, p.Line);
+        if (entry is null)
+            return Task.FromResult(ctx.Fail("not_found", "no attribution for this line"));
+        var dto = new AttributionEntryDto(entry.Id, entry.SessionId, entry.ToolUseId, entry.FilePath, entry.StartLine, entry.EndLine, entry.At.ToString("o"));
+        return Task.FromResult(ctx.Ok(dto, CoveJsonContext.Default.AttributionEntryDto));
+    }
+
+    [CoveCommand("cove://commands/attribution.find-by-range")]
+    public static Task<ControlResponse> AttributionFindByRange(EngineDispatchContext ctx)
+    {
+        if (ctx.Attribution is not { } idx)
+            return Task.FromResult(ctx.Fail("not_ready", "attribution index not available"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.AttributionFindByRangeParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "attribution find-by-range params required"));
+        var entries = idx.FindByRange(p.FilePath, p.StartLine, p.EndLine);
+        var dtos = entries.Select(e => new AttributionEntryDto(e.Id, e.SessionId, e.ToolUseId, e.FilePath, e.StartLine, e.EndLine, e.At.ToString("o"))).ToList();
+        return Task.FromResult(ctx.Ok(new AttributionListResult(dtos), CoveJsonContext.Default.AttributionListResult));
+    }
+
+    [CoveCommand("cove://commands/attribution.find-by-tool-use")]
+    public static Task<ControlResponse> AttributionFindByToolUse(EngineDispatchContext ctx)
+    {
+        if (ctx.Attribution is not { } idx)
+            return Task.FromResult(ctx.Fail("not_ready", "attribution index not available"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.AttributionFindByToolUseParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "attribution find-by-tool-use params required"));
+        var entries = idx.FindByToolUse(p.ToolUseId);
+        var dtos = entries.Select(e => new AttributionEntryDto(e.Id, e.SessionId, e.ToolUseId, e.FilePath, e.StartLine, e.EndLine, e.At.ToString("o"))).ToList();
+        return Task.FromResult(ctx.Ok(new AttributionListResult(dtos), CoveJsonContext.Default.AttributionListResult));
+    }
 }

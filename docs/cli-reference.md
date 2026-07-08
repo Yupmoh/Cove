@@ -11,6 +11,10 @@ Generated from the command registry. Do not edit by hand.
 | `agent definition list` | cli |  |
 | `agent definition show` | cli |  |
 | `attach` | cli |  |
+| `attribution find-by-line` | cli |  |
+| `attribution find-by-range` | cli |  |
+| `attribution find-by-tool-use` | cli |  |
+| `attribution record` | cli |  |
 | `blackboard post` | cli |  |
 | `blackboard show` | cli |  |
 | `browser back` | cli |  |
@@ -40,6 +44,10 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/agent.spawned-panes` | core |  |
 | `cove://commands/agent.stop` | core |  |
 | `cove://commands/attach.raw` | core | raw external-terminal attach (TM-79, runtime-owned) |
+| `cove://commands/attribution.find-by-line` | core |  |
+| `cove://commands/attribution.find-by-range` | core |  |
+| `cove://commands/attribution.find-by-tool-use` | core |  |
+| `cove://commands/attribution.record` | core |  |
 | `cove://commands/blackboard.post` | core |  |
 | `cove://commands/blackboard.show` | core |  |
 | `cove://commands/browser.back` | core |  |
@@ -353,4 +361,4 @@ Generated from the command registry. Do not edit by hand.
 | `vault set-setting` | cli |  |
 | `version` | cli |  |
 
-Total: 348 commands
+Total: 356 commands

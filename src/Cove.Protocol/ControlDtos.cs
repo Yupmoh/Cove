@@ -353,6 +353,12 @@ public sealed record ReviewAuditDto(string Id, string CommentId, string FromStat
 public sealed record ReviewAuditResult(System.Collections.Generic.IReadOnlyList<ReviewAuditDto> Entries);
 public sealed record ReviewTelemetryDto(string SessionId, string Adapter, int FilesTouched);
 public sealed record ReviewTelemetryResult(System.Collections.Generic.IReadOnlyList<ReviewTelemetryDto> Entries);
+public sealed record AttributionRecordParams(string SessionId, string ToolUseId, string FilePath, int StartLine, int EndLine);
+public sealed record AttributionFindByLineParams(string FilePath, int Line);
+public sealed record AttributionFindByRangeParams(string FilePath, int StartLine, int EndLine);
+public sealed record AttributionFindByToolUseParams(string ToolUseId);
+public sealed record AttributionEntryDto(string Id, string SessionId, string ToolUseId, string FilePath, int StartLine, int EndLine, string At);
+public sealed record AttributionListResult(System.Collections.Generic.IReadOnlyList<AttributionEntryDto> Entries);
 
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
@@ -600,5 +606,11 @@ public sealed record ReviewTelemetryResult(System.Collections.Generic.IReadOnlyL
 [JsonSerializable(typeof(ReviewAuditResult))]
 [JsonSerializable(typeof(ReviewTelemetryDto))]
 [JsonSerializable(typeof(ReviewTelemetryResult))]
+[JsonSerializable(typeof(AttributionRecordParams))]
+[JsonSerializable(typeof(AttributionFindByLineParams))]
+[JsonSerializable(typeof(AttributionFindByRangeParams))]
+[JsonSerializable(typeof(AttributionFindByToolUseParams))]
+[JsonSerializable(typeof(AttributionEntryDto))]
+[JsonSerializable(typeof(AttributionListResult))]
 [JsonSerializable(typeof(JsonElement))]
 public sealed partial class CoveJsonContext : JsonSerializerContext;

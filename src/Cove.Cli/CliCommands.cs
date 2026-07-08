@@ -822,4 +822,19 @@ internal static class CliCommands
     [CoveCommand("review telemetry")]
     public static Task<int> ReviewTelemetry(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/review.telemetry");
+    [CoveCommand("attribution record")]
+    public static Task<int> AttributionRecord(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/attribution.record");
+
+    [CoveCommand("attribution find-by-line")]
+    public static Task<int> AttributionFindByLine(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/attribution.find-by-line");
+
+    [CoveCommand("attribution find-by-range")]
+    public static Task<int> AttributionFindByRange(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/attribution.find-by-range");
+
+    [CoveCommand("attribution find-by-tool-use")]
+    public static Task<int> AttributionFindByToolUse(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/attribution.find-by-tool-use");
 }

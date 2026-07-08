@@ -28,6 +28,22 @@
     "source": "cli"
   },
   {
+    "command": "attribution find-by-line",
+    "source": "cli"
+  },
+  {
+    "command": "attribution find-by-range",
+    "source": "cli"
+  },
+  {
+    "command": "attribution find-by-tool-use",
+    "source": "cli"
+  },
+  {
+    "command": "attribution record",
+    "source": "cli"
+  },
+  {
     "command": "blackboard post",
     "source": "cli"
   },
@@ -142,6 +158,22 @@
   {
     "command": "cove://commands/attach.raw",
     "description": "raw external-terminal attach (TM-79, runtime-owned)",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/attribution.find-by-line",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/attribution.find-by-range",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/attribution.find-by-tool-use",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/attribution.record",
     "source": "core"
   },
   {
