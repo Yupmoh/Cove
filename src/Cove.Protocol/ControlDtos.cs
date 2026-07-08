@@ -223,6 +223,10 @@ public sealed record RunNowParams(string CardId);
 public sealed record RunNowResult(bool Success, string? RunId, string? Error);
 public sealed record RepeatContinueParams(string CardId);
 public sealed record RepeatFinishParams(string CardId);
+public sealed record TaskBoardExportParams(string ExportPath, int WorkspaceCount);
+public sealed record TaskBoardExportResultDto(bool Success, string? ExportPath, string? ExportedAt, int SchemaVersion, int WorkspaceCount, string? Error);
+public sealed record TaskBoardDiffParams(string ImportPath);
+public sealed record TaskBoardDiffResultDto(bool Success, string[] Diffs, string? Error);
 public sealed record StatusSetHiddenParams(string WorkspaceId, string Id, bool Hidden);
 
 public sealed record Note
@@ -391,6 +395,10 @@ public sealed record BrowserPaneDto(string PaneId, string CurrentUrl, System.Col
 [JsonSerializable(typeof(TaskSetDoneParams))]
 [JsonSerializable(typeof(RunResumeParams))]
 [JsonSerializable(typeof(ScheduleSetRouteParams))]
+[JsonSerializable(typeof(TaskBoardExportParams))]
+[JsonSerializable(typeof(TaskBoardExportResultDto))]
+[JsonSerializable(typeof(TaskBoardDiffParams))]
+[JsonSerializable(typeof(TaskBoardDiffResultDto))]
 [JsonSerializable(typeof(RunNowParams))]
 [JsonSerializable(typeof(RunNowResult))]
 [JsonSerializable(typeof(RepeatContinueParams))]

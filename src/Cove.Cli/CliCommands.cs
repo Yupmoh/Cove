@@ -644,6 +644,14 @@ internal static class CliCommands
     public static Task<int> TaskRepeatFinish(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/task.repeat.finish");
 
+    [CoveCommand("task-board export")]
+    public static Task<int> TaskBoardExport(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/task-board.export");
+
+    [CoveCommand("task-board diff")]
+    public static Task<int> TaskBoardDiff(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/task-board.diff");
+
     [CoveCommand("timeline append")]
     public static Task<int> TimelineAppend(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/timeline.append");
