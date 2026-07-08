@@ -10,4 +10,10 @@ internal static partial class ConfigLog
 
     [ZLoggerMessage(LogLevel.Warning, "failed to read config at {path} after retries")]
     public static partial void ConfigReadFailed(this ILogger logger, string path);
+
+    [ZLoggerMessage(LogLevel.Warning, "config write blocked (unwritable state) at {path}")]
+    public static partial void ConfigWriteBlocked(this ILogger logger, string path);
+
+    [ZLoggerMessage(LogLevel.Warning, "config set unknown key {key}")]
+    public static partial void ConfigUnknownKey(this ILogger logger, string key);
 }

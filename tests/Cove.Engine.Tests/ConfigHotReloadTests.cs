@@ -74,11 +74,11 @@ public sealed class ConfigHotReloadTests
         try
         {
             var path = Path.Combine(dir, "config.json");
-            File.WriteAllText(path, "{\"terminal.fontSize\":\"12\"}");
+            File.WriteAllText(path, "{\"terminal\":{\"fontSize\":12}}");
             var cfg = new ConfigService(dir, NullLogger.Instance);
             Assert.Equal("12", cfg.Get("terminal.fontSize"));
 
-            File.WriteAllText(path, "{\"terminal.fontSize\":\"14\"}");
+            File.WriteAllText(path, "{\"terminal\":{\"fontSize\":14}}");
             cfg.Reload();
             Assert.Equal("14", cfg.Get("terminal.fontSize"));
         }
@@ -94,7 +94,7 @@ public sealed class ConfigHotReloadTests
         try
         {
             var path = Path.Combine(dir, "config.json");
-            File.WriteAllText(path, "{\"terminal.fontSize\":\"12\"}");
+            File.WriteAllText(path, "{\"terminal\":{\"fontSize\":12}}");
             cfg = new ConfigService(dir, NullLogger.Instance);
             cfg.StartWatching();
             var changedKeys = new System.Collections.Generic.List<string>();
@@ -122,7 +122,8 @@ public sealed class ConfigHotReloadTests
             var path = Path.Combine(dir, "config.json");
             File.WriteAllText(path, "{ this is not valid json");
             var cfg = new ConfigService(dir, NullLogger.Instance);
-            Assert.Null(cfg.Get("terminal.fontSize"));
+            Assert.False(cfg.IsWritable());
+            Assert.Equal("11", cfg.Get("terminal.fontSize"));
         }
         finally { try { Directory.Delete(dir, true); } catch { } }
     }
@@ -155,7 +156,7 @@ public sealed class ConfigHotReloadTests
             var cfg = new ConfigService(dir, NullLogger.Instance);
             cfg.Set("terminal.fontSize", "14");
             var raw = File.ReadAllText(Path.Combine(dir, "config.json"));
-            Assert.Contains("\"14\"", raw);
+            Assert.Contains("\"fontSize\": 14", raw);
         }
         finally { try { Directory.Delete(dir, true); } catch { } }
     }
