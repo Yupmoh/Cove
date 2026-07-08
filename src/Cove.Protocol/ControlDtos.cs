@@ -63,6 +63,7 @@ public sealed record ConfigGetResult(string Value);
 public sealed record ConfigSetParams(string Key, string Value);
 public sealed record ExtensionRunParams(string Command, string? Params = null);
 public sealed record ExtensionRunResult(string Output);
+public sealed record AttachRawParams(string Session);
 
 public sealed record LayoutMutateParams(string Op, string? RoomId = null, string? TargetPaneId = null, string? NewPaneId = null, string? Orientation = null, string? Name = null, string? PaneId = null, int Dir = 1);
 public sealed record LayoutMutateResult(string? RoomId = null);
@@ -227,6 +228,7 @@ public sealed record BrowserPaneDto(string PaneId, string CurrentUrl, System.Col
 [JsonSerializable(typeof(ConfigGetResult))]
 [JsonSerializable(typeof(ConfigSetParams))]
 [JsonSerializable(typeof(ExtensionRunParams))]
+[JsonSerializable(typeof(AttachRawParams))]
 [JsonSerializable(typeof(ExtensionRunResult))]
 [JsonSerializable(typeof(System.Collections.Generic.Dictionary<string, string>))]
 [JsonSerializable(typeof(System.Collections.Generic.List<string>))]
