@@ -44,13 +44,30 @@ public sealed class CommandContext
     }
 
     public async Task<int> RouteCoreAsync(string uri)
+        => await RouteCoreWithParamsAsync(uri, null);
+
+    public async Task<int> RouteCoreWithParamsAsync(string uri, string? paramsJson)
     {
+        System.Text.Json.JsonElement? parsedParams = null;
+        if (paramsJson is not null)
+        {
+            try
+            {
+                parsedParams = JsonDocument.Parse(paramsJson).RootElement.Clone();
+            }
+            catch (System.Text.Json.JsonException)
+            {
+                Stderr.WriteLine("error: invalid_params");
+                Stderr.WriteLine("usage: --params '<json>'");
+                return 1;
+            }
+        }
         var connector = new DaemonConnector(Paths, Endpoint);
         FrameConnection conn = await connector.ConnectOrSpawnAsync("cli", System.Threading.CancellationToken.None);
         await using (conn)
         {
             await conn.WriteFrameAsync(FrameType.Request, 0,
-                ControlCodec.Encode(new ControlRequest("1", uri, Source: Source)), System.Threading.CancellationToken.None);
+                ControlCodec.Encode(new ControlRequest("1", uri, Params: parsedParams, Source: Source)), System.Threading.CancellationToken.None);
             Frame? resp = await conn.ReadFrameAsync(System.Threading.CancellationToken.None);
             if (resp is not { } f)
             {

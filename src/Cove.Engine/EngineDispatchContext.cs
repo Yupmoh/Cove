@@ -10,10 +10,10 @@ using Cove.Engine.Knowledge;
 using Cove.Engine.Launch;
 using Cove.Engine.Lifecycle;
 using Cove.Engine.Panes;
+using Cove.Engine.Protocol;
 using Cove.Engine.Pty;
 using Cove.Engine.Sessions;
 using Cove.Engine.Tasks;
-using Cove.Engine.Protocol;
 using Cove.Protocol;
 
 namespace Cove.Engine;
@@ -49,7 +49,8 @@ public sealed class EngineDispatchContext
         RegistryService? registry = null,
         Cove.Engine.Activity.OmniChatStore? omniChat = null,
         PaneScopeStore? paneScopes = null,
-        StateBus? stateBus = null)
+        StateBus? stateBus = null,
+        ExtensionRegistry? extensions = null)
     {
         Request = request;
         Panes = panes;
@@ -80,6 +81,7 @@ public sealed class EngineDispatchContext
         OmniChat = omniChat;
         PaneScopes = paneScopes;
         StateBus = stateBus;
+        Extensions = extensions;
     }
 
     public ControlRequest Request { get; }
@@ -111,12 +113,16 @@ public sealed class EngineDispatchContext
     public RegistryService? Registry { get; }
     public PaneScopeStore? PaneScopes { get; }
     public StateBus? StateBus { get; }
+    public ExtensionRegistry? Extensions { get; }
 
     public ControlResponse Ok<T>(T data, JsonTypeInfo<T> typeInfo)
         => new ControlResponse(Request.Id, true, JsonSerializer.SerializeToElement(data, typeInfo));
 
     public ControlResponse Ok()
         => new ControlResponse(Request.Id, true, null);
+
+    public ControlResponse OkJson(string json)
+        => new ControlResponse(Request.Id, true, JsonDocument.Parse(json).RootElement.Clone());
 
     public ControlResponse Fail(string code, string message)
         => new ControlResponse(Request.Id, false, null, new ControlError(code, message));

@@ -53,6 +53,7 @@ public sealed class DaemonHost
     private Cove.Engine.Activity.OmniChatStore? _omniChat;
     private Cove.Engine.Protocol.PaneScopeStore? _paneScopes;
     private Cove.Engine.Protocol.StateBus? _stateBus;
+    private Cove.Engine.Protocol.ExtensionRegistry? _extensions;
     private Cove.Engine.Lifecycle.AgentLifecycleController? _lifecycle;
     private Cove.Engine.Launch.LaunchOrchestrator? _launcher;
     private Cove.Engine.Tasks.TaskStore? _tasks;
@@ -111,6 +112,8 @@ public sealed class DaemonHost
         _launcher = new Cove.Engine.Launch.LaunchOrchestrator(_manifestStore, new Cove.Adapters.MethodRunner(), new Cove.Adapters.BinaryDiscoveryService(), probedPath, resumeService, new Cove.Engine.Launch.LauncherOverrideStore(System.IO.Path.Combine(dataDir, "launcher-overrides"), logger), logger);
         _tasks = new Cove.Engine.Tasks.TaskStore(dataDir);
         _stateBus = new Cove.Engine.Protocol.StateBus(dataDir, logger);
+        _extensions = new Cove.Engine.Protocol.ExtensionRegistry(_manifestStore!);
+        _extensions.Index();
         _paneScopes = new Cove.Engine.Protocol.PaneScopeStore(dataDir, logger);
         _notes = new Cove.Engine.Knowledge.NoteStore(dataDir);
         _timeline = new Cove.Engine.Knowledge.TimelineStore(dataDir);
@@ -349,7 +352,7 @@ public sealed class DaemonHost
             return false;
         }
 
-        ControlResponse? generated = await Cove.Engine.EngineCommandRouter.RouteAsync(req, _panes, _layout, _workspaces, _runCommands, _restoration, _snapshots, _skills, _agents, _launchProfiles, _adapterEnv, _hookServer, _hookRouter, _agentRouter, _activity, _sessions, _lifecycle, _launcher, _tasks, _notes, _timeline, _paneTypes, _browser, _config, _manifestStore, _registry, _omniChat, _paneScopes, _stateBus, cancellationToken).ConfigureAwait(false);
+        ControlResponse? generated = await Cove.Engine.EngineCommandRouter.RouteAsync(req, _panes, _layout, _workspaces, _runCommands, _restoration, _snapshots, _skills, _agents, _launchProfiles, _adapterEnv, _hookServer, _hookRouter, _agentRouter, _activity, _sessions, _lifecycle, _launcher, _tasks, _notes, _timeline, _paneTypes, _browser, _config, _manifestStore, _registry, _omniChat, _paneScopes, _stateBus, _extensions, cancellationToken).ConfigureAwait(false);
         if (generated is not null)
         {
             if (generated.Ok && IsMutatingVerb(req.Uri))

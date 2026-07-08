@@ -178,6 +178,10 @@ internal static class CliCommands
     public static async Task<int> Commands(CommandContext ctx)
     {
         var catalogue = Cove.Generated.CoveCommandRegistry.Catalogue;
+        var dataDir = Cove.Platform.CoveDataDir.Resolve(ctx.Channel);
+        var manifests = new Cove.Adapters.AdapterManifestStore(System.IO.Path.Combine(dataDir.Root, "adapters"), null);
+        var extensions = new Cove.Engine.Protocol.ExtensionRegistry(manifests);
+        var extensionCommands = extensions.List();
         if (ctx.IsJson)
         {
             using var buffer = new System.IO.MemoryStream();
@@ -193,6 +197,15 @@ internal static class CliCommands
                     writer.WriteString("source", entry.Source);
                     writer.WriteEndObject();
                 }
+                foreach (var ext in extensionCommands)
+                {
+                    writer.WriteStartObject();
+                    writer.WriteString("command", ext.Command);
+                    writer.WriteString("source", ext.Source);
+                    writer.WriteString("adapter", ext.Adapter);
+                    writer.WriteString("method", ext.Method);
+                    writer.WriteEndObject();
+                }
                 writer.WriteEndArray();
                 writer.Flush();
             }
@@ -203,7 +216,9 @@ internal static class CliCommands
             ctx.Stdout.WriteLine("Commands:");
             foreach (var entry in catalogue.OrderBy(c => c.Source).ThenBy(c => c.Command))
                 ctx.Stdout.WriteLine($"  [{entry.Source}] {entry.Command}");
-            ctx.Stdout.WriteLine($"Total: {catalogue.Count}");
+            foreach (var ext in extensionCommands.OrderBy(e => e.Adapter).ThenBy(e => e.Method))
+                ctx.Stdout.WriteLine($"  [extension] {ext.Command}");
+            ctx.Stdout.WriteLine($"Total: {catalogue.Count + extensionCommands.Count}");
         }
         await Task.CompletedTask;
         return 0;
@@ -215,6 +230,83 @@ internal static class CliCommands
         var paneId = System.Environment.GetEnvironmentVariable("COVE_PANE_ID") ?? "(unset)";
         ctx.Stdout.WriteLine($"pane: {paneId}");
         return Task.FromResult(0);
+    }
+
+    [CoveCommand("extension list")]
+    public static Task<int> ExtensionList(CommandContext ctx)
+    {
+        var dataDir = Cove.Platform.CoveDataDir.Resolve(ctx.Channel);
+        var manifests = new Cove.Adapters.AdapterManifestStore(System.IO.Path.Combine(dataDir.Root, "adapters"), null);
+        var extensions = new Cove.Engine.Protocol.ExtensionRegistry(manifests);
+        var commands = extensions.List();
+        if (ctx.IsJson)
+        {
+            using var buffer = new System.IO.MemoryStream();
+            using (var writer = new System.Text.Json.Utf8JsonWriter(buffer))
+            {
+                writer.WriteStartArray();
+                foreach (var ext in commands)
+                {
+                    writer.WriteStartObject();
+                    writer.WriteString("command", ext.Command);
+                    writer.WriteString("source", ext.Source);
+                    writer.WriteString("adapter", ext.Adapter);
+                    writer.WriteString("method", ext.Method);
+                    writer.WriteEndObject();
+                }
+                writer.WriteEndArray();
+                writer.Flush();
+            }
+            ctx.Stdout.WriteLine(System.Text.Encoding.UTF8.GetString(buffer.ToArray()));
+        }
+        else
+        {
+            foreach (var ext in commands.OrderBy(e => e.Adapter).ThenBy(e => e.Method))
+                ctx.Stdout.WriteLine($"{ext.Command}  (adapter: {ext.Adapter}, method: {ext.Method})");
+            ctx.Stdout.WriteLine($"Total: {commands.Count}");
+        }
+        return Task.FromResult(0);
+    }
+
+    [CoveCommand("extension run")]
+    public static Task<int> ExtensionRun(CommandContext ctx, string[] args)
+    {
+        if (args.Length < 1)
+        {
+            ctx.Stderr.WriteLine("usage: cove extension run <extension.adapter.method> [--params '<json>']");
+            return Task.FromResult(1);
+        }
+        var command = args[0];
+        string? paramsJson = null;
+        for (var i = 1; i < args.Length - 1; i++)
+        {
+            if (args[i] == "--params")
+                paramsJson = args[i + 1];
+        }
+        using var payloadBuf = new System.IO.MemoryStream();
+        using (var payloadWriter = new System.Text.Json.Utf8JsonWriter(payloadBuf))
+        {
+            payloadWriter.WriteStartObject();
+            payloadWriter.WriteString("command", command);
+            if (paramsJson is not null)
+            {
+                try
+                {
+                    using var paramsDoc = System.Text.Json.JsonDocument.Parse(paramsJson);
+                    payloadWriter.WritePropertyName("params");
+                    paramsDoc.RootElement.WriteTo(payloadWriter);
+                }
+                catch (System.Text.Json.JsonException)
+                {
+                    ctx.Stderr.WriteLine("error: invalid_params");
+                    ctx.Stderr.WriteLine("usage: --params '<json>'");
+                    return Task.FromResult(1);
+                }
+            }
+            payloadWriter.WriteEndObject();
+            payloadWriter.Flush();
+        }
+        return ctx.RouteCoreWithParamsAsync("cove://commands/extension.run", System.Text.Encoding.UTF8.GetString(payloadBuf.ToArray()));
     }
 
     [CoveCommand("exec")]
