@@ -218,6 +218,10 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/edits.find",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/emit_event",
     "description": "mcp-bridge emit_event (PL-30, headless-safe)",
     "source": "core"
@@ -933,6 +937,10 @@
   },
   {
     "command": "docs generate",
+    "source": "cli"
+  },
+  {
+    "command": "edits find",
     "source": "cli"
   },
   {

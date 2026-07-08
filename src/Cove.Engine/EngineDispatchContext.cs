@@ -49,6 +49,7 @@ public sealed class EngineDispatchContext
         MemoryRanker? memoryRanker = null,
         ProposalStore? proposals = null,
         MemoryConsolidator? consolidator = null,
+        EditsIndex? edits = null,
         PaneTypeRegistry? paneTypes = null,
         BrowserPaneManager? browser = null,
         ConfigService? config = null,
@@ -87,6 +88,7 @@ public sealed class EngineDispatchContext
         MemoryRanker = memoryRanker;
         Proposals = proposals;
         Consolidator = consolidator;
+        Edits = edits;
         PaneTypes = paneTypes;
         Browser = browser;
         Config = config;
@@ -126,6 +128,7 @@ public sealed class EngineDispatchContext
     public MemoryRanker? MemoryRanker { get; }
     public ProposalStore? Proposals { get; }
     public MemoryConsolidator? Consolidator { get; }
+    public EditsIndex? Edits { get; }
     public PaneTypeRegistry? PaneTypes { get; }
     public ConfigService? Config { get; }
     public BrowserPaneManager? Browser { get; }

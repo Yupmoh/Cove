@@ -400,4 +400,17 @@ public static class KnowledgeCommands
         var ok = proposals.Transition(p.ProposalId, p.State);
         return Task.FromResult(ok ? ctx.Ok() : ctx.Fail("not_found", "proposal not found or already in target state"));
     }
+
+    [CoveCommand("cove://commands/edits.find")]
+    public static Task<ControlResponse> EditsFind(EngineDispatchContext ctx)
+    {
+        if (ctx.Edits is not { } index)
+            return Task.FromResult(ctx.Fail("not_ready", "edits index not available"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.EditsFindParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "edits find params required"));
+
+        var records = index.FindByFile(p.FilePath, p.Limit ?? 20);
+        var dtos = records.Select(r => new EditRecordDto(r.SessionId, r.FilePath, r.Tool, r.Op, r.OccurredAt.ToString("o"), r.EditSummary)).ToList();
+        return Task.FromResult(ctx.Ok(new EditsFindResult(dtos), CoveJsonContext.Default.EditsFindResult));
+    }
 }

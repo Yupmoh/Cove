@@ -58,6 +58,7 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/collection.switch` | core |  |
 | `cove://commands/config.get` | core |  |
 | `cove://commands/config.set` | core |  |
+| `cove://commands/edits.find` | core |  |
 | `cove://commands/emit_event` | core | mcp-bridge emit_event (PL-30, headless-safe) |
 | `cove://commands/execute_command` | core | mcp-bridge execute_command (PL-30, headless-safe) |
 | `cove://commands/execute_js` | core | mcp-bridge execute_js (PL-30, render-bound) |
@@ -235,6 +236,7 @@ Generated from the command registry. Do not edit by hand.
 | `cove://hooks/_state` | core |  |
 | `cove://hooks/pane-states` | core |  |
 | `docs generate` | cli |  |
+| `edits find` | cli |  |
 | `exec` | cli |  |
 | `extension list` | cli |  |
 | `extension run` | cli |  |
@@ -322,4 +324,4 @@ Generated from the command registry. Do not edit by hand.
 | `timeline list` | cli |  |
 | `version` | cli |  |
 
-Total: 317 commands
+Total: 319 commands

@@ -287,6 +287,9 @@ public sealed record MemoryConsolidateParams(string WorkspaceId, bool DryRun);
 public sealed record MemoryConsolidateResult(int Candidates);
 public sealed record MemoryProposeParams(string WorkspaceId, string Kind, string Content);
 public sealed record MemoryProposalTransitionParams(string ProposalId, string State);
+public sealed record EditsFindParams(string FilePath, int? Limit);
+public sealed record EditsFindResult(System.Collections.Generic.IReadOnlyList<EditRecordDto> Edits);
+public sealed record EditRecordDto(string SessionId, string FilePath, string? Tool, string? Op, string OccurredAt, string? EditSummary);
 public sealed record Fact
 {
     public string Id { get; init; } = "";
@@ -533,6 +536,9 @@ public sealed record BrowserPaneDto(string PaneId, string CurrentUrl, System.Col
 [JsonSerializable(typeof(CanvasActionResult))]
 [JsonSerializable(typeof(Fact))]
 [JsonSerializable(typeof(Proposal))]
+[JsonSerializable(typeof(EditsFindParams))]
+[JsonSerializable(typeof(EditsFindResult))]
+[JsonSerializable(typeof(EditRecordDto))]
 [JsonSerializable(typeof(TimelineEntry))]
 [JsonSerializable(typeof(TimelineAppendParams))]
 [JsonSerializable(typeof(KnowledgePingParams))]

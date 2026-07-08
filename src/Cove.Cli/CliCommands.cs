@@ -696,6 +696,10 @@ internal static class CliCommands
     public static Task<int> MemoryProposalTransition(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/memory.proposal.transition");
 
+    [CoveCommand("edits find")]
+    public static Task<int> EditsFind(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/edits.find");
+
     [CoveCommand("timeline list")]
     public static Task<int> TimelineList(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/timeline.list");
