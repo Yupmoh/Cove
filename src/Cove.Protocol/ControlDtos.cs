@@ -290,6 +290,12 @@ public sealed record MemoryProposalTransitionParams(string ProposalId, string St
 public sealed record EditsFindParams(string FilePath, int? Limit);
 public sealed record EditsFindResult(System.Collections.Generic.IReadOnlyList<EditRecordDto> Edits);
 public sealed record EditRecordDto(string SessionId, string FilePath, string? Tool, string? Op, string OccurredAt, string? EditSummary);
+public sealed record VaultSearchParams(string WorkspaceId, string Query, int? Limit);
+public sealed record VaultSearchResult(System.Collections.Generic.IReadOnlyList<SessionCorpusEntryDto> Entries);
+public sealed record SessionCorpusEntryDto(string Id, string WorkspaceId, string Adapter, string StartedAt, string? EndedAt, string? ExtractorVersion);
+public sealed record VaultResumeParams(string WorkspaceId, string SessionId);
+public sealed record VaultSetSettingParams(string WorkspaceId, string Key, string Value);
+public sealed record VaultReindexParams(string WorkspaceId);
 public sealed record Fact
 {
     public string Id { get; init; } = "";
@@ -539,6 +545,12 @@ public sealed record BrowserPaneDto(string PaneId, string CurrentUrl, System.Col
 [JsonSerializable(typeof(EditsFindParams))]
 [JsonSerializable(typeof(EditsFindResult))]
 [JsonSerializable(typeof(EditRecordDto))]
+[JsonSerializable(typeof(VaultSearchParams))]
+[JsonSerializable(typeof(VaultSearchResult))]
+[JsonSerializable(typeof(SessionCorpusEntryDto))]
+[JsonSerializable(typeof(VaultResumeParams))]
+[JsonSerializable(typeof(VaultSetSettingParams))]
+[JsonSerializable(typeof(VaultReindexParams))]
 [JsonSerializable(typeof(TimelineEntry))]
 [JsonSerializable(typeof(TimelineAppendParams))]
 [JsonSerializable(typeof(KnowledgePingParams))]

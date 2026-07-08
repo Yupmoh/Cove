@@ -50,6 +50,7 @@ public sealed class EngineDispatchContext
         ProposalStore? proposals = null,
         MemoryConsolidator? consolidator = null,
         EditsIndex? edits = null,
+        SessionCorpusIndexer? corpus = null,
         PaneTypeRegistry? paneTypes = null,
         BrowserPaneManager? browser = null,
         ConfigService? config = null,
@@ -89,6 +90,7 @@ public sealed class EngineDispatchContext
         Proposals = proposals;
         Consolidator = consolidator;
         Edits = edits;
+        Corpus = corpus;
         PaneTypes = paneTypes;
         Browser = browser;
         Config = config;
@@ -129,6 +131,7 @@ public sealed class EngineDispatchContext
     public ProposalStore? Proposals { get; }
     public MemoryConsolidator? Consolidator { get; }
     public EditsIndex? Edits { get; }
+    public SessionCorpusIndexer? Corpus { get; }
     public PaneTypeRegistry? PaneTypes { get; }
     public ConfigService? Config { get; }
     public BrowserPaneManager? Browser { get; }

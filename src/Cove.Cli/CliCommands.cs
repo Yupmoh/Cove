@@ -700,6 +700,21 @@ internal static class CliCommands
     public static Task<int> EditsFind(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/edits.find");
 
+    [CoveCommand("vault search")]
+    public static Task<int> VaultSearch(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/vault.search");
+
+    [CoveCommand("vault resume")]
+    public static Task<int> VaultResume(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/vault.resume");
+
+    [CoveCommand("vault set-setting")]
+    public static Task<int> VaultSetSetting(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/vault.set-setting");
+
+    [CoveCommand("vault reindex")]
+    public static Task<int> VaultReindex(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/vault.reindex");
     [CoveCommand("timeline list")]
     public static Task<int> TimelineList(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/timeline.list");

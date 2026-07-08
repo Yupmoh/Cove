@@ -201,6 +201,10 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/task.update` | core |  |
 | `cove://commands/timeline.append` | core |  |
 | `cove://commands/timeline.list` | core |  |
+| `cove://commands/vault.reindex` | core |  |
+| `cove://commands/vault.resume` | core |  |
+| `cove://commands/vault.search` | core |  |
+| `cove://commands/vault.set-setting` | core |  |
 | `cove://commands/wing.create` | core |  |
 | `cove://commands/wing.list` | core |  |
 | `cove://commands/wing.remove` | core |  |
@@ -322,6 +326,10 @@ Generated from the command registry. Do not edit by hand.
 | `task-board export` | cli |  |
 | `timeline append` | cli |  |
 | `timeline list` | cli |  |
+| `vault reindex` | cli |  |
+| `vault resume` | cli |  |
+| `vault search` | cli |  |
+| `vault set-setting` | cli |  |
 | `version` | cli |  |
 
-Total: 319 commands
+Total: 327 commands

@@ -413,4 +413,43 @@ public static class KnowledgeCommands
         var dtos = records.Select(r => new EditRecordDto(r.SessionId, r.FilePath, r.Tool, r.Op, r.OccurredAt.ToString("o"), r.EditSummary)).ToList();
         return Task.FromResult(ctx.Ok(new EditsFindResult(dtos), CoveJsonContext.Default.EditsFindResult));
     }
+
+    [CoveCommand("cove://commands/vault.search")]
+    public static Task<ControlResponse> VaultSearch(EngineDispatchContext ctx)
+    {
+        if (ctx.Corpus is not { } corpus)
+            return Task.FromResult(ctx.Fail("not_ready", "session corpus not available"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.VaultSearchParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "vault search params required"));
+        var entries = corpus.SearchSessions(p.WorkspaceId, p.Query, p.Limit ?? 20);
+        var dtos = entries.Select(e => new SessionCorpusEntryDto(e.Id, e.WorkspaceId, e.Adapter, e.StartedAt, e.EndedAt, e.ExtractorVersion)).ToList();
+        return Task.FromResult(ctx.Ok(new VaultSearchResult(dtos), CoveJsonContext.Default.VaultSearchResult));
+    }
+
+    [CoveCommand("cove://commands/vault.resume")]
+    public static Task<ControlResponse> VaultResume(EngineDispatchContext ctx)
+    {
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.VaultResumeParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "vault resume params required"));
+        return Task.FromResult(ctx.Ok());
+    }
+
+    [CoveCommand("cove://commands/vault.set-setting")]
+    public static Task<ControlResponse> VaultSetSetting(EngineDispatchContext ctx)
+    {
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.VaultSetSettingParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "vault set-setting params required"));
+        return Task.FromResult(ctx.Ok());
+    }
+
+    [CoveCommand("cove://commands/vault.reindex")]
+    public static Task<ControlResponse> VaultReindex(EngineDispatchContext ctx)
+    {
+        if (ctx.Corpus is not { } corpus)
+            return Task.FromResult(ctx.Fail("not_ready", "session corpus not available"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.VaultReindexParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "vault reindex params required"));
+        corpus.ReindexIfVersionChanged(p.WorkspaceId, "latest");
+        return Task.FromResult(ctx.Ok());
+    }
 }
