@@ -175,6 +175,16 @@ public sealed class KnowledgePersistenceKernel
                 updated_at TEXT NOT NULL
             );
             CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(title, body, content='notes_index', content_rowid='rowid', tokenize='porter unicode61 remove_diacritics 1');
+            CREATE TRIGGER IF NOT EXISTS notes_ai AFTER INSERT ON notes_index BEGIN
+                INSERT INTO notes_fts(rowid, title, body) VALUES (new.rowid, new.title, new.body);
+            END;
+            CREATE TRIGGER IF NOT EXISTS notes_ad AFTER DELETE ON notes_index BEGIN
+                INSERT INTO notes_fts(notes_fts, rowid, title, body) VALUES('delete', old.rowid, old.title, old.body);
+            END;
+            CREATE TRIGGER IF NOT EXISTS notes_au AFTER UPDATE ON notes_index BEGIN
+                INSERT INTO notes_fts(notes_fts, rowid, title, body) VALUES('delete', old.rowid, old.title, old.body);
+                INSERT INTO notes_fts(rowid, title, body) VALUES (new.rowid, new.title, new.body);
+            END;
             """;
         cmd.ExecuteNonQuery();
         _logger.LogWarning("knowledge: notes/index.db schema ensured at {path}", path);
