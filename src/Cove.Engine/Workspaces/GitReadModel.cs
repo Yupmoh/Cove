@@ -163,9 +163,36 @@ public sealed class GitReadModel
             _logger.LogWarning("git log failed: {err}", result.Stderr);
             return new GitLog([]);
         }
+        return ParseLog(result.Stdout);
+    }
+    public async Task<GitLog> GetUnpushedAsync(string repoDir, CancellationToken ct = default)
+    {
+        var result = await _git.RunAsync(repoDir, ["log", "@{u}..HEAD", "--format=%H%n%an%n%ad%n%s%n---", "--date=iso"], ct);
+        if (!result.Ok)
+        {
+            if (!result.Stderr.Contains("no upstream", System.StringComparison.OrdinalIgnoreCase))
+                _logger.LogWarning("git log unpushed failed: {err}", result.Stderr);
+            return new GitLog([]);
+        }
+        return ParseLog(result.Stdout);
+    }
 
+    public async Task<GitLog> GetUnpulledAsync(string repoDir, CancellationToken ct = default)
+    {
+        var result = await _git.RunAsync(repoDir, ["log", "HEAD..@{u}", "--format=%H%n%an%n%ad%n%s%n---", "--date=iso"], ct);
+        if (!result.Ok)
+        {
+            if (!result.Stderr.Contains("no upstream", System.StringComparison.OrdinalIgnoreCase))
+                _logger.LogWarning("git log unpulled failed: {err}", result.Stderr);
+            return new GitLog([]);
+        }
+        return ParseLog(result.Stdout);
+    }
+
+    private static GitLog ParseLog(string output)
+    {
         var commits = new System.Collections.Generic.List<GitLogCommit>();
-        var blocks = result.Stdout.Split("\n---\n", StringSplitOptions.RemoveEmptyEntries);
+        var blocks = output.Split("\n---\n", StringSplitOptions.RemoveEmptyEntries);
         foreach (var block in blocks)
         {
             var lines = block.Split('\n', StringSplitOptions.RemoveEmptyEntries);

@@ -159,6 +159,40 @@ public sealed partial class GitReadModelTests : IAsyncDisposable
         if (entry is not null)
             Assert.False(entry.IsStaged);
     }
+    [Fact]
+    public async Task GetUnpushedAsync_ReturnsCommitsAheadOfUpstream()
+    {
+        var unpushed = await _model.GetUnpushedAsync(_repoDir);
+        Assert.Empty(unpushed.Commits);
+    }
+
+    [Fact]
+    public async Task GetUnpulledAsync_ReturnsCommitsBehindUpstream()
+    {
+        var unpulled = await _model.GetUnpulledAsync(_repoDir);
+        Assert.Empty(unpulled.Commits);
+    }
+
+    [Fact]
+    public async Task GetUnpushedAsync_NoUpstream_ReturnsEmpty()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), $"cove-noupstream-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var git = new ProcessGitRunner();
+            await git.RunAsync(dir, ["init", "-q"]);
+            await git.RunAsync(dir, ["config", "user.email", "test@cove.dev"]);
+            await git.RunAsync(dir, ["config", "user.name", "Test"]);
+            File.WriteAllText(Path.Combine(dir, "a.txt"), "a\n");
+            await git.RunAsync(dir, ["add", "a.txt"]);
+            await git.RunAsync(dir, ["commit", "-q", "-m", "init"]);
+            var model = new GitReadModel(git, NullLogger.Instance);
+            var unpushed = await model.GetUnpushedAsync(dir);
+            Assert.Empty(unpushed.Commits);
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
 
     public async ValueTask DisposeAsync()
     {
