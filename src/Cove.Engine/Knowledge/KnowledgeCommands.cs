@@ -437,8 +437,12 @@ public static class KnowledgeCommands
     [CoveCommand("cove://commands/vault.set-setting")]
     public static Task<ControlResponse> VaultSetSetting(EngineDispatchContext ctx)
     {
+        if (ctx.VaultSettings is not { } settings)
+            return Task.FromResult(ctx.Fail("not_ready", "vault settings store not available"));
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.VaultSetSettingParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "vault set-setting params required"));
+
+        settings.Set(p.Key, p.Value);
         return Task.FromResult(ctx.Ok());
     }
 
@@ -449,7 +453,9 @@ public static class KnowledgeCommands
             return Task.FromResult(ctx.Fail("not_ready", "session corpus not available"));
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.VaultReindexParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "vault reindex params required"));
-        corpus.ReindexIfVersionChanged(p.WorkspaceId, "latest");
+
+        var version = ctx.VaultSettings?.Get()?.ExtractorVersion ?? "latest";
+        corpus.ReindexIfVersionChanged(p.WorkspaceId, version);
         return Task.FromResult(ctx.Ok());
     }
 }
