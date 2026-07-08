@@ -7,6 +7,7 @@ namespace Cove.Engine.Snapshots;
 public enum SnapshotTrigger { Interval, Shutdown, PreUpdate, PreRestore, Manual, Event }
 
 public sealed record Snapshot(string Id, string Hash, SnapshotTrigger Trigger, DateTimeOffset TakenAtUtc, bool Pinned);
+public sealed record SnapshotDiff(string Key, string? OldValue, string? NewValue, string ChangeType);
 
 public sealed class SnapshotService
 {
@@ -139,6 +140,72 @@ public sealed class SnapshotService
             content[rel] = await File.ReadAllTextAsync(file).ConfigureAwait(false);
         }
         return content;
+    }
+    public async Task<IReadOnlyList<SnapshotDiff>?> InspectAsync(string snapshotId)
+    {
+        var list = await ListAsync().ConfigureAwait(false);
+        var snap = list.FirstOrDefault(s => s.Id == snapshotId);
+        if (snap is null)
+        {
+            _logger.LogWarning("snapshots: inspect — snapshot {id} not found", snapshotId);
+            return null;
+        }
+
+        var snapshotFiles = new HashSet<string>(StringComparer.Ordinal);
+        var treeResult = await _git.RunAsync(_snapshotsDir, ["ls-tree", "-r", "--name-only", snap.Hash], CancellationToken.None).ConfigureAwait(false);
+        if (treeResult.Ok)
+        {
+            foreach (var line in treeResult.Stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+                snapshotFiles.Add(line.Trim());
+        }
+
+        var currentFiles = new HashSet<string>(StringComparer.Ordinal);
+        if (Directory.Exists(_snapshotsDir))
+        {
+            foreach (var file in Directory.EnumerateFiles(_snapshotsDir, "*.json", SearchOption.AllDirectories))
+            {
+                var rel = Path.GetRelativePath(_snapshotsDir, file);
+                currentFiles.Add(rel);
+            }
+        }
+
+        var allKeys = snapshotFiles.Union(currentFiles).OrderBy(k => k, StringComparer.Ordinal);
+        var diffs = new List<SnapshotDiff>();
+        foreach (var key in allKeys)
+        {
+            var inSnapshot = snapshotFiles.Contains(key);
+            var inCurrent = currentFiles.Contains(key);
+
+            if (inSnapshot && !inCurrent)
+            {
+                var snapContent = await ReadGitFileAsync(snap.Hash, key).ConfigureAwait(false);
+                diffs.Add(new SnapshotDiff(key, snapContent, null, "removed"));
+            }
+            else if (!inSnapshot && inCurrent)
+            {
+                var curContent = await File.ReadAllTextAsync(Path.Combine(_snapshotsDir, key)).ConfigureAwait(false);
+                diffs.Add(new SnapshotDiff(key, null, curContent, "added"));
+            }
+            else
+            {
+                var snapContent = await ReadGitFileAsync(snap.Hash, key).ConfigureAwait(false);
+                var curContent = await File.ReadAllTextAsync(Path.Combine(_snapshotsDir, key)).ConfigureAwait(false);
+                if (!string.Equals(snapContent, curContent, StringComparison.Ordinal))
+                    diffs.Add(new SnapshotDiff(key, snapContent, curContent, "changed"));
+            }
+        }
+        return diffs;
+    }
+
+    private async Task<string?> ReadGitFileAsync(string commitHash, string relativePath)
+    {
+        var result = await _git.RunAsync(_snapshotsDir, ["show", $"{commitHash}:{relativePath}"], CancellationToken.None).ConfigureAwait(false);
+        if (!result.Ok)
+        {
+            _logger.LogWarning("snapshots: git show {hash}:{path} failed: {err}", commitHash, relativePath, result.Stderr);
+            return null;
+        }
+        return result.Stdout;
     }
     public async Task PruneAsync()
     {

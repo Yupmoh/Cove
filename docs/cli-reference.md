@@ -150,6 +150,7 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/skills.index` | core |  |
 | `cove://commands/skills.resolve-manifest` | core |  |
 | `cove://commands/skills.resolve-prompt-sigils` | core |  |
+| `cove://commands/snapshot.inspect` | core |  |
 | `cove://commands/snapshot.list` | core |  |
 | `cove://commands/snapshot.pin` | core |  |
 | `cove://commands/snapshot.prune` | core |  |
@@ -336,4 +337,4 @@ Generated from the command registry. Do not edit by hand.
 | `vault set-setting` | cli |  |
 | `version` | cli |  |
 
-Total: 331 commands
+Total: 332 commands

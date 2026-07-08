@@ -15,6 +15,7 @@ import { renderNotepadPane } from "./notepad-pane";
 import { renderMermaidNote } from "./mermaid-note";
 import { renderSessionPicker } from "./session-picker";
 import { renderLibraryPopover } from "./library-popover";
+import { renderSnapshotInspector } from "./snapshot-inspector";
 
 const CREDIT_THRESHOLD = 131072;
 
@@ -541,6 +542,17 @@ function renderLibraryPane(paneId: string): HTMLElement {
   });
   return placeholder;
 }
+function renderSnapshotInspectorPane(paneId: string): HTMLElement {
+  const placeholder = document.createElement("div");
+  placeholder.className = "snapshot-inspector-placeholder";
+  placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
+  renderSnapshotInspector("default").then(el => {
+    placeholder.replaceWith(el);
+  }).catch(e => {
+    placeholder.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to load snapshots: ${(e as Error).message}</div>`;
+  });
+  return placeholder;
+}
 function renderNode(node: MosaicNode): HTMLElement {
   if (node.kind === "leaf") {
     const subs = node.subtabs.length > 0 ? node.subtabs : [{ documentId: node.paneId, paneType: "terminal", title: null }];
@@ -559,6 +571,7 @@ function renderNode(node: MosaicNode): HTMLElement {
     if (active.paneType === "note-mermaid") return renderMermaidNotePane(active.documentId);
     if (active.paneType === "session-picker") return renderSessionPickerPane(active.documentId);
     if (active.paneType === "library") return renderLibraryPane(active.documentId);
+    if (active.paneType === "snapshot-inspector") return renderSnapshotInspectorPane(active.documentId);
     if (isEmpty) return emptyPaneStrip(node.paneId);
     const activeEl = getPane(subs[activeIdx].documentId).el;
     if (subs.length <= 1) return activeEl;

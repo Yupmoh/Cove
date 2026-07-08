@@ -209,4 +209,141 @@ public sealed class SnapshotTests
         }
         finally { try { Directory.Delete(dir, true); } catch { } }
     }
+    [Fact]
+    public async Task Inspect_ReturnsNull_ForUnknownSnapshot()
+    {
+        var dir = NewDir();
+        try
+        {
+            var svc = NewService(dir);
+            await svc.TakeAsync(State(content: "v1"), SnapshotTrigger.Manual);
+
+            var diffs = await svc.InspectAsync("nonexistent-id");
+
+            Assert.Null(diffs);
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
+
+    [Fact]
+    public async Task Inspect_NoChanges_WhenStateUnchanged()
+    {
+        var dir = NewDir();
+        try
+        {
+            var svc = NewService(dir);
+            var snap = await svc.TakeAsync(State(content: "v1"), SnapshotTrigger.Manual);
+
+            var diffs = await svc.InspectAsync(snap!.Id);
+
+            Assert.NotNull(diffs);
+            Assert.Empty(diffs);
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
+
+    [Fact]
+    public async Task Inspect_ShowsChangedFile_WhenStateModified()
+    {
+        var dir = NewDir();
+        try
+        {
+            var svc = NewService(dir);
+            var snap = await svc.TakeAsync(State(content: "v1"), SnapshotTrigger.Manual);
+
+            await File.WriteAllTextAsync(
+                Path.Combine(dir, "snapshots", "workspaces/ws-1/workspace.json"),
+                "v2-modified");
+
+            var diffs = await svc.InspectAsync(snap!.Id);
+
+            Assert.NotNull(diffs);
+            var diff = Assert.Single(diffs);
+            Assert.Equal("workspaces/ws-1/workspace.json", diff.Key);
+            Assert.Contains("v1", diff.OldValue);
+            Assert.Contains("v2-modified", diff.NewValue);
+            Assert.Equal("changed", diff.ChangeType);
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
+
+    [Fact]
+    public async Task Inspect_ShowsAddedFile_WhenNewFileInCurrent()
+    {
+        var dir = NewDir();
+        try
+        {
+            var svc = NewService(dir);
+            var snap = await svc.TakeAsync(State(content: "v1"), SnapshotTrigger.Manual);
+
+            await File.WriteAllTextAsync(
+                Path.Combine(dir, "snapshots", "workspaces/ws-1/new.json"),
+                "new-content");
+
+            var diffs = await svc.InspectAsync(snap!.Id);
+
+            Assert.NotNull(diffs);
+            var added = diffs.FirstOrDefault(d => d.ChangeType == "added");
+            Assert.NotNull(added);
+            Assert.Equal("workspaces/ws-1/new.json", added!.Key);
+            Assert.Null(added.OldValue);
+            Assert.Contains("new-content", added.NewValue);
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
+
+    [Fact]
+    public async Task Inspect_ShowsRemovedFile_WhenFileDeletedFromCurrent()
+    {
+        var dir = NewDir();
+        try
+        {
+            var svc = NewService(dir);
+            var state = new Dictionary<string, string>
+            {
+                ["workspaces/ws-1/workspace.json"] = "v1",
+                ["workspaces/ws-1/extra.json"] = "extra-content",
+            };
+            var snap = await svc.TakeAsync(state, SnapshotTrigger.Manual);
+
+            File.Delete(Path.Combine(dir, "snapshots", "workspaces/ws-1/extra.json"));
+
+            var diffs = await svc.InspectAsync(snap!.Id);
+
+            Assert.NotNull(diffs);
+            var removed = diffs.FirstOrDefault(d => d.ChangeType == "removed");
+            Assert.NotNull(removed);
+            Assert.Equal("workspaces/ws-1/extra.json", removed!.Key);
+            Assert.Contains("extra-content", removed.OldValue);
+            Assert.Null(removed.NewValue);
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
+
+    [Fact]
+    public async Task Restore_ThenInspect_RoundTripsWithUndo()
+    {
+        var dir = NewDir();
+        try
+        {
+            var svc = NewService(dir);
+            await svc.TakeAsync(State(content: "v1"), SnapshotTrigger.Manual);
+            await Task.Delay(1100);
+            await svc.TakeAsync(State(content: "v2"), SnapshotTrigger.Manual);
+
+            var list = await svc.ListAsync();
+            var first = list.Last();
+
+            var restored = await svc.RestoreAsync(first.Id);
+            Assert.Contains("v1", restored!.Values.First());
+
+            var afterRestore = await svc.ListAsync();
+            var preRestoreSnap = afterRestore.FirstOrDefault(s => s.Trigger == SnapshotTrigger.PreRestore);
+            Assert.NotNull(preRestoreSnap);
+
+            var undoDiffs = await svc.InspectAsync(preRestoreSnap!.Id);
+            Assert.NotNull(undoDiffs);
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
 }

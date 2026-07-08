@@ -593,6 +593,10 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/snapshot.inspect",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/snapshot.list",
     "source": "core"
   },
