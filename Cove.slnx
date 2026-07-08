@@ -11,6 +11,7 @@
     <Project Path="src/Cove.Platform/Cove.Platform.csproj" />
     <Project Path="src/Cove.Protocol/Cove.Protocol.csproj" />
     <Project Path="src/Cove.SourceGen/Cove.SourceGen.csproj" />
+    <Project Path="src/Cove.Tasks/Cove.Tasks.csproj" />
     <Project Path="src/Cove.Tui/Cove.Tui.csproj" />
   </Folder>
   <Folder Name="/tests/">
@@ -24,6 +25,7 @@
     <Project Path="tests/Cove.Protocol.Tests/Cove.Protocol.Tests.csproj" />
     <Project Path="tests/Cove.Pty.Harness/Cove.Pty.Harness.csproj" />
     <Project Path="tests/Cove.SourceGen.Tests/Cove.SourceGen.Tests.csproj" />
+    <Project Path="tests/Cove.Tasks.Tests/Cove.Tasks.Tests.csproj" />
     <Project Path="tests/Cove.Tui.Tests/Cove.Tui.Tests.csproj" />
   </Folder>
 </Solution>
