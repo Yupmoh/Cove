@@ -83,9 +83,14 @@ public sealed class PaneCommandsTests
     [Fact]
     public async Task ScmCommit_ReturnsResult()
     {
-        var prm = JsonDocument.Parse("""{"repoRoot":"/repo","message":"fix: bug","amend":false,"sign":true}""").RootElement.Clone();
-        var resp = await EngineCommandRouter.RouteAsync(new ControlRequest("r1", "cove://commands/scm.commit", prm));
+        var (repoDir, git) = SetupTestRepo();
+        System.IO.File.WriteAllText(System.IO.Path.Combine(repoDir, "test.txt"), "modified\n");
+        RunGit(repoDir, "add", "test.txt");
+        var prm = JsonDocument.Parse($$"""{"repoRoot":"{{repoDir.Replace("\\", "\\\\")}}","message":"fix: modify","amend":false,"sign":false}""").RootElement.Clone();
+        var resp = await EngineCommandRouter.RouteAsync(new ControlRequest("r1", "cove://commands/scm.commit", prm), gitReadModel: git);
         Assert.True(resp!.Ok);
+        var json = resp.Data!.Value.GetRawText();
+        Assert.Contains("true", json);
     }
 
     [Fact]

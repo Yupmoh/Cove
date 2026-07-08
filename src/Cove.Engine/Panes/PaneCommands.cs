@@ -116,11 +116,15 @@ public static class PaneScmCommands
     }
 
     [CoveCommand("cove://commands/scm.commit")]
-    public static Task<ControlResponse> Commit(EngineDispatchContext ctx)
+    public static async Task<ControlResponse> Commit(EngineDispatchContext ctx)
     {
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(PaneScmJsonContext.Default.ScmCommitParams) is not { } p)
-            return Task.FromResult(ctx.Fail("invalid_params", "scm commit params required"));
-        return Task.FromResult(ctx.Ok(new ScmCommitResult(p.Message, Success: true), PaneScmJsonContext.Default.ScmCommitResult));
+            return ctx.Fail("invalid_params", "scm commit params required");
+        if (ctx.GitReadModel is not { } git)
+            return ctx.Fail("not_ready", "git read model not available");
+
+        var success = await git.CommitAsync(p.RepoRoot, p.Message, p.Amend ?? false, p.Sign ?? false, default);
+        return ctx.Ok(new ScmCommitResult(p.Message, success), PaneScmJsonContext.Default.ScmCommitResult);
     }
 
     [CoveCommand("cove://commands/scm.blame")]

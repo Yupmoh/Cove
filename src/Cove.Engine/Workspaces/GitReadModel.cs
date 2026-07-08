@@ -192,5 +192,20 @@ public sealed class GitReadModel
         if (!result.Ok)
             _logger.LogWarning("git restore --staged failed: {err}", result.Stderr);
     }
+
+    public async Task<bool> CommitAsync(string repoDir, string message, bool amend = false, bool sign = false, CancellationToken ct = default)
+    {
+        var args = new System.Collections.Generic.List<string> { "commit", "-q", "-m", message };
+        if (amend) args.Add("--amend");
+        if (sign) args.Add("-S");
+        var result = await _git.RunAsync(repoDir, [.. args], ct);
+        if (!result.Ok)
+        {
+            _logger.LogWarning("git commit failed: {err}", result.Stderr);
+            return false;
+        }
+        return true;
+    }
+
     private static bool IsHex(char c) => (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
 }
