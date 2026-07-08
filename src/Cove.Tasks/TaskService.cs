@@ -12,6 +12,7 @@ public sealed class TaskService
     private readonly CardRepository _cards;
     private readonly TaskCounterRepository _counter;
     private readonly TasksStore _store;
+    private readonly StatusRepository _statuses;
 
     public TaskService(string dataDir, ILogger logger)
     {
@@ -22,15 +23,17 @@ public sealed class TaskService
         _channel = new TasksWriteChannel(_factory, logger);
         _cards = new CardRepository(_factory, _channel);
         _counter = new TaskCounterRepository(_factory, _channel);
+        _statuses = new StatusRepository(_factory, _channel);
     }
 
-    public TaskService(SqliteConnectionFactory factory, TasksWriteChannel channel, TasksStore store, CardRepository cards, TaskCounterRepository counter)
+    public TaskService(SqliteConnectionFactory factory, TasksWriteChannel channel, TasksStore store, CardRepository cards, TaskCounterRepository counter, StatusRepository statuses)
     {
         _factory = factory;
         _channel = channel;
         _store = store;
         _cards = cards;
         _counter = counter;
+        _statuses = statuses;
     }
 
     public System.Threading.Tasks.Task StartAsync() => _channel.StartAsync();
@@ -103,4 +106,22 @@ public sealed class TaskService
     }
 
     public async System.Threading.Tasks.Task<int> DeleteCardAsync(string id) => await _cards.DeleteAsync(id);
+
+    public System.Threading.Tasks.Task<Cove.Tasks.Store.StatusRow?> CreateStatusAsync(string workspaceId, string id, string name, string hexColor, double position)
+    {
+        SeedDefaultStatuses(workspaceId);
+        return _statuses.CreateAsync(workspaceId, id, name, hexColor, position);
+    }
+
+    public System.Collections.Generic.IReadOnlyList<Cove.Tasks.Store.StatusRow> ListStatuses(string workspaceId, bool includeHidden = false)
+        => _statuses.ListByWorkspace(workspaceId, includeHidden);
+
+    public System.Threading.Tasks.Task DeleteStatusAsync(string workspaceId, string id, string? rehomeToStatusId)
+        => _statuses.DeleteAsync(workspaceId, id, rehomeToStatusId);
+
+    public System.Threading.Tasks.Task ReorderStatusesAsync(string workspaceId, string[] orderedIds)
+        => _statuses.ReorderAsync(workspaceId, orderedIds);
+
+    public System.Threading.Tasks.Task SetStatusHiddenAsync(string workspaceId, string id, bool hidden)
+        => _statuses.SetHiddenAsync(workspaceId, id, hidden);
 }

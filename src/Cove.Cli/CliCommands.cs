@@ -456,6 +456,26 @@ internal static class CliCommands
     public static Task<int> TaskDelete(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/task.delete");
 
+    [CoveCommand("task status list")]
+    public static Task<int> TaskStatusList(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/task.status.list");
+
+    [CoveCommand("task status create")]
+    public static Task<int> TaskStatusCreate(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/task.status.create");
+
+    [CoveCommand("task status delete")]
+    public static Task<int> TaskStatusDelete(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/task.status.delete");
+
+    [CoveCommand("task status reorder")]
+    public static Task<int> TaskStatusReorder(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/task.status.reorder");
+
+    [CoveCommand("task status hide")]
+    public static Task<int> TaskStatusHide(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/task.status.set-hidden");
+
     [CoveCommand("note list")]
     public static Task<int> NoteList(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/note.list");

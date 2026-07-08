@@ -520,6 +520,26 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/task.status.create",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/task.status.delete",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/task.status.list",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/task.status.reorder",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/task.status.set-hidden",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/task.update",
     "source": "core"
   },
@@ -757,6 +777,26 @@
   },
   {
     "command": "task list",
+    "source": "cli"
+  },
+  {
+    "command": "task status create",
+    "source": "cli"
+  },
+  {
+    "command": "task status delete",
+    "source": "cli"
+  },
+  {
+    "command": "task status hide",
+    "source": "cli"
+  },
+  {
+    "command": "task status list",
+    "source": "cli"
+  },
+  {
+    "command": "task status reorder",
     "source": "cli"
   },
   {

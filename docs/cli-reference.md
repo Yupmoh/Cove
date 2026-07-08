@@ -131,6 +131,11 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/task.get` | core |  |
 | `cove://commands/task.list` | core |  |
 | `cove://commands/task.ping` | core | echo back params as pong (smoke) |
+| `cove://commands/task.status.create` | core |  |
+| `cove://commands/task.status.delete` | core |  |
+| `cove://commands/task.status.list` | core |  |
+| `cove://commands/task.status.reorder` | core |  |
+| `cove://commands/task.status.set-hidden` | core |  |
 | `cove://commands/task.update` | core |  |
 | `cove://commands/timeline.append` | core |  |
 | `cove://commands/timeline.list` | core |  |
@@ -191,9 +196,14 @@ Generated from the command registry. Do not edit by hand.
 | `task delete` | cli |  |
 | `task get` | cli |  |
 | `task list` | cli |  |
+| `task status create` | cli |  |
+| `task status delete` | cli |  |
+| `task status hide` | cli |  |
+| `task status list` | cli |  |
+| `task status reorder` | cli |  |
 | `task update` | cli |  |
 | `timeline append` | cli |  |
 | `timeline list` | cli |  |
 | `version` | cli |  |
 
-Total: 191 commands
+Total: 201 commands

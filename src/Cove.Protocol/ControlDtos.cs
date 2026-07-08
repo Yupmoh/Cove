@@ -166,6 +166,14 @@ public sealed record TaskUpdateParams(string Id, string? Title, string? StatusId
 public sealed record TaskListResult(System.Collections.Generic.IReadOnlyList<TaskCard> Cards);
 public sealed record TaskPingParams(string Echo, string? Kind);
 public sealed record TaskPingResult(string Echo, string? Kind, string Status);
+public sealed record StatusInfo(string WorkspaceId, string Id, string Name, string HexColor, double Position, bool Hidden, bool IsLooping, bool IsInProgress, bool IsReview, bool IsCompletion);
+public sealed record StatusListResult(System.Collections.Generic.IReadOnlyList<StatusInfo> Statuses);
+public sealed record StatusListParams(string WorkspaceId);
+public sealed record StatusCreateParams(string WorkspaceId, string Id, string Name, string HexColor, double Position);
+public sealed record StatusRefParams(string WorkspaceId, string Id);
+public sealed record StatusDeleteParams(string WorkspaceId, string Id, string? RehomeToStatusId);
+public sealed record StatusReorderParams(string WorkspaceId, string[] OrderedIds);
+public sealed record StatusSetHiddenParams(string WorkspaceId, string Id, bool Hidden);
 
 public sealed record Note
 {
@@ -310,6 +318,14 @@ public sealed record BrowserPaneDto(string PaneId, string CurrentUrl, System.Col
 [JsonSerializable(typeof(TaskListResult))]
 [JsonSerializable(typeof(TaskPingParams))]
 [JsonSerializable(typeof(TaskPingResult))]
+[JsonSerializable(typeof(StatusInfo))]
+[JsonSerializable(typeof(StatusListParams))]
+[JsonSerializable(typeof(StatusListResult))]
+[JsonSerializable(typeof(StatusCreateParams))]
+[JsonSerializable(typeof(StatusRefParams))]
+[JsonSerializable(typeof(StatusDeleteParams))]
+[JsonSerializable(typeof(StatusReorderParams))]
+[JsonSerializable(typeof(StatusSetHiddenParams))]
 [JsonSerializable(typeof(Note))]
 [JsonSerializable(typeof(NoteCreateParams))]
 [JsonSerializable(typeof(NoteRefParams))]
