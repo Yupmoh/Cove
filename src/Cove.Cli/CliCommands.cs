@@ -576,6 +576,10 @@ internal static class CliCommands
     public static Task<int> RunComplete(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/run.complete");
 
+    [CoveCommand("run resume")]
+    public static Task<int> RunResume(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/run.resume");
+
     [CoveCommand("note list")]
     public static Task<int> NoteList(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/note.list");

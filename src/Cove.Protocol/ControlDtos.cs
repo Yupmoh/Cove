@@ -211,6 +211,8 @@ public sealed record TaskSetInReviewParams(string? RunId, string? PaneId, string
 public sealed record TaskSetDoneParams(string? RunId, string? PaneId, string? WorkspaceId);
 public sealed record TaskClaimParams(string CardId, string? PaneId);
 public sealed record TaskClaimResult(bool Success, string? RunId, string? Error);
+public sealed record RunResumeParams(string Id, string? PaneId, string? AdapterOverride);
+public sealed record RunResumeResult(bool Success, string? NewSegmentId, string? Error, string Outcome);
 public sealed record StatusSetHiddenParams(string WorkspaceId, string Id, bool Hidden);
 
 public sealed record Note
@@ -377,6 +379,8 @@ public sealed record BrowserPaneDto(string PaneId, string CurrentUrl, System.Col
 [JsonSerializable(typeof(RunListParams))]
 [JsonSerializable(typeof(TaskSetInReviewParams))]
 [JsonSerializable(typeof(TaskSetDoneParams))]
+[JsonSerializable(typeof(RunResumeParams))]
+[JsonSerializable(typeof(RunResumeResult))]
 [JsonSerializable(typeof(TaskClaimParams))]
 [JsonSerializable(typeof(TaskClaimResult))]
 [JsonSerializable(typeof(RunRefParams))]

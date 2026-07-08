@@ -37,3 +37,10 @@ public interface IAgentLauncher
 {
     AdapterLaunchResult Launch(string paneId, string adapter, string resolvedCommand, System.Collections.Generic.IReadOnlyDictionary<string, string> env, string prompt);
 }
+
+public sealed record AdapterResumeResult(string AdapterSessionId, bool Success, string? Error);
+
+public interface IAdapterResumeLauncher
+{
+    AdapterResumeResult Resume(string paneId, string adapter, string resolvedCommand, string priorAdapterSessionId, System.Collections.Generic.IReadOnlyDictionary<string, string> env);
+}

@@ -18,8 +18,8 @@ public static class RunStateTransitions
         {
             [RunState.Active] = [RunState.Interrupted, RunState.Completed, RunState.Cancelled, RunState.Resuming],
             [RunState.Interrupted] = [RunState.Resuming, RunState.Cancelled],
-            [RunState.Resuming] = [RunState.Succeeded, RunState.Failed, RunState.Cancelled],
-            [RunState.Completed] = [],
+            [RunState.Resuming] = [RunState.Active, RunState.Succeeded, RunState.Failed, RunState.Cancelled, RunState.Interrupted],
+            [RunState.Completed] = [RunState.Resuming],
             [RunState.Cancelled] = [],
             [RunState.Succeeded] = [],
             [RunState.Failed] = [],

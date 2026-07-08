@@ -437,6 +437,10 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/run.resume",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/run.segments",
     "source": "core"
   },
@@ -865,6 +869,10 @@
   },
   {
     "command": "run list",
+    "source": "cli"
+  },
+  {
+    "command": "run resume",
     "source": "cli"
   },
   {

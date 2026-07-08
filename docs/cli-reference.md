@@ -111,6 +111,7 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/run.cancel` | core |  |
 | `cove://commands/run.complete` | core |  |
 | `cove://commands/run.list` | core |  |
+| `cove://commands/run.resume` | core |  |
 | `cove://commands/run.segments` | core |  |
 | `cove://commands/run.show` | core |  |
 | `cove://commands/session.background` | core |  |
@@ -218,6 +219,7 @@ Generated from the command registry. Do not edit by hand.
 | `run cancel` | cli |  |
 | `run complete` | cli |  |
 | `run list` | cli |  |
+| `run resume` | cli |  |
 | `run segments` | cli |  |
 | `run show` | cli |  |
 | `skills list` | cli |  |
@@ -256,4 +258,4 @@ Generated from the command registry. Do not edit by hand.
 | `timeline list` | cli |  |
 | `version` | cli |  |
 
-Total: 251 commands
+Total: 253 commands

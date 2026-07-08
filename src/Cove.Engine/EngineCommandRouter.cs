@@ -38,6 +38,7 @@ public static class EngineCommandRouter
         LaunchOrchestrator? launcher = null,
         Cove.Tasks.TaskService? taskService = null,
         Cove.Tasks.Dispatch.DispatchSaga? dispatchSaga = null,
+        Cove.Tasks.Dispatch.ResumeSaga? resumeSaga = null,
         NoteStore? notes = null,
         TimelineStore? timeline = null,
         PaneTypeRegistry? paneTypes = null,
@@ -70,8 +71,8 @@ public static class EngineCommandRouter
                 if (denied is not null)
                     return denied;
             }
-            var dispatchCtx = new EngineDispatchContext(request, panes, layout, workspaces, runCommands, restoration, snapshots, skills, agents, launchProfiles, adapterEnv, hookServer, hookRouter, agentRouter, activity, sessions, lifecycle, launcher, taskService, dispatchSaga, notes, timeline, paneTypes, browser, config, manifestStore, registry, omniChat, paneScopes, stateBus, extensions);
-            dispatchCtx.Redrive = subReq => RouteAsync(subReq, panes, layout, workspaces, runCommands, restoration, snapshots, skills, agents, launchProfiles, adapterEnv, hookServer, hookRouter, agentRouter, activity, sessions, lifecycle, launcher, taskService, dispatchSaga, notes, timeline, paneTypes, browser, config, manifestStore, registry, omniChat, paneScopes, stateBus, extensions, cancellationToken);
+            var dispatchCtx = new EngineDispatchContext(request, panes, layout, workspaces, runCommands, restoration, snapshots, skills, agents, launchProfiles, adapterEnv, hookServer, hookRouter, agentRouter, activity, sessions, lifecycle, launcher, taskService, dispatchSaga, resumeSaga, notes, timeline, paneTypes, browser, config, manifestStore, registry, omniChat, paneScopes, stateBus, extensions);
+            dispatchCtx.Redrive = subReq => RouteAsync(subReq, panes, layout, workspaces, runCommands, restoration, snapshots, skills, agents, launchProfiles, adapterEnv, hookServer, hookRouter, agentRouter, activity, sessions, lifecycle, launcher, taskService, dispatchSaga, resumeSaga, notes, timeline, paneTypes, browser, config, manifestStore, registry, omniChat, paneScopes, stateBus, extensions, cancellationToken);
             return await typed(dispatchCtx);
         }
         catch (System.Exception ex)
