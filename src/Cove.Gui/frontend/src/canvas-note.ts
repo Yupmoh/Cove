@@ -284,6 +284,7 @@ function renderElement(el: CanvasElement, container: HTMLElement): HTMLElement {
       const btn = document.createElement("button");
       btn.textContent = (el.props.label as string) || "Button";
       btn.style.cssText = "padding:4px 12px;background:#2563eb;border:1px solid #3b82f6;border-radius:4px;color:#fff;cursor:pointer;font-size:12px;";
+      btn.addEventListener("click", () => dispatchAction(el));
       node.appendChild(btn);
       break;
     }
@@ -383,6 +384,52 @@ function renderElement(el: CanvasElement, container: HTMLElement): HTMLElement {
   }
 
   return node;
+}
+
+async function dispatchAction(el: CanvasElement): Promise<void> {
+  const action = el.props.action as string | undefined;
+  if (!action) return;
+
+  const actionId = el.id;
+  const payload = resolveFraming(action, canvasState.state, actionId);
+
+  if (action.startsWith("send_to_agent:")) {
+    const target = action.substring("send_to_agent:".length);
+    try {
+      await invoke("cove://commands/canvas.action", {
+        action: "send_to_agent",
+        targetPane: target,
+        actionId,
+        payload,
+        state: canvasState.state,
+      });
+    } catch (e) {
+      console.error("send_to_agent failed:", e);
+    }
+  } else if (action.startsWith("cove_command:")) {
+    const uri = action.substring("cove_command:".length);
+    try {
+      await invoke("cove://commands/canvas.action", {
+        action: "cove_command",
+        uri: resolveFraming(uri, canvasState.state, actionId),
+        actionId,
+        payload,
+        state: canvasState.state,
+      });
+    } catch (e) {
+      console.error("cove_command failed:", e);
+    }
+  }
+}
+
+function resolveFraming(template: string, state: Record<string, unknown>, actionId: string): string {
+  let result = template;
+  result = result.replace(/\{actionId\}/g, actionId);
+  result = result.replace(/\{payload\}/g, JSON.stringify(state));
+  for (const [key, value] of Object.entries(state)) {
+    result = result.replace(new RegExp(`\\{${key}\\}`, "g"), String(value));
+  }
+  return result;
 }
 
 function addComponent(type: string): void {

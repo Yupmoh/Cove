@@ -271,6 +271,8 @@ public sealed record NoteMediaSaveResult(string MediaPath);
 public sealed record NoteGetStateParams(string WorkspaceId, string Id);
 public sealed record NoteGetStateResult(string? State);
 public sealed record NoteSaveStateParams(string WorkspaceId, string Id, string StateJson);
+public sealed record CanvasActionParams(string Action, string? TargetPane, string? Uri, string ActionId, string? Payload, System.Text.Json.JsonElement? State);
+public sealed record CanvasActionResult(bool Dispatched, string? TargetPaneId, string? ResolvedUri);
 public sealed record TimelineListParams(string WorkspaceId);
 public sealed record TimelineListResult(System.Collections.Generic.IReadOnlyList<TimelineEntry> Entries);
 public sealed record KnowledgePingParams(string? Echo);
@@ -483,6 +485,8 @@ public sealed record BrowserPaneDto(string PaneId, string CurrentUrl, System.Col
 [JsonSerializable(typeof(NoteGetStateParams))]
 [JsonSerializable(typeof(NoteGetStateResult))]
 [JsonSerializable(typeof(NoteSaveStateParams))]
+[JsonSerializable(typeof(CanvasActionParams))]
+[JsonSerializable(typeof(CanvasActionResult))]
 [JsonSerializable(typeof(TimelineEntry))]
 [JsonSerializable(typeof(TimelineAppendParams))]
 [JsonSerializable(typeof(KnowledgePingParams))]

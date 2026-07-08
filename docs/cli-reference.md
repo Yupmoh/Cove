@@ -19,6 +19,7 @@ Generated from the command registry. Do not edit by hand.
 | `browser navigate` | cli |  |
 | `browser open` | cli |  |
 | `browser reload` | cli |  |
+| `canvas action` | cli |  |
 | `commands` | cli |  |
 | `config get` | cli |  |
 | `config set` | cli |  |
@@ -47,6 +48,7 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/browser.navigate` | core |  |
 | `cove://commands/browser.open` | core |  |
 | `cove://commands/browser.reload` | core |  |
+| `cove://commands/canvas.action` | core |  |
 | `cove://commands/capture_native_screenshot` | core | mcp-bridge capture_native_screenshot (PL-30, render-bound) |
 | `cove://commands/collection.create` | core |  |
 | `cove://commands/collection.list` | core |  |
@@ -302,4 +304,4 @@ Generated from the command registry. Do not edit by hand.
 | `timeline list` | cli |  |
 | `version` | cli |  |
 
-Total: 297 commands
+Total: 299 commands

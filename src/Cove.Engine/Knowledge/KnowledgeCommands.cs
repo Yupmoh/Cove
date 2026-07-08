@@ -196,6 +196,41 @@ public static class KnowledgeCommands
         return Task.FromResult(ctx.Ok());
     }
 
+    [CoveCommand("cove://commands/canvas.action")]
+    public static async Task<ControlResponse> CanvasAction(EngineDispatchContext ctx)
+    {
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.CanvasActionParams) is not { } p)
+            return ctx.Fail("invalid_params", "canvas action params required");
+
+        if (p.Action == "cove_command")
+        {
+            if (string.IsNullOrEmpty(p.Uri))
+                return ctx.Fail("invalid_params", "uri required for cove_command action");
+            if (ctx.Redrive is null)
+                return ctx.Fail("not_ready", "redrive unavailable");
+            var subReq = new ControlRequest(ctx.Request.Id + "-action", p.Uri, p.State);
+            var subResp = await ctx.Redrive(subReq);
+            if (subResp is null)
+                return ctx.Fail("not_found", $"command '{p.Uri}' not found");
+            return ctx.Ok(new CanvasActionResult(true, null, p.Uri), CoveJsonContext.Default.CanvasActionResult);
+        }
+
+        if (p.Action == "send_to_agent")
+        {
+            if (string.IsNullOrEmpty(p.TargetPane))
+                return ctx.Fail("invalid_params", "targetPane required for send_to_agent action");
+            if (ctx.Panes is not { } panes)
+                return ctx.Fail("not_ready", "pane registry not available");
+            var message = p.Payload ?? "";
+            var bytes = System.Text.Encoding.UTF8.GetBytes(message + "\r");
+            if (!panes.Write(p.TargetPane, bytes))
+                return ctx.Fail("not_found", $"target pane {p.TargetPane} not found or write failed");
+            return ctx.Ok(new CanvasActionResult(true, p.TargetPane, null), CoveJsonContext.Default.CanvasActionResult);
+        }
+
+        return ctx.Fail("invalid_action", $"unknown action: {p.Action}");
+    }
+
     [CoveCommand("cove://commands/timeline.append")]
     public static Task<ControlResponse> TimelineAppend(EngineDispatchContext ctx)
     {

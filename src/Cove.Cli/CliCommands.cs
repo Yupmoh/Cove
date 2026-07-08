@@ -656,6 +656,10 @@ internal static class CliCommands
     public static Task<int> NoteSaveState(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/note.save-state");
 
+    [CoveCommand("canvas action")]
+    public static Task<int> CanvasAction(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/canvas.action");
+
     [CoveCommand("timeline list")]
     public static Task<int> TimelineList(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/timeline.list");
