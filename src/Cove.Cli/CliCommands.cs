@@ -528,6 +528,18 @@ internal static class CliCommands
     public static Task<int> TaskLaunchConfigSet(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/task.launch-config.set");
 
+    [CoveCommand("task binding get")]
+    public static Task<int> TaskBindingGet(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/task.binding.get");
+
+    [CoveCommand("task binding set")]
+    public static Task<int> TaskBindingSet(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/task.binding.set");
+
+    [CoveCommand("task binding resolve-profile")]
+    public static Task<int> TaskBindingResolveProfile(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/task.binding.resolve-profile");
+
     [CoveCommand("note list")]
     public static Task<int> NoteList(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/note.list");

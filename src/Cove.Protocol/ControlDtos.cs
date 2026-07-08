@@ -192,6 +192,12 @@ public sealed record LaunchConfigInfo(string? Adapter, string? ProfileSlug, stri
 public sealed record LaunchConfigSetParams(string CardId, string? Adapter, string? ProfileSlug, string? ExecutionMode, string? InProgressStatusId, string? ReviewStatusId, string? CompletionStatusId, string? MergeTarget, string? WorktreeBranchSource, string? WorktreeBranchName);
 public sealed record LaunchConfigGetParams(string CardId);
 public sealed record LaunchConfigValidationResultDto(bool IsValid, string[] Errors);
+public sealed record SkillSelectionDto(string Provenance, string Name, string Mode);
+public sealed record TaskBindingInfo(string? AgentRef, string? ProfileSlug, SkillSelectionDto[] Skills);
+public sealed record TaskBindingSetParams(string CardId, string? AgentRef, string? ProfileSlug, SkillSelectionDto[] Skills);
+public sealed record TaskBindingGetParams(string CardId);
+public sealed record TaskProfileResolveParams(string CardId);
+public sealed record TaskProfilePayloadDto(string? AgentRef, string? ProfileSlug, SkillSelectionDto[] Skills);
 public sealed record StatusSetHiddenParams(string WorkspaceId, string Id, bool Hidden);
 
 public sealed record Note
@@ -354,6 +360,12 @@ public sealed record BrowserPaneDto(string PaneId, string CurrentUrl, System.Col
 [JsonSerializable(typeof(LabelReorderParams))]
 [JsonSerializable(typeof(LabelFilterParams))]
 [JsonSerializable(typeof(LabelFilterResult))]
+[JsonSerializable(typeof(SkillSelectionDto))]
+[JsonSerializable(typeof(TaskBindingInfo))]
+[JsonSerializable(typeof(TaskBindingSetParams))]
+[JsonSerializable(typeof(TaskBindingGetParams))]
+[JsonSerializable(typeof(TaskProfileResolveParams))]
+[JsonSerializable(typeof(TaskProfilePayloadDto))]
 [JsonSerializable(typeof(CommentInfo))]
 [JsonSerializable(typeof(CommentListResult))]
 [JsonSerializable(typeof(LaunchConfigInfo))]

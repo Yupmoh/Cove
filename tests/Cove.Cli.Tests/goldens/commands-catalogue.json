@@ -499,6 +499,18 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/task.binding.get",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/task.binding.resolve-profile",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/task.binding.set",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/task.comment.add",
     "source": "core"
   },
@@ -813,6 +825,18 @@
   },
   {
     "command": "skills resolve-prompt-sigils",
+    "source": "cli"
+  },
+  {
+    "command": "task binding get",
+    "source": "cli"
+  },
+  {
+    "command": "task binding resolve-profile",
+    "source": "cli"
+  },
+  {
+    "command": "task binding set",
     "source": "cli"
   },
   {

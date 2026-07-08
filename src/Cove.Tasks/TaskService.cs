@@ -176,4 +176,16 @@ public sealed class TaskService
         await _cards.UpdateAsync(card);
         return result;
     }
+
+    public async System.Threading.Tasks.Task SetBindingAsync(string cardId, string? agentRef, System.Collections.Generic.IReadOnlyList<SkillSelection> skills, string? profileSlug)
+        => await SkillsBinder.BindAsync(_cards, cardId, agentRef, skills, profileSlug);
+
+    public TaskBinding GetBinding(string cardId)
+        => SkillsBinder.GetBinding(_cards, cardId);
+
+    public TaskProfilePayload ResolveTaskProfile(string cardId)
+    {
+        var card = _cards.GetById(cardId);
+        return card is null ? new TaskProfilePayload(null, null, []) : SkillsBinder.ResolveTaskProfile(card);
+    }
 }
