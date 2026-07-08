@@ -12,6 +12,7 @@ import { renderSketchNote } from "./sketch-note";
 import { renderCanvasNote } from "./canvas-note";
 import { renderHtmlNote } from "./html-note";
 import { renderNotepadPane } from "./notepad-pane";
+import { renderMermaidNote } from "./mermaid-note";
 
 const CREDIT_THRESHOLD = 131072;
 
@@ -505,6 +506,17 @@ function renderNotepadPaneWrapper(paneId: string): HTMLElement {
   });
   return placeholder;
 }
+function renderMermaidNotePane(paneId: string): HTMLElement {
+  const placeholder = document.createElement("div");
+  placeholder.className = "mermaid-note-placeholder";
+  placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
+  renderMermaidNote("default", paneId).then(el => {
+    placeholder.replaceWith(el);
+  }).catch(e => {
+    placeholder.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to load mermaid note: ${(e as Error).message}</div>`;
+  });
+  return placeholder;
+}
 function renderNode(node: MosaicNode): HTMLElement {
   if (node.kind === "leaf") {
     const subs = node.subtabs.length > 0 ? node.subtabs : [{ documentId: node.paneId, paneType: "terminal", title: null }];
@@ -520,6 +532,7 @@ function renderNode(node: MosaicNode): HTMLElement {
     if (active.paneType === "note-canvas") return renderCanvasNotePane(active.documentId);
     if (active.paneType === "note-html") return renderHtmlNotePane(active.documentId);
     if (active.paneType === "notepad") return renderNotepadPaneWrapper(active.documentId);
+    if (active.paneType === "note-mermaid") return renderMermaidNotePane(active.documentId);
     if (isEmpty) return emptyPaneStrip(node.paneId);
     const activeEl = getPane(subs[activeIdx].documentId).el;
     if (subs.length <= 1) return activeEl;
