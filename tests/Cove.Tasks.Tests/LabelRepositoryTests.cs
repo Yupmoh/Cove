@@ -173,6 +173,26 @@ public sealed class LabelRepositoryTests
     }
 
     [Fact]
+    public async System.Threading.Tasks.Task Delete_DoesNotRemoveCardLabelsFromOtherWorkspace()
+    {
+        var (factory, _, labels, cards, _) = await NewAsync();
+        SeedStatus(factory, "ws2", "todo");
+        var card1 = await SeedCardAsync(cards, "ws1", 1);
+        var card2 = await SeedCardAsync(cards, "ws2", 2);
+        await labels.CreateAsync("ws1", "bug", "Bug", "ff0000", position: 0);
+        await labels.CreateAsync("ws2", "bug", "Bug", "00ff00", position: 0);
+        await labels.AssignToCardAsync(card1, "bug");
+        await labels.AssignToCardAsync(card2, "bug");
+
+        await labels.DeleteAsync("ws1", "bug");
+
+        Assert.Empty(labels.GetLabelsForCard(card1));
+        var ws2Labels = labels.GetLabelsForCard(card2);
+        Assert.Single(ws2Labels);
+        Assert.Equal("ws2", ws2Labels[0].WorkspaceId);
+    }
+
+    [Fact]
     public async System.Threading.Tasks.Task WorkspaceIsolation_LabelsScopedPerWorkspace()
     {
         var (_, _, labels, _, _) = await NewAsync();

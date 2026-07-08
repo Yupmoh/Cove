@@ -90,7 +90,7 @@ public sealed class LabelRepository
 
     private static void DeleteInternal(SqliteConnection conn, string workspaceId, string id)
     {
-        conn.Execute("DELETE FROM card_labels WHERE label_id = @Id", new { Id = id });
+        conn.Execute("DELETE FROM card_labels WHERE label_id = @Id AND card_id IN (SELECT id FROM cards WHERE workspace_id = @WorkspaceId)", new { Id = id, WorkspaceId = workspaceId });
         conn.Execute("DELETE FROM labels WHERE workspace_id = @WorkspaceId AND id = @Id", new { WorkspaceId = workspaceId, Id = id });
     }
 
