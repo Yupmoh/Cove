@@ -29,6 +29,10 @@ public sealed partial class GitReadModelTests : IAsyncDisposable
         File.WriteAllText(Path.Combine(_repoDir, "committed.txt"), "line1\nline2\n");
         RunGit("add", "committed.txt");
         RunGit("commit", "-q", "-m", "initial");
+        File.WriteAllText(Path.Combine(_repoDir, "original.txt"), "rename me\n");
+        RunGit("add", "original.txt");
+        RunGit("commit", "-q", "-m", "add original");
+        RunGit("mv", "original.txt", "renamed.txt");
         File.WriteAllText(Path.Combine(_repoDir, "committed.txt"), "line1\nline2 modified\n");
         File.WriteAllText(Path.Combine(_repoDir, "staged.txt"), "staged content\n");
         RunGit("add", "staged.txt");
@@ -123,8 +127,18 @@ public sealed partial class GitReadModelTests : IAsyncDisposable
         var status = await _model.GetStatusAsync(_repoDir);
         var truthResult = await _git.RunAsync(_repoDir, ["status", "--porcelain=v2", "-z"]);
         var truthLines = truthResult.Stdout.Split('\0', StringSplitOptions.RemoveEmptyEntries);
-        var truthFileCount = truthLines.Count(l => l.StartsWith("1 ") || l.StartsWith("u ") || l.StartsWith("? "));
+        var truthFileCount = truthLines.Count(l => l.StartsWith("1 ") || l.StartsWith("2 ") || l.StartsWith("u ") || l.StartsWith("? "));
         Assert.Equal(truthFileCount, status.Entries.Count);
+    }
+    [Fact]
+    public async Task Status_DetectsRenamedFile()
+    {
+        var status = await _model.GetStatusAsync(_repoDir);
+        var renameEntry = status.Entries.FirstOrDefault(e => e.StatusCode == "R");
+        Assert.NotNull(renameEntry);
+        Assert.Equal("renamed.txt", renameEntry!.FilePath);
+        Assert.Equal("original.txt", renameEntry.OldFilePath);
+        Assert.True(renameEntry.IsStaged);
     }
 
     [Fact]

@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Cove.Engine.Workspaces;
 
-public sealed record GitStatusEntry(string FilePath, string StatusCode, bool IsStaged, bool IsUntracked);
+public sealed record GitStatusEntry(string FilePath, string StatusCode, bool IsStaged, bool IsUntracked, string? OldFilePath = null);
 public sealed record GitStatus(IReadOnlyList<GitStatusEntry> Entries);
 public sealed record GitDiffFile(string Path, int Additions, int Deletions, string? Patch);
 public sealed record GitDiff(IReadOnlyList<GitDiffFile> Files);
@@ -34,9 +34,10 @@ public sealed class GitReadModel
         }
 
         var entries = new System.Collections.Generic.List<GitStatusEntry>();
-        var fields = result.Stdout.Split('\0', StringSplitOptions.RemoveEmptyEntries);
-        foreach (var line in fields)
+        var fields = result.Stdout.Split('\0');
+        for (var i = 0; i < fields.Length; i++)
         {
+            var line = fields[i];
             if (line.StartsWith("1 "))
             {
                 var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
@@ -45,6 +46,16 @@ public sealed class GitReadModel
                 var filePath = parts[^1];
                 var isStaged = !statusCode.StartsWith(".");
                 entries.Add(new GitStatusEntry(filePath, statusCode[..1], isStaged, false));
+            }
+            else if (line.StartsWith("2 "))
+            {
+                var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length < 10) continue;
+                var statusCode = parts[1];
+                var newFilePath = parts[^1];
+                var oldFilePath = i + 1 < fields.Length ? fields[i + 1] : "";
+                var isStaged = !statusCode.StartsWith(".");
+                entries.Add(new GitStatusEntry(newFilePath, "R", isStaged, false, oldFilePath));
             }
             else if (line.StartsWith("u "))
             {
