@@ -10,6 +10,7 @@ Cove is **headless-first**: a `cove daemon` engine owns PTYs, sessions, and SQLi
 - [Terminal core](terminal-core.md) — the M1 terminal engine: mosaic, PTY lifecycle, crash recovery, persistence
 - [PTY flow control](pty-flow-control.md) — the credit flow-control and lossless-delivery contract
 - [Control channel](control-channel.md) — the framed `cove://` protocol
+- [TUI guide](tui-guide.md) — terminal-mode client, keymap, SSH, degradation matrix
 - [CLI reference](cli-reference.md) — every `cove` command
 - [Configuration reference](config-reference.md) — every config key, grouped by tab
 - [Ryn upstream](ryn-upstream.md) — Ryn framework capabilities and their status
