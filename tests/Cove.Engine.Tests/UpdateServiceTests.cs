@@ -173,4 +173,54 @@ public sealed class UpdateServiceTests
             return Task.FromResult(new HttpResponseMessage(_statusCode) { Content = content });
         }
     }
+    [Fact]
+    public async Task ApplyUpdateAsync_StagesArtifactAndRequestsRelaunch()
+    {
+        var service = new UpdateService(new HttpClient(), "1.0.0", new UpdateChannel("stable", "https://mock"));
+        var tempDir = Path.Combine(Path.GetTempPath(), $"cove-apply-test-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+        var downloadedPath = Path.Combine(tempDir, "update.bin");
+        await File.WriteAllBytesAsync(downloadedPath, new byte[] { 1, 2, 3, 4, 5 });
+
+        string? relaunchStagedPath = null;
+        service.RelaunchRequested += (s, e) => relaunchStagedPath = e.StagedPath;
+
+        try
+        {
+            var result = await service.ApplyUpdateAsync(downloadedPath);
+
+            Assert.True(result.RelaunchRequired);
+            Assert.True(File.Exists(result.StagedPath));
+            Assert.Contains("cove-update-staging", result.StagedPath);
+            Assert.Equal(result.StagedPath, relaunchStagedPath);
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
+            if (Directory.Exists(Path.Combine(Path.GetTempPath(), "cove-update-staging")))
+                Directory.Delete(Path.Combine(Path.GetTempPath(), "cove-update-staging"), true);
+        }
+    }
+
+    [Fact]
+    public async Task ApplyUpdateAsync_ReturnsErrorWhenArtifactMissing()
+    {
+        var service = new UpdateService(new HttpClient(), "1.0.0", new UpdateChannel("stable", "https://mock"));
+        var result = await service.ApplyUpdateAsync("/nonexistent/path.bin");
+
+        Assert.False(result.RelaunchRequired);
+        Assert.Equal("artifact not found", result.Message);
+    }
+
+    [Fact]
+    public void RequestRelaunch_FiresEvent()
+    {
+        var service = new UpdateService(new HttpClient(), "1.0.0", new UpdateChannel("stable", "https://mock"));
+        var fired = false;
+        service.RelaunchRequested += (s, e) => fired = true;
+
+        service.RequestRelaunch();
+
+        Assert.True(fired);
+    }
 }

@@ -127,6 +127,45 @@ public sealed class UpdateService
         }
     }
 
+    public event EventHandler<UpdateRelaunchRequestedEventArgs>? RelaunchRequested;
+
+    public sealed record UpdateApplyResult(string StagedPath, bool RelaunchRequired, string Message);
+
+    public async Task<UpdateApplyResult> ApplyUpdateAsync(string downloadedPath, CancellationToken ct = default)
+    {
+        if (!File.Exists(downloadedPath))
+        {
+            _logger.LogWarning("updates: downloaded artifact not found at {path}", downloadedPath);
+            return new UpdateApplyResult("", false, "artifact not found");
+        }
+
+        var stagingDir = Path.Combine(Path.GetTempPath(), "cove-update-staging");
+        Directory.CreateDirectory(stagingDir);
+        var stagedPath = Path.Combine(stagingDir, $"cove-{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}.bin");
+
+        try
+        {
+            await using var src = File.OpenRead(downloadedPath);
+            await using var dst = File.Create(stagedPath);
+            await src.CopyToAsync(dst, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "updates: failed to stage artifact from {src} to {dst}", downloadedPath, stagedPath);
+            return new UpdateApplyResult("", false, ex.Message);
+        }
+
+        _logger.LogInformation("updates: staged {ver} to {path} — relaunch required", "n/a", stagedPath);
+        RelaunchRequested?.Invoke(this, new UpdateRelaunchRequestedEventArgs(stagedPath));
+        return new UpdateApplyResult(stagedPath, true, "relaunch required to complete update");
+    }
+
+    public void RequestRelaunch()
+    {
+        _logger.LogInformation("updates: relaunch requested");
+        RelaunchRequested?.Invoke(this, new UpdateRelaunchRequestedEventArgs(""));
+    }
+
     private static bool IsVersionGreater(string a, string b)
     {
         if (TryParseVersion(a, out var va) && TryParseVersion(b, out var vb))
@@ -146,4 +185,8 @@ public sealed class UpdateService
         var trimmed = s.TrimStart('v', 'V');
         return Version.TryParse(trimmed, out v!);
     }
+}
+public sealed class UpdateRelaunchRequestedEventArgs(string stagedPath) : EventArgs
+{
+    public string StagedPath { get; } = stagedPath;
 }
