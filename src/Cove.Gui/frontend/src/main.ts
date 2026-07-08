@@ -5,6 +5,7 @@ import { SearchAddon } from "@xterm/addon-search";
 import "@xterm/xterm/css/xterm.css";
 import { toBase64Utf8, parseRelayText } from "./wsproto";
 import { renderKanbanBoard } from "./tasks-kanban";
+import { renderTaskList } from "./tasks-list";
 
 const CREDIT_THRESHOLD = 131072;
 
@@ -412,6 +413,26 @@ function renderKanbanPane(paneId: string): HTMLElement {
   });
   return placeholder;
 }
+
+function renderTaskListPane(paneId: string): HTMLElement {
+  const placeholder = document.createElement("div");
+  placeholder.className = "task-list-placeholder";
+  placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
+  renderTaskList("default").then(el => {
+    placeholder.replaceWith(el);
+  }).catch(e => {
+    placeholder.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to load task list: ${(e as Error).message}</div>`;
+  });
+  return placeholder;
+}
+
+function renderTaskDetailPane(paneId: string): HTMLElement {
+  const placeholder = document.createElement("div");
+  placeholder.className = "task-detail-placeholder";
+  placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;display:flex;align-items:center;justify-content:center;color:#6b7280;";
+  placeholder.textContent = "Select a task to view details";
+  return placeholder;
+}
 function renderNode(node: MosaicNode): HTMLElement {
   if (node.kind === "leaf") {
     const subs = node.subtabs.length > 0 ? node.subtabs : [{ documentId: node.paneId, paneType: "terminal", title: null }];
@@ -419,6 +440,8 @@ function renderNode(node: MosaicNode): HTMLElement {
     const active = subs[activeIdx];
     const isEmpty = active.paneType === "empty" || node.subtabs.length === 0;
     if (active.paneType === "tasks-kanban") return renderKanbanPane(active.documentId);
+    if (active.paneType === "tasks-list") return renderTaskListPane(active.documentId);
+    if (active.paneType === "tasks-detail") return renderTaskDetailPane(active.documentId);
     if (isEmpty) return emptyPaneStrip(node.paneId);
     const activeEl = getPane(subs[activeIdx].documentId).el;
     if (subs.length <= 1) return activeEl;
