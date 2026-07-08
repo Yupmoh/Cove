@@ -239,4 +239,28 @@ public sealed class BrowserStoreTests
         var exportPath = store.ExportHistoryToJsonFile();
         Assert.EndsWith("browser-history.json", exportPath);
     }
+    [Fact]
+    public void PaneState_RoundTripsForResumeOnRestart()
+    {
+        var dir = NewDir();
+        var store1 = new BrowserPaneStateStore(dir, NullLogger.Instance);
+        var original = new BrowserPaneState(
+            "pane-resume", "https://example.com/page", "Example Page", "fav.ico",
+            new[] { "https://example.com/prev1", "https://example.com/prev2" },
+            new[] { "https://example.com/next1" },
+            new System.Collections.Generic.Dictionary<string, double> { ["example.com"] = 1.25 },
+            false, "target-1", System.DateTimeOffset.UtcNow);
+
+        store1.Save("pane-resume", original);
+
+        var store2 = new BrowserPaneStateStore(dir, NullLogger.Instance);
+        var restored = store2.Load("pane-resume");
+
+        Assert.NotNull(restored);
+        Assert.Equal("https://example.com/page", restored!.Url);
+        Assert.Equal(2, restored.BackStack.Length);
+        Assert.Equal("https://example.com/prev1", restored.BackStack[0]);
+        Assert.Single(restored.ForwardStack);
+        Assert.Equal(1.25, restored.PerSiteZoom["example.com"]);
+    }
 }
