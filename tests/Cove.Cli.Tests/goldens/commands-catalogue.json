@@ -545,6 +545,10 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/review.dispatch",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/review.list-comments",
     "source": "core"
   },
@@ -1185,6 +1189,10 @@
   },
   {
     "command": "review close",
+    "source": "cli"
+  },
+  {
+    "command": "review dispatch",
     "source": "cli"
   },
   {

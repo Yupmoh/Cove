@@ -837,4 +837,8 @@ internal static class CliCommands
     [CoveCommand("attribution find-by-tool-use")]
     public static Task<int> AttributionFindByToolUse(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/attribution.find-by-tool-use");
+
+    [CoveCommand("review dispatch")]
+    public static Task<int> ReviewDispatch(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/review.dispatch");
 }

@@ -138,6 +138,7 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/review.add-comment` | core |  |
 | `cove://commands/review.audit` | core |  |
 | `cove://commands/review.close` | core |  |
+| `cove://commands/review.dispatch` | core |  |
 | `cove://commands/review.list-comments` | core |  |
 | `cove://commands/review.re-anchor` | core |  |
 | `cove://commands/review.reopen` | core |  |
@@ -298,6 +299,7 @@ Generated from the command registry. Do not edit by hand.
 | `review add-comment` | cli |  |
 | `review audit` | cli |  |
 | `review close` | cli |  |
+| `review dispatch` | cli |  |
 | `review list-comments` | cli |  |
 | `review re-anchor` | cli |  |
 | `review reopen` | cli |  |
@@ -361,4 +363,4 @@ Generated from the command registry. Do not edit by hand.
 | `vault set-setting` | cli |  |
 | `version` | cli |  |
 
-Total: 356 commands
+Total: 358 commands

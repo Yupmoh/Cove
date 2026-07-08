@@ -55,6 +55,7 @@ public sealed class EngineDispatchContext
         LibraryStore? library = null,
         ReviewStore? reviews = null,
         AttributionIndex? attribution = null,
+        ReviewDispatcher? reviewDispatcher = null,
         PaneTypeRegistry? paneTypes = null,
         BrowserPaneManager? browser = null,
         ConfigService? config = null,
@@ -99,6 +100,7 @@ public sealed class EngineDispatchContext
         Library = library;
         Reviews = reviews;
         Attribution = attribution;
+        ReviewDispatcher = reviewDispatcher;
         PaneTypes = paneTypes;
         Browser = browser;
         Config = config;
@@ -144,6 +146,7 @@ public sealed class EngineDispatchContext
     public LibraryStore? Library { get; }
     public ReviewStore? Reviews { get; }
     public AttributionIndex? Attribution { get; }
+    public ReviewDispatcher? ReviewDispatcher { get; }
     public PaneTypeRegistry? PaneTypes { get; }
     public ConfigService? Config { get; }
     public BrowserPaneManager? Browser { get; }

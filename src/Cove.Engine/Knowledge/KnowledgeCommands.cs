@@ -612,4 +612,24 @@ public static class KnowledgeCommands
         var dtos = entries.Select(e => new AttributionEntryDto(e.Id, e.SessionId, e.ToolUseId, e.FilePath, e.StartLine, e.EndLine, e.At.ToString("o"))).ToList();
         return Task.FromResult(ctx.Ok(new AttributionListResult(dtos), CoveJsonContext.Default.AttributionListResult));
     }
+
+    [CoveCommand("cove://commands/review.dispatch")]
+    public static async Task<ControlResponse> ReviewDispatch(EngineDispatchContext ctx)
+    {
+        if (ctx.ReviewDispatcher is not { } dispatcher)
+            return ctx.Fail("not_ready", "review dispatcher not available");
+        if (ctx.Panes is not { } panes)
+            return ctx.Fail("not_ready", "pane registry not available");
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.ReviewDispatchParams) is not { } p)
+            return ctx.Fail("invalid_params", "review dispatch params required");
+
+        var request = new ReviewDispatchRequest(p.TargetPaneId, p.WorkspaceId, p.SessionId, p.TaskRunId, p.Message, p.CommitSha);
+        var result = await dispatcher.DispatchAsync(request, (paneId, bytes) =>
+        {
+            panes.Write(paneId, bytes);
+            return Task.CompletedTask;
+        });
+        var dto = new ReviewDispatchResultDto(result.DispatchId, result.TargetPaneId, result.SessionId, result.TaskRunId, result.DispatchedAt.ToString("o"));
+        return ctx.Ok(dto, CoveJsonContext.Default.ReviewDispatchResultDto);
+    }
 }

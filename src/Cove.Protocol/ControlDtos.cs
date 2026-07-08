@@ -359,6 +359,8 @@ public sealed record AttributionFindByRangeParams(string FilePath, int StartLine
 public sealed record AttributionFindByToolUseParams(string ToolUseId);
 public sealed record AttributionEntryDto(string Id, string SessionId, string ToolUseId, string FilePath, int StartLine, int EndLine, string At);
 public sealed record AttributionListResult(System.Collections.Generic.IReadOnlyList<AttributionEntryDto> Entries);
+public sealed record ReviewDispatchParams(string TargetPaneId, string WorkspaceId, string SessionId, string? TaskRunId, string Message, string? CommitSha);
+public sealed record ReviewDispatchResultDto(string DispatchId, string TargetPaneId, string SessionId, string? TaskRunId, string DispatchedAt);
 
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
@@ -612,5 +614,7 @@ public sealed record AttributionListResult(System.Collections.Generic.IReadOnlyL
 [JsonSerializable(typeof(AttributionFindByToolUseParams))]
 [JsonSerializable(typeof(AttributionEntryDto))]
 [JsonSerializable(typeof(AttributionListResult))]
+[JsonSerializable(typeof(ReviewDispatchParams))]
+[JsonSerializable(typeof(ReviewDispatchResultDto))]
 [JsonSerializable(typeof(JsonElement))]
 public sealed partial class CoveJsonContext : JsonSerializerContext;

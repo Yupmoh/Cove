@@ -16,6 +16,7 @@ import { renderMermaidNote } from "./mermaid-note";
 import { renderSessionPicker } from "./session-picker";
 import { renderLibraryPopover } from "./library-popover";
 import { renderSnapshotInspector } from "./snapshot-inspector";
+import { renderDiffReviewPane } from "./diff-review-pane";
 
 const CREDIT_THRESHOLD = 131072;
 
@@ -553,6 +554,17 @@ function renderSnapshotInspectorPane(paneId: string): HTMLElement {
   });
   return placeholder;
 }
+function renderDiffReviewPaneWrapper(paneId: string): HTMLElement {
+  const placeholder = document.createElement("div");
+  placeholder.className = "diff-review-placeholder";
+  placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
+  renderDiffReviewPane("default").then(el => {
+    placeholder.replaceWith(el);
+  }).catch(e => {
+    placeholder.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to load diff review: ${(e as Error).message}</div>`;
+  });
+  return placeholder;
+}
 function renderNode(node: MosaicNode): HTMLElement {
   if (node.kind === "leaf") {
     const subs = node.subtabs.length > 0 ? node.subtabs : [{ documentId: node.paneId, paneType: "terminal", title: null }];
@@ -572,6 +584,7 @@ function renderNode(node: MosaicNode): HTMLElement {
     if (active.paneType === "session-picker") return renderSessionPickerPane(active.documentId);
     if (active.paneType === "library") return renderLibraryPane(active.documentId);
     if (active.paneType === "snapshot-inspector") return renderSnapshotInspectorPane(active.documentId);
+    if (active.paneType === "diff-review") return renderDiffReviewPaneWrapper(active.documentId);
     if (isEmpty) return emptyPaneStrip(node.paneId);
     const activeEl = getPane(subs[activeIdx].documentId).el;
     if (subs.length <= 1) return activeEl;

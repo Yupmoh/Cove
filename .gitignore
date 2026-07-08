@@ -30,3 +30,4 @@ dist/
 
 BenchmarkDotNet.Artifacts/
 WATCHDOG.yml
+*.actual
