@@ -254,33 +254,32 @@ internal static class CliCommands
     [CoveCommand("commands")]
     public static async Task<int> Commands(CommandContext ctx)
     {
-        var catalogue = Cove.Generated.CoveCommandRegistry.Catalogue;
+        var cliCatalogue = Cove.Generated.CoveCommandRegistry.Catalogue;
+        var engineCatalogue = Cove.Engine.EngineCommandCatalogue.Entries;
         var dataDir = Cove.Platform.CoveDataDir.Resolve(ctx.Channel);
         var manifests = new Cove.Adapters.AdapterManifestStore(System.IO.Path.Combine(dataDir.Root, "adapters"), null);
         var extensions = new Cove.Engine.Protocol.ExtensionRegistry(manifests);
         var extensionCommands = extensions.List();
+        var allCommands = new System.Collections.Generic.List<(string Command, string? Description, string Source)>();
+        foreach (var e in cliCatalogue)
+            allCommands.Add((e.Command, e.Description, e.Source));
+        foreach (var e in engineCatalogue)
+            allCommands.Add((e.Command, e.Description, e.Source));
+        foreach (var ext in extensionCommands)
+            allCommands.Add((ext.Command, ext.Description, ext.Source));
         if (ctx.IsJson)
         {
             using var buffer = new System.IO.MemoryStream();
             using (var writer = new System.Text.Json.Utf8JsonWriter(buffer))
             {
                 writer.WriteStartArray();
-                foreach (var entry in catalogue)
+                foreach (var entry in allCommands)
                 {
                     writer.WriteStartObject();
                     writer.WriteString("command", entry.Command);
                     if (entry.Description is not null)
                         writer.WriteString("description", entry.Description);
                     writer.WriteString("source", entry.Source);
-                    writer.WriteEndObject();
-                }
-                foreach (var ext in extensionCommands)
-                {
-                    writer.WriteStartObject();
-                    writer.WriteString("command", ext.Command);
-                    writer.WriteString("source", ext.Source);
-                    writer.WriteString("adapter", ext.Adapter);
-                    writer.WriteString("method", ext.Method);
                     writer.WriteEndObject();
                 }
                 writer.WriteEndArray();
@@ -291,11 +290,9 @@ internal static class CliCommands
         else
         {
             ctx.Stdout.WriteLine("Commands:");
-            foreach (var entry in catalogue.OrderBy(c => c.Source).ThenBy(c => c.Command))
+            foreach (var entry in allCommands.OrderBy(c => c.Source).ThenBy(c => c.Command))
                 ctx.Stdout.WriteLine($"  [{entry.Source}] {entry.Command}");
-            foreach (var ext in extensionCommands.OrderBy(e => e.Adapter).ThenBy(e => e.Method))
-                ctx.Stdout.WriteLine($"  [extension] {ext.Command}");
-            ctx.Stdout.WriteLine($"Total: {catalogue.Count + extensionCommands.Count}");
+            ctx.Stdout.WriteLine($"Total: {allCommands.Count}");
         }
         await Task.CompletedTask;
         return 0;

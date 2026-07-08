@@ -73,11 +73,17 @@ public sealed class ApiContractGoldenTests
 
     private static string SerializeCatalogue()
     {
+        var all = new System.Collections.Generic.List<(string Command, string? Description, string Source)>();
+        foreach (var e in CoveCommandRegistry.Catalogue)
+            all.Add((e.Command, e.Description, e.Source));
+        foreach (var e in Cove.Engine.EngineCommandCatalogue.Entries)
+            all.Add((e.Command, e.Description, e.Source));
+        all.Sort((a, b) => string.CompareOrdinal(a.Command, b.Command));
         using var buffer = new System.IO.MemoryStream();
         using (var writer = new System.Text.Json.Utf8JsonWriter(buffer, new System.Text.Json.JsonWriterOptions { Indented = true }))
         {
             writer.WriteStartArray();
-            foreach (var entry in CoveCommandRegistry.Catalogue)
+            foreach (var entry in all)
             {
                 writer.WriteStartObject();
                 writer.WriteString("command", entry.Command);

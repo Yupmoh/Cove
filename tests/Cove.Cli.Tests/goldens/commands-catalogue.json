@@ -68,6 +68,601 @@
     "source": "cli"
   },
   {
+    "command": "cove://commands/activity.list",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/activity.needs-input",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/adapter-env.list",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/adapter-env.resolve",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/adapter-env.save",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/adapter.list",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/agent.close",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/agent.definition.delete",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/agent.definition.list",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/agent.definition.show",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/agent.list",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/agent.message",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/agent.replay",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/agent.spawned-panes",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/agent.stop",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/attach.raw",
+    "description": "raw external-terminal attach (TM-79, runtime-owned)",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/browser.back",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/browser.close",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/browser.forward",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/browser.navigate",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/browser.open",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/browser.reload",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/capture_native_screenshot",
+    "description": "mcp-bridge capture_native_screenshot (PL-30, render-bound)",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/collection.create",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/collection.list",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/collection.move-workspace",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/collection.remove",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/collection.rename",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/collection.switch",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/config.get",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/config.set",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/emit_event",
+    "description": "mcp-bridge emit_event (PL-30, headless-safe)",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/execute_command",
+    "description": "mcp-bridge execute_command (PL-30, headless-safe)",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/execute_js",
+    "description": "mcp-bridge execute_js (PL-30, render-bound)",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/extension.list",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/extension.run",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/get_backend_state",
+    "description": "mcp-bridge get_backend_state (PL-30, headless-safe)",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/get_ipc_events",
+    "description": "mcp-bridge get_ipc_events (PL-30, headless-safe)",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/get_window_info",
+    "description": "mcp-bridge get_window_info (PL-30, render-bound)",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/launch-profile.delete",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/launch-profile.list",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/launch-profile.set-default",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/launch.build",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/launch.overrides.clear",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/launch.overrides.get",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/launch.overrides.save",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/launcher.options",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/layout.get",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/layout.mutate",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/layout.snapshot",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/list_windows",
+    "description": "mcp-bridge list_windows (PL-30, render-bound)",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/note.create",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/note.delete",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/note.get",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/note.list",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/note.update",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/omni-chat.append",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/omni-chat.clear",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/omni-chat.history",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/pane-types.list",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/pane.kill",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/pane.list",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/pane.read",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/pane.rename",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/pane.resize",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/pane.scope.get",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/pane.scope.set",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/pane.search",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/pane.spawn",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/pane.write",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/protocol.resolve",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/registry.fetch",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/resident.dock",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/resident.list",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/resident.set-collapsed",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/resident.set-height",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/resident.undock",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/restore.chooser",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/restore.confirm",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/restore.undo",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/room.close",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/room.create",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/room.list",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/room.move-to-wing",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/room.pin",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/room.rename",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/room.switch",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/session.background",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/session.dismiss",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/session.foreground",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/session.list",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/session.state",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/session.stop",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/skills.index",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/skills.resolve-manifest",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/skills.resolve-prompt-sigils",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/snapshot.list",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/snapshot.pin",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/snapshot.prune",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/snapshot.restore",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/snapshot.take",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/start_ipc_monitor",
+    "description": "mcp-bridge start_ipc_monitor (PL-30, headless-safe)",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/state.read",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/state.write",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/stop_ipc_monitor",
+    "description": "mcp-bridge stop_ipc_monitor (PL-30, headless-safe)",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/task.create",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/task.delete",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/task.get",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/task.list",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/task.update",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/timeline.append",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/timeline.list",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/wing.create",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/wing.list",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/wing.remove",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/wing.rename",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/wing.reorder",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/wing.set-icon",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/wing.switch",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/workspace-command.clear",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/workspace-command.create",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/workspace-command.delete",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/workspace-command.edit",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/workspace-command.list",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/workspace-command.logs",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/workspace-command.restart",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/workspace-command.start",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/workspace-command.status",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/workspace-command.stop",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/workspace.create",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/workspace.delete",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/workspace.hide",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/workspace.list",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/workspace.move-room",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/workspace.reorder",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/workspace.set-accent",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/workspace.set-icon",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/workspace.switch",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/worktree.adopt",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/worktree.create",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/worktree.list",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/worktree.orphans",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/worktree.prune",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/worktree.remove",
+    "source": "core"
+  },
+  {
+    "command": "cove://hooks/_state",
+    "source": "core"
+  },
+  {
+    "command": "cove://hooks/pane-states",
+    "source": "core"
+  },
+  {
     "command": "docs generate",
     "source": "cli"
   },
