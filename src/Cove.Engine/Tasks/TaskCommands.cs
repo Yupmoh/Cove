@@ -7,80 +7,80 @@ namespace Cove.Engine.Tasks;
 public static class TaskCommands
 {
     [CoveCommand("cove://commands/task.create")]
-    public static Task<ControlResponse> Create(EngineDispatchContext ctx)
+    public static async Task<ControlResponse> Create(EngineDispatchContext ctx)
     {
-        if (ctx.Tasks is not { } store)
-            return Task.FromResult(ctx.Fail("not_ready", "task store not available"));
+        if (ctx.TaskService is not { } svc)
+            return ctx.Fail("not_ready", "task store not available");
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.TaskCreateParams) is not { } p)
-            return Task.FromResult(ctx.Fail("invalid_params", "task create params required"));
+            return ctx.Fail("invalid_params", "task create params required");
 
-        var card = store.Create(new TaskCard
-        {
-            Title = p.Title,
-            Description = p.Description ?? "",
-            WorkspaceId = p.WorkspaceId,
-            Source = p.Source,
-            Priority = ParsePriority(p.Priority),
-            Size = ParseSize(p.Size),
-            Assignee = p.Assignee,
-        });
-        return Task.FromResult(ctx.Ok(card, CoveJsonContext.Default.TaskCard));
+        var row = await svc.CreateCardAsync(p.WorkspaceId, p.Title, p.Source, p.Description, (int)ParsePriority(p.Priority), (int)ParseSize(p.Size), p.Assignee);
+        return ctx.Ok(ToCard(row), CoveJsonContext.Default.TaskCard);
     }
 
     [CoveCommand("cove://commands/task.get")]
     public static Task<ControlResponse> Get(EngineDispatchContext ctx)
     {
-        if (ctx.Tasks is not { } store)
+        if (ctx.TaskService is not { } svc)
             return Task.FromResult(ctx.Fail("not_ready", "task store not available"));
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.TaskRefParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "task ref params required"));
 
-        var card = p.HumanId is not null ? store.ResolveByHumanId(p.HumanId) : store.Get(p.Id ?? "");
-        if (card is null)
+        Cove.Tasks.Store.CardRow? row;
+        if (p.HumanId is not null && TryParseHumanId(p.HumanId, out var number))
+            row = svc.GetCardByHumanId(p.WorkspaceId ?? "", number);
+        else
+            row = svc.GetCard(p.Id ?? "");
+
+        if (row is null)
             return Task.FromResult(ctx.Fail("not_found", "task not found"));
-        return Task.FromResult(ctx.Ok(card, CoveJsonContext.Default.TaskCard));
+        return Task.FromResult(ctx.Ok(ToCard(row), CoveJsonContext.Default.TaskCard));
     }
 
     [CoveCommand("cove://commands/task.list")]
     public static Task<ControlResponse> List(EngineDispatchContext ctx)
     {
-        if (ctx.Tasks is not { } store)
+        if (ctx.TaskService is not { } svc)
             return Task.FromResult(ctx.Fail("not_ready", "task store not available"));
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.TaskListParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "task list params required"));
 
-        var cards = store.ListByWorkspace(p.WorkspaceId);
+        var cards = svc.ListCards(p.WorkspaceId).Select(ToCard).ToList();
         return Task.FromResult(ctx.Ok(new TaskListResult(cards), CoveJsonContext.Default.TaskListResult));
     }
 
     [CoveCommand("cove://commands/task.update")]
-    public static Task<ControlResponse> Update(EngineDispatchContext ctx)
+    public static async Task<ControlResponse> Update(EngineDispatchContext ctx)
     {
-        if (ctx.Tasks is not { } store)
-            return Task.FromResult(ctx.Fail("not_ready", "task store not available"));
+        if (ctx.TaskService is not { } svc)
+            return ctx.Fail("not_ready", "task store not available");
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.TaskUpdateParams) is not { } p)
-            return Task.FromResult(ctx.Fail("invalid_params", "task update params required"));
+            return ctx.Fail("invalid_params", "task update params required");
 
-        store.Update(p.Id, c => c with
-        {
-            Title = p.Title ?? c.Title,
-            StatusId = p.StatusId ?? c.StatusId,
-            Description = p.Description ?? c.Description,
-            Assignee = p.Assignee ?? c.Assignee,
-        });
-        return Task.FromResult(ctx.Ok());
+        var row = svc.GetCard(p.Id);
+        if (row is null)
+            return ctx.Fail("not_found", "task not found");
+
+        if (p.Title is not null) row.Title = p.Title;
+        if (p.StatusId is not null) row.StatusId = p.StatusId;
+        if (p.Description is not null) row.Description = p.Description;
+        if (p.Assignee is not null) row.Assignee = p.Assignee;
+        if (p.Source is not null) row.Source = p.Source;
+
+        await svc.UpdateCardAsync(row);
+        return ctx.Ok(ToCard(row), CoveJsonContext.Default.TaskCard);
     }
 
     [CoveCommand("cove://commands/task.delete")]
-    public static Task<ControlResponse> Delete(EngineDispatchContext ctx)
+    public static async Task<ControlResponse> Delete(EngineDispatchContext ctx)
     {
-        if (ctx.Tasks is not { } store)
-            return Task.FromResult(ctx.Fail("not_ready", "task store not available"));
+        if (ctx.TaskService is not { } svc)
+            return ctx.Fail("not_ready", "task store not available");
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.TaskRefParams) is not { } p)
-            return Task.FromResult(ctx.Fail("invalid_params", "task ref params required"));
+            return ctx.Fail("invalid_params", "task ref params required");
 
-        store.Delete(p.Id ?? "");
-        return Task.FromResult(ctx.Ok());
+        await svc.DeleteCardAsync(p.Id ?? "");
+        return ctx.Ok();
     }
 
     [CoveCommand("cove://commands/task.ping", Description = "echo back params as pong (smoke)")]
@@ -90,6 +90,32 @@ public static class TaskCommands
             return Task.FromResult(ctx.Fail("invalid_params", "task ping params required"));
         var result = new TaskPingResult(p.Echo, p.Kind, "pong");
         return Task.FromResult(ctx.Ok(result, CoveJsonContext.Default.TaskPingResult));
+    }
+
+    private static TaskCard ToCard(Cove.Tasks.Store.CardRow row) => new()
+    {
+        Id = row.Id,
+        Title = row.Title,
+        Description = row.Description,
+        StatusId = row.StatusId,
+        Priority = (TaskPriority)row.Priority,
+        Size = (TaskSize)row.Size,
+        Assignee = row.Assignee,
+        Source = row.Source,
+        WorkspaceId = row.WorkspaceId,
+        TaskNumber = row.TaskNumber,
+        CurrentPrimaryRunId = row.CurrentPrimaryRunId,
+        CreatedAt = System.DateTimeOffset.Parse(row.CreatedAt),
+        UpdatedAt = System.DateTimeOffset.Parse(row.UpdatedAt),
+    };
+
+    private static bool TryParseHumanId(string humanId, out int number)
+    {
+        const string prefix = "COVE-";
+        if (humanId.StartsWith(prefix, System.StringComparison.OrdinalIgnoreCase))
+            return int.TryParse(humanId[prefix.Length..], out number);
+        number = 0;
+        return false;
     }
 
     private static TaskPriority ParsePriority(string? p) => p?.ToLowerInvariant() switch

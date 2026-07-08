@@ -39,7 +39,7 @@ public sealed class EngineDispatchContext
         SessionResumeOrchestrator? sessions = null,
         AgentLifecycleController? lifecycle = null,
         LaunchOrchestrator? launcher = null,
-        TaskStore? tasks = null,
+        Cove.Tasks.TaskService? taskService = null,
         NoteStore? notes = null,
         TimelineStore? timeline = null,
         PaneTypeRegistry? paneTypes = null,
@@ -70,7 +70,7 @@ public sealed class EngineDispatchContext
         Sessions = sessions;
         Lifecycle = lifecycle;
         Launcher = launcher;
-        Tasks = tasks;
+        TaskService = taskService;
         Notes = notes;
         Timeline = timeline;
         PaneTypes = paneTypes;
@@ -102,7 +102,7 @@ public sealed class EngineDispatchContext
     public SessionResumeOrchestrator? Sessions { get; }
     public AgentLifecycleController? Lifecycle { get; }
     public LaunchOrchestrator? Launcher { get; }
-    public TaskStore? Tasks { get; }
+    public Cove.Tasks.TaskService? TaskService { get; }
     public NoteStore? Notes { get; }
     public TimelineStore? Timeline { get; }
     public PaneTypeRegistry? PaneTypes { get; }

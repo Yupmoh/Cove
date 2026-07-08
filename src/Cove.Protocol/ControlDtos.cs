@@ -160,9 +160,9 @@ public sealed record TaskCard
     public string HumanId => $"COVE-{TaskNumber}";
 }
 public sealed record TaskCreateParams(string Title, string WorkspaceId, string Source, string? Description, string? Priority, string? Size, string? Assignee);
-public sealed record TaskRefParams(string? Id, string? HumanId);
+public sealed record TaskRefParams(string? Id, string? HumanId, string? WorkspaceId);
 public sealed record TaskListParams(string WorkspaceId);
-public sealed record TaskUpdateParams(string Id, string? Title, string? StatusId, string? Description, string? Assignee);
+public sealed record TaskUpdateParams(string Id, string? Title, string? StatusId, string? Description, string? Assignee, string? Source);
 public sealed record TaskListResult(System.Collections.Generic.IReadOnlyList<TaskCard> Cards);
 public sealed record TaskPingParams(string Echo, string? Kind);
 public sealed record TaskPingResult(string Echo, string? Kind, string Status);

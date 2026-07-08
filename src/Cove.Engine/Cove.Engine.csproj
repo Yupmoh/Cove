@@ -13,6 +13,7 @@
     <ProjectReference Include="../Cove.Protocol/Cove.Protocol.csproj" />
     <ProjectReference Include="../Cove.Persistence/Cove.Persistence.csproj" />
     <ProjectReference Include="../Cove.Adapters/Cove.Adapters.csproj" />
+    <ProjectReference Include="../Cove.Tasks/Cove.Tasks.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />

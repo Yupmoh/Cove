@@ -56,7 +56,7 @@ public sealed class DaemonHost
     private Cove.Engine.Protocol.ExtensionRegistry? _extensions;
     private Cove.Engine.Lifecycle.AgentLifecycleController? _lifecycle;
     private Cove.Engine.Launch.LaunchOrchestrator? _launcher;
-    private Cove.Engine.Tasks.TaskStore? _tasks;
+    private Cove.Tasks.TaskService? _taskService;
     private Cove.Engine.Knowledge.NoteStore? _notes;
     private Cove.Engine.Knowledge.TimelineStore? _timeline;
     private Cove.Engine.Panes.PaneTypeRegistry? _paneTypes;
@@ -110,7 +110,8 @@ public sealed class DaemonHost
         var resumeProtocol = new Cove.Engine.Launch.AdapterResumeProtocol(_manifestStore, new Cove.Adapters.MethodRunner(), logger);
         var resumeService = new Cove.Engine.Restart.AgentResumeService(resumeProtocol);
         _launcher = new Cove.Engine.Launch.LaunchOrchestrator(_manifestStore, new Cove.Adapters.MethodRunner(), new Cove.Adapters.BinaryDiscoveryService(), probedPath, resumeService, new Cove.Engine.Launch.LauncherOverrideStore(System.IO.Path.Combine(dataDir, "launcher-overrides"), logger), logger);
-        _tasks = new Cove.Engine.Tasks.TaskStore(dataDir);
+        _taskService = new Cove.Tasks.TaskService(dataDir, logger);
+        _ = _taskService.StartAsync();
         _stateBus = new Cove.Engine.Protocol.StateBus(dataDir, logger);
         _extensions = new Cove.Engine.Protocol.ExtensionRegistry(_manifestStore!);
         _extensions.Index();
@@ -352,7 +353,7 @@ public sealed class DaemonHost
             return false;
         }
 
-        ControlResponse? generated = await Cove.Engine.EngineCommandRouter.RouteAsync(req, _panes, _layout, _workspaces, _runCommands, _restoration, _snapshots, _skills, _agents, _launchProfiles, _adapterEnv, _hookServer, _hookRouter, _agentRouter, _activity, _sessions, _lifecycle, _launcher, _tasks, _notes, _timeline, _paneTypes, _browser, _config, _manifestStore, _registry, _omniChat, _paneScopes, _stateBus, _extensions, cancellationToken).ConfigureAwait(false);
+        ControlResponse? generated = await Cove.Engine.EngineCommandRouter.RouteAsync(req, _panes, _layout, _workspaces, _runCommands, _restoration, _snapshots, _skills, _agents, _launchProfiles, _adapterEnv, _hookServer, _hookRouter, _agentRouter, _activity, _sessions, _lifecycle, _launcher, _taskService, _notes, _timeline, _paneTypes, _browser, _config, _manifestStore, _registry, _omniChat, _paneScopes, _stateBus, _extensions, cancellationToken).ConfigureAwait(false);
         if (generated is not null)
         {
             if (generated.Ok && IsMutatingVerb(req.Uri))

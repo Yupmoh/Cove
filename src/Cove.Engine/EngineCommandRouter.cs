@@ -36,7 +36,7 @@ public static class EngineCommandRouter
         SessionResumeOrchestrator? sessions = null,
         AgentLifecycleController? lifecycle = null,
         LaunchOrchestrator? launcher = null,
-        TaskStore? tasks = null,
+        Cove.Tasks.TaskService? taskService = null,
         NoteStore? notes = null,
         TimelineStore? timeline = null,
         PaneTypeRegistry? paneTypes = null,
@@ -69,8 +69,8 @@ public static class EngineCommandRouter
                 if (denied is not null)
                     return denied;
             }
-            var dispatchCtx = new EngineDispatchContext(request, panes, layout, workspaces, runCommands, restoration, snapshots, skills, agents, launchProfiles, adapterEnv, hookServer, hookRouter, agentRouter, activity, sessions, lifecycle, launcher, tasks, notes, timeline, paneTypes, browser, config, manifestStore, registry, omniChat, paneScopes, stateBus, extensions);
-            dispatchCtx.Redrive = subReq => RouteAsync(subReq, panes, layout, workspaces, runCommands, restoration, snapshots, skills, agents, launchProfiles, adapterEnv, hookServer, hookRouter, agentRouter, activity, sessions, lifecycle, launcher, tasks, notes, timeline, paneTypes, browser, config, manifestStore, registry, omniChat, paneScopes, stateBus, extensions, cancellationToken);
+            var dispatchCtx = new EngineDispatchContext(request, panes, layout, workspaces, runCommands, restoration, snapshots, skills, agents, launchProfiles, adapterEnv, hookServer, hookRouter, agentRouter, activity, sessions, lifecycle, launcher, taskService, notes, timeline, paneTypes, browser, config, manifestStore, registry, omniChat, paneScopes, stateBus, extensions);
+            dispatchCtx.Redrive = subReq => RouteAsync(subReq, panes, layout, workspaces, runCommands, restoration, snapshots, skills, agents, launchProfiles, adapterEnv, hookServer, hookRouter, agentRouter, activity, sessions, lifecycle, launcher, taskService, notes, timeline, paneTypes, browser, config, manifestStore, registry, omniChat, paneScopes, stateBus, extensions, cancellationToken);
             return await typed(dispatchCtx);
         }
         catch (System.Exception ex)
