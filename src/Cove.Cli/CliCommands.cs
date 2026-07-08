@@ -203,11 +203,33 @@ internal static class CliCommands
         }
         var json = System.IO.File.ReadAllText(configPath);
         using var doc = System.Text.Json.JsonDocument.Parse(json);
-        if (doc.RootElement.TryGetProperty(key.Replace(".", ":"), out var val))
-            ctx.Stdout.WriteLine(val.ToString());
-        else
-            ctx.Stderr.WriteLine($"error: config key '{key}' not found");
-        return Task.FromResult(0);
+        if (TryGetConfigValue(doc.RootElement, key, out var val))
+        {
+            ctx.Stdout.WriteLine(val);
+            return Task.FromResult(0);
+        }
+        ctx.Stderr.WriteLine($"error: config key '{key}' not found");
+        return Task.FromResult(1);
+    }
+
+    private static bool TryGetConfigValue(System.Text.Json.JsonElement root, string key, out string value)
+    {
+        value = "";
+        if (root.ValueKind == System.Text.Json.JsonValueKind.Object && root.TryGetProperty(key, out var flat))
+        {
+            value = flat.ValueKind == System.Text.Json.JsonValueKind.String ? flat.GetString() ?? "" : flat.GetRawText();
+            return true;
+        }
+        var parts = key.Split('.');
+        var current = root;
+        foreach (var part in parts)
+        {
+            if (current.ValueKind != System.Text.Json.JsonValueKind.Object || !current.TryGetProperty(part, out var next))
+                return false;
+            current = next;
+        }
+        value = current.ValueKind == System.Text.Json.JsonValueKind.String ? current.GetString() ?? "" : current.GetRawText();
+        return true;
     }
     [CoveCommand("config set")]
     public static Task<int> ConfigSet(CommandContext ctx)

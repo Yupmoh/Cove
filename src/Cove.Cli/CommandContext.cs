@@ -44,9 +44,9 @@ public sealed class CommandContext
     }
 
     public async Task<int> RouteCoreAsync(string uri)
-        => await RouteCoreWithParamsAsync(uri, null);
+        => await RouteCoreWithParamsAsync(uri, null, noAutostart: Args.Contains("--no-autostart"));
 
-    public async Task<int> RouteCoreWithParamsAsync(string uri, string? paramsJson)
+    public async Task<int> RouteCoreWithParamsAsync(string uri, string? paramsJson, bool noAutostart = false)
     {
         System.Text.Json.JsonElement? parsedParams = null;
         if (paramsJson is not null)
@@ -63,29 +63,47 @@ public sealed class CommandContext
             }
         }
         var connector = new DaemonConnector(Paths, Endpoint);
+        if (noAutostart)
+        {
+            var probeConn = await connector.TryConnectAndHelloAsync("cli", System.Threading.CancellationToken.None);
+            if (probeConn is null)
+            {
+                Stderr.WriteLine("[not_connected]");
+                return 1;
+            }
+            await using (probeConn)
+            {
+                return await DispatchAsync(probeConn, uri, parsedParams);
+            }
+        }
         FrameConnection conn = await connector.ConnectOrSpawnAsync("cli", System.Threading.CancellationToken.None);
         await using (conn)
         {
-            await conn.WriteFrameAsync(FrameType.Request, 0,
-                ControlCodec.Encode(new ControlRequest("1", uri, Params: parsedParams, Source: Source, CallerPaneId: ResolveCallerPaneId())), System.Threading.CancellationToken.None);
-            Frame? resp = await conn.ReadFrameAsync(System.Threading.CancellationToken.None);
-            if (resp is not { } f)
-            {
-                Stderr.WriteLine("error: no_response");
-                return 1;
-            }
-            ControlResponse r = ControlCodec.DecodeResponse(f.Payload);
-            if (!r.Ok)
-            {
-                Stderr.WriteLine($"error: {r.Error?.Code ?? "unknown"}");
-                return 1;
-            }
-            if (r.Data is { } d)
-                Render(d);
-            else
-                Stdout.WriteLine("{}");
-            return 0;
+            return await DispatchAsync(conn, uri, parsedParams);
         }
+    }
+
+    private async Task<int> DispatchAsync(FrameConnection conn, string uri, System.Text.Json.JsonElement? parsedParams)
+    {
+        await conn.WriteFrameAsync(FrameType.Request, 0,
+            ControlCodec.Encode(new ControlRequest("1", uri, Params: parsedParams, Source: Source, CallerPaneId: ResolveCallerPaneId())), System.Threading.CancellationToken.None);
+        Frame? resp = await conn.ReadFrameAsync(System.Threading.CancellationToken.None);
+        if (resp is not { } f)
+        {
+            Stderr.WriteLine("error: no_response");
+            return 1;
+        }
+        ControlResponse r = ControlCodec.DecodeResponse(f.Payload);
+        if (!r.Ok)
+        {
+            Stderr.WriteLine($"error: {r.Error?.Code ?? "unknown"}");
+            return 1;
+        }
+        if (r.Data is { } d)
+            Render(d);
+        else
+            Stdout.WriteLine("{}");
+        return 0;
     }
 
     private static string? ResolveCallerPaneId()
@@ -154,7 +172,7 @@ public sealed class CommandContext
             if (cliArgs[i] == "--channel" && i + 1 < cliArgs.Length) { i++; continue; }
             if (cliArgs[i] == "--filter" && i + 1 < cliArgs.Length) { i++; continue; }
             if (cliArgs[i] == "--source" && i + 1 < cliArgs.Length) { i++; continue; }
-            if (cliArgs[i] == "--json") continue;
+            if (cliArgs[i] == "--json" || cliArgs[i] == "--no-autostart") continue;
             positional.Add(cliArgs[i]);
         }
         return positional.Skip(verbWordCount).ToArray();
