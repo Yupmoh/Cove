@@ -11,6 +11,8 @@ Generated from the command registry. Do not edit by hand.
 | `agent definition list` | cli |  |
 | `agent definition show` | cli |  |
 | `attach` | cli |  |
+| `blackboard post` | cli |  |
+| `blackboard show` | cli |  |
 | `browser back` | cli |  |
 | `browser close` | cli |  |
 | `browser forward` | cli |  |
@@ -37,6 +39,8 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/agent.spawned-panes` | core |  |
 | `cove://commands/agent.stop` | core |  |
 | `cove://commands/attach.raw` | core | raw external-terminal attach (TM-79, runtime-owned) |
+| `cove://commands/blackboard.post` | core |  |
+| `cove://commands/blackboard.show` | core |  |
 | `cove://commands/browser.back` | core |  |
 | `cove://commands/browser.close` | core |  |
 | `cove://commands/browser.forward` | core |  |
@@ -284,4 +288,4 @@ Generated from the command registry. Do not edit by hand.
 | `timeline list` | cli |  |
 | `version` | cli |  |
 
-Total: 279 commands
+Total: 283 commands

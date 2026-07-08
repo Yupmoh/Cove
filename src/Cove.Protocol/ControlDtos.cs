@@ -262,6 +262,20 @@ public sealed record TimelineListParams(string WorkspaceId);
 public sealed record TimelineListResult(System.Collections.Generic.IReadOnlyList<TimelineEntry> Entries);
 public sealed record KnowledgePingParams(string? Echo);
 public sealed record KnowledgePingResult(string Pong, string? Echo);
+public sealed record BlackboardPostParams(string WorkspaceId, string Kind, string Audience, string Content, string? RefId, int? TtlSeconds);
+public sealed record BlackboardShowParams(string WorkspaceId, string? Audience);
+public sealed record BlackboardShowResult(System.Collections.Generic.IReadOnlyList<BlackboardPost> Posts);
+public sealed record BlackboardPost
+{
+    public string Id { get; init; } = "";
+    public required string WorkspaceId { get; init; }
+    public required string Kind { get; init; }
+    public required string Audience { get; init; }
+    public required string Content { get; init; }
+    public string? RefId { get; init; }
+    public System.DateTimeOffset? ExpiresAt { get; init; }
+    public System.DateTimeOffset CreatedAt { get; init; }
+}
 
 public sealed record PaneTypeDto(string Name, string DisplayName, string ContentSource, bool IsDockable);
 public sealed record PaneTypeListResult(System.Collections.Generic.IReadOnlyList<PaneTypeDto> PaneTypes);
@@ -452,6 +466,10 @@ public sealed record BrowserPaneDto(string PaneId, string CurrentUrl, System.Col
 [JsonSerializable(typeof(BriefMeta))]
 [JsonSerializable(typeof(RecapMeta))]
 [JsonSerializable(typeof(UpdateMeta))]
+[JsonSerializable(typeof(BlackboardPost))]
+[JsonSerializable(typeof(BlackboardPostParams))]
+[JsonSerializable(typeof(BlackboardShowParams))]
+[JsonSerializable(typeof(BlackboardShowResult))]
 [JsonSerializable(typeof(PaneTypeDto))]
 [JsonSerializable(typeof(PaneTypeListResult))]
 [JsonSerializable(typeof(BrowserOpenParams))]

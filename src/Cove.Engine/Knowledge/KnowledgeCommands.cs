@@ -106,4 +106,28 @@ public static class KnowledgeCommands
         var entries = store.ListByWorkspace(p.WorkspaceId);
         return Task.FromResult(ctx.Ok(new TimelineListResult(entries), CoveJsonContext.Default.TimelineListResult));
     }
+    [CoveCommand("cove://commands/blackboard.post")]
+    public static Task<ControlResponse> BlackboardPost(EngineDispatchContext ctx)
+    {
+        if (ctx.Blackboard is not { } store)
+            return Task.FromResult(ctx.Fail("not_ready", "blackboard store not available"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.BlackboardPostParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "blackboard post params required"));
+
+        System.TimeSpan? ttl = p.TtlSeconds.HasValue ? System.TimeSpan.FromSeconds(p.TtlSeconds.Value) : null;
+        var post = store.Post(p.WorkspaceId, p.Kind, p.Audience, p.Content, p.RefId, ttl);
+        return Task.FromResult(ctx.Ok(post, CoveJsonContext.Default.BlackboardPost));
+    }
+
+    [CoveCommand("cove://commands/blackboard.show")]
+    public static Task<ControlResponse> BlackboardShow(EngineDispatchContext ctx)
+    {
+        if (ctx.Blackboard is not { } store)
+            return Task.FromResult(ctx.Fail("not_ready", "blackboard store not available"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.BlackboardShowParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "blackboard show params required"));
+
+        var posts = store.Show(p.WorkspaceId, p.Audience);
+        return Task.FromResult(ctx.Ok(new BlackboardShowResult(posts), CoveJsonContext.Default.BlackboardShowResult));
+    }
 }

@@ -660,6 +660,14 @@ internal static class CliCommands
     public static Task<int> KnowledgePing(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/knowledge.ping");
 
+    [CoveCommand("blackboard post")]
+    public static Task<int> BlackboardPost(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/blackboard.post");
+
+    [CoveCommand("blackboard show")]
+    public static Task<int> BlackboardShow(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/blackboard.show");
+
     [CoveCommand("pane-types list")]
     public static Task<int> PaneTypesList(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/pane-types.list");

@@ -62,6 +62,7 @@ public sealed class DaemonHost
     private Cove.Tasks.Scheduler.TaskSchedulerEngine? _scheduler;
     private Cove.Engine.Knowledge.NoteStore? _notes;
     private Cove.Engine.Knowledge.TimelineStore? _timeline;
+    private Cove.Engine.Knowledge.BlackboardStore? _blackboard;
     private Cove.Engine.Panes.PaneTypeRegistry? _paneTypes;
     private Cove.Engine.Browser.BrowserPaneManager? _browser;
     private Cove.Engine.Config.ConfigService? _config;
@@ -136,6 +137,7 @@ public sealed class DaemonHost
         _paneScopes = new Cove.Engine.Protocol.PaneScopeStore(dataDir, logger);
         _notes = new Cove.Engine.Knowledge.NoteStore(dataDir);
         _timeline = new Cove.Engine.Knowledge.TimelineStore(dataDir, logger);
+        _blackboard = new Cove.Engine.Knowledge.BlackboardStore(dataDir, logger);
         _omniChat = new Cove.Engine.Activity.OmniChatStore(System.IO.Path.Combine(dataDir, "omni-chat"), logger);
         _browser = new Cove.Engine.Browser.BrowserPaneManager();
         _config = new Cove.Engine.Config.ConfigService(dataDir, logger);
@@ -371,7 +373,7 @@ public sealed class DaemonHost
             return false;
         }
 
-        ControlResponse? generated = await Cove.Engine.EngineCommandRouter.RouteAsync(req, _panes, _layout, _workspaces, _runCommands, _restoration, _snapshots, _skills, _agents, _launchProfiles, _adapterEnv, _hookServer, _hookRouter, _agentRouter, _activity, _sessions, _lifecycle, _launcher, _taskService, _dispatchSaga, _resumeSaga, _notes, _timeline, _paneTypes, _browser, _config, _manifestStore, _registry, _omniChat, _paneScopes, _stateBus, _extensions, cancellationToken).ConfigureAwait(false);
+        ControlResponse? generated = await Cove.Engine.EngineCommandRouter.RouteAsync(req, _panes, _layout, _workspaces, _runCommands, _restoration, _snapshots, _skills, _agents, _launchProfiles, _adapterEnv, _hookServer, _hookRouter, _agentRouter, _activity, _sessions, _lifecycle, _launcher, _taskService, _dispatchSaga, _resumeSaga, _notes, _timeline, _blackboard, _paneTypes, _browser, _config, _manifestStore, _registry, _omniChat, _paneScopes, _stateBus, _extensions, cancellationToken).ConfigureAwait(false);
         if (generated is not null)
         {
             if (generated.Ok && IsMutatingVerb(req.Uri))

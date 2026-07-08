@@ -44,6 +44,7 @@ public sealed class EngineDispatchContext
         Cove.Tasks.Dispatch.ResumeSaga? resumeSaga = null,
         NoteStore? notes = null,
         TimelineStore? timeline = null,
+        BlackboardStore? blackboard = null,
         PaneTypeRegistry? paneTypes = null,
         BrowserPaneManager? browser = null,
         ConfigService? config = null,
@@ -77,6 +78,7 @@ public sealed class EngineDispatchContext
         ResumeSaga = resumeSaga;
         Notes = notes;
         Timeline = timeline;
+        Blackboard = blackboard;
         PaneTypes = paneTypes;
         Browser = browser;
         Config = config;
@@ -111,6 +113,7 @@ public sealed class EngineDispatchContext
     public Cove.Tasks.Dispatch.DispatchSaga? DispatchSaga { get; }
     public NoteStore? Notes { get; }
     public TimelineStore? Timeline { get; }
+    public BlackboardStore? Blackboard { get; }
     public PaneTypeRegistry? PaneTypes { get; }
     public ConfigService? Config { get; }
     public BrowserPaneManager? Browser { get; }

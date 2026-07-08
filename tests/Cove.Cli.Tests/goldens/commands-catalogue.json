@@ -28,6 +28,14 @@
     "source": "cli"
   },
   {
+    "command": "blackboard post",
+    "source": "cli"
+  },
+  {
+    "command": "blackboard show",
+    "source": "cli"
+  },
+  {
     "command": "browser back",
     "source": "cli"
   },
@@ -130,6 +138,14 @@
   {
     "command": "cove://commands/attach.raw",
     "description": "raw external-terminal attach (TM-79, runtime-owned)",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/blackboard.post",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/blackboard.show",
     "source": "core"
   },
   {
