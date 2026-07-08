@@ -98,6 +98,7 @@ public sealed class PtyPool
                 if (entry.Session.HasExited)
                 {
                     _logger.LogWarning("pty-pool: discarding exited pre-warmed session in pool {key}", poolKey);
+                    entry.Session.Dispose();
                     continue;
                 }
                 if (System.DateTimeOffset.UtcNow - entry.WarmedAt > _maxWarmAge)

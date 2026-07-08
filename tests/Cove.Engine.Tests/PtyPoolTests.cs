@@ -108,6 +108,7 @@ public sealed class PtyPoolTests
         var pool = new PtyPool(host, NullLogger.Instance);
         pool.PreWarm("default", Req());
         Assert.Null(pool.TryAcquire("default"));
+        Assert.True(host.Spawned[0].IsDisposed);
     }
 
     [Fact]
