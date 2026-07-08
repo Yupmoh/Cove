@@ -50,4 +50,10 @@ public sealed class CommandsCatalogueTests
     {
         Assert.Equal(CoveCommandRegistry.Keys.Count, CoveCommandRegistry.Catalogue.Count);
     }
+
+    [Fact]
+    public void Catalogue_AttachCliVerbPresent()
+    {
+        Assert.Contains(CoveCommandRegistry.Catalogue, e => e.Command == "attach" && e.Source == "cli");
+    }
 }

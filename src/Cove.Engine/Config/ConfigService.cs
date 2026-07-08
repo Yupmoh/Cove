@@ -322,6 +322,13 @@ public sealed class ConfigService : System.IDisposable
                 _writable = false;
                 return;
             }
+            catch (System.InvalidOperationException ex)
+            {
+                _logger.ConfigParseFailed(_path, ex.Message);
+                _config = new CoveConfig();
+                _writable = false;
+                return;
+            }
             catch (IOException)
             {
                 System.Threading.Thread.Sleep(20);

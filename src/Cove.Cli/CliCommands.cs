@@ -16,6 +16,33 @@ internal static class CliCommands
     public static Task<int> PaneList(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/pane.list");
 
+    [CoveCommand("attach")]
+    public static Task<int> Attach(CommandContext ctx)
+    {
+        var args = ctx.Args;
+        var raw = args.Length > 0 && args[0] == "--raw";
+        if (!raw)
+        {
+            ctx.Stderr.WriteLine("usage: cove attach --raw <session>");
+            return Task.FromResult(1);
+        }
+        if (args.Length < 2)
+        {
+            ctx.Stderr.WriteLine("usage: cove attach --raw <session>");
+            return Task.FromResult(1);
+        }
+        var session = args[1];
+        using var attachBuf = new System.IO.MemoryStream();
+        using (var attachWriter = new System.Text.Json.Utf8JsonWriter(attachBuf))
+        {
+            attachWriter.WriteStartObject();
+            attachWriter.WriteString("session", session);
+            attachWriter.WriteEndObject();
+            attachWriter.Flush();
+        }
+        return ctx.RouteCoreWithParamsAsync("cove://commands/attach.raw", System.Text.Encoding.UTF8.GetString(attachBuf.ToArray()));
+    }
+
     [CoveCommand("skills list")]
     public static Task<int> SkillsList(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/skills.index");
@@ -61,8 +88,9 @@ internal static class CliCommands
         => ctx.RouteCoreAsync("cove://commands/adapter-env.resolve");
 
     [CoveCommand("hook emit")]
-    public static async Task<int> HookEmit(CommandContext ctx, string[] args)
+    public static async Task<int> HookEmit(CommandContext ctx)
     {
+        var args = ctx.Args;
         var portFile = System.IO.Path.Combine(ctx.Paths.DataDir.Root, "hook-port");
         if (!System.IO.File.Exists(portFile))
         {
@@ -114,8 +142,9 @@ internal static class CliCommands
     }
 
     [CoveCommand("config get")]
-    public static Task<int> ConfigGet(CommandContext ctx, string[] args)
+    public static Task<int> ConfigGet(CommandContext ctx)
     {
+        var args = ctx.Args;
         if (args.Length < 1)
         {
             ctx.Stderr.WriteLine("usage: cove config get <key>");
@@ -136,10 +165,10 @@ internal static class CliCommands
             ctx.Stderr.WriteLine($"error: config key '{key}' not found");
         return Task.FromResult(0);
     }
-
     [CoveCommand("config set")]
-    public static Task<int> ConfigSet(CommandContext ctx, string[] args)
+    public static Task<int> ConfigSet(CommandContext ctx)
     {
+        var args = ctx.Args;
         if (args.Length < 2)
         {
             ctx.Stderr.WriteLine("usage: cove config set <key> <value>");
@@ -148,28 +177,32 @@ internal static class CliCommands
         var key = args[0];
         var value = args[1];
         var configPath = System.IO.Path.Combine(ctx.Paths.DataDir.Root, "config.json");
-        var config = new Dictionary<string, string>();
+        var config = new System.Collections.Generic.Dictionary<string, System.Text.Json.JsonElement>();
         if (System.IO.File.Exists(configPath))
         {
             try
             {
                 using var doc = System.Text.Json.JsonDocument.Parse(System.IO.File.ReadAllText(configPath));
                 foreach (var prop in doc.RootElement.EnumerateObject())
-                    config[prop.Name] = prop.Value.GetRawText();
+                    config[prop.Name] = prop.Value.Clone();
             }
-            catch { }
+            catch (System.Text.Json.JsonException) { ctx.Stderr.WriteLine("warning: config.json corrupt, overwriting"); }
         }
-        config[key.Replace(".", ":")] = value;
-        using var buffer = new System.IO.MemoryStream();
-        using (var writer = new System.Text.Json.Utf8JsonWriter(buffer, new System.Text.Json.JsonWriterOptions { Indented = true }))
+        config.Remove(key);
+        using var setBuf = new System.IO.MemoryStream();
+        using (var setWriter = new System.Text.Json.Utf8JsonWriter(setBuf, new System.Text.Json.JsonWriterOptions { Indented = true }))
         {
-            writer.WriteStartObject();
+            setWriter.WriteStartObject();
             foreach (var kv in config)
-                writer.WriteString(kv.Key, kv.Value);
-            writer.WriteEndObject();
-            writer.Flush();
+            {
+                setWriter.WritePropertyName(kv.Key);
+                kv.Value.WriteTo(setWriter);
+            }
+            setWriter.WriteString(key, value);
+            setWriter.WriteEndObject();
+            setWriter.Flush();
         }
-        System.IO.File.WriteAllText(configPath, System.Text.Encoding.UTF8.GetString(buffer.ToArray()));
+        System.IO.File.WriteAllText(configPath, System.Text.Encoding.UTF8.GetString(setBuf.ToArray()));
         ctx.Stdout.WriteLine($"set {key} = {value}");
         return Task.FromResult(0);
     }
@@ -269,8 +302,9 @@ internal static class CliCommands
     }
 
     [CoveCommand("extension run")]
-    public static Task<int> ExtensionRun(CommandContext ctx, string[] args)
+    public static Task<int> ExtensionRun(CommandContext ctx)
     {
+        var args = ctx.Args;
         if (args.Length < 1)
         {
             ctx.Stderr.WriteLine("usage: cove extension run <extension.adapter.method> [--params '<json>']");
@@ -308,10 +342,10 @@ internal static class CliCommands
         }
         return ctx.RouteCoreWithParamsAsync("cove://commands/extension.run", System.Text.Encoding.UTF8.GetString(payloadBuf.ToArray()));
     }
-
     [CoveCommand("exec")]
-    public static Task<int> Exec(CommandContext ctx, string[] args)
+    public static Task<int> Exec(CommandContext ctx)
     {
+        var args = ctx.Args;
         if (args.Length < 1)
         {
             ctx.Stderr.WriteLine("usage: cove exec <dot.name> [--params '<json>']");
@@ -320,10 +354,10 @@ internal static class CliCommands
         var uri = "cove://commands/" + args[0].Replace(".", "/");
         return ctx.RouteCoreAsync(uri);
     }
-
     [CoveCommand("protocol resolve")]
-    public static Task<int> ProtocolResolve(CommandContext ctx, string[] args)
+    public static Task<int> ProtocolResolve(CommandContext ctx)
     {
+        var args = ctx.Args;
         if (args.Length < 1)
         {
             ctx.Stderr.WriteLine("usage: cove protocol resolve <uri>");

@@ -145,7 +145,7 @@ public sealed class ExtensionRegistryTests
             File.WriteAllText(Path.Combine(root, "echo-adapter", "echo.sh"), "#!/bin/bash\necho hello-from-adapter\n");
             var manifests = new AdapterManifestStore(root, NullLogger.Instance);
             var registry = new ExtensionRegistry(manifests);
-            var prm = System.Text.Json.JsonSerializer.SerializeToElement(new { command = "extension.echo-adapter.echo" });
+            var prm = System.Text.Json.JsonDocument.Parse("{\"command\":\"extension.echo-adapter.echo\"}").RootElement.Clone();
             var request = new Cove.Protocol.ControlRequest("1", "cove://commands/extension.run", prm);
             var response = await Cove.Engine.EngineCommandRouter.RouteAsync(request, extensions: registry, manifestStore: manifests);
             Assert.NotNull(response);
