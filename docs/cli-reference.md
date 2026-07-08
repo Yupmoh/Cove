@@ -156,12 +156,15 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/task.launch-config.set` | core |  |
 | `cove://commands/task.list` | core |  |
 | `cove://commands/task.ping` | core | echo back params as pong (smoke) |
+| `cove://commands/task.repeat.continue` | core |  |
+| `cove://commands/task.repeat.finish` | core |  |
 | `cove://commands/task.repeat.get` | core |  |
 | `cove://commands/task.repeat.pause` | core |  |
 | `cove://commands/task.repeat.resume` | core |  |
 | `cove://commands/task.repeat.set` | core |  |
 | `cove://commands/task.repeat.skip-next` | core |  |
 | `cove://commands/task.repeat.stop` | core |  |
+| `cove://commands/task.run-now` | core |  |
 | `cove://commands/task.set-done` | core |  |
 | `cove://commands/task.set-in-review` | core |  |
 | `cove://commands/task.status.create` | core |  |
@@ -254,12 +257,15 @@ Generated from the command registry. Do not edit by hand.
 | `task launch-config get` | cli |  |
 | `task launch-config set` | cli |  |
 | `task list` | cli |  |
+| `task repeat continue` | cli |  |
+| `task repeat finish` | cli |  |
 | `task repeat get` | cli |  |
 | `task repeat pause` | cli |  |
 | `task repeat resume` | cli |  |
 | `task repeat set` | cli |  |
 | `task repeat skip-next` | cli |  |
 | `task repeat stop` | cli |  |
+| `task run-now` | cli |  |
 | `task set-done` | cli |  |
 | `task set-in-review` | cli |  |
 | `task status create` | cli |  |
@@ -272,4 +278,4 @@ Generated from the command registry. Do not edit by hand.
 | `timeline list` | cli |  |
 | `version` | cli |  |
 
-Total: 267 commands
+Total: 273 commands

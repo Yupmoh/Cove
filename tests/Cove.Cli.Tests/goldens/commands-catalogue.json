@@ -620,6 +620,14 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/task.repeat.continue",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/task.repeat.finish",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/task.repeat.get",
     "source": "core"
   },
@@ -641,6 +649,10 @@
   },
   {
     "command": "cove://commands/task.repeat.stop",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/task.run-now",
     "source": "core"
   },
   {
@@ -1012,6 +1024,14 @@
     "source": "cli"
   },
   {
+    "command": "task repeat continue",
+    "source": "cli"
+  },
+  {
+    "command": "task repeat finish",
+    "source": "cli"
+  },
+  {
     "command": "task repeat get",
     "source": "cli"
   },
@@ -1033,6 +1053,10 @@
   },
   {
     "command": "task repeat stop",
+    "source": "cli"
+  },
+  {
+    "command": "task run-now",
     "source": "cli"
   },
   {

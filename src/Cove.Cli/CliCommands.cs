@@ -632,6 +632,18 @@ internal static class CliCommands
     public static Task<int> TimelineList(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/timeline.list");
 
+    [CoveCommand("task run-now")]
+    public static Task<int> TaskRunNow(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/task.run-now");
+
+    [CoveCommand("task repeat continue")]
+    public static Task<int> TaskRepeatContinue(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/task.repeat.continue");
+
+    [CoveCommand("task repeat finish")]
+    public static Task<int> TaskRepeatFinish(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/task.repeat.finish");
+
     [CoveCommand("timeline append")]
     public static Task<int> TimelineAppend(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/timeline.append");

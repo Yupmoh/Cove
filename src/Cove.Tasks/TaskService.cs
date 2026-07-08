@@ -228,7 +228,7 @@ public sealed class TaskService
 
     public Schedules.ScheduleRow? GetSchedule(string cardId) => _schedules.GetByCard(cardId);
     public System.Threading.Tasks.Task UpsertScheduleAsync(Schedules.ScheduleRow row) => _schedules.UpsertAsync(row);
-    public System.Threading.Tasks.Task UpdateScheduleAsync(string cardId, bool? paused, bool? skipNext, string? nextFireAt, string? lastFiredAt) => _schedules.UpdateAsync(cardId, paused, skipNext, nextFireAt, lastFiredAt);
+    public System.Threading.Tasks.Task UpdateScheduleAsync(string cardId, bool? paused, bool? skipNext, string? nextFireAt, string? lastFiredAt, string? pendingIntent = null) => _schedules.UpdateAsync(cardId, paused, skipNext, nextFireAt, lastFiredAt, pendingIntent);
     public System.Threading.Tasks.Task DeleteScheduleAsync(string cardId) => _schedules.DeleteAsync(cardId);
     public System.Collections.Generic.IReadOnlyList<Schedules.ScheduleRow> ListDueSchedules(System.DateTimeOffset now) => _schedules.ListDue(now);
 }

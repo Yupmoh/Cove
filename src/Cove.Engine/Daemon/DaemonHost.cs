@@ -59,6 +59,7 @@ public sealed class DaemonHost
     private Cove.Tasks.TaskService? _taskService;
     private Cove.Tasks.Dispatch.DispatchSaga? _dispatchSaga;
     private Cove.Tasks.Dispatch.ResumeSaga? _resumeSaga;
+    private Cove.Tasks.Scheduler.TaskSchedulerEngine? _scheduler;
     private Cove.Engine.Knowledge.NoteStore? _notes;
     private Cove.Engine.Knowledge.TimelineStore? _timeline;
     private Cove.Engine.Panes.PaneTypeRegistry? _paneTypes;
@@ -120,6 +121,8 @@ public sealed class DaemonHost
         var restoredSummary = restoration.RestoreOnStartup();
         if (restoredSummary.RestoredRuns.Count > 0)
             logger.LogWarning("restore: {count} non-terminal runs rehydrated as interrupted", restoredSummary.RestoredRuns.Count);
+        _scheduler = new Cove.Tasks.Scheduler.TaskSchedulerEngine(_taskService, new Cove.Tasks.Schedules.CronosCronExpander(), new Cove.Tasks.Scheduler.SystemClock(), logger);
+        _ = _scheduler.StartAsync(_shutdown.Token);
         _stateBus = new Cove.Engine.Protocol.StateBus(dataDir, logger);
         _extensions = new Cove.Engine.Protocol.ExtensionRegistry(_manifestStore!);
         _extensions.Index();

@@ -74,7 +74,7 @@ internal static class ExpectedColumns
             new ExpectedColumn("at", "TEXT"), new ExpectedColumn("completion_rule", "TEXT"),
             new ExpectedColumn("mark_done_by", "TEXT"), new ExpectedColumn("block_overlap", "INTEGER"),
             new ExpectedColumn("home_status_id", "TEXT"), new ExpectedColumn("paused", "INTEGER"),
-            new ExpectedColumn("skip_next", "INTEGER"), new ExpectedColumn("next_fire_at", "TEXT"),
+            new ExpectedColumn("skip_next", "INTEGER"), new ExpectedColumn("next_fire_at", "TEXT"), new ExpectedColumn("pending_intent", "TEXT"),
             new ExpectedColumn("last_fired_at", "TEXT"), new ExpectedColumn("created_at", "TEXT"),
             new ExpectedColumn("updated_at", "TEXT"),
         ],

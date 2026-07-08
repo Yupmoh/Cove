@@ -219,6 +219,10 @@ public sealed record ScheduleGetParams(string CardId);
 public sealed record ScheduleInfo(string CardId, string TriggerKind, string? Cron, string? Tz, string? At, string CompletionRule, string MarkDoneBy, bool BlockOverlap, string? HomeStatusId, bool Paused, bool SkipNext, string? NextFireAt, string? LastFiredAt, string Mode);
 public sealed record ScheduleUpdateStateParams(string CardId, bool? Paused, bool? SkipNext);
 public sealed record ScheduleValidationResultDto(bool IsValid, string[] Errors, string? NextFireAt);
+public sealed record RunNowParams(string CardId);
+public sealed record RunNowResult(bool Success, string? RunId, string? Error);
+public sealed record RepeatContinueParams(string CardId);
+public sealed record RepeatFinishParams(string CardId);
 public sealed record StatusSetHiddenParams(string WorkspaceId, string Id, bool Hidden);
 
 public sealed record Note
@@ -387,6 +391,10 @@ public sealed record BrowserPaneDto(string PaneId, string CurrentUrl, System.Col
 [JsonSerializable(typeof(TaskSetDoneParams))]
 [JsonSerializable(typeof(RunResumeParams))]
 [JsonSerializable(typeof(ScheduleSetRouteParams))]
+[JsonSerializable(typeof(RunNowParams))]
+[JsonSerializable(typeof(RunNowResult))]
+[JsonSerializable(typeof(RepeatContinueParams))]
+[JsonSerializable(typeof(RepeatFinishParams))]
 [JsonSerializable(typeof(ScheduleGetParams))]
 [JsonSerializable(typeof(ScheduleInfo))]
 [JsonSerializable(typeof(ScheduleUpdateStateParams))]

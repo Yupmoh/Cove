@@ -19,6 +19,7 @@ public sealed class ScheduleRow
     public bool Paused { get; set; }
     public bool SkipNext { get; set; }
     public string? NextFireAt { get; set; }
+    public string? PendingIntent { get; set; }
     public string? LastFiredAt { get; set; }
     public string CreatedAt { get; set; } = "";
     public string UpdatedAt { get; set; } = "";
@@ -29,7 +30,9 @@ public sealed class ScheduleRepository
     private readonly SqliteConnectionFactory _factory;
     private readonly TasksWriteChannel? _channel;
 
-    private const string SelectColumns = "card_id AS CardId, trigger_kind AS TriggerKind, cron AS Cron, tz AS Tz, at AS At, completion_rule AS CompletionRule, mark_done_by AS MarkDoneBy, block_overlap AS BlockOverlap, home_status_id AS HomeStatusId, paused AS Paused, skip_next AS SkipNext, next_fire_at AS NextFireAt, last_fired_at AS LastFiredAt, created_at AS CreatedAt, updated_at AS UpdatedAt";
+    private const string SelectColumns = "card_id AS CardId, trigger_kind AS TriggerKind, cron AS Cron, tz AS Tz, at AS At, completion_rule AS CompletionRule, mark_done_by AS MarkDoneBy, block_overlap AS BlockOverlap, home_status_id AS HomeStatusId, paused AS Paused, skip_next AS SkipNext, next_fire_at AS NextFireAt, pending_intent AS PendingIntent, last_fired_at AS LastFiredAt, created_at AS CreatedAt, updated_at AS UpdatedAt";
+
+    private const string UpsertSql = "INSERT INTO card_schedules (card_id, trigger_kind, cron, tz, at, completion_rule, mark_done_by, block_overlap, home_status_id, paused, skip_next, next_fire_at, pending_intent, last_fired_at, created_at, updated_at) VALUES (@CardId, @TriggerKind, @Cron, @Tz, @At, @CompletionRule, @MarkDoneBy, @BlockOverlap, @HomeStatusId, @Paused, @SkipNext, @NextFireAt, @PendingIntent, @LastFiredAt, @CreatedAt, @UpdatedAt) ON CONFLICT(card_id) DO UPDATE SET trigger_kind=@TriggerKind, cron=@Cron, tz=@Tz, at=@At, completion_rule=@CompletionRule, mark_done_by=@MarkDoneBy, block_overlap=@BlockOverlap, home_status_id=@HomeStatusId, paused=@Paused, skip_next=@SkipNext, next_fire_at=@NextFireAt, pending_intent=@PendingIntent, last_fired_at=@LastFiredAt, updated_at=@UpdatedAt";
 
     public ScheduleRepository(SqliteConnectionFactory factory, TasksWriteChannel? channel = null)
     {
@@ -52,9 +55,7 @@ public sealed class ScheduleRepository
 
     private static void UpsertInternal(SqliteConnection conn, ScheduleRow row)
     {
-        conn.Execute(
-            "INSERT INTO card_schedules (card_id, trigger_kind, cron, tz, at, completion_rule, mark_done_by, block_overlap, home_status_id, paused, skip_next, next_fire_at, last_fired_at, created_at, updated_at) VALUES (@CardId, @TriggerKind, @Cron, @Tz, @At, @CompletionRule, @MarkDoneBy, @BlockOverlap, @HomeStatusId, @Paused, @SkipNext, @NextFireAt, @LastFiredAt, @CreatedAt, @UpdatedAt) ON CONFLICT(card_id) DO UPDATE SET trigger_kind=@TriggerKind, cron=@Cron, tz=@Tz, at=@At, completion_rule=@CompletionRule, mark_done_by=@MarkDoneBy, block_overlap=@BlockOverlap, home_status_id=@HomeStatusId, paused=@Paused, skip_next=@SkipNext, next_fire_at=@NextFireAt, last_fired_at=@LastFiredAt, updated_at=@UpdatedAt",
-            row);
+        conn.Execute(UpsertSql, row);
     }
 
     public ScheduleRow? GetByCard(string cardId)
@@ -74,18 +75,18 @@ public sealed class ScheduleRepository
             new { Now = nowStr }).AsList();
     }
 
-    public System.Threading.Tasks.Task UpdateAsync(string cardId, bool? paused, bool? skipNext, string? nextFireAt, string? lastFiredAt)
+    public System.Threading.Tasks.Task UpdateAsync(string cardId, bool? paused, bool? skipNext, string? nextFireAt, string? lastFiredAt, string? pendingIntent = null)
     {
         if (_channel is null)
         {
             using var conn = _factory.Open();
-            UpdateInternal(conn, cardId, paused, skipNext, nextFireAt, lastFiredAt);
+            UpdateInternal(conn, cardId, paused, skipNext, nextFireAt, lastFiredAt, pendingIntent);
             return System.Threading.Tasks.Task.CompletedTask;
         }
-        return _channel.ExecuteAsync(conn => { UpdateInternal(conn, cardId, paused, skipNext, nextFireAt, lastFiredAt); return System.Threading.Tasks.Task.CompletedTask; });
+        return _channel.ExecuteAsync(conn => { UpdateInternal(conn, cardId, paused, skipNext, nextFireAt, lastFiredAt, pendingIntent); return System.Threading.Tasks.Task.CompletedTask; });
     }
 
-    private static void UpdateInternal(SqliteConnection conn, string cardId, bool? paused, bool? skipNext, string? nextFireAt, string? lastFiredAt)
+    private static void UpdateInternal(SqliteConnection conn, string cardId, bool? paused, bool? skipNext, string? nextFireAt, string? lastFiredAt, string? pendingIntent)
     {
         var sets = new System.Collections.Generic.List<string>();
         var p = new DynamicParameters();
@@ -95,6 +96,7 @@ public sealed class ScheduleRepository
         if (skipNext is not null) { sets.Add("skip_next = @SkipNext"); p.Add("SkipNext", skipNext.Value ? 1 : 0); }
         if (nextFireAt is not null) { sets.Add("next_fire_at = @NextFireAt"); p.Add("NextFireAt", nextFireAt); }
         if (lastFiredAt is not null) { sets.Add("last_fired_at = @LastFiredAt"); p.Add("LastFiredAt", lastFiredAt); }
+        if (pendingIntent is not null) { sets.Add("pending_intent = @PendingIntent"); p.Add("PendingIntent", pendingIntent); }
         sets.Add("updated_at = @Now");
         conn.Execute($"UPDATE card_schedules SET {string.Join(", ", sets)} WHERE card_id = @CardId", p);
     }

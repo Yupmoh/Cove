@@ -130,6 +130,7 @@ CREATE TABLE IF NOT EXISTS card_schedules (
     paused INTEGER NOT NULL DEFAULT 0,
     skip_next INTEGER NOT NULL DEFAULT 0,
     next_fire_at TEXT,
+    pending_intent TEXT,
     last_fired_at TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
