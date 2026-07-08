@@ -504,6 +504,22 @@ internal static class CliCommands
     public static Task<int> TaskLabelFilter(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/task.label.filter");
 
+    [CoveCommand("task comment add")]
+    public static Task<int> TaskCommentAdd(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/task.comment.add");
+
+    [CoveCommand("task comment list")]
+    public static Task<int> TaskCommentList(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/task.comment.list");
+
+    [CoveCommand("task comment count")]
+    public static Task<int> TaskCommentCount(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/task.comment.count");
+
+    [CoveCommand("task comment delete")]
+    public static Task<int> TaskCommentDelete(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/task.comment.delete");
+
     [CoveCommand("note list")]
     public static Task<int> NoteList(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/note.list");

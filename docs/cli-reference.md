@@ -126,6 +126,10 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/state.read` | core |  |
 | `cove://commands/state.write` | core |  |
 | `cove://commands/stop_ipc_monitor` | core | mcp-bridge stop_ipc_monitor (PL-30, headless-safe) |
+| `cove://commands/task.comment.add` | core |  |
+| `cove://commands/task.comment.count` | core |  |
+| `cove://commands/task.comment.delete` | core |  |
+| `cove://commands/task.comment.list` | core |  |
 | `cove://commands/task.create` | core |  |
 | `cove://commands/task.delete` | core |  |
 | `cove://commands/task.get` | core |  |
@@ -199,6 +203,10 @@ Generated from the command registry. Do not edit by hand.
 | `protocol resolve` | cli |  |
 | `skills list` | cli |  |
 | `skills resolve-prompt-sigils` | cli |  |
+| `task comment add` | cli |  |
+| `task comment count` | cli |  |
+| `task comment delete` | cli |  |
+| `task comment list` | cli |  |
 | `task create` | cli |  |
 | `task delete` | cli |  |
 | `task get` | cli |  |
@@ -220,4 +228,4 @@ Generated from the command registry. Do not edit by hand.
 | `timeline list` | cli |  |
 | `version` | cli |  |
 
-Total: 215 commands
+Total: 223 commands

@@ -499,6 +499,22 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/task.comment.add",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/task.comment.count",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/task.comment.delete",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/task.comment.list",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/task.create",
     "source": "core"
   },
@@ -789,6 +805,22 @@
   },
   {
     "command": "skills resolve-prompt-sigils",
+    "source": "cli"
+  },
+  {
+    "command": "task comment add",
+    "source": "cli"
+  },
+  {
+    "command": "task comment count",
+    "source": "cli"
+  },
+  {
+    "command": "task comment delete",
+    "source": "cli"
+  },
+  {
+    "command": "task comment list",
     "source": "cli"
   },
   {

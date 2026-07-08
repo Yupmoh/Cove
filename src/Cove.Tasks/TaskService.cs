@@ -13,6 +13,7 @@ public sealed class TaskService
     private readonly TaskCounterRepository _counter;
     private readonly StatusRepository _statuses;
     private readonly LabelRepository _labels;
+    private readonly CommentRepository _comments;
     private readonly TasksStore _store;
 
     public TaskService(string dataDir, ILogger logger)
@@ -25,6 +26,7 @@ public sealed class TaskService
         _cards = new CardRepository(_factory, _channel);
         _counter = new TaskCounterRepository(_factory, _channel);
         _statuses = new StatusRepository(_factory, _channel);
+        _comments = new CommentRepository(_factory, _channel, _cards);
         _labels = new LabelRepository(_factory, _channel);
     }
 
@@ -141,4 +143,16 @@ public sealed class TaskService
 
     public System.Threading.Tasks.Task ReorderLabelsAsync(string workspaceId, string[] orderedIds)
         => _labels.ReorderAsync(workspaceId, orderedIds);
+
+    public System.Threading.Tasks.Task<Cove.Tasks.Store.CommentRow?> AddCommentAsync(string cardId, string kind, string body, string source)
+        => _comments.AddAsync(cardId, kind, body, source);
+
+    public System.Collections.Generic.IReadOnlyList<Cove.Tasks.Store.CommentRow> ListComments(string cardId)
+        => _comments.ListByCard(cardId);
+
+    public int CountComments(string cardId)
+        => _comments.CountByCard(cardId);
+
+    public System.Threading.Tasks.Task DeleteCommentAsync(string id)
+        => _comments.DeleteAsync(id);
 }

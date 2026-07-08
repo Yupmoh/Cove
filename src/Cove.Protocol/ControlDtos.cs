@@ -182,6 +182,12 @@ public sealed record LabelAssignParams(string CardId, string LabelId);
 public sealed record LabelReorderParams(string WorkspaceId, string[] OrderedIds);
 public sealed record LabelFilterParams(string WorkspaceId, string LabelId);
 public sealed record LabelFilterResult(System.Collections.Generic.IReadOnlyList<string> CardIds);
+public sealed record CommentInfo(string Id, string CardId, string Kind, string Body, string Source, string CreatedAt);
+public sealed record CommentListResult(System.Collections.Generic.IReadOnlyList<CommentInfo> Comments);
+public sealed record CommentAddParams(string CardId, string Kind, string Body, string Source);
+public sealed record CommentListParams(string CardId);
+public sealed record CommentRefParams(string Id);
+public sealed record CommentCountResult(int Count);
 public sealed record StatusSetHiddenParams(string WorkspaceId, string Id, bool Hidden);
 
 public sealed record Note
@@ -344,6 +350,12 @@ public sealed record BrowserPaneDto(string PaneId, string CurrentUrl, System.Col
 [JsonSerializable(typeof(LabelReorderParams))]
 [JsonSerializable(typeof(LabelFilterParams))]
 [JsonSerializable(typeof(LabelFilterResult))]
+[JsonSerializable(typeof(CommentInfo))]
+[JsonSerializable(typeof(CommentListResult))]
+[JsonSerializable(typeof(CommentAddParams))]
+[JsonSerializable(typeof(CommentListParams))]
+[JsonSerializable(typeof(CommentRefParams))]
+[JsonSerializable(typeof(CommentCountResult))]
 [JsonSerializable(typeof(Note))]
 [JsonSerializable(typeof(NoteCreateParams))]
 [JsonSerializable(typeof(NoteRefParams))]
