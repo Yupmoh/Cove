@@ -151,7 +151,15 @@ public static class KnowledgeCommands
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.NoteMediaSaveParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "note media save params required"));
 
-        var bytes = System.Convert.FromBase64String(p.Base64Data);
+        byte[] bytes;
+        try
+        {
+            bytes = System.Convert.FromBase64String(p.Base64Data);
+        }
+        catch (System.FormatException)
+        {
+            return Task.FromResult(ctx.Fail("invalid_data", "base64 data is malformed or contains a data-URL prefix"));
+        }
         var mediaPath = store.SaveMedia(p.WorkspaceId, p.Id, p.FileName, bytes);
         return Task.FromResult(ctx.Ok(new NoteMediaSaveResult(mediaPath), CoveJsonContext.Default.NoteMediaSaveResult));
     }
