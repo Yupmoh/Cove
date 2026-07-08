@@ -38,6 +38,7 @@ public sealed class PaneTypeRegistry
         registry.Register(new PaneTypeDefinition("tasks-kanban", "Tasks Board", "tasks", IsDockable: false));
         registry.Register(new PaneTypeDefinition("tasks-list", "Tasks List", "tasks", IsDockable: true));
         registry.Register(new PaneTypeDefinition("tasks-detail", "Task Detail", "tasks", IsDockable: true));
+        registry.Register(new PaneTypeDefinition("timeline-feed", "Timeline", "timeline", IsDockable: true));
         return registry;
     }
 }

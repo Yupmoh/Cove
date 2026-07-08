@@ -6,6 +6,7 @@ import "@xterm/xterm/css/xterm.css";
 import { toBase64Utf8, parseRelayText } from "./wsproto";
 import { renderKanbanBoard } from "./tasks-kanban";
 import { renderTaskList } from "./tasks-list";
+import { renderTimelineFeed } from "./timeline-feed";
 
 const CREDIT_THRESHOLD = 131072;
 
@@ -433,6 +434,17 @@ function renderTaskDetailPane(paneId: string): HTMLElement {
   placeholder.textContent = "Select a task to view details";
   return placeholder;
 }
+function renderTimelinePane(paneId: string): HTMLElement {
+  const placeholder = document.createElement("div");
+  placeholder.className = "timeline-pane-placeholder";
+  placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
+  renderTimelineFeed("default").then(el => {
+    placeholder.replaceWith(el);
+  }).catch(e => {
+    placeholder.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to load timeline: ${(e as Error).message}</div>`;
+  });
+  return placeholder;
+}
 function renderNode(node: MosaicNode): HTMLElement {
   if (node.kind === "leaf") {
     const subs = node.subtabs.length > 0 ? node.subtabs : [{ documentId: node.paneId, paneType: "terminal", title: null }];
@@ -442,6 +454,7 @@ function renderNode(node: MosaicNode): HTMLElement {
     if (active.paneType === "tasks-kanban") return renderKanbanPane(active.documentId);
     if (active.paneType === "tasks-list") return renderTaskListPane(active.documentId);
     if (active.paneType === "tasks-detail") return renderTaskDetailPane(active.documentId);
+    if (active.paneType === "timeline-feed") return renderTimelinePane(active.documentId);
     if (isEmpty) return emptyPaneStrip(node.paneId);
     const activeEl = getPane(subs[activeIdx].documentId).el;
     if (subs.length <= 1) return activeEl;
