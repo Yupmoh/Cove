@@ -45,4 +45,8 @@ public static class ConfigSchemaGenerator
 
         return sb.ToString();
     }
+    public static void WriteReferenceDoc(string path)
+    {
+        System.IO.File.WriteAllText(path, GenerateReferenceDoc());
+    }
 }

@@ -82,6 +82,12 @@ internal static class CliCommands
         if (!string.IsNullOrEmpty(dir)) System.IO.Directory.CreateDirectory(dir);
         CliReferenceDoc.WriteTo(outPath);
         ctx.Stdout.WriteLine($"wrote {outPath}");
+
+        var configPath = System.IO.Path.ChangeExtension(outPath, null);
+        configPath = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(configPath)!, "config-reference.md");
+        Cove.Engine.Config.ConfigSchemaGenerator.WriteReferenceDoc(configPath);
+        ctx.Stdout.WriteLine($"wrote {configPath}");
+
         return Task.FromResult(0);
     }
 

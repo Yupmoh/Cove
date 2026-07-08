@@ -11,6 +11,7 @@ Cove is **headless-first**: a `cove daemon` engine owns PTYs, sessions, and SQLi
 - [PTY flow control](pty-flow-control.md) — the credit flow-control and lossless-delivery contract
 - [Control channel](control-channel.md) — the framed `cove://` protocol
 - [CLI reference](cli-reference.md) — every `cove` command
+- [Configuration reference](config-reference.md) — every config key, grouped by tab
 - [Ryn upstream](ryn-upstream.md) — Ryn framework capabilities and their status
 - [Post-1.0 backlog](post-1.0-backlog.md) — deferred features and their blockers
 - [ADRs](adr/) — architecture decision records
