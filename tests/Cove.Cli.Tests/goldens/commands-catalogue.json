@@ -555,6 +555,14 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/task.launch-config.get",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/task.launch-config.set",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/task.list",
     "source": "core"
   },
@@ -861,6 +869,14 @@
   },
   {
     "command": "task label unassign",
+    "source": "cli"
+  },
+  {
+    "command": "task launch-config get",
+    "source": "cli"
+  },
+  {
+    "command": "task launch-config set",
     "source": "cli"
   },
   {

@@ -188,6 +188,10 @@ public sealed record CommentAddParams(string CardId, string Kind, string Body, s
 public sealed record CommentListParams(string CardId);
 public sealed record CommentRefParams(string Id);
 public sealed record CommentCountResult(int Count);
+public sealed record LaunchConfigInfo(string? Adapter, string? ProfileSlug, string ExecutionMode, string? InProgressStatusId, string? ReviewStatusId, string? CompletionStatusId, string? MergeTarget, string? WorktreeBranchSource, string? WorktreeBranchName);
+public sealed record LaunchConfigSetParams(string CardId, string? Adapter, string? ProfileSlug, string? ExecutionMode, string? InProgressStatusId, string? ReviewStatusId, string? CompletionStatusId, string? MergeTarget, string? WorktreeBranchSource, string? WorktreeBranchName);
+public sealed record LaunchConfigGetParams(string CardId);
+public sealed record LaunchConfigValidationResultDto(bool IsValid, string[] Errors);
 public sealed record StatusSetHiddenParams(string WorkspaceId, string Id, bool Hidden);
 
 public sealed record Note
@@ -352,6 +356,10 @@ public sealed record BrowserPaneDto(string PaneId, string CurrentUrl, System.Col
 [JsonSerializable(typeof(LabelFilterResult))]
 [JsonSerializable(typeof(CommentInfo))]
 [JsonSerializable(typeof(CommentListResult))]
+[JsonSerializable(typeof(LaunchConfigInfo))]
+[JsonSerializable(typeof(LaunchConfigSetParams))]
+[JsonSerializable(typeof(LaunchConfigGetParams))]
+[JsonSerializable(typeof(LaunchConfigValidationResultDto))]
 [JsonSerializable(typeof(CommentAddParams))]
 [JsonSerializable(typeof(CommentListParams))]
 [JsonSerializable(typeof(CommentRefParams))]

@@ -140,6 +140,8 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/task.label.list` | core |  |
 | `cove://commands/task.label.reorder` | core |  |
 | `cove://commands/task.label.unassign` | core |  |
+| `cove://commands/task.launch-config.get` | core |  |
+| `cove://commands/task.launch-config.set` | core |  |
 | `cove://commands/task.list` | core |  |
 | `cove://commands/task.ping` | core | echo back params as pong (smoke) |
 | `cove://commands/task.status.create` | core |  |
@@ -217,6 +219,8 @@ Generated from the command registry. Do not edit by hand.
 | `task label list` | cli |  |
 | `task label reorder` | cli |  |
 | `task label unassign` | cli |  |
+| `task launch-config get` | cli |  |
+| `task launch-config set` | cli |  |
 | `task list` | cli |  |
 | `task status create` | cli |  |
 | `task status delete` | cli |  |
@@ -228,4 +232,4 @@ Generated from the command registry. Do not edit by hand.
 | `timeline list` | cli |  |
 | `version` | cli |  |
 
-Total: 223 commands
+Total: 227 commands

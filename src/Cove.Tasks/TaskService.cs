@@ -155,4 +155,25 @@ public sealed class TaskService
 
     public System.Threading.Tasks.Task DeleteCommentAsync(string id)
         => _comments.DeleteAsync(id);
+
+    public LaunchConfig.LaunchConfigModel? GetLaunchConfig(string cardId)
+    {
+        var card = _cards.GetById(cardId);
+        return card is null ? null : LaunchConfig.LaunchConfigSerializer.Deserialize(card.LaunchConfigJson);
+    }
+
+    public async System.Threading.Tasks.Task<LaunchConfig.LaunchConfigValidationResult> SetLaunchConfigAsync(string cardId, LaunchConfig.LaunchConfigModel config, LaunchConfig.LaunchConfigValidationContext context)
+    {
+        var result = LaunchConfig.LaunchConfigValidator.Validate(config, context);
+        if (!result.IsValid)
+            return result;
+        var card = _cards.GetById(cardId);
+        if (card is null)
+            return new LaunchConfig.LaunchConfigValidationResult(false, ["card not found"]);
+        card.LaunchConfigJson = LaunchConfig.LaunchConfigSerializer.Serialize(config);
+        if (config.ProfileSlug is not null) card.ProfileSlug = config.ProfileSlug;
+        if (config.Adapter is not null) card.AgentRef = config.Adapter;
+        await _cards.UpdateAsync(card);
+        return result;
+    }
 }

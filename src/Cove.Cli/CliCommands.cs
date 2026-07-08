@@ -520,6 +520,14 @@ internal static class CliCommands
     public static Task<int> TaskCommentDelete(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/task.comment.delete");
 
+    [CoveCommand("task launch-config get")]
+    public static Task<int> TaskLaunchConfigGet(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/task.launch-config.get");
+
+    [CoveCommand("task launch-config set")]
+    public static Task<int> TaskLaunchConfigSet(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/task.launch-config.set");
+
     [CoveCommand("note list")]
     public static Task<int> NoteList(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/note.list");
