@@ -52,7 +52,7 @@ public sealed class AgentStatusStateMachine
         if (anySubagentNeedsInput)
             return AgentStatus.WaitingForInput;
 
-        if (adapterStatus == AgentStatus.Working)
+        if (adapterStatus == AgentStatus.Working || !allSubagentsIdle)
             return AgentStatus.Working;
 
         if (adapterStatus == AgentStatus.Idle && allSubagentsIdle)
