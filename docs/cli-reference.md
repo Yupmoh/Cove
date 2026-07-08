@@ -26,6 +26,13 @@ Generated from the command registry. Do not edit by hand.
 | `browser open` | cli |  |
 | `browser reload` | cli |  |
 | `canvas action` | cli |  |
+| `capture attach` | cli |  |
+| `capture delete` | cli |  |
+| `capture flag` | cli |  |
+| `capture list` | cli |  |
+| `capture show` | cli |  |
+| `capture start` | cli |  |
+| `capture stop` | cli |  |
 | `commands` | cli |  |
 | `config get` | cli |  |
 | `config set` | cli |  |
@@ -59,6 +66,13 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/browser.open` | core |  |
 | `cove://commands/browser.reload` | core |  |
 | `cove://commands/canvas.action` | core |  |
+| `cove://commands/capture.attach` | core |  |
+| `cove://commands/capture.delete` | core |  |
+| `cove://commands/capture.flag` | core |  |
+| `cove://commands/capture.list` | core |  |
+| `cove://commands/capture.show` | core |  |
+| `cove://commands/capture.start` | core |  |
+| `cove://commands/capture.stop` | core |  |
 | `cove://commands/capture_native_screenshot` | core | mcp-bridge capture_native_screenshot (PL-30, render-bound) |
 | `cove://commands/collection.create` | core |  |
 | `cove://commands/collection.list` | core |  |
@@ -393,4 +407,4 @@ Generated from the command registry. Do not edit by hand.
 | `viewer get-state` | cli |  |
 | `viewer open` | cli |  |
 
-Total: 388 commands
+Total: 402 commands
