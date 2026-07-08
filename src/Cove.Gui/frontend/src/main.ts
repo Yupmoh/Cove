@@ -9,6 +9,7 @@ import { renderTaskList } from "./tasks-list";
 import { renderTimelineFeed } from "./timeline-feed";
 import { renderMarkdownNote } from "./markdown-note";
 import { renderSketchNote } from "./sketch-note";
+import { renderCanvasNote } from "./canvas-note";
 
 const CREDIT_THRESHOLD = 131072;
 
@@ -469,6 +470,17 @@ function renderSketchNotePane(paneId: string): HTMLElement {
   });
   return placeholder;
 }
+function renderCanvasNotePane(paneId: string): HTMLElement {
+  const placeholder = document.createElement("div");
+  placeholder.className = "canvas-note-placeholder";
+  placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
+  renderCanvasNote("default", paneId).then(el => {
+    placeholder.replaceWith(el);
+  }).catch(e => {
+    placeholder.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to load canvas: ${(e as Error).message}</div>`;
+  });
+  return placeholder;
+}
 function renderNode(node: MosaicNode): HTMLElement {
   if (node.kind === "leaf") {
     const subs = node.subtabs.length > 0 ? node.subtabs : [{ documentId: node.paneId, paneType: "terminal", title: null }];
@@ -481,6 +493,7 @@ function renderNode(node: MosaicNode): HTMLElement {
     if (active.paneType === "timeline-feed") return renderTimelinePane(active.documentId);
     if (active.paneType === "note-markdown") return renderMarkdownNotePane(active.documentId);
     if (active.paneType === "note-sketch") return renderSketchNotePane(active.documentId);
+    if (active.paneType === "note-canvas") return renderCanvasNotePane(active.documentId);
     if (isEmpty) return emptyPaneStrip(node.paneId);
     const activeEl = getPane(subs[activeIdx].documentId).el;
     if (subs.length <= 1) return activeEl;
