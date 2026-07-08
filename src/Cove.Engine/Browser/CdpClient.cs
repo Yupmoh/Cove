@@ -2,6 +2,7 @@ using System.Net.WebSockets;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Channels;
+using Microsoft.Extensions.Logging;
 
 namespace Cove.Engine.Browser;
 
@@ -11,27 +12,28 @@ public sealed record CdpEvent(string Method, JsonElement Params);
 
 public interface ICdpTransport : IAsyncDisposable
 {
-    Task<JsonElement> SendAsync(string method, object? parameters, CancellationToken ct = default);
+    Task<JsonElement> SendAsync(string method, JsonElement? parameters, CancellationToken ct = default);
     IAsyncEnumerable<CdpEvent> SubscribeAsync(string method, CancellationToken ct = default);
 }
 
 public sealed class CdpClient : ICdpTransport
 {
     private readonly ClientWebSocket _ws;
-    private readonly Channel<JsonElement> _responseChannel;
     private readonly Channel<CdpEvent> _eventChannel;
+    private readonly ILogger _logger;
     private int _nextId = 1;
     private readonly Dictionary<int, TaskCompletionSource<JsonElement>> _pending = new();
     private readonly CancellationTokenSource _cts = new();
     private readonly Task _receiveTask;
+    private readonly Task _connectTask;
 
-    public CdpClient(string wsUrl)
+    public CdpClient(string wsUrl, ILogger? logger = null)
     {
         _ws = new ClientWebSocket();
-        _responseChannel = Channel.CreateUnbounded<JsonElement>();
+        _logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance;
         _eventChannel = Channel.CreateUnbounded<CdpEvent>();
         _receiveTask = ReceiveLoopAsync();
-        _ = ConnectAsync(wsUrl);
+        _connectTask = ConnectAsync(wsUrl);
     }
 
     private async Task ConnectAsync(string wsUrl)
@@ -39,8 +41,9 @@ public sealed class CdpClient : ICdpTransport
         await _ws.ConnectAsync(new Uri(wsUrl), _cts.Token).ConfigureAwait(false);
     }
 
-    public async Task<JsonElement> SendAsync(string method, object? parameters, CancellationToken ct = default)
+    public async Task<JsonElement> SendAsync(string method, JsonElement? parameters, CancellationToken ct = default)
     {
+        await _connectTask.ConfigureAwait(false);
         var id = Interlocked.Increment(ref _nextId) - 1;
         var tcs = new TaskCompletionSource<JsonElement>();
         lock (_pending) _pending[id] = tcs;
@@ -120,11 +123,11 @@ public sealed class CdpClient : ICdpTransport
                         await _eventChannel.Writer.WriteAsync(new CdpEvent(method, paramEl)).ConfigureAwait(false);
                     }
                 }
-                catch (JsonException) { }
+                catch (JsonException ex) { _logger.LogWarning(ex, "cdp: failed to parse message"); sb.Clear(); }
             }
         }
         catch (OperationCanceledException) { }
-        catch (Exception) { }
+        catch (Exception ex) { _logger.LogWarning(ex, "cdp: receive loop terminated"); }
     }
 
     public async ValueTask DisposeAsync()
@@ -142,8 +145,9 @@ public sealed class CdpException(int code, string message) : Exception($"CDP err
 {
     public int Code { get; } = code;
 }
-public sealed record CdpRequest(int Id, string Method, object? Params);
+public sealed record CdpRequest(int Id, string Method, JsonElement? Params);
 
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase, DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
 [JsonSerializable(typeof(CdpRequest))]
+[JsonSerializable(typeof(string))]
 public sealed partial class CdpJsonContext : JsonSerializerContext { }
