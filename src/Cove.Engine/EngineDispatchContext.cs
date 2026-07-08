@@ -40,6 +40,7 @@ public sealed class EngineDispatchContext
         AgentLifecycleController? lifecycle = null,
         LaunchOrchestrator? launcher = null,
         Cove.Tasks.TaskService? taskService = null,
+        Cove.Tasks.Dispatch.DispatchSaga? dispatchSaga = null,
         NoteStore? notes = null,
         TimelineStore? timeline = null,
         PaneTypeRegistry? paneTypes = null,
@@ -71,6 +72,7 @@ public sealed class EngineDispatchContext
         Lifecycle = lifecycle;
         Launcher = launcher;
         TaskService = taskService;
+        DispatchSaga = dispatchSaga;
         Notes = notes;
         Timeline = timeline;
         PaneTypes = paneTypes;
@@ -103,6 +105,7 @@ public sealed class EngineDispatchContext
     public AgentLifecycleController? Lifecycle { get; }
     public LaunchOrchestrator? Launcher { get; }
     public Cove.Tasks.TaskService? TaskService { get; }
+    public Cove.Tasks.Dispatch.DispatchSaga? DispatchSaga { get; }
     public NoteStore? Notes { get; }
     public TimelineStore? Timeline { get; }
     public PaneTypeRegistry? PaneTypes { get; }

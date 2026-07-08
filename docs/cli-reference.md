@@ -148,6 +148,7 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/task.label.list` | core |  |
 | `cove://commands/task.label.reorder` | core |  |
 | `cove://commands/task.label.unassign` | core |  |
+| `cove://commands/task.launch` | core |  |
 | `cove://commands/task.launch-config.get` | core |  |
 | `cove://commands/task.launch-config.set` | core |  |
 | `cove://commands/task.list` | core |  |
@@ -235,6 +236,7 @@ Generated from the command registry. Do not edit by hand.
 | `task label list` | cli |  |
 | `task label reorder` | cli |  |
 | `task label unassign` | cli |  |
+| `task launch` | cli |  |
 | `task launch-config get` | cli |  |
 | `task launch-config set` | cli |  |
 | `task list` | cli |  |
@@ -248,4 +250,4 @@ Generated from the command registry. Do not edit by hand.
 | `timeline list` | cli |  |
 | `version` | cli |  |
 
-Total: 243 commands
+Total: 245 commands

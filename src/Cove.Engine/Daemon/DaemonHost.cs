@@ -57,6 +57,7 @@ public sealed class DaemonHost
     private Cove.Engine.Lifecycle.AgentLifecycleController? _lifecycle;
     private Cove.Engine.Launch.LaunchOrchestrator? _launcher;
     private Cove.Tasks.TaskService? _taskService;
+    private Cove.Tasks.Dispatch.DispatchSaga? _dispatchSaga;
     private Cove.Engine.Knowledge.NoteStore? _notes;
     private Cove.Engine.Knowledge.TimelineStore? _timeline;
     private Cove.Engine.Panes.PaneTypeRegistry? _paneTypes;
@@ -68,6 +69,7 @@ public sealed class DaemonHost
         _paths = paths;
         _endpoint = endpoint;
         _exitWhenIdle = exitWhenIdle;
+        _dispatchSaga = null;
     }
 
     public async Task<int> RunAsync(CancellationToken externalCancellation)
@@ -353,7 +355,7 @@ public sealed class DaemonHost
             return false;
         }
 
-        ControlResponse? generated = await Cove.Engine.EngineCommandRouter.RouteAsync(req, _panes, _layout, _workspaces, _runCommands, _restoration, _snapshots, _skills, _agents, _launchProfiles, _adapterEnv, _hookServer, _hookRouter, _agentRouter, _activity, _sessions, _lifecycle, _launcher, _taskService, _notes, _timeline, _paneTypes, _browser, _config, _manifestStore, _registry, _omniChat, _paneScopes, _stateBus, _extensions, cancellationToken).ConfigureAwait(false);
+        ControlResponse? generated = await Cove.Engine.EngineCommandRouter.RouteAsync(req, _panes, _layout, _workspaces, _runCommands, _restoration, _snapshots, _skills, _agents, _launchProfiles, _adapterEnv, _hookServer, _hookRouter, _agentRouter, _activity, _sessions, _lifecycle, _launcher, _taskService, _dispatchSaga, _notes, _timeline, _paneTypes, _browser, _config, _manifestStore, _registry, _omniChat, _paneScopes, _stateBus, _extensions, cancellationToken).ConfigureAwait(false);
         if (generated is not null)
         {
             if (generated.Ok && IsMutatingVerb(req.Uri))

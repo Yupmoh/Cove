@@ -540,6 +540,10 @@ internal static class CliCommands
     public static Task<int> TaskBindingResolveProfile(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/task.binding.resolve-profile");
 
+    [CoveCommand("task launch")]
+    public static Task<int> TaskLaunch(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/task.launch");
+
     [CoveCommand("run list")]
     public static Task<int> RunList(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/run.list");

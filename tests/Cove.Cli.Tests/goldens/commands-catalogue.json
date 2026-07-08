@@ -587,6 +587,10 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/task.launch",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/task.launch-config.get",
     "source": "core"
   },
@@ -933,6 +937,10 @@
   },
   {
     "command": "task label unassign",
+    "source": "cli"
+  },
+  {
+    "command": "task launch",
     "source": "cli"
   },
   {
