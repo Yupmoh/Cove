@@ -6,10 +6,42 @@ namespace Cove.Cli;
 internal static class CliCommands
 {
     [CoveCommand("version")]
-    public static Task<int> Version(CommandContext ctx)
+    public static async Task<int> Version(CommandContext ctx)
     {
-        ctx.Stdout.WriteLine(CoveBuild.InformationalVersion);
-        return Task.FromResult(0);
+        var cliVersion = CoveBuild.InformationalVersion;
+        var connector = new Cove.Engine.Daemon.DaemonConnector(ctx.Paths, ctx.Endpoint);
+        var conn = await connector.TryConnectAndHelloAsync("cli", System.Threading.CancellationToken.None);
+        if (conn is not null)
+        {
+            await conn.DisposeAsync();
+            ctx.Stdout.WriteLine($"cove {cliVersion} (daemon: connected)");
+        }
+        else
+        {
+            ctx.Stdout.WriteLine($"cove {cliVersion} (daemon: disconnected)");
+        }
+        return 0;
+    }
+
+    [CoveCommand("migrate")]
+    public static async Task<int> Migrate(CommandContext ctx)
+    {
+        var connector = new Cove.Engine.Daemon.DaemonConnector(ctx.Paths, ctx.Endpoint);
+        var conn = await connector.TryConnectAndHelloAsync("cli", System.Threading.CancellationToken.None);
+        if (conn is not null)
+        {
+            await conn.DisposeAsync();
+            ctx.Stderr.WriteLine("error: daemon_running, stop it first (cove stop)");
+            return 1;
+        }
+        using var loggerFactory = Cove.Platform.CoveLog.CreateConsoleLoggerFactory();
+        var runner = new Cove.Engine.Migrations.MigrationRunner(ctx.Paths.DataDir.Root, loggerFactory.CreateLogger("migrate"));
+        var result = runner.Migrate();
+        if (result.NoOp)
+            ctx.Stdout.WriteLine($"no migrations needed (at version {result.ToVersion})");
+        else
+            ctx.Stdout.WriteLine($"migrated {result.FromVersion} -> {result.ToVersion}");
+        return 0;
     }
 
     [CoveCommand("pane list")]
@@ -261,7 +293,13 @@ internal static class CliCommands
     public static Task<int> Context(CommandContext ctx)
     {
         var paneId = System.Environment.GetEnvironmentVariable("COVE_PANE_ID") ?? "(unset)";
+        var cwd = System.Environment.CurrentDirectory;
+        var workspace = System.Environment.GetEnvironmentVariable("COVE_WORKSPACE_ID") ?? "(unset)";
+        var room = System.Environment.GetEnvironmentVariable("COVE_ROOM_ID") ?? "(unset)";
         ctx.Stdout.WriteLine($"pane: {paneId}");
+        ctx.Stdout.WriteLine($"workspace: {workspace}");
+        ctx.Stdout.WriteLine($"room: {room}");
+        ctx.Stdout.WriteLine($"cwd: {cwd}");
         return Task.FromResult(0);
     }
 
