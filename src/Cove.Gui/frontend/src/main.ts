@@ -29,6 +29,7 @@ import { parseQuery, filterAndSort, MruTracker, cycleCategory, categoryLabel, ty
 import { buildEmptyState, EmptyStateMessages } from "./empty-states";
 import { DEFAULT_DRAFT, draftFromTheme, themeFromDraft, cssVarsFromTheme, isCustom, isBuiltin, canSaveDraft, canDelete, isValidHex, contrastRatio, contrastTier, THEME_COLOR_FIELDS, type ThemeDto, type ThemeDraft } from "./theme-editor";
 import { categorizeBindings, isReservedChord, isValidChord, chordDisplay, canRecordChord, normalizeChord as normalizeChordStr, type KeybindDto } from "./keyboard-editor";
+import { ONBOARDING_STEPS, INITIAL_ONBOARDING_STATE, nextStep, prevStep, dismiss as dismissOnboarding, currentStepData, isLastStep, isFirstStep, progressPercent, selectAdapter, setTelemetryOptIn, shouldShowOnboarding, type OnboardingState } from "./onboarding";
 
 const CREDIT_THRESHOLD = 131072;
 
@@ -2015,6 +2016,109 @@ async function onKeybindClear(chord: string, container: HTMLElement): Promise<vo
     renderKeyboardEditorBody(container);
   } catch { void 0; }
 }
+const onboardingEl = document.getElementById("onboarding")!;
+let onboardingState: OnboardingState = { ...INITIAL_ONBOARDING_STATE };
+
+async function maybeShowOnboarding(): Promise<void> {
+  try {
+    const seen = await invoke<{ ok: boolean; value?: string }>("app.configGet", { key: "onboarding.completed" });
+    const hasSeen = seen.ok && seen.value === "true";
+    if (!shouldShowOnboarding(hasSeen)) return;
+    onboardingEl.classList.add("open");
+    renderOnboarding();
+  } catch { void 0; }
+}
+
+function renderOnboarding(): void {
+  const step = currentStepData(onboardingState);
+  (onboardingEl.querySelector(".ob-title") as HTMLElement).textContent = step.title;
+  (onboardingEl.querySelector(".ob-progress-bar") as HTMLElement).style.width = `${progressPercent(onboardingState)}%`;
+  const body = onboardingEl.querySelector(".ob-body") as HTMLElement;
+  body.innerHTML = "";
+  const p = document.createElement("p");
+  p.textContent = step.body;
+  body.appendChild(p);
+
+  if (step.id === "adapters") { renderAdapterChoice(body); }
+  if (step.id === "telemetry") { renderTelemetryChoice(body); }
+
+  const prevBtn = onboardingEl.querySelector(".ob-prev") as HTMLButtonElement;
+  const nextBtn = onboardingEl.querySelector(".ob-next") as HTMLButtonElement;
+  prevBtn.disabled = isFirstStep(onboardingState);
+  nextBtn.textContent = isLastStep(onboardingState) ? "Finish" : "Next";
+}
+
+function renderAdapterChoice(body: HTMLElement): void {
+  const list = document.createElement("div");
+  list.className = "ob-adapter-list";
+  const adapters = [
+    { id: "claude", name: "Claude Code" },
+    { id: "codex", name: "Codex" },
+    { id: "gemini", name: "Gemini CLI" },
+    { id: null, name: "Skip — configure later" },
+  ];
+  for (const a of adapters) {
+    const el = document.createElement("div");
+    el.className = "ob-adapter" + (onboardingState.selectedAdapter === a.id ? " selected" : "");
+    const name = document.createElement("span");
+    name.className = "ob-adapter-name";
+    name.textContent = a.name;
+    el.appendChild(name);
+    el.addEventListener("click", () => { onboardingState = selectAdapter(onboardingState, a.id); renderOnboarding(); });
+    list.appendChild(el);
+  }
+  body.appendChild(list);
+}
+
+function renderTelemetryChoice(body: HTMLElement): void {
+  const toggle = document.createElement("div");
+  toggle.className = "ob-telemetry-toggle";
+  const cb = document.createElement("input");
+  cb.type = "checkbox";
+  cb.id = "ob-telemetry-cb";
+  cb.checked = onboardingState.telemetryOptIn;
+  const label = document.createElement("label");
+  label.htmlFor = "ob-telemetry-cb";
+  label.textContent = "Enable anonymous telemetry (optional)";
+  label.style.fontSize = "12px";
+  label.style.color = "var(--fg)";
+  cb.addEventListener("change", () => { onboardingState = setTelemetryOptIn(onboardingState, cb.checked); });
+  toggle.appendChild(cb);
+  toggle.appendChild(label);
+  body.appendChild(toggle);
+}
+
+async function onOnboardingNext(): Promise<void> {
+  if (isLastStep(onboardingState)) {
+    await completeOnboarding();
+    return;
+  }
+  onboardingState = nextStep(onboardingState);
+  renderOnboarding();
+}
+
+function onOnboardingPrev(): void {
+  onboardingState = prevStep(onboardingState);
+  renderOnboarding();
+}
+
+async function onOnboardingSkip(): Promise<void> {
+  onboardingState = dismissOnboarding(onboardingState);
+  await completeOnboarding();
+}
+
+async function completeOnboarding(): Promise<void> {
+  onboardingEl.classList.remove("open");
+  try {
+    await invoke("cove://commands/config.set", { key: "onboarding.completed", value: "true" });
+    if (onboardingState.telemetryOptIn) { await invoke("cove://commands/config.set", { key: "telemetry.enabled", value: "true" }); }
+    if (onboardingState.selectedAdapter) { await invoke("cove://commands/config.set", { key: "adapterCommands.default", value: onboardingState.selectedAdapter }); }
+  } catch { void 0; }
+}
+
+(onboardingEl.querySelector(".ob-next") as HTMLButtonElement).addEventListener("click", () => void onOnboardingNext());
+(onboardingEl.querySelector(".ob-prev") as HTMLButtonElement).addEventListener("click", onOnboardingPrev);
+(onboardingEl.querySelector(".ob-skip") as HTMLElement).addEventListener("click", () => void onOnboardingSkip());
 
 settingsEl.addEventListener("mousedown", (e) => { if (e.target === settingsEl) closeSettings(); });
 document.getElementById("set-close")!.addEventListener("click", closeSettings);
@@ -2359,4 +2463,5 @@ notepadSidebarEl.addEventListener("keydown", (e) => {
   if (snap.rooms.length === 0) {
     await newRoom();
   }
+  void maybeShowOnboarding();
 })();
