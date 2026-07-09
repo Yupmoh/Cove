@@ -122,7 +122,9 @@ public static class KnowledgeCommands
         {
             if (note.Kind != "sketch")
                 return Task.FromResult(ctx.Fail("invalid_format", "--png is only valid for sketch notes"));
-            return Task.FromResult(ctx.Fail("not_supported", "PNG rasterization requires an image package not yet added — use --svg instead"));
+            var rasterizer = new SketchPngRasterizer(Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
+            var png = rasterizer.Rasterize(note.Content);
+            return Task.FromResult(ctx.Ok(new NoteReadResult(note.Id, note.Title, System.Convert.ToBase64String(png), note.Kind, "png"), CoveJsonContext.Default.NoteReadResult));
         }
 
         return Task.FromResult(ctx.Ok(new NoteReadResult(note.Id, note.Title, note.Content, note.Kind, null), CoveJsonContext.Default.NoteReadResult));
