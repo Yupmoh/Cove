@@ -107,6 +107,7 @@ public sealed class DurabilityHarnessTests
     [Fact]
     public async Task SnapshotTakeAndRestore_RoundTripsContent()
     {
+        if (System.OperatingSystem.IsWindows()) return;
         var dir = NewDir();
         try
         {

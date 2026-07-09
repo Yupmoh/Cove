@@ -128,6 +128,7 @@ public sealed class ManagedShellTests
     [Fact]
     public void EnvSh_SourcesInBash()
     {
+        if (System.OperatingSystem.IsWindows()) return;
         if (!ShellExists("bash")) return;
         var dir = NewDir();
         try

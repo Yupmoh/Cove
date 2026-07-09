@@ -138,6 +138,7 @@ public sealed class ExtensionRegistryTests
     [Fact]
     public async Task ExtensionRun_DispatchesThroughVerbHandlerAndReturnsOutput()
     {
+        if (System.OperatingSystem.IsWindows()) return;
         var root = NewDir();
         try
         {

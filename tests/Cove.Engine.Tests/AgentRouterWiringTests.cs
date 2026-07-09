@@ -16,6 +16,7 @@ public sealed class AgentRouterWiringTests
     [Fact]
     public async Task PaneSpawn_WithAdapter_RegistersAgent()
     {
+        if (System.OperatingSystem.IsWindows()) return;
         var router = new AgentMessageRouter();
         var panes = NewPanes();
         var request = new ControlRequest("1", "cove://commands/pane.spawn", JsonDocument.Parse("""{"command":"/bin/sh","args":["-c","sleep 30"],"adapter":"claude-code","agentName":"Researcher","workspace":"ws1","room":"room1"}""").RootElement);
@@ -33,6 +34,7 @@ public sealed class AgentRouterWiringTests
     [Fact]
     public async Task PaneSpawn_WithoutAdapter_DoesNotRegister()
     {
+        if (System.OperatingSystem.IsWindows()) return;
         var router = new AgentMessageRouter();
         var panes = NewPanes();
         var request = new ControlRequest("1", "cove://commands/pane.spawn", JsonDocument.Parse("""{"command":"/bin/sh","args":["-c","sleep 30"]}""").RootElement);
@@ -45,6 +47,7 @@ public sealed class AgentRouterWiringTests
     [Fact]
     public async Task PaneKill_UnregistersAgent()
     {
+        if (System.OperatingSystem.IsWindows()) return;
         var router = new AgentMessageRouter();
         var panes = NewPanes();
         var spawnReq = new ControlRequest("1", "cove://commands/pane.spawn", JsonDocument.Parse("""{"command":"/bin/sh","args":["-c","sleep 30"],"adapter":"claude-code"}""").RootElement);
@@ -62,6 +65,7 @@ public sealed class AgentRouterWiringTests
     [Fact]
     public async Task AgentList_ReturnsRegisteredAgents()
     {
+        if (System.OperatingSystem.IsWindows()) return;
         var router = new AgentMessageRouter();
         var panes = NewPanes();
         var spawnReq = new ControlRequest("1", "cove://commands/pane.spawn", JsonDocument.Parse("""{"command":"/bin/sh","args":["-c","sleep 30"],"adapter":"claude-code","agentName":"A","workspace":"ws1","room":"room1"}""").RootElement);

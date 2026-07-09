@@ -21,6 +21,7 @@ public sealed class PaneRouteTests
     [Fact]
     public void Rename_UpdatesTitle()
     {
+        if (System.OperatingSystem.IsWindows()) return;
         using var reg = NewRegistry();
         var info = reg.Spawn(new SpawnParams("/bin/sh", new[] { "-c", "sleep 30" }, "/tmp", null, 40, 10));
         Assert.True(reg.Rename(info.PaneId, "my pane"));
@@ -38,6 +39,7 @@ public sealed class PaneRouteTests
     [Fact]
     public void Read_ReturnsBytesFromOffset()
     {
+        if (System.OperatingSystem.IsWindows()) return;
         using var reg = NewRegistry();
         var info = reg.Spawn(new SpawnParams("/bin/sh", new[] { "-c", "sleep 30" }, "/tmp", null, 40, 10));
         reg.Write(info.PaneId, System.Text.Encoding.UTF8.GetBytes("echo hello\n"));

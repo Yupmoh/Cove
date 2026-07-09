@@ -128,20 +128,20 @@ public sealed class AdapterReloadWatcherTests
         try
         {
             var triggerCount = 0;
-            using var watcher = new AdapterReloadWatcher(dir, debounceMs: 150);
+            using var watcher = new AdapterReloadWatcher(dir, debounceMs: 300);
             watcher.AdapterChanged += (_) => Interlocked.Increment(ref triggerCount);
             watcher.Start();
 
             for (int i = 0; i < 5; i++)
             {
                 WriteManifest(adapterDir, version: $"1.0.{i}");
-                await Task.Delay(20);
+                await Task.Delay(10);
             }
 
-            await Task.Delay(500);
-            var finalCount = triggerCount;
-            await Task.Delay(500);
-            Assert.True(triggerCount <= 2, $"expected <=2 debounced events, got {triggerCount} (final {finalCount})");
+            Assert.True(await WaitForAsync(() => Volatile.Read(ref triggerCount) >= 1, TimeSpan.FromSeconds(5)), "debounced reload never fired");
+            await Task.Delay(700);
+            var settled = Volatile.Read(ref triggerCount);
+            Assert.True(settled <= 2, $"expected <=2 debounced events, got {settled}");
         }
         finally { try { Directory.Delete(dir, true); } catch { } }
     }

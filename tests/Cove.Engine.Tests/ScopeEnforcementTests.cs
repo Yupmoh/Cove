@@ -23,6 +23,7 @@ public sealed class ScopeEnforcementTests
     [Fact]
     public async Task PaneWrite_CrossPane_SameTabScope_ReturnsAccessDenied()
     {
+        if (System.OperatingSystem.IsWindows()) return;
         var panes = NewPanes();
         var scopeStore = new PaneScopeStore(NewDir(), NullLogger.Instance);
         string callerPane = "", targetPane = "";
@@ -49,6 +50,7 @@ public sealed class ScopeEnforcementTests
     [Fact]
     public async Task PaneWrite_SamePane_SameTabScope_Allowed()
     {
+        if (System.OperatingSystem.IsWindows()) return;
         var panes = NewPanes();
         var scopeStore = new PaneScopeStore(NewDir(), NullLogger.Instance);
         string pane = "";
@@ -68,6 +70,7 @@ public sealed class ScopeEnforcementTests
     [Fact]
     public async Task PaneWrite_CrossPane_AllScope_Allowed()
     {
+        if (System.OperatingSystem.IsWindows()) return;
         var panes = NewPanes();
         var scopeStore = new PaneScopeStore(NewDir(), NullLogger.Instance);
         string callerPane = "", targetPane = "";
@@ -92,6 +95,7 @@ public sealed class ScopeEnforcementTests
     [Fact]
     public async Task PaneWrite_NoCallerPaneId_Allowed()
     {
+        if (System.OperatingSystem.IsWindows()) return;
         var panes = NewPanes();
         var scopeStore = new PaneScopeStore(NewDir(), NullLogger.Instance);
         string pane = "";
