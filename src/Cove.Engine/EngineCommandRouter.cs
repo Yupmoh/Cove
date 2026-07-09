@@ -66,6 +66,7 @@ public static class EngineCommandRouter
         Cove.Engine.Workspaces.GitReadModel? gitReadModel = null,
         Cove.Engine.Search.SearchService? searchService = null,
         Cove.Engine.Theming.ThemeService? themes = null,
+        Cove.Engine.Keybindings.KeybindingEngine? keybindings = null,
         System.Threading.CancellationToken cancellationToken = default)
     {
         System.Func<EngineDispatchContext, System.Threading.Tasks.Task<ControlResponse>> typed;
@@ -87,8 +88,8 @@ public static class EngineCommandRouter
                 if (denied is not null)
                     return denied;
             }
-        var dispatchCtx = new EngineDispatchContext(request, panes, layout, workspaces, runCommands, restoration, snapshots, skills, agents, launchProfiles, adapterEnv, hookServer, hookRouter, agentRouter, activity, sessions, lifecycle, launcher, taskService, dispatchSaga, resumeSaga, timeline, blackboard, noteFiles, memory, memoryRanker, proposals, consolidator, edits, corpus, vaultSettings, library, reviews, attribution, reviewDispatcher, paneTypes, browser, config, manifestStore, registry, omniChat, paneScopes, stateBus, extensions, captures, gitReadModel, searchService, themes);
-            dispatchCtx.Redrive = subReq => RouteAsync(subReq, panes, layout, workspaces, runCommands, restoration, snapshots, skills, agents, launchProfiles, adapterEnv, hookServer, hookRouter, agentRouter, activity, sessions, lifecycle, launcher, taskService, dispatchSaga, resumeSaga, timeline, blackboard, noteFiles, memory, memoryRanker, proposals, consolidator, edits, corpus, vaultSettings, library, reviews, attribution, reviewDispatcher, paneTypes, browser, config, manifestStore, registry, omniChat, paneScopes, stateBus, extensions, captures, gitReadModel, searchService, themes, cancellationToken);
+        var dispatchCtx = new EngineDispatchContext(request, panes, layout, workspaces, runCommands, restoration, snapshots, skills, agents, launchProfiles, adapterEnv, hookServer, hookRouter, agentRouter, activity, sessions, lifecycle, launcher, taskService, dispatchSaga, resumeSaga, timeline, blackboard, noteFiles, memory, memoryRanker, proposals, consolidator, edits, corpus, vaultSettings, library, reviews, attribution, reviewDispatcher, paneTypes, browser, config, manifestStore, registry, omniChat, paneScopes, stateBus, extensions, captures, gitReadModel, searchService, themes, keybindings);
+            dispatchCtx.Redrive = subReq => RouteAsync(subReq, panes, layout, workspaces, runCommands, restoration, snapshots, skills, agents, launchProfiles, adapterEnv, hookServer, hookRouter, agentRouter, activity, sessions, lifecycle, launcher, taskService, dispatchSaga, resumeSaga, timeline, blackboard, noteFiles, memory, memoryRanker, proposals, consolidator, edits, corpus, vaultSettings, library, reviews, attribution, reviewDispatcher, paneTypes, browser, config, manifestStore, registry, omniChat, paneScopes, stateBus, extensions, captures, gitReadModel, searchService, themes, keybindings, cancellationToken);
             return await typed(dispatchCtx);
         }
         catch (System.Exception ex)

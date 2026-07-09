@@ -69,7 +69,8 @@ public sealed class EngineDispatchContext
         CaptureStore? captures = null,
         Cove.Engine.Workspaces.GitReadModel? gitReadModel = null,
         Cove.Engine.Search.SearchService? searchService = null,
-        Cove.Engine.Theming.ThemeService? themes = null)
+        Cove.Engine.Theming.ThemeService? themes = null,
+        Cove.Engine.Keybindings.KeybindingEngine? keybindings = null)
     {
         Request = request;
         Panes = panes;
@@ -119,6 +120,7 @@ public sealed class EngineDispatchContext
         GitReadModel = gitReadModel;
         SearchService = searchService;
         Themes = themes;
+        Keybindings = keybindings;
     }
 
     public ControlRequest Request { get; }
@@ -168,6 +170,7 @@ public sealed class EngineDispatchContext
     public CaptureStore? Captures { get; }
     public Cove.Engine.Workspaces.GitReadModel? GitReadModel { get; }
     public Cove.Engine.Theming.ThemeService? Themes { get; }
+    public Cove.Engine.Keybindings.KeybindingEngine? Keybindings { get; }
     public Cove.Engine.Search.SearchService? SearchService { get; }
     public System.Func<ControlRequest, System.Threading.Tasks.Task<ControlResponse?>>? Redrive { get; set; }
 

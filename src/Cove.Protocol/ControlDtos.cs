@@ -70,6 +70,15 @@ public sealed record ThemeRefParams(string Name);
 public sealed record ThemeSaveParams(string Name, string Type, string TerminalBackground, string TerminalForeground, string ChromeSurface, string ChromeText, string ChromeAccent);
 public sealed record ThemeActiveResult(ThemeDto? Theme);
 public sealed record ThemeBuiltinResult(bool IsBuiltin);
+public sealed record KeybindDto(string Chord, string ActionType, string Action, string? Description);
+public sealed record KeybindListResult(System.Collections.Generic.IReadOnlyList<KeybindDto> Bindings, System.Collections.Generic.IReadOnlyList<string> Conflicts);
+public sealed record KeybindSetParams(string Chord, string ActionType, string Action, string? Description = null);
+public sealed record KeybindClearParams(string Chord);
+public sealed record KeybindChordParams(string Chord);
+public sealed record KeybindWarningDto(string Warning);
+public sealed record KeybindSetResult(bool Success, KeybindWarningDto? Warning);
+public sealed record KeybindConflictsResult(System.Collections.Generic.IReadOnlyList<string> Conflicts);
+public sealed record KeybindReservedResult(bool IsReserved);
 public sealed record ExtensionRunParams(string Command, string? Params = null);
 public sealed record ExtensionRunResult(string Output);
 public sealed record AttachRawParams(string Session);
@@ -394,6 +403,15 @@ public sealed record ReviewDispatchResultDto(string DispatchId, string TargetPan
 [JsonSerializable(typeof(ResizeParams))]
 [JsonSerializable(typeof(PaneInfo))]
 [JsonSerializable(typeof(PaneWriteParams))]
+[JsonSerializable(typeof(KeybindDto))]
+[JsonSerializable(typeof(KeybindListResult))]
+[JsonSerializable(typeof(KeybindSetParams))]
+[JsonSerializable(typeof(KeybindClearParams))]
+[JsonSerializable(typeof(KeybindChordParams))]
+[JsonSerializable(typeof(KeybindWarningDto))]
+[JsonSerializable(typeof(KeybindSetResult))]
+[JsonSerializable(typeof(KeybindConflictsResult))]
+[JsonSerializable(typeof(KeybindReservedResult))]
 [JsonSerializable(typeof(PaneRefParams))]
 [JsonSerializable(typeof(PaneRenameParams))]
 [JsonSerializable(typeof(PaneReadParams))]

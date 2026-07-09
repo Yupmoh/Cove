@@ -28,6 +28,7 @@ import { groupByWorkspace, moveSelection, selectedNote, kindIcon, kindColor, typ
 import { parseQuery, filterAndSort, MruTracker, cycleCategory, categoryLabel, type PaletteItem } from "./omni-palette";
 import { buildEmptyState, EmptyStateMessages } from "./empty-states";
 import { DEFAULT_DRAFT, draftFromTheme, themeFromDraft, cssVarsFromTheme, isCustom, isBuiltin, canSaveDraft, canDelete, isValidHex, contrastRatio, contrastTier, THEME_COLOR_FIELDS, type ThemeDto, type ThemeDraft } from "./theme-editor";
+import { categorizeBindings, isReservedChord, isValidChord, chordDisplay, canRecordChord, normalizeChord as normalizeChordStr, type KeybindDto } from "./keyboard-editor";
 
 const CREDIT_THRESHOLD = 131072;
 
@@ -1556,7 +1557,7 @@ function closeSettings(): void {
 }
 function renderSettings(): void {
   const schemaTabs = [...new Set(configSchema.map((e) => e.tab))].sort();
-  const tabs = schemaTabs.includes("theme") ? schemaTabs : ["theme", ...schemaTabs];
+  const tabs = schemaTabs.includes("theme") ? (schemaTabs.includes("keyboard") ? schemaTabs : ["theme", "keyboard", ...schemaTabs]) : (schemaTabs.includes("keyboard") ? ["theme", ...schemaTabs] : ["theme", "keyboard", ...schemaTabs]);
   if (tabs.length === 0) {
     setTabsEl.innerHTML = "";
     setBodyEl.innerHTML = `<div style="padding:20px;color:var(--muted);text-align:center;">No settings available</div>`;
@@ -1576,6 +1577,10 @@ function renderSettings(): void {
   setBodyEl.innerHTML = "";
   if (activeSettingsTab === "theme") {
     renderThemeEditor(setBodyEl);
+    return;
+  }
+  if (activeSettingsTab === "keyboard") {
+    renderKeyboardEditor(setBodyEl);
     return;
   }
   const entries = configSchema.filter((e) => e.tab === activeSettingsTab);
@@ -1666,6 +1671,7 @@ let themeCustomNames: string[] = [];
 let themeDraft: ThemeDraft = { ...DEFAULT_DRAFT };
 let themeBuiltinNames: string[] = [];
 let themeAppliedVars: Record<string, string> | null = null;
+let themeAppliedTermTheme: typeof THEME | null = null;
 
 async function loadThemeData(): Promise<void> {
   try {
@@ -1686,6 +1692,13 @@ function applyThemeVars(theme: ThemeDto): void {
   const root = document.documentElement;
   for (const [k, v] of Object.entries(vars)) { root.style.setProperty(k, v); }
   themeAppliedVars = vars;
+  const opacity = settings.backgroundOpacity;
+  const bgR = parseInt(theme.terminalBackground.slice(1, 3), 16);
+  const bgG = parseInt(theme.terminalBackground.slice(3, 5), 16);
+  const bgB = parseInt(theme.terminalBackground.slice(5, 7), 16);
+  const termTheme = { ...THEME, background: `rgba(${bgR}, ${bgG}, ${bgB}, ${opacity >= 0 && opacity <= 1 ? opacity : 1})`, foreground: theme.terminalForeground, cursor: theme.chromeAccent, cursorAccent: theme.terminalBackground, selectionBackground: theme.chromeAccent };
+  themeAppliedTermTheme = termTheme;
+  for (const pv of panes.values()) { pv.term.options.theme = termTheme; }
 }
 
 function revertThemeVars(): void {
@@ -1693,6 +1706,11 @@ function revertThemeVars(): void {
   const root = document.documentElement;
   for (const k of Object.keys(themeAppliedVars)) { root.style.removeProperty(k); }
   themeAppliedVars = null;
+  if (themeAppliedTermTheme) {
+    const restored = { ...THEME, background: themeBackgroundWithOpacity(settings.backgroundOpacity) };
+    for (const pv of panes.values()) { pv.term.options.theme = restored; }
+    themeAppliedTermTheme = null;
+  }
 }
 
 function renderThemeEditor(container: HTMLElement): void {
@@ -1859,6 +1877,133 @@ async function onThemeDelete(name: string): Promise<void> {
     if (themeActiveName === name) { themeActiveName = null; revertThemeVars(); }
     await loadThemeData();
     renderThemeEditorBody(setBodyEl);
+  } catch { void 0; }
+}
+let keybindList: KeybindDto[] = [];
+let keybindConflicts: string[] = [];
+let keybindRecordingAction: string | null = null;
+
+async function loadKeybindData(): Promise<void> {
+  try {
+    const res = await invoke<{ bindings: KeybindDto[]; conflicts: string[] }>("cove://commands/keybind.list", {});
+    keybindList = res.bindings ?? [];
+    keybindConflicts = res.conflicts ?? [];
+  } catch { keybindList = []; keybindConflicts = []; }
+}
+
+function renderKeyboardEditor(container: HTMLElement): void {
+  void loadKeybindData().then(() => renderKeyboardEditorBody(container));
+  container.innerHTML = `<div style="padding:20px;color:var(--muted);text-align:center;">Loading keybindings…</div>`;
+}
+
+function renderKeyboardEditorBody(container: HTMLElement): void {
+  container.innerHTML = "";
+  const customActions = keybindList.filter((b) => !DEFAULT_ACTIONS.has(b.action)).map((b) => b.action);
+  const categories = categorizeBindings(keybindList, keybindConflicts, customActions);
+
+  if (keybindConflicts.length > 0) {
+    const warn = document.createElement("div");
+    warn.style.cssText = "padding:8px 12px;margin-bottom:8px;background:color-mix(in srgb, #e06c75 15%, transparent);border:1px solid #e06c75;border-radius:6px;font-size:11px;color:#e5a0a8;";
+    warn.textContent = `Conflicts: ${keybindConflicts.join(", ")} — two actions share the same chord`;
+    container.appendChild(warn);
+  }
+
+  for (const cat of categories) {
+    const header = document.createElement("div");
+    header.className = "set-section-header";
+    header.style.cssText = "padding:12px 0 4px;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border);";
+    header.textContent = cat.name;
+    container.appendChild(header);
+
+    for (const row of cat.rows) {
+      const rowEl = document.createElement("div");
+      rowEl.className = "set-row";
+      rowEl.style.cssText = "flex-direction:row;align-items:center;gap:10px;";
+      const label = document.createElement("label");
+      label.style.cssText = "flex-direction:column;gap:2px;flex:1;";
+      const labelText = document.createElement("span");
+      labelText.textContent = row.description ?? row.action;
+      if (row.isCustom) { const tag = document.createElement("span"); tag.textContent = " (custom)"; tag.style.color = "var(--muted)"; tag.style.fontWeight = "400"; labelText.appendChild(tag); }
+      label.appendChild(labelText);
+      const actionLabel = document.createElement("span");
+      actionLabel.className = "set-desc";
+      actionLabel.textContent = row.action;
+      label.appendChild(actionLabel);
+      rowEl.appendChild(label);
+
+      const chordBtn = document.createElement("button");
+      chordBtn.textContent = chordDisplay(row.chord);
+      chordBtn.style.cssText = `background:var(--panel-2);border:1px solid ${row.hasConflict ? "#e06c75" : "var(--border)"};color:var(--fg);border-radius:6px;padding:4px 10px;font-size:11px;font-family:monospace;min-width:80px;cursor:pointer;${keybindRecordingAction === row.action ? "outline:2px solid var(--accent);" : ""}`;
+      if (keybindRecordingAction === row.action) { chordBtn.textContent = "Press keys…"; }
+      chordBtn.addEventListener("click", () => { keybindRecordingAction = keybindRecordingAction === row.action ? null : row.action; renderKeyboardEditorBody(container); });
+      rowEl.appendChild(chordBtn);
+
+      const clearBtn = document.createElement("button");
+      clearBtn.textContent = "×";
+      clearBtn.style.cssText = "background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:4px 8px;font-size:13px;cursor:pointer;";
+      clearBtn.addEventListener("click", () => void onKeybindClear(row.chord, container));
+      rowEl.appendChild(clearBtn);
+
+      container.appendChild(rowEl);
+    }
+  }
+
+  if (keybindRecordingAction) {
+    const hint = document.createElement("div");
+    hint.style.cssText = "padding:8px 0;font-size:11px;color:var(--muted);";
+    hint.textContent = `Recording for "${keybindRecordingAction}" — press a key combination, Esc to cancel.`;
+    container.appendChild(hint);
+    const escHandler = (e: KeyboardEvent): void => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.key === "Escape") { keybindRecordingAction = null; renderKeyboardEditorBody(container); settingsEl.removeEventListener("keydown", escHandler, true); return; }
+      const chord = captureChord(e);
+      if (chord) {
+        settingsEl.removeEventListener("keydown", escHandler, true);
+        const act = keybindRecordingAction;
+        if (act) { void onKeybindSet(act, chord, container); }
+        keybindRecordingAction = null;
+      }
+    };
+    settingsEl.addEventListener("keydown", escHandler, true);
+  }
+}
+
+const DEFAULT_ACTIONS: Set<string> = new Set();
+
+function captureChord(e: KeyboardEvent): string {
+  const parts: string[] = [];
+  if (e.metaKey) parts.push("cmd");
+  if (e.ctrlKey) parts.push("ctrl");
+  if (e.altKey) parts.push("alt");
+  if (e.shiftKey) parts.push("shift");
+  const key = e.key.toLowerCase();
+  if (!["meta", "control", "alt", "shift"].includes(key)) {
+    parts.push(key === " " ? "space" : key);
+  }
+  if (parts.length === 0) return "";
+  const chord = parts.join("+");
+  return isValidChord(chord) ? chord : "";
+}
+
+async function onKeybindSet(action: string, chord: string, container: HTMLElement): Promise<void> {
+  const normalized = normalizeChordStr(chord);
+  const check = canRecordChord(normalized, action, keybindList);
+  if (!check.valid) {
+    if (isReservedChord(normalized)) { return; }
+    if (check.conflictAction) { const proceed = confirm(`"${chordDisplay(normalized)}" is bound to "${check.conflictAction}". Rebind?`); if (!proceed) return; }
+  }
+  try {
+    const res = await invoke<{ success: boolean; warning?: { warning: string } | null }>("cove://commands/keybind.set", { chord: normalized, actionType: "app-command", action });
+    if (res.success) { await loadKeybindData(); renderKeyboardEditorBody(container); }
+  } catch { void 0; }
+}
+
+async function onKeybindClear(chord: string, container: HTMLElement): Promise<void> {
+  try {
+    await invoke("cove://commands/keybind.clear", { chord });
+    await loadKeybindData();
+    renderKeyboardEditorBody(container);
   } catch { void 0; }
 }
 

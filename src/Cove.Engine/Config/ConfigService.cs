@@ -171,6 +171,51 @@ public sealed class ConfigService : System.IDisposable
         SettingsChanged?.Invoke(key);
     }
 
+    public string? GetKeybindingsJson()
+    {
+        lock (_lock)
+        {
+            if (_config.Keybindings.Bindings.Count == 0) return null;
+            var sb = new System.Text.StringBuilder();
+            sb.Append('{');
+            var first = true;
+            foreach (var kv in _config.Keybindings.Bindings)
+            {
+                if (!first) sb.Append(',');
+                first = false;
+                sb.Append('"').Append(kv.Key).Append("\":").Append(kv.Value.GetRawText());
+            }
+            sb.Append('}');
+            return sb.ToString();
+        }
+    }
+
+    public void SetKeybindings(string json)
+    {
+        if (!IsWritable())
+        {
+            _logger.ConfigWriteBlocked(_path);
+            return;
+        }
+        lock (_lock)
+        {
+            _config.Keybindings.Bindings.Clear();
+            try
+            {
+                using var doc = JsonDocument.Parse(json);
+                foreach (var prop in doc.RootElement.EnumerateObject())
+                    _config.Keybindings.Bindings[prop.Name] = prop.Value.Clone();
+            }
+            catch (JsonException ex)
+            {
+                _logger.ConfigParseFailed(_path, ex.Message);
+                return;
+            }
+            Save();
+        }
+        SettingsChanged?.Invoke("keybindings");
+    }
+
     private static int AutoDetectInt(string value) => int.TryParse(value, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var i) ? i : 0;
     private static double AutoDetectDouble(string value) => double.TryParse(value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var d) ? d : 0.0;
     private static bool AutoDetectBool(string value) => bool.TryParse(value, out var b) && b;
