@@ -105,6 +105,8 @@ public sealed class ConfigHotReloadTests
 
             for (var i = 0; i < 300 && cfg.Get("terminal.fontSize") != "14"; i++)
                 Thread.Sleep(100);
+            for (var i = 0; i < 300 && !changedKeys.Contains("terminal.fontSize"); i++)
+                Thread.Sleep(100);
 
             Assert.Equal("14", cfg.Get("terminal.fontSize"));
             Assert.Contains("terminal.fontSize", changedKeys);
