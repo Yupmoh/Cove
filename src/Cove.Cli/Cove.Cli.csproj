@@ -13,6 +13,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Cove.Engine/Cove.Engine.csproj" />
+    <ProjectReference Include="../Cove.Tui/Cove.Tui.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="ZLogger" />

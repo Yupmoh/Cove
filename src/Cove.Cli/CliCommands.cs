@@ -1,4 +1,5 @@
 using Cove.Platform;
+using Cove.Tui.Attach;
 using Cove.Protocol;
 
 namespace Cove.Cli;
@@ -92,30 +93,30 @@ internal static class CliCommands
     }
 
     [CoveCommand("attach")]
-    public static Task<int> Attach(CommandContext ctx)
+    public static async Task<int> Attach(CommandContext ctx)
     {
         var args = ctx.Args;
         var raw = args.Length > 0 && args[0] == "--raw";
-        if (!raw)
+        if (raw)
         {
-            ctx.Stderr.WriteLine("usage: cove attach --raw <session>");
-            return Task.FromResult(1);
+            if (args.Length < 2)
+            {
+                ctx.Stderr.WriteLine("usage: cove attach --raw <session>");
+                return 1;
+            }
+            var session = args[1];
+            using var attachBuf = new System.IO.MemoryStream();
+            using (var attachWriter = new System.Text.Json.Utf8JsonWriter(attachBuf))
+            {
+                attachWriter.WriteStartObject();
+                attachWriter.WriteString("session", session);
+                attachWriter.WriteEndObject();
+                attachWriter.Flush();
+            }
+            return await ctx.RouteCoreWithParamsAsync("cove://commands/attach.raw", System.Text.Encoding.UTF8.GetString(attachBuf.ToArray()));
         }
-        if (args.Length < 2)
-        {
-            ctx.Stderr.WriteLine("usage: cove attach --raw <session>");
-            return Task.FromResult(1);
-        }
-        var session = args[1];
-        using var attachBuf = new System.IO.MemoryStream();
-        using (var attachWriter = new System.Text.Json.Utf8JsonWriter(attachBuf))
-        {
-            attachWriter.WriteStartObject();
-            attachWriter.WriteString("session", session);
-            attachWriter.WriteEndObject();
-            attachWriter.Flush();
-        }
-        return ctx.RouteCoreWithParamsAsync("cove://commands/attach.raw", System.Text.Encoding.UTF8.GetString(attachBuf.ToArray()));
+        var paneId = args.Length > 0 ? args[0] : "";
+        return await AttachCompositor.RunAsync(ctx.Paths, ctx.Endpoint, paneId, ctx.Source);
     }
 
     [CoveCommand("skills list")]
