@@ -106,6 +106,20 @@ public sealed class CoveGuiCommands
     private static string DefaultShell()
         => OperatingSystem.IsWindows() ? "powershell.exe" : (Environment.GetEnvironmentVariable("SHELL") ?? "/bin/zsh");
 
+    [RynCommand("app.callEngine")]
+    public async ValueTask<string> CallEngine(string uri, string argsJson, CancellationToken ct)
+    {
+        JsonElement? args = null;
+        if (!string.IsNullOrEmpty(argsJson) && argsJson != "null")
+        {
+            using var doc = JsonDocument.Parse(argsJson);
+            args = doc.RootElement.Clone();
+        }
+        var r = await _link.RequestAsync(uri, args, ct);
+        if (!r.Ok)
+            throw new InvalidOperationException(r.Error?.Message ?? r.Error?.Code ?? "engine_error");
+        return r.Data is { } d ? d.GetRawText() : "{}";
+    }
     private async ValueTask<string> Call(string uri, JsonElement? p, CancellationToken ct)
     {
         var r = await _link.RequestAsync(uri, p, ct);

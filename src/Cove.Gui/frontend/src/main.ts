@@ -40,7 +40,13 @@ function themeBackgroundWithOpacity(opacity: number): string {
 }
 
 async function invoke<T>(cmd: string, args: unknown): Promise<T> {
-  return JSON.parse((await window.__ryn.invoke(cmd, args as Record<string, unknown>)) as string) as T;
+  let result: unknown;
+  if (cmd.startsWith("cove://")) {
+    result = await window.__ryn.invoke("app.callEngine", { uri: cmd, argsJson: JSON.stringify(args ?? {}) });
+  } else {
+    result = await window.__ryn.invoke(cmd, args as Record<string, unknown>);
+  }
+  return JSON.parse(result as string) as T;
 }
 
 interface Subtab {
@@ -1122,6 +1128,7 @@ window.addEventListener("keydown", (e) => {
   if (k === "k") { e.preventDefault(); paletteEl.classList.contains("open") ? closePalette() : openPalette(); return; }
   if (paletteEl.classList.contains("open")) return;
   if (k === "t") { e.preventDefault(); void newRoom(); }
+  else if (k === "z" && e.shiftKey) { e.preventDefault(); document.body.classList.toggle("zen-mode"); fitAll(); }
   else if (k === "z" && !e.shiftKey) { e.preventDefault(); void toggleZoom(); }
   else if (k === "d" && e.shiftKey) { e.preventDefault(); void splitActive("col"); }
   else if (k === "d") { e.preventDefault(); void splitActive("row"); }
