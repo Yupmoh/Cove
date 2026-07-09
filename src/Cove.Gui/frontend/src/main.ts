@@ -1524,42 +1524,120 @@ palInput.addEventListener("keydown", (e) => {
 paletteEl.addEventListener("mousedown", (e) => { if (e.target === paletteEl) closePalette(); });
 
 const settingsEl = document.getElementById("settings")!;
-const setFontFam = document.getElementById("set-fontFamily") as HTMLInputElement;
-const setFont = document.getElementById("set-fontSize") as HTMLInputElement;
-const setLine = document.getElementById("set-lineHeight") as HTMLInputElement;
-const setCursor = document.getElementById("set-cursorStyle") as HTMLSelectElement;
-const setBlink = document.getElementById("set-cursorBlink") as HTMLInputElement;
-const setLig = document.getElementById("set-ligatures") as HTMLInputElement;
-const setScroll = document.getElementById("set-scrollbackLines") as HTMLInputElement;
-const setPad = document.getElementById("set-padding") as HTMLInputElement;
-const setBgOp = document.getElementById("set-backgroundOpacity") as HTMLInputElement;
+const setTabsEl = document.getElementById("set-tabs")!;
+const setBodyEl = document.getElementById("set-body")!;
 
-function openSettings() {
-  setFontFam.value = settings.fontFamily;
-  setFont.value = String(settings.fontSize);
-  setLine.value = String(settings.lineHeight);
-  setCursor.value = settings.cursorStyle;
-  setBlink.checked = settings.cursorBlink;
-  setLig.checked = settings.ligatures;
-  setScroll.value = String(settings.scrollback);
-  setPad.value = String(settings.padding);
-  setBgOp.value = String(settings.backgroundOpacity);
+interface ConfigSchemaEntry { key: string; label: string; tab: string; control: string; description: string | null; type: string; }
+let configSchema: ConfigSchemaEntry[] = [];
+let activeSettingsTab: string | null = null;
+
+async function loadConfigSchema(): Promise<void> {
+  try {
+    const res = await invoke<{ entries: ConfigSchemaEntry[] }>("cove://commands/config.schema", {});
+    configSchema = res.entries ?? [];
+  } catch {
+    configSchema = [];
+  }
+}
+
+function openSettings(): void {
+  if (configSchema.length === 0) {
+    void loadConfigSchema().then(() => renderSettings());
+  } else {
+    renderSettings();
+  }
   settingsEl.classList.add("open");
 }
-function closeSettings() { settingsEl.classList.remove("open"); if (focusedPaneId) panes.get(focusedPaneId)?.term.focus(); }
-function readSettings() {
-  settings.fontFamily = setFontFam.value.trim();
-  const fs = Number(setFont.value); if (fs >= 9 && fs <= 24) settings.fontSize = fs;
-  const lh = Number(setLine.value); if (lh >= 1 && lh <= 2) settings.lineHeight = lh;
-  const cs = setCursor.value; if (cs === "block" || cs === "bar" || cs === "underline") settings.cursorStyle = cs;
-  settings.cursorBlink = setBlink.checked;
-  settings.ligatures = setLig.checked;
-  const sb = Number(setScroll.value); if (sb >= 100 && sb <= 100000) settings.scrollback = sb;
-  const pd = Number(setPad.value); if (pd >= 0 && pd <= 40) settings.padding = pd;
-  const bo = Number(setBgOp.value); if (bo >= 0 && bo <= 1) settings.backgroundOpacity = bo;
-  applySettings();
+
+function closeSettings(): void {
+  settingsEl.classList.remove("open");
+  if (focusedPaneId) panes.get(focusedPaneId)?.term.focus();
 }
-for (const ctl of [setFontFam, setFont, setLine, setCursor, setBlink, setLig, setScroll, setPad, setBgOp]) ctl.addEventListener("change", readSettings);
+
+function renderSettings(): void {
+  const tabs = [...new Set(configSchema.map((e) => e.tab))].sort();
+  if (tabs.length === 0) {
+    setTabsEl.innerHTML = "";
+    setBodyEl.innerHTML = `<div style="padding:20px;color:var(--muted);text-align:center;">No settings available</div>`;
+    return;
+  }
+  if (!activeSettingsTab || !tabs.includes(activeSettingsTab)) activeSettingsTab = tabs[0];
+
+  setTabsEl.innerHTML = "";
+  for (const tab of tabs) {
+    const el = document.createElement("div");
+    el.className = "set-tab" + (tab === activeSettingsTab ? " active" : "");
+    el.textContent = tab.charAt(0).toUpperCase() + tab.slice(1);
+    el.addEventListener("click", () => { activeSettingsTab = tab; renderSettings(); });
+    setTabsEl.appendChild(el);
+  }
+
+  setBodyEl.innerHTML = "";
+  const entries = configSchema.filter((e) => e.tab === activeSettingsTab);
+  for (const entry of entries) {
+    const row = document.createElement("div");
+    row.className = "set-row";
+    const label = document.createElement("label");
+    const labelText = document.createElement("span");
+    labelText.textContent = entry.label;
+    label.appendChild(labelText);
+    if (entry.description) {
+      const desc = document.createElement("span");
+      desc.className = "set-desc";
+      desc.textContent = entry.description;
+      label.appendChild(desc);
+    }
+    row.appendChild(label);
+
+    void loadSettingValue(entry, row);
+    setBodyEl.appendChild(row);
+  }
+}
+
+async function loadSettingValue(entry: ConfigSchemaEntry, row: HTMLElement): Promise<void> {
+  let currentValue = "";
+  try {
+    const res = await invoke<{ value: string } | null>("cove://commands/config.get", { key: entry.key });
+    currentValue = res?.value ?? "";
+  } catch { void 0; }
+
+  const input = createSettingControl(entry, currentValue);
+  input.addEventListener("change", () => void saveSetting(entry.key, input));
+  row.appendChild(input);
+}
+
+function createSettingControl(entry: ConfigSchemaEntry, value: string): HTMLInputElement | HTMLSelectElement {
+  if (entry.control === "select" || entry.type === "Boolean") {
+    const select = document.createElement("select");
+    if (entry.type === "Boolean") {
+      const t = document.createElement("option"); t.value = "true"; t.textContent = "On"; select.appendChild(t);
+      const f = document.createElement("option"); f.value = "false"; f.textContent = "Off"; select.appendChild(f);
+      select.value = value === "true" ? "true" : "false";
+    }
+    select.style.cssText = "width:120px;";
+    return select;
+  }
+  if (entry.type === "Int32" || entry.type === "Double") {
+    const input = document.createElement("input");
+    input.type = "number";
+    input.value = value;
+    input.style.cssText = "width:120px;";
+    return input;
+  }
+  const input = document.createElement("input");
+  input.type = "text";
+  input.value = value;
+  return input;
+}
+
+async function saveSetting(key: string, input: HTMLInputElement | HTMLSelectElement): Promise<void> {
+  const value = input.type === "checkbox" ? String((input as HTMLInputElement).checked) : input.value;
+  try {
+    await invoke("cove://commands/config.set", { key, value });
+    if (key.startsWith("terminal.")) { settings = await loadSettings(); applySettings(); }
+  } catch { void 0; }
+}
+
 settingsEl.addEventListener("mousedown", (e) => { if (e.target === settingsEl) closeSettings(); });
 document.getElementById("set-close")!.addEventListener("click", closeSettings);
 settingsEl.addEventListener("keydown", (e) => { if (e.key === "Escape") closeSettings(); });

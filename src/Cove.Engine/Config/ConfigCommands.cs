@@ -29,4 +29,13 @@ internal static class ConfigCommands
         config.Set(p.Key, p.Value);
         return Task.FromResult(ctx.Ok());
     }
+
+    [CoveCommand("cove://commands/config.schema")]
+    public static Task<ControlResponse> ConfigSchema(EngineDispatchContext ctx)
+    {
+        var entries = Cove.Engine.Config.ConfigSchemaGenerator.Generate()
+            .Select(e => new ConfigSchemaEntryDto(e.Key, e.Label, e.Tab, e.Control, e.Description, e.Type))
+            .ToList();
+        return Task.FromResult(ctx.Ok(new ConfigSchemaResult(entries), Cove.Protocol.CoveJsonContext.Default.ConfigSchemaResult));
+    }
 }

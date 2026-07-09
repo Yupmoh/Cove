@@ -62,6 +62,8 @@ public sealed record PaneReadResult(string DataBase64, long NextOffset, long Hea
 public sealed record ConfigGetParams(string Key);
 public sealed record ConfigGetResult(string Value);
 public sealed record ConfigSetParams(string Key, string Value);
+public sealed record ConfigSchemaEntryDto(string Key, string Label, string Tab, string Control, string? Description, string Type);
+public sealed record ConfigSchemaResult(System.Collections.Generic.IReadOnlyList<ConfigSchemaEntryDto> Entries);
 public sealed record ExtensionRunParams(string Command, string? Params = null);
 public sealed record ExtensionRunResult(string Output);
 public sealed record AttachRawParams(string Session);
@@ -391,6 +393,8 @@ public sealed record ReviewDispatchResultDto(string DispatchId, string TargetPan
 [JsonSerializable(typeof(PaneReadParams))]
 [JsonSerializable(typeof(PaneReadResult))]
 [JsonSerializable(typeof(ConfigGetParams))]
+[JsonSerializable(typeof(ConfigSchemaEntryDto))]
+[JsonSerializable(typeof(ConfigSchemaResult))]
 [JsonSerializable(typeof(ConfigGetResult))]
 [JsonSerializable(typeof(ConfigSetParams))]
 [JsonSerializable(typeof(ExtensionRunParams))]
