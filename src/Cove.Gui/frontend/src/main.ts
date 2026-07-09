@@ -21,6 +21,7 @@ import { renderEditorPane } from "./editor-pane";
 import { renderSourceControlPane } from "./source-control-pane";
 import { renderSearchPane } from "./search-pane";
 import { renderBrowserPane } from "./browser-pane";
+import { renderDiffViewerPane } from "./diff-viewer-pane";
 
 const CREDIT_THRESHOLD = 131072;
 
@@ -649,6 +650,17 @@ function renderBrowserPaneWrapper(paneId: string, url: string): HTMLElement {
   });
   return placeholder;
 }
+function renderDiffViewerPaneWrapper(paneId: string, refInput: string): HTMLElement {
+  const placeholder = document.createElement("div");
+  placeholder.className = "diff-viewer-placeholder";
+  placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
+  renderDiffViewerPane(paneId, paneId, refInput).then(el => {
+    placeholder.replaceWith(el);
+  }).catch(e => {
+    placeholder.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to load diff: ${(e as Error).message}</div>`;
+  });
+  return placeholder;
+}
 function renderNode(node: MosaicNode): HTMLElement {
   if (node.kind === "leaf") {
     const subs = node.subtabs.length > 0 ? node.subtabs : [{ documentId: node.paneId, paneType: "terminal", title: null }];
@@ -674,6 +686,7 @@ function renderNode(node: MosaicNode): HTMLElement {
     if (active.paneType === "git") return renderGitPaneWrapper(active.documentId);
     if (active.paneType === "search") return renderSearchPaneWrapper(active.documentId);
     if (active.paneType === "browser") return renderBrowserPaneWrapper(active.documentId, active.title ?? "about:blank");
+    if (active.paneType === "diff") return renderDiffViewerPaneWrapper(active.documentId, active.title ?? "");
     if (isEmpty) return emptyPaneStrip(node.paneId);
     const activeEl = getPane(subs[activeIdx].documentId).el;
     if (subs.length <= 1) return activeEl;

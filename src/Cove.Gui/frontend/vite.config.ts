@@ -10,6 +10,11 @@ export default defineConfig({
         main: resolve(__dirname, "index.html"),
         perf: resolve(__dirname, "perf/index.html"),
       },
+      output: {
+        manualChunks: {
+          monaco: ["monaco-editor"],
+        },
+      },
     },
   },
   server: { strictPort: true, port: 5173 },

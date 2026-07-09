@@ -1,4 +1,6 @@
+import type * as Monaco from "monaco-editor";
 import { invoke } from "./invoke";
+import { MonacoLoader, detectLanguage } from "./monaco-loader";
 
 interface EditorState {
   filePath: string;
@@ -9,131 +11,146 @@ interface EditorState {
   readOnly: boolean;
 }
 
+const LARGE_FILE_THRESHOLD = 5 * 1024 * 1024;
+
 export async function renderEditorPane(paneId: string, filePath: string): Promise<HTMLElement> {
   const el = document.createElement("div");
   el.className = "editor-pane";
-  el.style.cssText = "display:flex;flex-direction:column;height:100%;background:#0d1117;color:#e6edf3;font-family:ui-monospace,monospace;";
+  el.style.cssText = "display:flex;flex-direction:column;height:100%;background:#1e1e1e;color:#d4d4d4;font-family:ui-monospace,monospace;";
 
   const header = document.createElement("div");
-  header.style.cssText = "padding:6px 12px;border-bottom:1px solid #21262d;display:flex;gap:8px;align-items:center;";
+  header.style.cssText = "padding:6px 12px;border-bottom:1px solid #303030;display:flex;gap:8px;align-items:center;flex-shrink:0;";
   const titleEl = document.createElement("span");
-  titleEl.style.cssText = "font-size:13px;font-weight:600;color:#e6edf3;";
+  titleEl.style.cssText = "font-size:13px;font-weight:600;color:#d4d4d4;";
   titleEl.textContent = filePath.split("/").pop() || filePath;
   header.appendChild(titleEl);
   const pathEl = document.createElement("span");
-  pathEl.style.cssText = "font-size:11px;color:#6e7681;";
+  pathEl.style.cssText = "font-size:11px;color:#858585;";
   pathEl.textContent = filePath;
   header.appendChild(pathEl);
   el.appendChild(header);
 
   const readOnlyBanner = document.createElement("div");
-  readOnlyBanner.style.cssText = "padding:4px 12px;background:#1a1520;color:#f85149;font-size:11px;display:none;";
+  readOnlyBanner.style.cssText = "padding:4px 12px;background:#3a1a1a;color:#f85149;font-size:11px;display:none;";
   readOnlyBanner.textContent = "Read-only file";
   el.appendChild(readOnlyBanner);
 
-  const textarea = document.createElement("textarea");
-  textarea.style.cssText = "flex:1;padding:8px 12px;background:#0d1117;color:#e6edf3;border:none;outline:none;font-family:ui-monospace,monospace;font-size:13px;line-height:1.5;resize:none;tab-size:2;";
-  textarea.spellcheck = false;
-  el.appendChild(textarea);
+  const largeFileBanner = document.createElement("div");
+  largeFileBanner.style.cssText = "padding:4px 12px;background:#3a2a1a;color:#cca766;font-size:11px;display:none;";
+  largeFileBanner.textContent = "Large file: syntax highlighting may be limited";
+  el.appendChild(largeFileBanner);
+
+  const container = document.createElement("div");
+  container.style.cssText = "flex:1;min-height:0;position:relative;";
+  el.appendChild(container);
 
   const statusBar = document.createElement("div");
-  statusBar.style.cssText = "padding:4px 12px;border-top:1px solid #21262d;display:flex;gap:12px;font-size:11px;color:#6e7681;";
+  statusBar.style.cssText = "padding:4px 12px;border-top:1px solid #303030;display:flex;gap:12px;font-size:11px;color:#858585;flex-shrink:0;";
   const cursorPos = document.createElement("span");
   cursorPos.textContent = "Ln 1, Col 1";
   statusBar.appendChild(cursorPos);
+  const langLabel = document.createElement("span");
+  langLabel.textContent = detectLanguage(filePath);
+  statusBar.appendChild(langLabel);
   const saveStatus = document.createElement("span");
   saveStatus.textContent = "Saved";
   statusBar.appendChild(saveStatus);
   el.appendChild(statusBar);
 
+  const monaco = await MonacoLoader.load();
+  const language = detectLanguage(filePath);
+
+  let content = "";
+  let readOnly = false;
+  let largeFile = false;
+
+  try {
+    const result = await invoke<{ content: string; size: number }>("cove://commands/editor.open", { filePath, paneId });
+    content = result.content ?? "";
+    readOnly = (result.size ?? 0) > LARGE_FILE_THRESHOLD;
+    largeFile = readOnly;
+  } catch (e) {
+    content = "";
+    readOnlyBanner.style.display = "block";
+    readOnlyBanner.textContent = `Failed to open: ${(e as Error).message}`;
+  }
+
+  const model = monaco.editor.createModel(content, readOnly ? "plaintext" : language);
+  const editor = monaco.editor.create(container, {
+    model,
+    theme: "vs-dark",
+    fontSize: 13,
+    lineHeight: 1.5 * 13,
+    minimap: { enabled: !largeFile },
+    wordWrap: largeFile ? "on" : "off",
+    readOnly,
+    automaticLayout: true,
+    scrollBeyondLastLine: false,
+  });
+
+  if (largeFile) largeFileBanner.style.display = "block";
+  if (readOnly) readOnlyBanner.style.display = "block";
+
   let dirty = false;
-  let saveTimer: ReturnType<typeof setTimeout> | null = null;
+  let saveTimer: ReturnType<typeof setTimeout> | undefined;
 
-  const updateCursor = () => {
-    const pos = textarea.selectionStart;
-    const text = textarea.value.substring(0, pos);
-    const lines = text.split("\n");
-    cursorPos.textContent = `Ln ${lines.length}, Col ${lines[lines.length - 1].length + 1}`;
-  };
-
-  const scheduleAutosave = () => {
-    if (saveTimer) clearTimeout(saveTimer);
+  model.onDidChangeContent(() => {
     dirty = true;
     saveStatus.textContent = "Modified";
-    saveStatus.style.color = "#d29922";
-    saveTimer = setTimeout(() => {
-      doSave();
-    }, 2000);
-  };
+    saveStatus.style.color = "#cca766";
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => { void doSave(); }, 2000);
+  });
+
+  editor.onDidChangeCursorPosition((e: Monaco.editor.ICursorPositionChangedEvent) => {
+    cursorPos.textContent = `Ln ${e.position.lineNumber}, Col ${e.position.column}`;
+  });
 
   const doSave = async () => {
-    const cursor = `${textarea.selectionStart}`;
-    const scroll = `${textarea.scrollTop}`;
+    if (readOnly) return;
     try {
-      await invoke("cove://commands/editor.save", {
-        filePath,
-        cursor,
-        scroll,
-        fold: null,
-        undo: null,
-        readOnly: false,
-      });
+      await invoke("cove://commands/editor.save", { filePath, paneId, content: model.getValue() });
       dirty = false;
       saveStatus.textContent = "Saved";
-      saveStatus.style.color = "#6e7681";
+      saveStatus.style.color = "#858585";
     } catch (e) {
       saveStatus.textContent = `Save failed: ${(e as Error).message}`;
       saveStatus.style.color = "#f85149";
     }
   };
 
-  textarea.addEventListener("input", () => {
-    updateCursor();
-    scheduleAutosave();
-  });
-
-  textarea.addEventListener("click", updateCursor);
-  textarea.addEventListener("keyup", updateCursor);
-
-  textarea.addEventListener("keydown", (e) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === "s") {
-      e.preventDefault();
-      if (saveTimer) clearTimeout(saveTimer);
-      doSave();
-    }
-    if (e.key === "Tab") {
-      e.preventDefault();
-      const start = textarea.selectionStart;
-      const end = textarea.selectionEnd;
-      textarea.value = textarea.value.substring(0, start) + "  " + textarea.value.substring(end);
-      textarea.selectionStart = textarea.selectionEnd = start + 2;
-    }
-  });
-
-  textarea.addEventListener("scroll", () => {
-    const scroll = `${textarea.scrollTop}`;
-    invoke("cove://commands/editor.set-state", {
-      filePath,
-      cursor: `${textarea.selectionStart}`,
-      scroll,
-      fold: null,
-      undo: null,
-      readOnly: false,
-    }).catch(() => {});
-  });
+  editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => { void doSave(); });
 
   try {
-    const result = await fetch(`cove://fs/read?path=${encodeURIComponent(filePath)}`);
-    if (result.ok) {
-      const content = await result.text();
-      textarea.value = content;
+    const state = await invoke<EditorState | null>("cove://commands/editor.get-state", { paneId });
+    if (state) {
+      if (state.cursor) {
+        try {
+          const sel = JSON.parse(state.cursor) as { startLineNumber: number; startColumn: number; endLineNumber: number; endColumn: number };
+          editor.setSelection(new monaco.Selection(sel.startLineNumber, sel.startColumn, sel.endLineNumber, sel.endColumn));
+        } catch { void 0; }
+      }
+      if (state.scroll) {
+        try { editor.setScrollTop(JSON.parse(state.scroll) as number); } catch { void 0; }
+      }
     }
-  } catch {
-    textarea.value = "";
-    textarea.placeholder = `Unable to load ${filePath}`;
-  }
+  } catch { void 0; }
 
-  updateCursor();
+  const saveState = async () => {
+    try {
+      const cursor = JSON.stringify(editor.getSelection());
+      const scroll = JSON.stringify(editor.getScrollTop());
+      await invoke("cove://commands/editor.set-state", { paneId, cursor, scroll });
+    } catch { void 0; }
+  };
+
+  const observer = new MutationObserver(() => {
+    if (!document.body.contains(el)) {
+      void saveState();
+      observer.disconnect();
+    }
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
 
   return el;
 }
