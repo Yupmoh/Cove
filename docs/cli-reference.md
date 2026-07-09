@@ -70,6 +70,8 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/browser.navigate` | core |  |
 | `cove://commands/browser.open` | core |  |
 | `cove://commands/browser.reload` | core |  |
+| `cove://commands/browser.screenshot` | core |  |
+| `cove://commands/browser.setUserAgent` | core |  |
 | `cove://commands/browser.snapshot` | core |  |
 | `cove://commands/canvas.action` | core |  |
 | `cove://commands/capture.attach` | core |  |
@@ -426,4 +428,4 @@ Generated from the command registry. Do not edit by hand.
 | `viewer get-state` | cli |  |
 | `viewer open` | cli |  |
 
-Total: 421 commands
+Total: 423 commands

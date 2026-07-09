@@ -45,6 +45,26 @@ public static class BrowserAutomationCommands
         return RunAsync(ctx, bridge, p.PaneId, "eval", null, null, p.Js);
     }
 
+    [CoveCommand("cove://commands/browser.screenshot")]
+    public static Task<ControlResponse> Screenshot(EngineDispatchContext ctx)
+    {
+        if (ctx.BrowserAutomation is not { } bridge)
+            return Task.FromResult(ctx.Fail("not_ready", "browser automation bridge not available"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.BrowserScreenshotParams) is not { } p || string.IsNullOrEmpty(p.PaneId))
+            return Task.FromResult(ctx.Fail("invalid_params", "screenshot requires paneId"));
+        return RunAsync(ctx, bridge, p.PaneId, "screenshot", null, null, null);
+    }
+
+    [CoveCommand("cove://commands/browser.setUserAgent")]
+    public static Task<ControlResponse> SetUserAgent(EngineDispatchContext ctx)
+    {
+        if (ctx.BrowserAutomation is not { } bridge)
+            return Task.FromResult(ctx.Fail("not_ready", "browser automation bridge not available"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.BrowserSetUserAgentParams) is not { } p || string.IsNullOrEmpty(p.PaneId) || string.IsNullOrEmpty(p.UserAgent))
+            return Task.FromResult(ctx.Fail("invalid_params", "setUserAgent requires paneId and userAgent"));
+        return RunAsync(ctx, bridge, p.PaneId, "setUserAgent", null, p.UserAgent, null);
+    }
+
     [CoveCommand("cove://commands/browser.automation.result")]
     public static Task<ControlResponse> Result(EngineDispatchContext ctx)
     {

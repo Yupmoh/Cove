@@ -367,6 +367,8 @@ public sealed record BrowserAutomationSnapshotParams(string PaneId);
 public sealed record BrowserAutomationClickParams(string PaneId, string Ref);
 public sealed record BrowserAutomationFillParams(string PaneId, string Ref, string Value);
 public sealed record BrowserAutomationEvalParams(string PaneId, string Js);
+public sealed record BrowserScreenshotParams(string PaneId);
+public sealed record BrowserSetUserAgentParams(string PaneId, string UserAgent);
 public sealed record ReviewAddCommentParams(string CommitSha, string FilePath, int Line, string Author, string Body, string? ParentId);
 public sealed record ReviewListCommentsParams(string CommitSha, string? FilePath, string? State);
 public sealed record ReviewTransitionParams(string CommentId, string Actor);
@@ -647,6 +649,8 @@ public sealed record ReviewDispatchResultDto(string DispatchId, string TargetPan
 [JsonSerializable(typeof(BrowserAutomationClickParams))]
 [JsonSerializable(typeof(BrowserAutomationFillParams))]
 [JsonSerializable(typeof(BrowserAutomationEvalParams))]
+[JsonSerializable(typeof(BrowserScreenshotParams))]
+[JsonSerializable(typeof(BrowserSetUserAgentParams))]
 [JsonSerializable(typeof(ReviewAddCommentParams))]
 [JsonSerializable(typeof(ReviewListCommentsParams))]
 [JsonSerializable(typeof(ReviewTransitionParams))]

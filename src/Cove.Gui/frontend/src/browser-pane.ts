@@ -1,6 +1,15 @@
 import { invoke } from "./invoke";
+import { FindBarState, type FindResult } from "./browser-find";
+import { PaneCrashState, crashReasonText } from "./browser-crash";
+import { PermissionPromptQueue, formatPermissionKinds, permissionOrigin, type PermissionRequest } from "./browser-permissions";
+import { DownloadShelfState, downloadPercent, formatBytes, joinPath, type DownloadItem } from "./browser-downloads";
 
 export const browserWebviewRegistry = new Map<string, string>();
+
+export let browserDownloadsDir = "";
+export function setBrowserDownloadsDir(dir: string): void { browserDownloadsDir = dir; }
+
+const permissionAutoDenyMs = 30000;
 
 export function normalizeUrl(input: string): string {
   if (input.length === 0) return "about:blank";
@@ -47,18 +56,19 @@ export class BrowserNavState {
 
 interface WebViewPaneOpenResult { id: string }
 
-export async function renderBrowserPane(paneId: string, initialUrl: string): Promise<HTMLElement> {
+export async function renderBrowserPane(paneId: string, initialUrl: string, userAgent?: string): Promise<HTMLElement> {
   const el = document.createElement("div");
   el.className = "browser-pane";
-  el.style.cssText = "display:flex;flex-direction:column;height:100%;background:#0d1117;color:#e6edf3;position:relative;overflow:hidden;";
+  el.tabIndex = 0;
+  el.style.cssText = "display:flex;flex-direction:column;height:100%;background:#0d1117;color:#e6edf3;position:relative;overflow:hidden;outline:none;";
 
   const chrome = document.createElement("div");
   chrome.style.cssText = "display:flex;align-items:center;gap:4px;padding:6px 8px;border-bottom:1px solid #21262d;background:#161b22;flex-shrink:0;";
   el.appendChild(chrome);
 
-  const backBtn = navButton("\u2190", "Back");
-  const fwdBtn = navButton("\u2192", "Forward");
-  const reloadBtn = navButton("\u21bb", "Reload");
+  const backBtn = navButton("←", "Back");
+  const fwdBtn = navButton("→", "Forward");
+  const reloadBtn = navButton("↻", "Reload");
   backBtn.style.opacity = "0.4";
   fwdBtn.style.opacity = "0.4";
   chrome.appendChild(backBtn);
@@ -67,7 +77,7 @@ export async function renderBrowserPane(paneId: string, initialUrl: string): Pro
 
   const urlBar = document.createElement("input");
   urlBar.type = "text";
-  urlBar.placeholder = "Enter URL or search\u2026";
+  urlBar.placeholder = "Enter URL or search…";
   urlBar.value = initialUrl;
   urlBar.style.cssText = "flex:1;min-width:0;padding:4px 10px;border:1px solid #30363d;border-radius:6px;background:#0d1117;color:#e6edf3;font-size:13px;outline:none;";
   chrome.appendChild(urlBar);
@@ -77,7 +87,10 @@ export async function renderBrowserPane(paneId: string, initialUrl: string): Pro
   securityGlyph.textContent = "";
   chrome.appendChild(securityGlyph);
 
-  const zoomOutBtn = navButton("\u2212", "Zoom out");
+  const findBtn = navButton("⌕", "Find in page");
+  chrome.appendChild(findBtn);
+
+  const zoomOutBtn = navButton("−", "Zoom out");
   const zoomResetBtn = navButton("100%", "Reset zoom");
   const zoomInBtn = navButton("+", "Zoom in");
   chrome.appendChild(zoomOutBtn);
@@ -87,31 +100,74 @@ export async function renderBrowserPane(paneId: string, initialUrl: string): Pro
   const devToolsBtn = navButton("Dev", "DevTools");
   chrome.appendChild(devToolsBtn);
 
+  const findState = new FindBarState();
+  const findBar = document.createElement("div");
+  findBar.style.cssText = "display:none;align-items:center;gap:6px;padding:5px 8px;border-bottom:1px solid #21262d;background:#12161c;flex-shrink:0;";
+  const findInput = document.createElement("input");
+  findInput.type = "text";
+  findInput.placeholder = "Find in page…";
+  findInput.style.cssText = "flex:1;min-width:0;padding:3px 8px;border:1px solid #30363d;border-radius:6px;background:#0d1117;color:#e6edf3;font-size:12px;outline:none;";
+  const findCounter = document.createElement("span");
+  findCounter.style.cssText = "font-size:11px;color:#8b949e;min-width:44px;text-align:center;flex-shrink:0;";
+  findCounter.textContent = "0/0";
+  const findPrevBtn = navButton("↑", "Previous match");
+  const findNextBtn = navButton("↓", "Next match");
+  const findCaseBtn = navButton("Aa", "Match case");
+  const findCloseBtn = navButton("✕", "Close");
+  findBar.appendChild(findInput);
+  findBar.appendChild(findCounter);
+  findBar.appendChild(findCaseBtn);
+  findBar.appendChild(findPrevBtn);
+  findBar.appendChild(findNextBtn);
+  findBar.appendChild(findCloseBtn);
+  el.appendChild(findBar);
+
   const titleBar = document.createElement("div");
   titleBar.style.cssText = "padding:2px 10px;font-size:11px;color:#6e7681;background:#161b22;border-bottom:1px solid #21262d;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
-  titleBar.textContent = "Loading\u2026";
+  titleBar.textContent = "Loading…";
   el.appendChild(titleBar);
 
+  const permBar = document.createElement("div");
+  permBar.style.cssText = "display:none;align-items:center;gap:10px;padding:8px 12px;background:#1f2733;border-bottom:1px solid #30363d;flex-shrink:0;font-size:12px;";
+  el.appendChild(permBar);
+
+  const downloadPromptBar = document.createElement("div");
+  downloadPromptBar.style.cssText = "display:none;align-items:center;gap:8px;padding:8px 12px;background:#1f2733;border-bottom:1px solid #30363d;flex-shrink:0;font-size:12px;";
+  el.appendChild(downloadPromptBar);
+
   const contentArea = document.createElement("div");
-  contentArea.style.cssText = "flex:1 1 0;min-height:0;position:relative;background:#fff;";
+  contentArea.style.cssText = "flex:1 1 0;min-width:0;min-height:0;position:relative;background:#fff;";
   contentArea.dataset.paneId = paneId;
   el.appendChild(contentArea);
+
+  const crashOverlay = document.createElement("div");
+  crashOverlay.style.cssText = "display:none;position:absolute;inset:0;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:#0d1117;color:#e6edf3;text-align:center;padding:24px;z-index:20;";
+  contentArea.appendChild(crashOverlay);
+
+  const downloadShelf = document.createElement("div");
+  downloadShelf.style.cssText = "display:none;flex-direction:column;gap:2px;max-height:140px;overflow-y:auto;padding:6px 8px;background:#161b22;border-top:1px solid #21262d;flex-shrink:0;";
+  el.appendChild(downloadShelf);
 
   const loadingBar = document.createElement("div");
   loadingBar.style.cssText = "position:absolute;top:0;left:0;right:0;height:2px;background:#34c2b0;transform-origin:left;transform:scaleX(0);transition:transform 0.2s;z-index:10;";
   el.appendChild(loadingBar);
 
   const nav = new BrowserNavState(initialUrl);
+  const crashState = new PaneCrashState();
+  const permQueue = new PermissionPromptQueue();
+  const permTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  const downloads = new DownloadShelfState();
   let webviewId: string | null = null;
   let zoomLevel = 1.0;
   let devToolsOpen = false;
+  let suspended = false;
 
   const updateChrome = () => {
     urlBar.value = nav.currentUrl;
     backBtn.style.opacity = nav.canGoBack ? "1" : "0.4";
     fwdBtn.style.opacity = nav.canGoForward ? "1" : "0.4";
-    if (nav.currentUrl.startsWith("https://")) securityGlyph.textContent = "\uD83D\uDD12";
-    else if (nav.currentUrl.startsWith("http://")) securityGlyph.textContent = "\u26A0";
+    if (nav.currentUrl.startsWith("https://")) securityGlyph.textContent = "🔒";
+    else if (nav.currentUrl.startsWith("http://")) securityGlyph.textContent = "⚠";
     else securityGlyph.textContent = "";
     zoomResetBtn.textContent = Math.round(zoomLevel * 100) + "%";
   };
@@ -121,7 +177,7 @@ export async function renderBrowserPane(paneId: string, initialUrl: string): Pro
   };
 
   const syncBounds = () => {
-    if (!webviewId) return;
+    if (!webviewId || crashState.isCrashed) return;
     const rect = contentArea.getBoundingClientRect();
     if (rect.width < 1 || rect.height < 1) return;
     void invoke("webviewPane.setBounds", { id: webviewId, x: Math.round(rect.x), y: Math.round(rect.y), width: Math.round(rect.width), height: Math.round(rect.height) }).catch(() => void 0);
@@ -129,7 +185,9 @@ export async function renderBrowserPane(paneId: string, initialUrl: string): Pro
 
   const openWebView = async (url: string) => {
     const storagePath = `/tmp/cove-webview-${paneId}`;
-    const result = await invoke<WebViewPaneOpenResult>("webviewPane.open", { url, x: 0, y: 0, width: 800, height: 600, storagePath, devTools: false, zoom: zoomLevel });
+    const openArgs: Record<string, unknown> = { url, x: 0, y: 0, width: 800, height: 600, storagePath, devTools: false, zoom: zoomLevel };
+    if (userAgent && userAgent.length > 0) openArgs.userAgent = userAgent;
+    const result = await invoke<WebViewPaneOpenResult>("webviewPane.open", openArgs);
     webviewId = result.id;
     browserWebviewRegistry.set(paneId, result.id);
     syncBounds();
@@ -183,6 +241,128 @@ export async function renderBrowserPane(paneId: string, initialUrl: string): Pro
     devToolsBtn.style.background = devToolsOpen ? "#34c2b0" : "";
   };
 
+  const renderFind = () => {
+    findBar.style.display = findState.open ? "flex" : "none";
+    findCounter.textContent = findState.counter;
+    findCaseBtn.style.background = findState.matchCase ? "#34c2b0" : "";
+  };
+
+  const runFind = async (forward: boolean) => {
+    if (!webviewId) return;
+    if (!findState.canSearch) {
+      await invoke("webviewPane.findStop", { id: webviewId, clearHighlights: true }).catch(() => void 0);
+      findState.applyResult({ matches: 0, activeIndex: 0 });
+      renderFind();
+      return;
+    }
+    const result = await invoke<FindResult>("webviewPane.find", { id: webviewId, text: findState.query, forward, matchCase: findState.matchCase }).catch(() => null);
+    if (result) findState.applyResult(result);
+    renderFind();
+  };
+
+  const runFindNext = async (forward: boolean) => {
+    if (!webviewId || !findState.canSearch) return;
+    const result = await invoke<FindResult>("webviewPane.findNext", { id: webviewId, forward }).catch(() => null);
+    if (result) findState.applyResult(result);
+    renderFind();
+  };
+
+  const openFind = () => {
+    findState.openBar();
+    renderFind();
+    findInput.value = findState.query;
+    findInput.focus();
+    findInput.select();
+  };
+
+  const closeFind = () => {
+    findState.closeBar();
+    renderFind();
+    if (webviewId) void invoke("webviewPane.findStop", { id: webviewId, clearHighlights: true }).catch(() => void 0);
+    el.focus();
+  };
+
+  const renderPermission = () => {
+    const active = permQueue.active;
+    if (!active) { permBar.style.display = "none"; permBar.replaceChildren(); return; }
+    permBar.style.display = "flex";
+    permBar.replaceChildren();
+    const label = document.createElement("span");
+    label.style.cssText = "flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;";
+    label.textContent = `${permissionOrigin(active.url)} wants: ${formatPermissionKinds(active.kinds)}`;
+    const allow = promptButton("Allow", "#238636");
+    const block = promptButton("Block", "#30363d");
+    allow.addEventListener("click", () => void resolvePermission(active.requestId, true));
+    block.addEventListener("click", () => void resolvePermission(active.requestId, false));
+    permBar.appendChild(label);
+    permBar.appendChild(block);
+    permBar.appendChild(allow);
+  };
+
+  const clearPermTimer = (requestId: string) => {
+    const t = permTimers.get(requestId);
+    if (t) { clearTimeout(t); permTimers.delete(requestId); }
+  };
+
+  const resolvePermission = async (requestId: string, grant: boolean) => {
+    if (!permQueue.has(requestId)) return;
+    clearPermTimer(requestId);
+    permQueue.remove(requestId);
+    renderPermission();
+    await invoke("webviewPane.resolvePermission", { requestId, grant }).catch(() => void 0);
+  };
+
+  const dismissPermissionOnTimeout = (requestId: string) => {
+    if (!permQueue.has(requestId)) return;
+    clearPermTimer(requestId);
+    permQueue.remove(requestId);
+    renderPermission();
+  };
+
+  const renderDownloadPrompt = () => {
+    const pending = downloads.prompts[0];
+    if (!pending) { downloadPromptBar.style.display = "none"; downloadPromptBar.replaceChildren(); return; }
+    downloadPromptBar.style.display = "flex";
+    downloadPromptBar.replaceChildren();
+    const label = document.createElement("span");
+    label.textContent = "Download";
+    label.style.cssText = "flex-shrink:0;color:#8b949e;";
+    const nameInput = document.createElement("input");
+    nameInput.type = "text";
+    nameInput.value = pending.suggestedName;
+    nameInput.style.cssText = "flex:1;min-width:0;padding:3px 8px;border:1px solid #30363d;border-radius:6px;background:#0d1117;color:#e6edf3;font-size:12px;outline:none;";
+    const allow = promptButton("Save", "#238636");
+    const deny = promptButton("Cancel", "#30363d");
+    allow.addEventListener("click", () => void resolveDownload(pending.downloadId, "allow", nameInput.value.trim() || pending.suggestedName));
+    deny.addEventListener("click", () => void resolveDownload(pending.downloadId, "deny", ""));
+    downloadPromptBar.appendChild(label);
+    downloadPromptBar.appendChild(nameInput);
+    downloadPromptBar.appendChild(deny);
+    downloadPromptBar.appendChild(allow);
+  };
+
+  const resolveDownload = async (downloadId: string, action: "allow" | "deny", filename: string) => {
+    const args: Record<string, unknown> = { downloadId, action };
+    if (action === "allow") {
+      const path = joinPath(browserDownloadsDir, filename);
+      downloads.allow(downloadId, browserDownloadsDir.length > 0 ? path : filename);
+      if (browserDownloadsDir.length > 0) args.path = path;
+    } else {
+      downloads.deny(downloadId);
+    }
+    renderDownloadPrompt();
+    renderDownloadShelf();
+    await invoke("webviewPane.resolveDownload", args).catch(() => void 0);
+  };
+
+  const renderDownloadShelf = () => {
+    const items = downloads.shelf;
+    if (items.length === 0) { downloadShelf.style.display = "none"; downloadShelf.replaceChildren(); return; }
+    downloadShelf.style.display = "flex";
+    downloadShelf.replaceChildren();
+    for (const item of items) downloadShelf.appendChild(downloadRow(item));
+  };
+
   backBtn.addEventListener("click", () => void doBack());
   fwdBtn.addEventListener("click", () => void doForward());
   reloadBtn.addEventListener("click", () => void doReload());
@@ -190,6 +370,27 @@ export async function renderBrowserPane(paneId: string, initialUrl: string): Pro
   zoomOutBtn.addEventListener("click", () => void setZoom(zoomLevel - 0.1));
   zoomResetBtn.addEventListener("click", () => void setZoom(1.0));
   devToolsBtn.addEventListener("click", () => void toggleDevTools());
+  findBtn.addEventListener("click", () => { if (findState.open) closeFind(); else openFind(); });
+
+  findInput.addEventListener("input", () => { findState.setQuery(findInput.value); void runFind(true); });
+  findInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); void runFindNext(!e.shiftKey); }
+    else if (e.key === "Escape") { e.preventDefault(); closeFind(); }
+  });
+  findPrevBtn.addEventListener("click", () => void runFindNext(false));
+  findNextBtn.addEventListener("click", () => void runFindNext(true));
+  findCaseBtn.addEventListener("click", () => { findState.toggleMatchCase(); renderFind(); void runFind(true); });
+  findCloseBtn.addEventListener("click", () => closeFind());
+
+  el.addEventListener("keydown", (e) => {
+    if ((e.metaKey || e.ctrlKey) && (e.key === "f" || e.key === "F")) {
+      e.preventDefault();
+      openFind();
+    } else if (e.key === "Escape" && findState.open) {
+      e.preventDefault();
+      closeFind();
+    }
+  });
 
   urlBar.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
@@ -199,16 +400,62 @@ export async function renderBrowserPane(paneId: string, initialUrl: string): Pro
     }
   });
 
+  const enterCrash = (reason: string | null) => {
+    if (!crashState.crash(reason)) return;
+    crashOverlay.replaceChildren();
+    const title = document.createElement("div");
+    title.style.cssText = "font-size:15px;font-weight:600;";
+    title.textContent = "This page crashed";
+    const detail = document.createElement("div");
+    detail.style.cssText = "font-size:12px;color:#8b949e;max-width:360px;";
+    detail.textContent = crashReasonText(reason);
+    const reloadCrashBtn = promptButton("Reload", "#238636");
+    reloadCrashBtn.addEventListener("click", () => void recoverFromCrash());
+    crashOverlay.appendChild(title);
+    crashOverlay.appendChild(detail);
+    crashOverlay.appendChild(reloadCrashBtn);
+    crashOverlay.style.display = "flex";
+    setLoading(false);
+    titleBar.textContent = "Crashed";
+  };
+
+  const recoverFromCrash = async () => {
+    if (!crashState.recover()) return;
+    crashOverlay.style.display = "none";
+    titleBar.textContent = "Loading…";
+    setLoading(true);
+    if (webviewId) await invoke("webviewPane.reloadFromCrash", { id: webviewId }).catch(() => void 0);
+    syncBounds();
+  };
+
+  const setSuspended = async (value: boolean) => {
+    if (suspended === value || !webviewId) return;
+    suspended = value;
+    await invoke("webviewPane.setSuspended", { id: webviewId, suspended: value }).catch(() => void 0);
+  };
+
+  const visObserver = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (entry.target !== el) continue;
+      const visible = entry.isIntersecting && entry.intersectionRatio > 0;
+      void setSuspended(!visible);
+    }
+  }, { threshold: 0 });
+  visObserver.observe(el);
+
   window.__ryn.on("webviewPane.navigated", (data: unknown) => {
     const evt = data as { id: string; url: string };
     if (evt.id !== webviewId) return;
     nav.navigate(evt.url);
     updateChrome();
+    findState.onNavigate();
+    renderFind();
   });
 
   window.__ryn.on("webviewPane.titleChanged", (data: unknown) => {
     const evt = data as { id: string; title: string };
     if (evt.id !== webviewId) return;
+    if (crashState.isCrashed) return;
     titleBar.textContent = evt.title;
   });
 
@@ -238,14 +485,83 @@ export async function renderBrowserPane(paneId: string, initialUrl: string): Pro
     titleBar.textContent = "Closed";
   });
 
+  window.__ryn.on("webviewPane.processTerminated", (data: unknown) => {
+    const evt = data as { id: string; reason?: string };
+    if (evt.id !== webviewId) return;
+    enterCrash(evt.reason ?? null);
+  });
+
+  window.__ryn.on("webviewPane.permissionRequested", (data: unknown) => {
+    const evt = data as { id: string; requestId: string; kinds: string[]; url: string };
+    if (evt.id !== webviewId) return;
+    const req: PermissionRequest = { requestId: evt.requestId, kinds: evt.kinds ?? [], url: evt.url ?? nav.currentUrl };
+    permQueue.add(req);
+    permTimers.set(req.requestId, setTimeout(() => dismissPermissionOnTimeout(req.requestId), permissionAutoDenyMs));
+    renderPermission();
+  });
+
+  window.__ryn.on("webviewPane.downloadRequested", (data: unknown) => {
+    const evt = data as { id: string; downloadId: string; url: string; suggestedName: string };
+    if (evt.id !== webviewId) return;
+    downloads.requested(evt.downloadId, evt.url, evt.suggestedName || "download");
+    renderDownloadPrompt();
+  });
+
+  window.__ryn.on("webviewPane.downloadProgress", (data: unknown) => {
+    const evt = data as { id: string; downloadId: string; receivedBytes: number; totalBytes: number };
+    if (evt.id !== webviewId) return;
+    downloads.progress(evt.downloadId, evt.receivedBytes ?? 0, evt.totalBytes ?? 0);
+    renderDownloadShelf();
+  });
+
+  window.__ryn.on("webviewPane.downloadCompleted", (data: unknown) => {
+    const evt = data as { id: string; downloadId: string; path?: string };
+    if (evt.id !== webviewId) return;
+    downloads.completed(evt.downloadId, evt.path);
+    renderDownloadShelf();
+  });
+
+  window.__ryn.on("webviewPane.downloadFailed", (data: unknown) => {
+    const evt = data as { id: string; downloadId: string; reason?: string };
+    if (evt.id !== webviewId) return;
+    downloads.failed(evt.downloadId, evt.reason ?? "download failed");
+    renderDownloadShelf();
+  });
+
   void openWebView(nav.currentUrl).then(() => {
     setLoading(true);
     void invoke("cove://commands/browser.open", { paneId, url: nav.currentUrl }).catch(() => void 0);
   });
 
   updateChrome();
+  renderFind();
 
   return el;
+}
+
+function downloadRow(item: DownloadItem): HTMLElement {
+  const row = document.createElement("div");
+  row.style.cssText = "display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:6px;background:#0d1117;font-size:12px;";
+  const name = document.createElement("span");
+  name.style.cssText = "flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
+  name.textContent = item.suggestedName;
+  const status = document.createElement("span");
+  status.style.cssText = "flex-shrink:0;color:#8b949e;";
+  const pct = downloadPercent(item);
+  if (item.state === "completed") status.textContent = "Done";
+  else if (item.state === "failed") { status.textContent = item.error ?? "Failed"; status.style.color = "#f85149"; }
+  else if (pct !== null) status.textContent = `${pct}%`;
+  else status.textContent = item.receivedBytes > 0 ? formatBytes(item.receivedBytes) : "Downloading…";
+  row.appendChild(name);
+  row.appendChild(status);
+  return row;
+}
+
+function promptButton(label: string, background: string): HTMLButtonElement {
+  const btn = document.createElement("button");
+  btn.textContent = label;
+  btn.style.cssText = `height:26px;padding:0 12px;border:1px solid #30363d;border-radius:6px;background:${background};color:#e6edf3;font-size:12px;cursor:pointer;flex-shrink:0;`;
+  return btn;
 }
 
 function navButton(label: string, title: string): HTMLButtonElement {

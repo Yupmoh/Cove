@@ -265,6 +265,14 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/browser.screenshot",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/browser.setUserAgent",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/browser.snapshot",
     "source": "core"
   },

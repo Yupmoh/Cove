@@ -143,6 +143,92 @@ public sealed class BrowserAutomationCommandsTests
     }
 
     [Fact]
+    public async Task Screenshot_NoBridge_FailsNotReady()
+    {
+        var ctx = new EngineDispatchContext(Req("cove://commands/browser.screenshot", "{\"paneId\":\"p1\"}"));
+
+        var resp = await BrowserAutomationCommands.Screenshot(ctx);
+
+        Assert.False(resp.Ok);
+        Assert.Equal("not_ready", resp.Error!.Code);
+    }
+
+    [Fact]
+    public async Task Screenshot_MissingPaneId_FailsInvalid()
+    {
+        var ctx = new EngineDispatchContext(Req("cove://commands/browser.screenshot", "{}"), browserAutomation: EchoBridge());
+
+        var resp = await BrowserAutomationCommands.Screenshot(ctx);
+
+        Assert.False(resp.Ok);
+        Assert.Equal("invalid_params", resp.Error!.Code);
+    }
+
+    [Fact]
+    public async Task Screenshot_RoundTrip_ReturnsGuiResult()
+    {
+        var ctx = new EngineDispatchContext(Req("cove://commands/browser.screenshot", "{\"paneId\":\"p1\"}"), browserAutomation: EchoBridge());
+
+        var resp = await BrowserAutomationCommands.Screenshot(ctx);
+
+        Assert.True(resp.Ok, resp.Error?.Message);
+        Assert.Equal("screenshot", resp.Data!.Value.GetProperty("kind").GetString());
+    }
+
+    [Fact]
+    public async Task Screenshot_NoGui_ReturnsAdrift()
+    {
+        var adrift = new BrowserAutomationBridge(_ => { }, NullLogger.Instance, TimeSpan.FromMilliseconds(60));
+        var ctx = new EngineDispatchContext(Req("cove://commands/browser.screenshot", "{\"paneId\":\"p1\"}"), browserAutomation: adrift);
+
+        var resp = await BrowserAutomationCommands.Screenshot(ctx);
+
+        Assert.False(resp.Ok);
+        Assert.Equal("adrift", resp.Error!.Code);
+    }
+
+    [Fact]
+    public async Task SetUserAgent_NoBridge_FailsNotReady()
+    {
+        var ctx = new EngineDispatchContext(Req("cove://commands/browser.setUserAgent", "{\"paneId\":\"p1\",\"userAgent\":\"UA\"}"));
+
+        var resp = await BrowserAutomationCommands.SetUserAgent(ctx);
+
+        Assert.False(resp.Ok);
+        Assert.Equal("not_ready", resp.Error!.Code);
+    }
+
+    [Fact]
+    public async Task SetUserAgent_MissingUserAgent_FailsInvalid()
+    {
+        var ctx = new EngineDispatchContext(Req("cove://commands/browser.setUserAgent", "{\"paneId\":\"p1\"}"), browserAutomation: EchoBridge());
+
+        var resp = await BrowserAutomationCommands.SetUserAgent(ctx);
+
+        Assert.False(resp.Ok);
+        Assert.Equal("invalid_params", resp.Error!.Code);
+    }
+
+    [Fact]
+    public async Task SetUserAgent_CarriesUserAgentValue()
+    {
+        BrowserAutomationExecEvent? emitted = null;
+        BrowserAutomationBridge? bridge = null;
+        bridge = new BrowserAutomationBridge(e =>
+        {
+            emitted = e;
+            Task.Run(() => bridge!.Complete(e.RequestId, "{\"ok\":true}"));
+        }, NullLogger.Instance, TimeSpan.FromSeconds(5));
+        var ctx = new EngineDispatchContext(Req("cove://commands/browser.setUserAgent", "{\"paneId\":\"p1\",\"userAgent\":\"CoveUA/1.0\"}"), browserAutomation: bridge);
+
+        var resp = await BrowserAutomationCommands.SetUserAgent(ctx);
+
+        Assert.True(resp.Ok, resp.Error?.Message);
+        Assert.Equal("setUserAgent", emitted!.Kind);
+        Assert.Equal("CoveUA/1.0", emitted.Value);
+    }
+
+    [Fact]
     public async Task Result_CompletesPending_AndRejectsUnknown()
     {
         var requestIdBox = new System.Threading.Tasks.TaskCompletionSource<string>();

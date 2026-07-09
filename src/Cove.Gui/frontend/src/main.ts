@@ -2358,6 +2358,12 @@ async function handleAutomationExec(ev: AutomationExecEvent): Promise<void> {
     const webviewId = browserWebviewRegistry.get(ev.paneId);
     if (!webviewId) {
       resultJson = JSON.stringify({ ok: false, error: `no live webview for pane ${ev.paneId}` });
+    } else if (ev.kind === "screenshot") {
+      const png = await invoke<string>("webviewPane.screenshot", { id: webviewId });
+      resultJson = JSON.stringify({ ok: true, png });
+    } else if (ev.kind === "setUserAgent") {
+      await invoke("webviewPane.setUserAgent", { id: webviewId, userAgent: ev.value ?? "" });
+      resultJson = JSON.stringify({ ok: true });
     } else {
       const js = buildAutomationJs(ev);
       const raw = await invoke<string>("webviewPane.eval", { id: webviewId, code: js });
