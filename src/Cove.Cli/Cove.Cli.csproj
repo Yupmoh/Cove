@@ -24,6 +24,10 @@
   <ItemGroup>
     <RuntimeHostConfigurationOption Include="System.IO.DisableFileLocking" Value="true" Trim="false" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="tools/rg/**" CopyToOutputDirectory="PreserveNewest" LinkBase="tools/rg" Condition="Exists('tools/rg')" />
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Cove.SourceGen/Cove.SourceGen.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   </ItemGroup>

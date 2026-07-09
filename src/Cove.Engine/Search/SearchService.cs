@@ -26,20 +26,39 @@ public sealed class SearchService
 
     public bool IsAvailable => !string.IsNullOrEmpty(_rgPath);
 
+    public static string RipgrepExecutableName() => OperatingSystem.IsWindows() ? "rg.exe" : "rg";
+
+    public static IReadOnlyList<string> BundledRipgrepCandidates(string baseDir, string rid)
+    {
+        var exe = RipgrepExecutableName();
+        var candidates = new List<string>();
+        if (!string.IsNullOrEmpty(rid))
+            candidates.Add(Path.Combine(baseDir, "tools", "rg", rid, exe));
+        candidates.Add(Path.Combine(baseDir, "tools", "rg", exe));
+        candidates.Add(Path.Combine(baseDir, exe));
+        return candidates;
+    }
+
     private static string FindRipgrep()
     {
+        foreach (var bundled in BundledRipgrepCandidates(AppContext.BaseDirectory, RuntimeIdentifier()))
+            if (File.Exists(bundled)) return bundled;
+
         var paths = new[] { "/opt/homebrew/bin/rg", "/usr/local/bin/rg", "/usr/bin/rg" };
         foreach (var p in paths)
             if (File.Exists(p)) return p;
 
+        var exe = RipgrepExecutableName();
         var envPath = Environment.GetEnvironmentVariable("PATH") ?? "";
         foreach (var dir in envPath.Split(Path.PathSeparator))
         {
-            var candidate = Path.Combine(dir.Trim(), "rg");
+            var candidate = Path.Combine(dir.Trim(), exe);
             if (File.Exists(candidate)) return candidate;
         }
         return "";
     }
+
+    private static string RuntimeIdentifier() => System.Runtime.InteropServices.RuntimeInformation.RuntimeIdentifier;
 
     public async Task<SearchResult> SearchAsync(SearchParams parameters, CancellationToken ct = default)
     {
