@@ -1,5 +1,7 @@
 import { invoke } from "./invoke";
 
+export const browserWebviewRegistry = new Map<string, string>();
+
 export function normalizeUrl(input: string): string {
   if (input.length === 0) return "about:blank";
   if (/^[a-z][a-z0-9+.-]*:\/\//i.test(input)) return input;
@@ -129,6 +131,7 @@ export async function renderBrowserPane(paneId: string, initialUrl: string): Pro
     const storagePath = `/tmp/cove-webview-${paneId}`;
     const result = await invoke<WebViewPaneOpenResult>("webviewPane.open", { url, x: 0, y: 0, width: 800, height: 600, storagePath, devTools: false, zoom: zoomLevel });
     webviewId = result.id;
+    browserWebviewRegistry.set(paneId, result.id);
     syncBounds();
     const ro = new ResizeObserver(() => syncBounds());
     ro.observe(contentArea);

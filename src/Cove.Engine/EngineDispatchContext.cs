@@ -70,7 +70,8 @@ public sealed class EngineDispatchContext
         Cove.Engine.Workspaces.GitReadModel? gitReadModel = null,
         Cove.Engine.Search.SearchService? searchService = null,
         Cove.Engine.Theming.ThemeService? themes = null,
-        Cove.Engine.Keybindings.KeybindingEngine? keybindings = null)
+        Cove.Engine.Keybindings.KeybindingEngine? keybindings = null,
+        Cove.Engine.Browser.BrowserAutomationBridge? browserAutomation = null)
     {
         Request = request;
         Panes = panes;
@@ -121,6 +122,7 @@ public sealed class EngineDispatchContext
         SearchService = searchService;
         Themes = themes;
         Keybindings = keybindings;
+        BrowserAutomation = browserAutomation;
     }
 
     public ControlRequest Request { get; }
@@ -172,6 +174,7 @@ public sealed class EngineDispatchContext
     public Cove.Engine.Theming.ThemeService? Themes { get; }
     public Cove.Engine.Keybindings.KeybindingEngine? Keybindings { get; }
     public Cove.Engine.Search.SearchService? SearchService { get; }
+    public Cove.Engine.Browser.BrowserAutomationBridge? BrowserAutomation { get; }
     public System.Func<ControlRequest, System.Threading.Tasks.Task<ControlResponse?>>? Redrive { get; set; }
 
     public ControlResponse Ok<T>(T data, JsonTypeInfo<T> typeInfo)

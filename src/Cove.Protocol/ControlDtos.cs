@@ -361,6 +361,12 @@ public sealed record BrowserNavigateParams(string PaneId, string Url);
 public sealed record BrowserPaneRefParams(string PaneId);
 public sealed record BrowserPaneDto(string PaneId, string CurrentUrl, System.Collections.Generic.IReadOnlyList<string> History, int HistoryIndex, bool CanGoBack, bool CanGoForward);
 public sealed record BrowserCreateParams(string Url, string? Title = null, string? WorkspaceId = null);
+public sealed record BrowserAutomationExecEvent(string RequestId, string PaneId, string Kind, string? Ref = null, string? Value = null, string? Js = null);
+public sealed record BrowserAutomationResultParams(string RequestId, string ResultJson);
+public sealed record BrowserAutomationSnapshotParams(string PaneId);
+public sealed record BrowserAutomationClickParams(string PaneId, string Ref);
+public sealed record BrowserAutomationFillParams(string PaneId, string Ref, string Value);
+public sealed record BrowserAutomationEvalParams(string PaneId, string Js);
 public sealed record ReviewAddCommentParams(string CommitSha, string FilePath, int Line, string Author, string Body, string? ParentId);
 public sealed record ReviewListCommentsParams(string CommitSha, string? FilePath, string? State);
 public sealed record ReviewTransitionParams(string CommentId, string Actor);
@@ -635,6 +641,12 @@ public sealed record ReviewDispatchResultDto(string DispatchId, string TargetPan
 [JsonSerializable(typeof(BrowserPaneRefParams))]
 [JsonSerializable(typeof(BrowserPaneDto))]
 [JsonSerializable(typeof(BrowserCreateParams))]
+[JsonSerializable(typeof(BrowserAutomationExecEvent))]
+[JsonSerializable(typeof(BrowserAutomationResultParams))]
+[JsonSerializable(typeof(BrowserAutomationSnapshotParams))]
+[JsonSerializable(typeof(BrowserAutomationClickParams))]
+[JsonSerializable(typeof(BrowserAutomationFillParams))]
+[JsonSerializable(typeof(BrowserAutomationEvalParams))]
 [JsonSerializable(typeof(ReviewAddCommentParams))]
 [JsonSerializable(typeof(ReviewListCommentsParams))]
 [JsonSerializable(typeof(ReviewTransitionParams))]

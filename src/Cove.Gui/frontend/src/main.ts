@@ -20,7 +20,8 @@ import { renderDiffReviewPane } from "./diff-review-pane";
 import { renderEditorPane } from "./editor-pane";
 import { renderSourceControlPane } from "./source-control-pane";
 import { renderSearchPane } from "./search-pane";
-import { renderBrowserPane } from "./browser-pane";
+import { browserWebviewRegistry, renderBrowserPane } from "./browser-pane";
+import { buildAutomationJs, type AutomationExecEvent } from "./automation-snapshot";
 import { renderDiffViewerPane } from "./diff-viewer-pane";
 import { renderMarkdownPane } from "./markdown-pane";
 import { partitionPinned, togglePin, reorderRoom, buildMiniDiagram, accentForPaneType, visibleRoomIds, buildWingModel, filterRoomsByWing, type MiniDiagramNode } from "./room-tabs";
@@ -2323,14 +2324,41 @@ function setupBadge(): void {
 }
 
 window.__ryn.on("engine.event", (data: unknown) => {
-  const evt = data as { channel?: string; payload?: { key?: string } };
-  if (evt?.channel === "config.changed" && evt.payload?.key) {
-    const key = evt.payload.key;
-    if (key.startsWith("appearance.")) { void applyAppearance(key); }
-    if (key.startsWith("terminal.")) { void loadSettings().then((s) => { settings = s; applySettings(); }); }
-    if (settingsEl.classList.contains("open")) { renderSettings(); }
+  const evt = data as { channel?: string; payload?: unknown };
+  if (evt?.channel === "config.changed") {
+    const key = (evt.payload as { key?: string } | undefined)?.key;
+    if (key) {
+      if (key.startsWith("appearance.")) { void applyAppearance(key); }
+      if (key.startsWith("terminal.")) { void loadSettings().then((s) => { settings = s; applySettings(); }); }
+      if (settingsEl.classList.contains("open")) { renderSettings(); }
+    }
+  }
+  if (evt?.channel === "browser.automation.exec") {
+    void handleAutomationExec(evt.payload as AutomationExecEvent);
   }
 });
+
+async function handleAutomationExec(ev: AutomationExecEvent): Promise<void> {
+  if (!ev?.requestId) return;
+  let resultJson: string;
+  try {
+    const webviewId = browserWebviewRegistry.get(ev.paneId);
+    if (!webviewId) {
+      resultJson = JSON.stringify({ ok: false, error: `no live webview for pane ${ev.paneId}` });
+    } else {
+      const js = buildAutomationJs(ev);
+      const raw = await invoke<string>("webviewPane.eval", { id: webviewId, code: js });
+      resultJson = typeof raw === "string" && raw.length > 0 ? raw : JSON.stringify({ ok: true });
+    }
+  } catch (e) {
+    resultJson = JSON.stringify({ ok: false, error: (e as Error).message });
+  }
+  try {
+    await invoke("cove://commands/browser.automation.result", { requestId: ev.requestId, resultJson });
+  } catch (e) {
+    console.warn("automation result post failed", e);
+  }
+}
 
 const notepadSidebarEl = document.getElementById("notepad-sidebar")!;
 const nsBodyEl = document.getElementById("ns-body")!;

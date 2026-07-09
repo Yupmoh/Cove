@@ -59,13 +59,18 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/attribution.record` | core |  |
 | `cove://commands/blackboard.post` | core |  |
 | `cove://commands/blackboard.show` | core |  |
+| `cove://commands/browser.automation.result` | core |  |
 | `cove://commands/browser.back` | core |  |
+| `cove://commands/browser.click` | core |  |
 | `cove://commands/browser.close` | core |  |
 | `cove://commands/browser.create` | core |  |
+| `cove://commands/browser.eval` | core |  |
+| `cove://commands/browser.fill` | core |  |
 | `cove://commands/browser.forward` | core |  |
 | `cove://commands/browser.navigate` | core |  |
 | `cove://commands/browser.open` | core |  |
 | `cove://commands/browser.reload` | core |  |
+| `cove://commands/browser.snapshot` | core |  |
 | `cove://commands/canvas.action` | core |  |
 | `cove://commands/capture.attach` | core |  |
 | `cove://commands/capture.delete` | core |  |
@@ -421,4 +426,4 @@ Generated from the command registry. Do not edit by hand.
 | `viewer get-state` | cli |  |
 | `viewer open` | cli |  |
 
-Total: 416 commands
+Total: 421 commands

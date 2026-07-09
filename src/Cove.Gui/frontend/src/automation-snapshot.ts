@@ -138,3 +138,28 @@ export function buildFillEvalPayload(ref: string, value: string): string {
     " el.dispatchEvent(new Event('change', { bubbles: true }));" +
     " return JSON.stringify({ ok: true }); })()";
 }
+
+export interface AutomationExecEvent {
+  requestId: string;
+  paneId: string;
+  kind: string;
+  ref?: string | null;
+  value?: string | null;
+  js?: string | null;
+}
+
+export function buildAutomationJs(ev: AutomationExecEvent): string {
+  switch (ev.kind) {
+    case "snapshot":
+      return buildSnapshotEvalPayload();
+    case "click":
+      return buildClickEvalPayload(ev.ref ?? "");
+    case "fill":
+      return buildFillEvalPayload(ev.ref ?? "", ev.value ?? "");
+    case "eval":
+      if (!ev.js) throw new Error("eval action requires js");
+      return ev.js;
+    default:
+      throw new Error(`unknown automation kind: ${ev.kind}`);
+  }
+}

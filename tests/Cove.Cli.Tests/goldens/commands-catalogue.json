@@ -221,7 +221,15 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/browser.automation.result",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/browser.back",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/browser.click",
     "source": "core"
   },
   {
@@ -230,6 +238,14 @@
   },
   {
     "command": "cove://commands/browser.create",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/browser.eval",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/browser.fill",
     "source": "core"
   },
   {
@@ -246,6 +262,10 @@
   },
   {
     "command": "cove://commands/browser.reload",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/browser.snapshot",
     "source": "core"
   },
   {
