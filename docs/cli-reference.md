@@ -185,6 +185,7 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/scm.status` | core |  |
 | `cove://commands/search.get-state` | core |  |
 | `cove://commands/search.query` | core |  |
+| `cove://commands/search.replace` | core |  |
 | `cove://commands/search.set-state` | core |  |
 | `cove://commands/session.background` | core |  |
 | `cove://commands/session.dismiss` | core |  |
@@ -407,4 +408,4 @@ Generated from the command registry. Do not edit by hand.
 | `viewer get-state` | cli |  |
 | `viewer open` | cli |  |
 
-Total: 402 commands
+Total: 403 commands

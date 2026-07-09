@@ -733,6 +733,10 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/search.replace",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/search.set-state",
     "source": "core"
   },
