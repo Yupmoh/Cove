@@ -22,6 +22,7 @@ import { renderSourceControlPane } from "./source-control-pane";
 import { renderSearchPane } from "./search-pane";
 import { renderBrowserPane } from "./browser-pane";
 import { renderDiffViewerPane } from "./diff-viewer-pane";
+import { renderMarkdownPane } from "./markdown-pane";
 
 const CREDIT_THRESHOLD = 131072;
 
@@ -661,6 +662,17 @@ function renderDiffViewerPaneWrapper(paneId: string, refInput: string): HTMLElem
   });
   return placeholder;
 }
+function renderMarkdownPaneWrapper(paneId: string): HTMLElement {
+  const placeholder = document.createElement("div");
+  placeholder.className = "markdown-pane-placeholder";
+  placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
+  renderMarkdownPane(paneId, paneId).then(el => {
+    placeholder.replaceWith(el);
+  }).catch(e => {
+    placeholder.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to load markdown: ${(e as Error).message}</div>`;
+  });
+  return placeholder;
+}
 function renderNode(node: MosaicNode): HTMLElement {
   if (node.kind === "leaf") {
     const subs = node.subtabs.length > 0 ? node.subtabs : [{ documentId: node.paneId, paneType: "terminal", title: null }];
@@ -675,6 +687,7 @@ function renderNode(node: MosaicNode): HTMLElement {
     if (active.paneType === "note-sketch") return renderSketchNotePane(active.documentId);
     if (active.paneType === "note-canvas") return renderCanvasNotePane(active.documentId);
     if (active.paneType === "note-html") return renderHtmlNotePane(active.documentId);
+    if (active.paneType === "markdown") return renderMarkdownPaneWrapper(active.documentId);
     if (active.paneType === "notepad") return renderNotepadPaneWrapper(active.documentId);
     if (active.paneType === "note-mermaid") return renderMermaidNotePane(active.documentId);
     if (active.paneType === "session-picker") return renderSessionPickerPane(active.documentId);

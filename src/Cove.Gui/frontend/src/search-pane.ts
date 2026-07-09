@@ -68,6 +68,19 @@ export async function renderSearchPane(workspaceId: string): Promise<HTMLElement
   globRow.appendChild(includeInput);
   globRow.appendChild(excludeInput);
   searchBox.appendChild(globRow);
+
+  const replaceRow = document.createElement("div");
+  replaceRow.style.cssText = "display:flex;gap:4px;margin-top:4px;";
+  const replaceInput = document.createElement("input");
+  replaceInput.type = "text";
+  replaceInput.placeholder = "Replace with...";
+  replaceInput.style.cssText = "flex:1;padding:4px 8px;background:#161b22;border:1px solid #30363d;border-radius:3px;color:#e6edf3;font-size:11px;";
+  replaceRow.appendChild(replaceInput);
+  const replaceBtn = document.createElement("button");
+  replaceBtn.textContent = "Replace All";
+  replaceBtn.style.cssText = "padding:4px 10px;background:#1f6feb;border:none;color:#fff;border-radius:3px;font-size:11px;cursor:pointer;";
+  replaceRow.appendChild(replaceBtn);
+  searchBox.appendChild(replaceRow);
   el.appendChild(searchBox);
 
   const resultsEl = document.createElement("div");
@@ -95,6 +108,43 @@ export async function renderSearchPane(workspaceId: string): Promise<HTMLElement
       resultsEl.innerHTML = `<div style="padding:20px;color:#f85149;">Search failed: ${(e as Error).message}</div>`;
     }
   };
+
+  const doReplace = async () => {
+    const query = input.value.trim();
+    const replacement = replaceInput.value;
+    if (!query) return;
+    try {
+      const searchResult = await invoke<SearchResult>("cove://commands/search.query", {
+        query,
+        path: workspaceId,
+        regex: regexToggle.value,
+        wholeWord: wordToggle.value,
+        caseInsensitive: !caseToggle.value,
+        includeGlob: includeInput.value || null,
+        excludeGlob: excludeInput.value || null,
+      });
+      const files = [...new Set(searchResult.matches.map((m) => m.filePath))];
+      if (files.length === 0) {
+        resultsEl.innerHTML = `<div style="padding:20px;color:#6e7681;font-size:13px;">No matches to replace.</div>`;
+        return;
+      }
+      const replaceResult = await invoke<{ results: { filePath: string; replacements: number; saved: boolean }[] }>("cove://commands/search.replace", {
+        search: query,
+        replacement,
+        files,
+        regex: regexToggle.value,
+        wholeWord: wordToggle.value,
+        caseInsensitive: !caseToggle.value,
+      });
+      const changed = replaceResult.results.filter((r) => r.saved).length;
+      resultsEl.innerHTML = `<div style="padding:20px;color:#3fb950;font-size:13px;">Replaced in ${changed} file(s).</div>`;
+    } catch (e) {
+      resultsEl.innerHTML = `<div style="padding:20px;color:#f85149;">Replace failed: ${(e as Error).message}</div>`;
+    }
+    await doSearch();
+  };
+
+  replaceBtn.addEventListener("click", doReplace);
 
   searchBtn.addEventListener("click", doSearch);
   input.addEventListener("keydown", (e) => {
