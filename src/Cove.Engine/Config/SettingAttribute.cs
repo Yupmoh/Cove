@@ -7,16 +7,16 @@ public sealed class SettingAttribute(string label, string tab, string control = 
     public string Tab { get; } = tab;
     public string Control { get; } = control;
     public string? Description { get; } = description;
+    public string[]? Options { get; set; }
 }
-
-public sealed record ConfigSchemaEntry(string Key, string Label, string Tab, string Control, string? Description, string Type);
+public sealed record ConfigSchemaEntry(string Key, string Label, string Tab, string Control, string? Description, string Type, string[]? Options = null);
 
 public static class ConfigSchemaGenerator
 {
     public static IReadOnlyList<ConfigSchemaEntry> Generate()
     {
         return Cove.Generated.CoveSettingSchema.Entries
-            .Select(e => new ConfigSchemaEntry(e.Key, e.Label, e.Tab, e.Control, e.Description, e.Type))
+            .Select(e => new ConfigSchemaEntry(e.Key, e.Label, e.Tab, e.Control, e.Description, e.Type, e.Options))
             .ToList();
     }
 

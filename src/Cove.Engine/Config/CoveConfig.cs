@@ -32,7 +32,7 @@ internal static class ConfigValueCoercion
 
 public sealed class CoveConfig
 {
-    [Setting("Theme", "appearance", "select", "Active theme name")]
+    [Setting("Theme", "appearance", "select", "Active theme name", Options = new[] { "cove-harbor", "cove-daybreak", "cove-midnight", "cove-shoal", "cove-beacon", "cove-chalk" })]
     public string Theme { get; set; } = "cove";
 
     [Setting("Terminal", "terminal", "section", "Terminal settings")]
@@ -262,7 +262,7 @@ public sealed class TerminalSection
     public double LetterSpacing { get; set; } = 0.0;
     [Setting("Font Ligatures", "terminal", "toggle", "Enable font ligatures")]
     public bool FontLigatures { get; set; } = false;
-    [Setting("Cursor Style", "terminal", "select", "Cursor style")]
+    [Setting("Cursor Style", "terminal", "select", "Cursor style", Options = new[] { "block", "bar", "underline" })]
     public string CursorStyle { get; set; } = "block";
     [Setting("Cursor Blink", "terminal", "toggle", "Cursor blink")]
     public bool CursorBlink { get; set; } = true;
@@ -319,7 +319,7 @@ public sealed class MarkdownEditorSection
     public string DefaultFont { get; set; } = "Default";
     [Setting("Font Size", "terminal", "number", "Markdown editor font size")]
     public int FontSize { get; set; } = 14;
-    [Setting("Text Align", "terminal", "select", "Text alignment")]
+    [Setting("Text Align", "terminal", "select", "Text alignment", Options = new[] { "left", "center", "right" })]
     public string TextAlign { get; set; } = "left";
     [Setting("Book View", "terminal", "toggle", "Enable book view")]
     public bool BookView { get; set; } = false;
@@ -327,7 +327,7 @@ public sealed class MarkdownEditorSection
     public string BookViewWidth { get; set; } = "5.5in";
     [Setting("Book View Margin", "terminal", "text", "Book view margin")]
     public string BookViewMargin { get; set; } = "0.5in";
-    [Setting("Default View Mode", "terminal", "select", "Default view mode")]
+    [Setting("Default View Mode", "terminal", "select", "Default view mode", Options = new[] { "rte", "source" })]
     public string DefaultViewMode { get; set; } = "rte";
     [Setting("Image Paste Folder", "terminal", "text", "Folder for pasted images")]
     public string ImagePasteFolder { get; set; } = "media";
@@ -376,7 +376,7 @@ public sealed class UpdatesSection
     public bool AutoInstall { get; set; } = false;
     [Setting("Auto Update Adapters", "updates", "toggle", "Automatically update adapters")]
     public bool AutoUpdateAdapters { get; set; } = true;
-    [Setting("Channel", "updates", "select", "Update channel")]
+    [Setting("Channel", "updates", "select", "Update channel", Options = new[] { "stable", "beta", "dev" })]
     public string Channel { get; set; } = "stable";
     [Setting("Check Interval", "updates", "number", "Check interval in hours")]
     public int CheckIntervalHours { get; set; } = 24;

@@ -1527,7 +1527,7 @@ const settingsEl = document.getElementById("settings")!;
 const setTabsEl = document.getElementById("set-tabs")!;
 const setBodyEl = document.getElementById("set-body")!;
 
-interface ConfigSchemaEntry { key: string; label: string; tab: string; control: string; description: string | null; type: string; }
+interface ConfigSchemaEntry { key: string; label: string; tab: string; control: string; description: string | null; type: string; options: string[] | null; }
 let configSchema: ConfigSchemaEntry[] = [];
 let activeSettingsTab: string | null = null;
 
@@ -1575,6 +1575,14 @@ function renderSettings(): void {
   setBodyEl.innerHTML = "";
   const entries = configSchema.filter((e) => e.tab === activeSettingsTab);
   for (const entry of entries) {
+    if (entry.control === "section") {
+      const header = document.createElement("div");
+      header.className = "set-section-header";
+      header.style.cssText = "padding:12px 0 4px;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border);";
+      header.textContent = entry.label;
+      setBodyEl.appendChild(header);
+      continue;
+    }
     const row = document.createElement("div");
     row.className = "set-row";
     const label = document.createElement("label");
@@ -1607,17 +1615,27 @@ async function loadSettingValue(entry: ConfigSchemaEntry, row: HTMLElement): Pro
 }
 
 function createSettingControl(entry: ConfigSchemaEntry, value: string): HTMLInputElement | HTMLSelectElement {
-  if (entry.control === "select" || entry.type === "Boolean") {
+  if (entry.control === "select" && entry.options && entry.options.length > 0) {
     const select = document.createElement("select");
-    if (entry.type === "Boolean") {
-      const t = document.createElement("option"); t.value = "true"; t.textContent = "On"; select.appendChild(t);
-      const f = document.createElement("option"); f.value = "false"; f.textContent = "Off"; select.appendChild(f);
-      select.value = value === "true" ? "true" : "false";
+    for (const opt of entry.options) {
+      const o = document.createElement("option");
+      o.value = opt;
+      o.textContent = opt;
+      select.appendChild(o);
     }
+    select.value = value;
+    select.style.cssText = "width:140px;";
+    return select;
+  }
+  if (entry.type === "bool" || entry.control === "toggle") {
+    const select = document.createElement("select");
+    const t = document.createElement("option"); t.value = "true"; t.textContent = "On"; select.appendChild(t);
+    const f = document.createElement("option"); f.value = "false"; f.textContent = "Off"; select.appendChild(f);
+    select.value = value === "true" ? "true" : "false";
     select.style.cssText = "width:120px;";
     return select;
   }
-  if (entry.type === "Int32" || entry.type === "Double") {
+  if (entry.type === "int" || entry.type === "double") {
     const input = document.createElement("input");
     input.type = "number";
     input.value = value;

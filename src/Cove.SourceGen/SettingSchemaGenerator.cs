@@ -32,9 +32,16 @@ public sealed class SettingSchemaGenerator : IIncrementalGenerator
         var tab = attr.ConstructorArguments[1].Value as string;
         var control = attr.ConstructorArguments.Length >= 3 ? attr.ConstructorArguments[2].Value as string ?? "text" : "text";
         string? description = null;
+        string[]? options = null;
         foreach (var na in attr.NamedArguments)
         {
             if (na.Key == "Description" && na.Value.Value is string d) description = d;
+            if (na.Key == "Options" && na.Value.Values is { } vals)
+            {
+                var list = new System.Collections.Generic.List<string>();
+                foreach (var v in vals) if (v.Value is string s) list.Add(s);
+                options = list.Count > 0 ? list.ToArray() : null;
+            }
         }
 
         var containingType = prop.ContainingType;
@@ -53,7 +60,7 @@ public sealed class SettingSchemaGenerator : IIncrementalGenerator
             _ => "object"
         };
 
-        return new SettingModel(configKey, label!, tab!, control, description, typeShort);
+        return new SettingModel(configKey, label!, tab!, control, description, typeShort, options);
     }
 
     private static string ResolveConfigKey(string sectionName, string propertyName)
@@ -94,7 +101,7 @@ public sealed class SettingSchemaGenerator : IIncrementalGenerator
         sb.AppendLine("#nullable enable");
         sb.AppendLine("namespace Cove.Generated;");
         sb.AppendLine();
-        sb.AppendLine("public sealed record SettingSchemaEntry(string Key, string Label, string Tab, string Control, string? Description, string Type);");
+        sb.AppendLine("public sealed record SettingSchemaEntry(string Key, string Label, string Tab, string Control, string? Description, string Type, string[]? Options);");
         sb.AppendLine();
         sb.AppendLine("public static class CoveSettingSchema");
         sb.AppendLine("{");
@@ -102,7 +109,10 @@ public sealed class SettingSchemaGenerator : IIncrementalGenerator
         sb.AppendLine("    {");
         foreach (var s in ordered)
         {
-            sb.AppendLine($"        new SettingSchemaEntry(\"{s.Key}\", \"{s.Label}\", \"{s.Tab}\", \"{s.Control}\", {(s.Description is null ? "null" : $"\"{s.Description}\"")}, \"{s.Type}\"),");
+            var optionsExpr = s.Options is null || s.Options.Length == 0
+                ? "null"
+                : "new string[] { " + string.Join(", ", s.Options.Select(o => $"\"{o}\"")) + " }";
+            sb.AppendLine($"        new SettingSchemaEntry(\"{s.Key}\", \"{s.Label}\", \"{s.Tab}\", \"{s.Control}\", {(s.Description is null ? "null" : $"\"{s.Description}\"")}, \"{s.Type}\", {optionsExpr}),");
         }
         sb.AppendLine("    };");
         sb.AppendLine("}");
@@ -117,9 +127,10 @@ public sealed class SettingSchemaGenerator : IIncrementalGenerator
         public readonly string Control;
         public readonly string? Description;
         public readonly string Type;
-        public SettingModel(string key, string label, string tab, string control, string? description, string type)
+        public readonly string[]? Options;
+        public SettingModel(string key, string label, string tab, string control, string? description, string type, string[]? options = null)
         {
-            Key = key; Label = label; Tab = tab; Control = control; Description = description; Type = type;
+            Key = key; Label = label; Tab = tab; Control = control; Description = description; Type = type; Options = options;
         }
     }
 }

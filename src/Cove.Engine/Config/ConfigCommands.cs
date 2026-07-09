@@ -34,7 +34,7 @@ internal static class ConfigCommands
     public static Task<ControlResponse> ConfigSchema(EngineDispatchContext ctx)
     {
         var entries = Cove.Engine.Config.ConfigSchemaGenerator.Generate()
-            .Select(e => new ConfigSchemaEntryDto(e.Key, e.Label, e.Tab, e.Control, e.Description, e.Type))
+            .Select(e => new ConfigSchemaEntryDto(e.Key, e.Label, e.Tab, e.Control, e.Description, e.Type, e.Options))
             .ToList();
         return Task.FromResult(ctx.Ok(new ConfigSchemaResult(entries), Cove.Protocol.CoveJsonContext.Default.ConfigSchemaResult));
     }
