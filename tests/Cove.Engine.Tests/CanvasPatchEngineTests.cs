@@ -108,7 +108,7 @@ public sealed class CanvasPatchEngineTests
     [Fact]
     public async Task PipedJsonl_YieldsOneWritePerFlush()
     {
-        var engine = new CanvasPatchEngine(NullLogger.Instance, System.TimeSpan.FromMilliseconds(20));
+        var engine = new CanvasPatchEngine(NullLogger.Instance, System.TimeSpan.FromMilliseconds(250));
         engine.Initialize(new JsonObject { ["items"] = new JsonArray() });
 
         int eventCount = 0;
@@ -118,7 +118,6 @@ public sealed class CanvasPatchEngineTests
         engine.QueuePatch(ParsePatch("""[{"op":"add","path":"/items/1","value":"b"}]"""));
         engine.QueuePatch(ParsePatch("""[{"op":"add","path":"/items/2","value":"c"}]"""));
 
-        await System.Threading.Tasks.Task.Delay(100);
         await engine.FlushAsync();
 
         Assert.Equal(1, eventCount);

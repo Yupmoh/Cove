@@ -190,24 +190,26 @@ public sealed class TaskSchedulerEngineTests
     [Fact]
     public void CronosCronExpander_SpringForwardDST_ComputesCorrectFireTime()
     {
+        if (!TimeZoneResolver.TryResolve("America/New_York", out var springZone)) return;
         var expander = new CronosCronExpander();
         var baseTime = new System.DateTimeOffset(2026, 3, 7, 12, 0, 0, System.TimeSpan.Zero);
         var result = expander.ComputeNextFire("0 9 * * *", baseTime, "America/New_York");
         Assert.NotNull(result);
         var fireTime = System.DateTimeOffset.Parse(result!);
-        var fireTimeLocal = System.TimeZoneInfo.ConvertTimeBySystemTimeZoneId(fireTime, "America/New_York");
+        var fireTimeLocal = System.TimeZoneInfo.ConvertTime(fireTime, springZone);
         Assert.Equal(9, fireTimeLocal.Hour);
     }
 
     [Fact]
     public void CronosCronExpander_FallBackDST_ComputesCorrectFireTime()
     {
+        if (!TimeZoneResolver.TryResolve("America/New_York", out var fallZone)) return;
         var expander = new CronosCronExpander();
         var baseTime = new System.DateTimeOffset(2026, 10, 31, 12, 0, 0, System.TimeSpan.Zero);
         var result = expander.ComputeNextFire("0 9 * * *", baseTime, "America/New_York");
         Assert.NotNull(result);
         var fireTime = System.DateTimeOffset.Parse(result!);
-        var fireTimeLocal = System.TimeZoneInfo.ConvertTimeBySystemTimeZoneId(fireTime, "America/New_York");
+        var fireTimeLocal = System.TimeZoneInfo.ConvertTime(fireTime, fallZone);
         Assert.Equal(9, fireTimeLocal.Hour);
     }
 

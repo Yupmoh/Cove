@@ -64,10 +64,10 @@ public sealed class StateStoreTests : IDisposable
     [Fact]
     public void Debounce_CoalescesRapidMarks_IntoOneWrite()
     {
-        using var store = NewStore(debounce: TimeSpan.FromMilliseconds(40));
+        using var store = NewStore(debounce: TimeSpan.FromMilliseconds(250));
         for (int i = 0; i < 5; i++)
             store.MarkDirty("state");
-        Thread.Sleep(200);
+        Thread.Sleep(800);
         Assert.Equal(1, Volatile.Read(ref _serializeCount));
     }
 

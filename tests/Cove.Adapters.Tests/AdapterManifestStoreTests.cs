@@ -133,7 +133,7 @@ public sealed class AdapterManifestStoreTests
 
         var dir = store.ResolveDir("claude-code");
 
-        Assert.Equal(Path.Combine("/fake", "root", "claude-code"), dir);
+        Assert.Equal(Path.Combine("/fake/root", "claude-code"), dir);
     }
 
     [Fact]
