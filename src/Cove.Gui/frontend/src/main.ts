@@ -1155,10 +1155,105 @@ window.addEventListener("keydown", (e) => {
 }, true);
 
 window.addEventListener("resize", () => fitAll());
+function setupMenuBar(): void {
+  const menu = [
+    { role: "appMenu" },
+    {
+      label: "File",
+      items: [
+        { id: "new-room", label: "New Room", accelerator: "CmdOrCtrl+T" },
+        { separator: true },
+        { id: "close-pane", label: "Close Pane", accelerator: "CmdOrCtrl+W" },
+      ],
+    },
+    { role: "editMenu" },
+    {
+      label: "View",
+      items: [
+        { id: "toggle-sidebar", label: "Toggle Sidebar", accelerator: "CmdOrCtrl+B" },
+        { id: "toggle-zen", label: "Toggle Zen Mode", accelerator: "CmdOrCtrl+Shift+Z" },
+        { separator: true },
+        { id: "zoom-in", label: "Zoom In", accelerator: "CmdOrCtrl+=" },
+        { id: "zoom-out", label: "Zoom Out", accelerator: "CmdOrCtrl+-" },
+        { id: "zoom-reset", label: "Reset Zoom", accelerator: "CmdOrCtrl+0" },
+      ],
+    },
+    {
+      label: "Pane",
+      items: [
+        { id: "split-right", label: "Split Right", accelerator: "CmdOrCtrl+D" },
+        { id: "split-down", label: "Split Down", accelerator: "CmdOrCtrl+Shift+D" },
+        { separator: true },
+        { id: "next-pane", label: "Next Pane", accelerator: "CmdOrCtrl+]" },
+        { id: "prev-pane", label: "Previous Pane", accelerator: "CmdOrCtrl+[" },
+        { separator: true },
+        { id: "zoom-pane", label: "Zoom Pane", accelerator: "CmdOrCtrl+Z" },
+      ],
+    },
+    {
+      label: "Go",
+      items: [
+        { id: "command-palette", label: "Command Palette…", accelerator: "CmdOrCtrl+K" },
+        { id: "launcher", label: "Launcher…", accelerator: "CmdOrCtrl+L" },
+        { separator: true },
+        { id: "find", label: "Find…", accelerator: "CmdOrCtrl+F" },
+        { separator: true },
+        { id: "settings", label: "Settings…", accelerator: "CmdOrCtrl+," },
+      ],
+    },
+    { role: "windowMenu" },
+  ];
+  invoke("menubar.setMenu", menu).catch(() => void 0);
+
+  window.__ryn.on("menubar.itemClicked", (data: unknown) => {
+    const id = data as string;
+    if (!id) return;
+    switch (id) {
+      case "new-room": void newRoom(); break;
+      case "close-pane": void closeFocused(); break;
+      case "toggle-sidebar": toggleSidebar(); break;
+      case "toggle-zen": document.body.classList.toggle("zen-mode"); fitAll(); break;
+      case "zoom-in": settings.fontSize = Math.min(24, settings.fontSize + 1); applySettings(); break;
+      case "zoom-out": settings.fontSize = Math.max(9, settings.fontSize - 1); applySettings(); break;
+      case "zoom-reset": settings.fontSize = 13; applySettings(); break;
+      case "split-right": void splitActive("row"); break;
+      case "split-down": void splitActive("col"); break;
+      case "next-pane": cycleFocus(1); break;
+      case "prev-pane": cycleFocus(-1); break;
+      case "zoom-pane": void toggleZoom(); break;
+      case "command-palette": paletteEl.classList.contains("open") ? closePalette() : openPalette(); break;
+      case "launcher": launcherEl.classList.contains("open") ? closeLauncher() : openLauncher(); break;
+      case "find": openFind(); break;
+      case "settings": openSettings(); break;
+    }
+  });
+}
+
+function setupBadge(): void {
+  const needsInputPanes = new Set<string>();
+  function updateBadge(): void {
+    const count = needsInputPanes.size;
+    if (count === 0)
+      invoke("badge.clear", {}).catch(() => void 0);
+    else
+      invoke("badge.setCount", count).catch(() => void 0);
+  }
+  window.__ryn.on("dock.badge", (data: unknown) => {
+    const evt = data as { paneId?: string };
+    if (evt?.paneId) { needsInputPanes.add(evt.paneId); updateBadge(); }
+  });
+  window.__ryn.on("needs-input.clear", (data: unknown) => {
+    const evt = data as { paneId?: string };
+    if (evt?.paneId) { needsInputPanes.delete(evt.paneId); updateBadge(); }
+  });
+  window.__ryn.on("dock.badge.clear", () => { needsInputPanes.clear(); updateBadge(); });
+}
 
 (async () => {
   settings = await loadSettings();
   applySettings();
+  setupMenuBar();
+  setupBadge();
   const snap = await reload();
   if (snap.rooms.length === 0) {
     await newRoom();

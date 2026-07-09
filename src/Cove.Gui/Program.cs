@@ -2,6 +2,9 @@ using Cove.Gui;
 using Microsoft.Extensions.DependencyInjection;
 using Ryn.Core;
 using Ryn.Ipc;
+using Ryn.Plugins.Badge;
+using Ryn.Plugins.GlobalShortcut;
+using Ryn.Plugins.MenuBar;
 
 internal static class Program
 {
@@ -38,6 +41,9 @@ internal static class Program
                 s.AddAppCommands();
                 s.AddCoveGuiCommands();
                 s.AddPerfResultsCommand();
+                s.AddRynMenuBar();
+                s.AddRynBadge();
+                s.AddRynGlobalShortcut();
             })
             .Build()
             .Run();

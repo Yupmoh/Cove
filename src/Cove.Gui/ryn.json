@@ -1,5 +1,8 @@
 {
   "capabilities": {
-    "app": true
+    "app": true,
+    "menubar": true,
+    "globalShortcut": true,
+    "badge": true
   }
 }
