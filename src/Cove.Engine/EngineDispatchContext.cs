@@ -68,7 +68,8 @@ public sealed class EngineDispatchContext
         ExtensionRegistry? extensions = null,
         CaptureStore? captures = null,
         Cove.Engine.Workspaces.GitReadModel? gitReadModel = null,
-        Cove.Engine.Search.SearchService? searchService = null)
+        Cove.Engine.Search.SearchService? searchService = null,
+        Cove.Engine.Theming.ThemeService? themes = null)
     {
         Request = request;
         Panes = panes;
@@ -117,6 +118,7 @@ public sealed class EngineDispatchContext
         Captures = captures;
         GitReadModel = gitReadModel;
         SearchService = searchService;
+        Themes = themes;
     }
 
     public ControlRequest Request { get; }
@@ -165,6 +167,7 @@ public sealed class EngineDispatchContext
     public Cove.Engine.Protocol.ExtensionRegistry? Extensions { get; }
     public CaptureStore? Captures { get; }
     public Cove.Engine.Workspaces.GitReadModel? GitReadModel { get; }
+    public Cove.Engine.Theming.ThemeService? Themes { get; }
     public Cove.Engine.Search.SearchService? SearchService { get; }
     public System.Func<ControlRequest, System.Threading.Tasks.Task<ControlResponse?>>? Redrive { get; set; }
 

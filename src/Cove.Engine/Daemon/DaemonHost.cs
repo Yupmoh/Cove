@@ -81,6 +81,7 @@ public sealed class DaemonHost
     private Cove.Engine.Captures.CaptureStore? _captures;
     private Cove.Engine.Workspaces.GitReadModel? _gitReadModel;
     private Cove.Engine.Search.SearchService? _searchService;
+    private Cove.Engine.Theming.ThemeService? _themes;
 
     public DaemonHost(DaemonPaths paths, IControlEndpoint endpoint, bool exitWhenIdle, Cove.Tasks.Dispatch.DispatchSaga? dispatchSaga = null, Cove.Tasks.Dispatch.ResumeSaga? resumeSaga = null)
     {
@@ -172,6 +173,7 @@ public sealed class DaemonHost
         _captures = new Cove.Engine.Captures.CaptureStore(dataDir, logger);
         _gitReadModel = new Cove.Engine.Workspaces.GitReadModel(new Cove.Engine.Workspaces.ProcessGitRunner(), logger);
         _searchService = new Cove.Engine.Search.SearchService(logger);
+        _themes = new Cove.Engine.Theming.ThemeService(dataDir);
         _config!.SettingsChanged += key => BroadcastEvent("config.changed", new ConfigChangedEvent(key), Cove.Protocol.CoveJsonContext.Default.ConfigChangedEvent);
         _hookServer.OnEvent += _hookRouter.Route;
         _paneTypes = Cove.Engine.Panes.PaneTypeRegistry.CreateWithBuiltins();
@@ -404,7 +406,7 @@ public sealed class DaemonHost
             await WriteResponseAsync(conn, Fail(req.Id, "not_ready", "sys/hello required before commands"), cancellationToken).ConfigureAwait(false);
             return false;
         }
-        ControlResponse? generated = await Cove.Engine.EngineCommandRouter.RouteAsync(req, _panes, _layout, _workspaces, _runCommands, _restoration, _snapshots, _skills, _agents, _launchProfiles, _adapterEnv, _hookServer, _hookRouter, _agentRouter, _activity, _sessions, _lifecycle, _launcher, _taskService, _dispatchSaga, _resumeSaga, _timeline, _blackboard, _noteFiles, _memory, _memoryRanker, _proposals, _consolidator, _edits, _corpus, _vaultSettings, _library, _reviews, _attribution, _reviewDispatcher, _paneTypes, _browser, _config, _manifestStore, _registry, _omniChat, _paneScopes, _stateBus, _extensions, _captures, _gitReadModel, _searchService, cancellationToken).ConfigureAwait(false);
+        ControlResponse? generated = await Cove.Engine.EngineCommandRouter.RouteAsync(req, _panes, _layout, _workspaces, _runCommands, _restoration, _snapshots, _skills, _agents, _launchProfiles, _adapterEnv, _hookServer, _hookRouter, _agentRouter, _activity, _sessions, _lifecycle, _launcher, _taskService, _dispatchSaga, _resumeSaga, _timeline, _blackboard, _noteFiles, _memory, _memoryRanker, _proposals, _consolidator, _edits, _corpus, _vaultSettings, _library, _reviews, _attribution, _reviewDispatcher, _paneTypes, _browser, _config, _manifestStore, _registry, _omniChat, _paneScopes, _stateBus, _extensions, _captures, _gitReadModel, _searchService, _themes, cancellationToken).ConfigureAwait(false);
         if (generated is not null)
         {
             if (generated.Ok && IsMutatingVerb(req.Uri))

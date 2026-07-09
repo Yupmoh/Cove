@@ -64,6 +64,12 @@ public sealed record ConfigGetResult(string Value);
 public sealed record ConfigSetParams(string Key, string Value);
 public sealed record ConfigSchemaEntryDto(string Key, string Label, string Tab, string Control, string? Description, string Type, string[]? Options = null);
 public sealed record ConfigSchemaResult(System.Collections.Generic.IReadOnlyList<ConfigSchemaEntryDto> Entries);
+public sealed record ThemeDto(string Name, string Type, string TerminalBackground, string TerminalForeground, string ChromeSurface, string ChromeText, string ChromeAccent);
+public sealed record ThemeListResult(System.Collections.Generic.IReadOnlyList<ThemeDto> Themes);
+public sealed record ThemeRefParams(string Name);
+public sealed record ThemeSaveParams(string Name, string Type, string TerminalBackground, string TerminalForeground, string ChromeSurface, string ChromeText, string ChromeAccent);
+public sealed record ThemeActiveResult(ThemeDto? Theme);
+public sealed record ThemeBuiltinResult(bool IsBuiltin);
 public sealed record ExtensionRunParams(string Command, string? Params = null);
 public sealed record ExtensionRunResult(string Output);
 public sealed record AttachRawParams(string Session);
@@ -391,6 +397,12 @@ public sealed record ReviewDispatchResultDto(string DispatchId, string TargetPan
 [JsonSerializable(typeof(PaneRefParams))]
 [JsonSerializable(typeof(PaneRenameParams))]
 [JsonSerializable(typeof(PaneReadParams))]
+[JsonSerializable(typeof(ThemeDto))]
+[JsonSerializable(typeof(ThemeListResult))]
+[JsonSerializable(typeof(ThemeRefParams))]
+[JsonSerializable(typeof(ThemeSaveParams))]
+[JsonSerializable(typeof(ThemeActiveResult))]
+[JsonSerializable(typeof(ThemeBuiltinResult))]
 [JsonSerializable(typeof(PaneReadResult))]
 [JsonSerializable(typeof(ConfigGetParams))]
 [JsonSerializable(typeof(ConfigSchemaEntryDto))]
