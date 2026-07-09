@@ -314,6 +314,10 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/config.schema",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/config.set",
     "source": "core"
   },
@@ -373,6 +377,26 @@
   {
     "command": "cove://commands/get_window_info",
     "description": "mcp-bridge get_window_info (PL-30, render-bound)",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/keybind.clear",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/keybind.conflicts",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/keybind.is-reserved",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/keybind.list",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/keybind.set",
     "source": "core"
   },
   {
@@ -989,6 +1013,30 @@
   },
   {
     "command": "cove://commands/task.update",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/theme.delete-custom",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/theme.get-active",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/theme.is-builtin",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/theme.list",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/theme.save-custom",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/theme.set-active",
     "source": "core"
   },
   {

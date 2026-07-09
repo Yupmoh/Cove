@@ -82,6 +82,7 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/collection.rename` | core |  |
 | `cove://commands/collection.switch` | core |  |
 | `cove://commands/config.get` | core |  |
+| `cove://commands/config.schema` | core |  |
 | `cove://commands/config.set` | core |  |
 | `cove://commands/editor.get-state` | core |  |
 | `cove://commands/editor.open` | core |  |
@@ -96,6 +97,11 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/get_backend_state` | core | mcp-bridge get_backend_state (PL-30, headless-safe) |
 | `cove://commands/get_ipc_events` | core | mcp-bridge get_ipc_events (PL-30, headless-safe) |
 | `cove://commands/get_window_info` | core | mcp-bridge get_window_info (PL-30, render-bound) |
+| `cove://commands/keybind.clear` | core |  |
+| `cove://commands/keybind.conflicts` | core |  |
+| `cove://commands/keybind.is-reserved` | core |  |
+| `cove://commands/keybind.list` | core |  |
+| `cove://commands/keybind.set` | core |  |
 | `cove://commands/knowledge.ping` | core |  |
 | `cove://commands/launch-profile.delete` | core |  |
 | `cove://commands/launch-profile.list` | core |  |
@@ -249,6 +255,12 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/task.status.reorder` | core |  |
 | `cove://commands/task.status.set-hidden` | core |  |
 | `cove://commands/task.update` | core |  |
+| `cove://commands/theme.delete-custom` | core |  |
+| `cove://commands/theme.get-active` | core |  |
+| `cove://commands/theme.is-builtin` | core |  |
+| `cove://commands/theme.list` | core |  |
+| `cove://commands/theme.save-custom` | core |  |
+| `cove://commands/theme.set-active` | core |  |
 | `cove://commands/timeline.append` | core |  |
 | `cove://commands/timeline.list` | core |  |
 | `cove://commands/vault.reindex` | core |  |
@@ -409,4 +421,4 @@ Generated from the command registry. Do not edit by hand.
 | `viewer get-state` | cli |  |
 | `viewer open` | cli |  |
 
-Total: 404 commands
+Total: 416 commands
