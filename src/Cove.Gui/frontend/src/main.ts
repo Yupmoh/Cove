@@ -40,6 +40,7 @@ import { initialZenState, toggleZen, type ChromeVisibility, type ZenState } from
 import { eventToChord, buildChordMap, resolveDispatch, defaultBindings, type ResolvedBinding } from "./keymap-dispatch";
 import { initHud, toggleHud, recordFrame, hudMetrics, readJsHeapBytes, hudLines, type HudState, type JsHeapProbe } from "./perf-hud";
 import { parseSnapshotExport, snapshotRows, summarizeSnapshots, formatBytes as formatSnapshotBytes, type DiagnosticsSnapshot } from "./diagnostics-snapshot";
+import { initialPerfBundlesState, applyBundleList, beginCreate, finishCreate, surfaceError, requestDelete, cancelDelete, bundleRows, PERF_BUNDLES_EMPTY_TEXT, type PerfBundlesState, type PerfBundleListResult, type PerfBundleDto } from "./perf-bundles";
 
 const CREDIT_THRESHOLD = 131072;
 
@@ -1670,7 +1671,7 @@ function renderDiagnosticsExtras(container: HTMLElement): void {
   container.appendChild(diagnosticsSectionHeader("Snapshot inspector"));
   const snapCaption = document.createElement("div");
   snapCaption.className = "diag-caption";
-  snapCaption.textContent = "Paste an exported diagnostics snapshot (a single object or an array — the same JSON the engine writes to diagnostics-snapshots.json inside a performance bundle).";
+  snapCaption.textContent = "Capture a live diagnostics snapshot from the engine, or paste an exported one (a single object or an array — the same JSON the engine writes to diagnostics-snapshots.json inside a performance bundle).";
   container.appendChild(snapCaption);
 
   const textarea = document.createElement("textarea");
@@ -1678,22 +1679,193 @@ function renderDiagnosticsExtras(container: HTMLElement): void {
   textarea.placeholder = '{ "takenAt": "…", "managedMemoryBytes": … }';
   container.appendChild(textarea);
 
+  const snapActions = document.createElement("div");
+  snapActions.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;";
+  container.appendChild(snapActions);
+
   const renderBtn = document.createElement("button");
   renderBtn.className = "diag-btn";
   renderBtn.textContent = "Inspect snapshot";
-  container.appendChild(renderBtn);
+  snapActions.appendChild(renderBtn);
+
+  const takeBtn = document.createElement("button");
+  takeBtn.className = "diag-btn";
+  takeBtn.textContent = "Take snapshot";
+  snapActions.appendChild(takeBtn);
+
+  const loadBtn = document.createElement("button");
+  loadBtn.className = "diag-btn";
+  loadBtn.textContent = "Load snapshots";
+  snapActions.appendChild(loadBtn);
 
   const output = document.createElement("div");
   output.className = "diag-snap";
   container.appendChild(output);
 
   renderBtn.addEventListener("click", () => renderSnapshotInspection(textarea.value, output));
+  takeBtn.addEventListener("click", () => void doTakeSnapshot(textarea, output));
+  loadBtn.addEventListener("click", () => void doLoadSnapshots(textarea, output));
+
+  container.appendChild(diagnosticsSectionHeader("Performance bundles"));
+  renderPerfBundles(container);
 
   container.appendChild(diagnosticsSectionHeader("Not yet available"));
   const note = document.createElement("div");
   note.className = "diag-note";
-  note.textContent = "Live snapshot capture/prune/export, performance-bundle create/list/delete, and in-page flame graphs require an engine control-plane route that does not exist yet — the diagnostics backend is not wired to cove:// commands. Per-pane element inspection is available now from any browser pane menu (DevTools).";
+  note.textContent = "In-page flame graphs are not available yet: a bundle's optional trace is a binary .nettrace with no in-webview parser or viewer — open it in an external profiler such as PerfView or dotnet-trace. Per-pane element inspection is available now from any browser pane menu (DevTools).";
   container.appendChild(note);
+}
+
+async function doTakeSnapshot(textarea: HTMLTextAreaElement, output: HTMLElement): Promise<void> {
+  try {
+    const snapshot = await invoke<DiagnosticsSnapshot>("cove://commands/diagnostics.snapshot.take", {});
+    textarea.value = JSON.stringify(snapshot, null, 2);
+    renderSnapshotInspection(textarea.value, output);
+  } catch (e) {
+    showSnapshotError(output, `Take snapshot failed: ${(e as Error).message}`);
+  }
+}
+
+async function doLoadSnapshots(textarea: HTMLTextAreaElement, output: HTMLElement): Promise<void> {
+  try {
+    const snapshots = await invoke<DiagnosticsSnapshot[]>("cove://commands/diagnostics.snapshot.list", {});
+    textarea.value = JSON.stringify(snapshots, null, 2);
+    renderSnapshotInspection(textarea.value, output);
+  } catch (e) {
+    showSnapshotError(output, `Load snapshots failed: ${(e as Error).message}`);
+  }
+}
+
+function showSnapshotError(output: HTMLElement, message: string): void {
+  output.innerHTML = "";
+  const err = document.createElement("div");
+  err.className = "diag-error";
+  err.textContent = message;
+  output.appendChild(err);
+}
+
+function renderPerfBundles(container: HTMLElement): void {
+  let state: PerfBundlesState = initialPerfBundlesState();
+
+  const caption = document.createElement("div");
+  caption.className = "diag-caption";
+  caption.textContent = "Create a performance bundle to package the engine's diagnostics snapshots into a shareable .zip, then manage the saved bundles below.";
+  container.appendChild(caption);
+
+  const createBtn = document.createElement("button");
+  createBtn.className = "diag-btn";
+  container.appendChild(createBtn);
+
+  const errorEl = document.createElement("div");
+  errorEl.className = "diag-error";
+  container.appendChild(errorEl);
+
+  const listEl = document.createElement("div");
+  listEl.className = "diag-snap";
+  container.appendChild(listEl);
+
+  const paint = (): void => {
+    createBtn.textContent = state.creating ? "Creating…" : "Create bundle";
+    createBtn.disabled = state.creating;
+    errorEl.textContent = state.error ?? "";
+    errorEl.style.display = state.error ? "block" : "none";
+    renderPerfBundleList(state, listEl, run);
+  };
+
+  const run = (next: PerfBundlesState): void => {
+    state = next;
+    paint();
+  };
+
+  const refresh = async (): Promise<void> => {
+    try {
+      const result = await invoke<PerfBundleListResult>("cove://commands/perf.bundle.list", {});
+      run(applyBundleList(state, result));
+    } catch (e) {
+      run(surfaceError(state, `List bundles failed: ${(e as Error).message}`));
+    }
+  };
+
+  createBtn.addEventListener("click", () => {
+    if (state.creating) return;
+    run(beginCreate(state));
+    void (async () => {
+      try {
+        await invoke<PerfBundleDto>("cove://commands/perf.bundle.create", {});
+        run(finishCreate(state));
+        await refresh();
+      } catch (e) {
+        run(surfaceError(state, `Create bundle failed: ${(e as Error).message}`));
+      }
+    })();
+  });
+
+  paint();
+  void refresh();
+}
+
+function renderPerfBundleList(state: PerfBundlesState, listEl: HTMLElement, run: (next: PerfBundlesState) => void): void {
+  listEl.innerHTML = "";
+  const rows = bundleRows(state);
+  if (rows.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "diag-caption";
+    empty.textContent = PERF_BUNDLES_EMPTY_TEXT;
+    listEl.appendChild(empty);
+    return;
+  }
+
+  for (const row of rows) {
+    const card = document.createElement("div");
+    card.className = "diag-snap-card";
+    card.style.cssText = "display:flex;gap:12px;align-items:center;justify-content:space-between;";
+
+    const info = document.createElement("div");
+    info.style.cssText = "min-width:0;flex:1;";
+    const name = document.createElement("div");
+    name.style.cssText = "font-size:12px;color:var(--fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
+    name.textContent = row.name;
+    name.title = row.bundlePath;
+    const meta = document.createElement("div");
+    meta.style.cssText = "font-size:11px;color:var(--muted);";
+    meta.textContent = `${row.createdAtLabel} · ${row.sizeLabel} · ${row.detail}`;
+    info.appendChild(name);
+    info.appendChild(meta);
+    card.appendChild(info);
+
+    const actions = document.createElement("div");
+    actions.style.cssText = "display:flex;gap:6px;flex-shrink:0;";
+    if (row.confirmingDelete) {
+      const confirm = document.createElement("button");
+      confirm.className = "diag-btn";
+      confirm.textContent = "Confirm";
+      confirm.addEventListener("click", () => void doDeleteBundle(state, row.bundlePath, run));
+      const cancel = document.createElement("button");
+      cancel.className = "diag-btn";
+      cancel.textContent = "Cancel";
+      cancel.addEventListener("click", () => run(cancelDelete(state)));
+      actions.appendChild(confirm);
+      actions.appendChild(cancel);
+    } else {
+      const del = document.createElement("button");
+      del.className = "diag-btn";
+      del.textContent = "Delete";
+      del.addEventListener("click", () => run(requestDelete(state, row.bundlePath)));
+      actions.appendChild(del);
+    }
+    card.appendChild(actions);
+    listEl.appendChild(card);
+  }
+}
+
+async function doDeleteBundle(state: PerfBundlesState, bundlePath: string, run: (next: PerfBundlesState) => void): Promise<void> {
+  try {
+    await invoke("cove://commands/perf.bundle.delete", { bundlePath });
+    const result = await invoke<PerfBundleListResult>("cove://commands/perf.bundle.list", {});
+    run(applyBundleList(cancelDelete(state), result));
+  } catch (e) {
+    run(surfaceError(cancelDelete(state), `Delete bundle failed: ${(e as Error).message}`));
+  }
 }
 
 function renderSnapshotInspection(text: string, output: HTMLElement): void {
