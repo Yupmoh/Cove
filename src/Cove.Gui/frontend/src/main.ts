@@ -31,6 +31,8 @@ import { buildEmptyState, EmptyStateMessages } from "./empty-states";
 import { DEFAULT_DRAFT, draftFromTheme, themeFromDraft, cssVarsFromTheme, isCustom, isBuiltin, canSaveDraft, canDelete, isValidHex, contrastRatio, contrastTier, THEME_COLOR_FIELDS, type ThemeDto, type ThemeDraft } from "./theme-editor";
 import { categorizeBindings, isReservedChord, isValidChord, chordDisplay, canRecordChord, normalizeChord as normalizeChordStr, type KeybindDto } from "./keyboard-editor";
 import { ONBOARDING_STEPS, INITIAL_ONBOARDING_STATE, nextStep, prevStep, dismiss as dismissOnboarding, currentStepData, isLastStep, isFirstStep, progressPercent, selectAdapter, setTelemetryOptIn, shouldShowOnboarding, type OnboardingState } from "./onboarding";
+import { initBackdrop, setBackdropMaterial, nextToggleMaterial, coerceMaterial, BACKDROP_PREF_KEY, type BackdropDeps, type BackdropMaterial } from "./backdrop";
+import { NotificationBridge, type NotificationBridgeDeps, type NotificationDeliverPayload } from "./notifications";
 
 const CREDIT_THRESHOLD = 131072;
 
@@ -1323,6 +1325,7 @@ function baseActions(): Action[] {
     { label: "Close pane", icon: "\u00d7", key: "Cmd W", run: () => void closeFocused() },
     { label: "Toggle sidebar", icon: "\u25e7", key: "Cmd B", run: toggleSidebar },
     { label: "Toggle notepad sidebar", icon: "\u270e", key: "Cmd Shift N", run: toggleNotepadSidebar },
+    { label: "Toggle window backdrop", icon: "\u25d0", run: () => void toggleBackdrop() },
     { label: "Increase font size", icon: "+", key: "Cmd =", run: () => { settings.fontSize = Math.min(24, settings.fontSize + 1); applySettings(); } },
     { label: "Decrease font size", icon: "-", key: "Cmd -", run: () => { settings.fontSize = Math.max(9, settings.fontSize - 1); applySettings(); } },
     { label: "Reset font size", icon: "\u21ba", key: "Cmd 0", run: () => { settings.fontSize = 13; applySettings(); } },
@@ -2253,6 +2256,7 @@ function setupMenuBar(): void {
       items: [
         { id: "toggle-sidebar", label: "Toggle Sidebar", accelerator: "CmdOrCtrl+B" },
         { id: "toggle-zen", label: "Toggle Zen Mode", accelerator: "CmdOrCtrl+Shift+Z" },
+        { id: "toggle-backdrop", label: "Toggle Window Backdrop" },
         { separator: true },
         { id: "zoom-in", label: "Zoom In", accelerator: "CmdOrCtrl+=" },
         { id: "zoom-out", label: "Zoom Out", accelerator: "CmdOrCtrl+-" },
@@ -2295,6 +2299,7 @@ function setupMenuBar(): void {
       case "close-pane": void closeFocused(); break;
       case "toggle-sidebar": toggleSidebar(); break;
       case "toggle-zen": document.body.classList.toggle("zen-mode"); fitAll(); break;
+      case "toggle-backdrop": void toggleBackdrop(); break;
       case "zoom-in": settings.fontSize = Math.min(24, settings.fontSize + 1); applySettings(); break;
       case "zoom-out": settings.fontSize = Math.max(9, settings.fontSize - 1); applySettings(); break;
       case "zoom-reset": settings.fontSize = 13; applySettings(); break;
@@ -2331,6 +2336,65 @@ function setupBadge(): void {
     if (evt?.paneId) { needsInputPanes.delete(evt.paneId); updateBadge(); }
   });
   engineEventHandlers.set("dock.badge.clear", () => { needsInputPanes.clear(); updateBadge(); });
+}
+
+let backdropMaterial: BackdropMaterial = "none";
+const backdropDeps: BackdropDeps = {
+  getBackdrop: () => window.__ryn.invoke("window.getBackdrop", {}),
+  setBackdrop: async (material) => { await window.__ryn.invoke("window.setBackdrop", { material }); },
+  loadPref: async () => {
+    try { const res = await invoke<{ ok: boolean; value?: string }>("app.configGet", { key: BACKDROP_PREF_KEY }); return res.ok ? res.value ?? null : null; }
+    catch { return null; }
+  },
+  savePref: async (material) => { await invoke("app.configSet", { key: BACKDROP_PREF_KEY, value: material }).catch((e) => console.warn("backdrop configSet failed", e)); },
+  applyClass: (translucent) => { document.body.classList.toggle("backdrop-translucent", translucent); },
+  warn: (message) => console.warn(message),
+};
+async function setupBackdrop(): Promise<void> {
+  try { backdropMaterial = coerceMaterial(await initBackdrop(backdropDeps)); }
+  catch (e) { console.warn("backdrop init failed", e); }
+}
+async function toggleBackdrop(): Promise<void> {
+  const next = nextToggleMaterial(backdropMaterial);
+  backdropMaterial = coerceMaterial(await setBackdropMaterial(next, backdropDeps));
+}
+
+function revealPane(paneId: string): void {
+  if (!layout) return;
+  const room = layout.rooms.find((r) => findLeafId(r.layoutTree, paneId) !== null);
+  if (!room) { console.warn("notification reveal: no room for pane", paneId); return; }
+  if (activeRoomId !== room.id) {
+    activeRoomId = room.id;
+    renderRoom();
+    renderRoomTabs();
+    renderSidebar();
+  }
+  const leaf = findLeafId(room.layoutTree, paneId) ?? paneId;
+  focusPane(leaf);
+}
+
+function setupNotifications(): void {
+  const deps: NotificationBridgeDeps = {
+    isPermissionGranted: () => invoke<boolean>("notification.isPermissionGranted", {}).catch(() => false),
+    requestPermission: () => invoke<boolean>("notification.requestPermission", {}).catch(() => false),
+    send: async (payload) => { await window.__ryn.invoke("notification.sendWithId", { id: payload.id, title: payload.title, body: payload.body }); },
+    reveal: (paneId) => revealPane(paneId),
+    warn: (message) => console.warn(message),
+  };
+  const bridge = new NotificationBridge(deps);
+  engineEventHandlers.set("notification.deliver", (payload) => {
+    const evt = payload as NotificationDeliverPayload | undefined;
+    if (!evt?.id) { console.warn("notification.deliver: malformed payload"); return; }
+    void bridge.deliver(evt);
+  });
+  window.__ryn.on("notification.activated", (data: unknown) => {
+    const id = typeof data === "string" ? data : (data as { id?: string })?.id;
+    if (id) bridge.onActivated(id);
+  });
+  window.__ryn.on("notification.dismissed", (data: unknown) => {
+    const id = typeof data === "string" ? data : (data as { id?: string })?.id;
+    if (id) bridge.onDismissed(id);
+  });
 }
 
 window.__ryn.on("engine.event", (data: unknown) => {
@@ -2524,6 +2588,8 @@ notepadSidebarEl.addEventListener("keydown", (e) => {
   void applyAppearance(null);
   setupMenuBar();
   setupBadge();
+  setupNotifications();
+  void setupBackdrop();
   void loadWings();
   const snap = await reload();
   if (snap.rooms.length === 0) {

@@ -50,6 +50,7 @@ public sealed class DaemonHost
     private Cove.Engine.Agents.AgentMessageRouter? _agentRouter;
     private Cove.Engine.Activity.ActivityAggregate? _activity;
     private Cove.Engine.Hooks.NeedsInputSignaler? _needsInputSignaler;
+    private Cove.Engine.Notifications.NotificationPolicyEngine? _notificationPolicy;
     private Cove.Engine.Sessions.SessionResumeOrchestrator? _sessions;
     private Cove.Engine.Activity.OmniChatStore? _omniChat;
     private Cove.Engine.Protocol.PaneScopeStore? _paneScopes;
@@ -189,7 +190,8 @@ public sealed class DaemonHost
         _config!.SettingsChanged += key => BroadcastEvent("config.changed", new ConfigChangedEvent(key), Cove.Protocol.CoveJsonContext.Default.ConfigChangedEvent);
         _hookServer.OnEvent += _hookRouter.Route;
         _paneTypes = Cove.Engine.Panes.PaneTypeRegistry.CreateWithBuiltins();
-        _needsInputSignaler = new Cove.Engine.Hooks.NeedsInputSignaler(_activity!, new DaemonNotificationBus(this), () => GetFocusedPane());
+        _notificationPolicy = new Cove.Engine.Notifications.NotificationPolicyEngine(dataDir, logger);
+        _needsInputSignaler = new Cove.Engine.Hooks.NeedsInputSignaler(_activity!, new DaemonNotificationBus(this), () => GetFocusedPane(), _notificationPolicy);
         _hookRouter.NeedsInputTransition += (paneId, needsInput) =>
         {
             if (needsInput) _needsInputSignaler!.CheckAndSignal(paneId);
@@ -836,5 +838,8 @@ public sealed class DaemonHost
 
         public void ClearDockBadge()
             => _host.BroadcastEvent("dock.badge.clear", new Cove.Protocol.NeedsInputSignalDto("", ""), Cove.Protocol.CoveJsonContext.Default.NeedsInputSignalDto);
+
+        public void DeliverNotification(string id, string title, string body, string paneId)
+            => _host.BroadcastEvent("notification.deliver", new Cove.Protocol.NotificationDeliverDto(id, title, body, paneId), Cove.Protocol.CoveJsonContext.Default.NotificationDeliverDto);
     }
 }

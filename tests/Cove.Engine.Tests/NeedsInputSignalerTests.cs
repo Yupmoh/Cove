@@ -1,6 +1,8 @@
 using Cove.Adapters;
 using Cove.Engine.Activity;
 using Cove.Engine.Hooks;
+using Cove.Engine.Notifications;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 namespace Cove.Engine.Tests;
 
@@ -12,10 +14,26 @@ public sealed class NeedsInputSignalerTests
         public int BadgesSent { get; private set; }
         public int BadgesCleared { get; private set; }
         public int SignalsCleared { get; private set; }
+        public int Delivered { get; private set; }
+        public string? LastDeliveredId { get; private set; }
+        public string? LastDeliveredPaneId { get; private set; }
         public void BroadcastNeedsInputSignal(string paneId, string adapter) => SignalsSent++;
         public void BroadcastDockBadge(string paneId, string adapter) => BadgesSent++;
         public void ClearNeedsInputSignal(string paneId) => SignalsCleared++;
         public void ClearDockBadge() => BadgesCleared++;
+        public void DeliverNotification(string id, string title, string body, string paneId)
+        {
+            Delivered++;
+            LastDeliveredId = id;
+            LastDeliveredPaneId = paneId;
+        }
+    }
+
+    private static NotificationPolicyEngine NewPolicy()
+    {
+        var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"cove-notif-signaler-{System.Guid.NewGuid():N}");
+        System.IO.Directory.CreateDirectory(dir);
+        return new NotificationPolicyEngine(dir, NullLogger.Instance);
     }
 
     private static ActivityAggregate NewAggregate(HookEventRouter router)
@@ -98,5 +116,56 @@ public sealed class NeedsInputSignalerTests
         signaler.CheckAndSignal("pane-1");
 
         Assert.Equal(2, bus.SignalsSent);
+    }
+
+    [Fact]
+    public void Deliver_FiresOsNotification_WhenPolicyAllows_CorrelatingWithPaneId()
+    {
+        var router = new HookEventRouter();
+        var aggregate = NewAggregate(router);
+        var bus = new CapturingBus();
+        var policy = NewPolicy();
+        var signaler = new NeedsInputSignaler(aggregate, bus, () => null, policy);
+
+        router.Route(Ev("pane-1", "claude-code", "session-start"));
+        router.Route(Ev("pane-1", "claude-code", "stop"));
+        signaler.CheckAndSignal("pane-1");
+
+        Assert.Equal(1, bus.Delivered);
+        Assert.Equal("pane-1", bus.LastDeliveredId);
+        Assert.Equal("pane-1", bus.LastDeliveredPaneId);
+    }
+
+    [Fact]
+    public void Deliver_Suppressed_WhenOsNotificationTierDisabled()
+    {
+        var router = new HookEventRouter();
+        var aggregate = NewAggregate(router);
+        var bus = new CapturingBus();
+        var policy = NewPolicy();
+        policy.SetTierEnabled(NotificationTier.OsNotification, false);
+        var signaler = new NeedsInputSignaler(aggregate, bus, () => null, policy);
+
+        router.Route(Ev("pane-1", "claude-code", "session-start"));
+        router.Route(Ev("pane-1", "claude-code", "stop"));
+        signaler.CheckAndSignal("pane-1");
+
+        Assert.Equal(1, bus.BadgesSent);
+        Assert.Equal(0, bus.Delivered);
+    }
+
+    [Fact]
+    public void Deliver_DoesNotFire_WhenNoPolicyProvided()
+    {
+        var router = new HookEventRouter();
+        var aggregate = NewAggregate(router);
+        var bus = new CapturingBus();
+        var signaler = new NeedsInputSignaler(aggregate, bus, () => null);
+
+        router.Route(Ev("pane-1", "claude-code", "session-start"));
+        router.Route(Ev("pane-1", "claude-code", "stop"));
+        signaler.CheckAndSignal("pane-1");
+
+        Assert.Equal(0, bus.Delivered);
     }
 }

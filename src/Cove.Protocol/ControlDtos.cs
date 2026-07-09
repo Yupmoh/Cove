@@ -142,6 +142,7 @@ public sealed record AdapterListResult(System.Collections.Generic.IReadOnlyList<
 public sealed record RegistryEntryDto(string Name, string DisplayName, string Version, bool Official);
 public sealed record RegistryFetchResult(RegistryEntryDto[] Adapters);
 public sealed record NeedsInputSignalDto(string PaneId, string Adapter);
+public sealed record NotificationDeliverDto(string Id, string Title, string Body, string PaneId);
 public sealed record OmniChatAppendParams(string PaneId, string Role, string Body);
 public sealed record OmniChatHistoryParams(string PaneId);
 public sealed record OmniChatHistoryResult(OmniChatMessageDto[] Messages);
@@ -492,6 +493,7 @@ public sealed record ReviewDispatchResultDto(string DispatchId, string TargetPan
 [JsonSerializable(typeof(AdapterListResult))]
 [JsonSerializable(typeof(RegistryFetchResult))]
 [JsonSerializable(typeof(NeedsInputSignalDto))]
+[JsonSerializable(typeof(NotificationDeliverDto))]
 [JsonSerializable(typeof(LauncherOptionsParams))]
 [JsonSerializable(typeof(LauncherOptionsResponse))]
 [JsonSerializable(typeof(OmniChatAppendParams))]
