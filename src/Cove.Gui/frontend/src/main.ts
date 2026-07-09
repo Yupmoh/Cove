@@ -380,7 +380,7 @@ async function addSubtab(termPaneId: string): Promise<void> {
   if (!room || !activeRoomId) return;
   const leafId = findLeafId(room.layoutTree, termPaneId);
   if (!leafId) return;
-  const sp = (await invoke<{ paneId: string }>("app.paneSpawn", { command: "", cwd: "", inheritCwdFrom: termPaneId, cols: 80, rows: 24 })).paneId;
+  const sp = (await invoke<{ paneId: string }>("app.paneSpawn", { command: "", cwd: "", inheritCwdFrom: termPaneId, cols: 80, rows: 24, adapter: "", agentName: "", workspace: "", room: "" })).paneId;
   await invoke("app.layoutMutate", { op: "addSubtab", roomId: activeRoomId, paneId: leafId, newPaneId: sp, targetPaneId: "", orientation: "", name: "", dir: 0 });
   await reload();
   focusPane(sp);
@@ -416,7 +416,7 @@ function emptyPaneStrip(paneId: string): HTMLElement {
 
 async function spawnIntoPane(paneId: string): Promise<void> {
   if (!activeRoomId) return;
-  const sp = (await invoke<{ paneId: string }>("app.paneSpawn", { command: "", cwd: "", inheritCwdFrom: "", cols: 80, rows: 24 })).paneId;
+  const sp = (await invoke<{ paneId: string }>("app.paneSpawn", { command: "", cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: "", agentName: "", workspace: "", room: "" })).paneId;
   await invoke("app.layoutMutate", { op: "addSubtab", roomId: activeRoomId, paneId: paneId, newPaneId: sp, targetPaneId: "", orientation: "", name: "", dir: 0 });
   await reload();
 }
@@ -844,7 +844,7 @@ async function splitActive(dir: "row" | "col"): Promise<void> {
   }
   const src = focusedPaneId;
   if (!src) return;
-  const sp = (await invoke<{ paneId: string }>("app.paneSpawn", { command: "", cwd: "", inheritCwdFrom: src, cols: 80, rows: 24 })).paneId;
+  const sp = (await invoke<{ paneId: string }>("app.paneSpawn", { command: "", cwd: "", inheritCwdFrom: src, cols: 80, rows: 24, adapter: "", agentName: "", workspace: "", room: "" })).paneId;
   await invoke("app.layoutMutate", { op: "split", roomId: activeRoomId, targetPaneId: src, newPaneId: sp, orientation: dir, name: "", paneId: "", dir: 0 });
   await reload();
   focusPane(sp);
@@ -890,7 +890,7 @@ function cycleFocus(d: number): void {
 }
 
 async function newRoom(): Promise<void> {
-  const sp = (await invoke<{ paneId: string }>("app.paneSpawn", { command: "", cwd: "", inheritCwdFrom: "", cols: 80, rows: 24 })).paneId;
+  const sp = (await invoke<{ paneId: string }>("app.paneSpawn", { command: "", cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: "", agentName: "", workspace: "", room: "" })).paneId;
   const r = await invoke<{ roomId: string }>("app.layoutMutate", { op: "createRoom", newPaneId: sp, name: "Terminal " + (layout ? layout.rooms.length + 1 : 1), roomId: "", targetPaneId: "", orientation: "", paneId: "", dir: 0 });
   activeRoomId = r.roomId;
   await reload();
@@ -1203,7 +1203,7 @@ function setupMenuBar(): void {
     },
     { role: "windowMenu" },
   ];
-  invoke("menubar.setMenu", menu).catch(() => void 0);
+  invoke("menubar.setMenu", { items: menu }).catch(() => void 0);
 
   window.__ryn.on("menubar.itemClicked", (data: unknown) => {
     const id = data as string;
