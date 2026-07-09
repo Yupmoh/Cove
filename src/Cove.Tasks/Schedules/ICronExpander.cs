@@ -78,9 +78,6 @@ public sealed class HandRolledCronExpander : ICronExpander
 
     private static System.TimeZoneInfo ResolveTimeZone(string? tz)
     {
-        if (string.IsNullOrWhiteSpace(tz))
-            return System.TimeZoneInfo.Utc;
-        try { return System.TimeZoneInfo.FindSystemTimeZoneById(tz); }
-        catch { return System.TimeZoneInfo.Utc; }
+        return TimeZoneResolver.TryResolve(tz, out var zone) ? zone : System.TimeZoneInfo.Utc;
     }
 }

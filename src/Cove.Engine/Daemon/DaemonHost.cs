@@ -147,7 +147,7 @@ public sealed class DaemonHost
         var restoredSummary = restoration.RestoreOnStartup();
         if (restoredSummary.RestoredRuns.Count > 0)
             logger.LogWarning("restore: {count} non-terminal runs rehydrated as interrupted", restoredSummary.RestoredRuns.Count);
-        _scheduler = new Cove.Tasks.Scheduler.TaskSchedulerEngine(_taskService, new Cove.Tasks.Schedules.CronosCronExpander(), new Cove.Tasks.Scheduler.SystemClock(), logger);
+        _scheduler = new Cove.Tasks.Scheduler.TaskSchedulerEngine(_taskService, new Cove.Tasks.Schedules.CronosCronExpander(logger), new Cove.Tasks.Scheduler.SystemClock(), logger);
         _ = _scheduler.StartAsync(_shutdown.Token);
         _stateBus = new Cove.Engine.Protocol.StateBus(dataDir, logger);
         _extensions = new Cove.Engine.Protocol.ExtensionRegistry(_manifestStore!);
