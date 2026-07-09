@@ -1518,6 +1518,14 @@ document.getElementById("tb-split-r")!.addEventListener("click", () => void spli
 document.getElementById("tb-split-d")!.addEventListener("click", () => void splitActive("col"));
 document.getElementById("tb-sidebar")!.addEventListener("click", toggleSidebar);
 document.getElementById("tb-pal")!.addEventListener("click", openPalette);
+document.getElementById("tb-find")!.addEventListener("click", openPalette);
+document.getElementById("tb-settings")!.addEventListener("click", openSettings);
+document.body.classList.add(navigator.platform.toUpperCase().includes("MAC") ? "platform-mac" : "platform-other");
+window.__ryn.on("window.focused", () => document.body.classList.remove("window-inactive"));
+window.__ryn.on("window.blurred", () => document.body.classList.add("window-inactive"));
+void invoke<{ version?: string }>("cove://sys/daemon.status", {}).then((s) => {
+  if (s?.version) document.getElementById("wordmark-ver")!.textContent = "v" + s.version;
+}).catch(() => void 0);
 
 palInput.addEventListener("input", () => { palSel = 0; renderPalette(); });
 palInput.addEventListener("keydown", (e) => {
