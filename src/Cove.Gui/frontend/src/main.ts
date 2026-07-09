@@ -585,7 +585,7 @@ function renderEditorPaneWrapper(paneId: string): HTMLElement {
   const placeholder = document.createElement("div");
   placeholder.className = "editor-pane-placeholder";
   placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
-  renderEditorPane(paneId, paneId).then(el => {
+  renderEditorPane(paneId, paneFilePaths.get(paneId) ?? paneId).then(el => {
     placeholder.replaceWith(el);
   }).catch(e => {
     placeholder.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to load editor: ${(e as Error).message}</div>`;
@@ -1326,13 +1326,29 @@ function jumpActions(): Action[] {
 let palSel = 0;
 let palActions: PaletteItem[] = [];
 const palMru = new MruTracker(JSON.parse(localStorage.getItem("cove.palette.mru") ?? "[]"));
+let palCachedItems: PaletteItem[] | null = null;
+const paneFilePaths = new Map<string, string>();
+let palFileSearchTimer: ReturnType<typeof setTimeout> | null = null;
+let palFileResults: PaletteItem[] = [];
+let palFileQuery = "";
+let palFileSearchTag = 0;
 
 function openPalette() {
   paletteEl.classList.add("open");
   palInput.value = "";
   palSel = 0;
+  palCachedItems = null;
+  palFileResults = [];
+  palFileQuery = "";
+  palFileSearchTag++;
+  void loadPaletteCache();
   renderPalette();
   palInput.focus();
+}
+
+async function loadPaletteCache(): Promise<void> {
+  palCachedItems = await paletteItems();
+  renderPalette();
 }
 
 function closePalette() {
@@ -1343,27 +1359,46 @@ function closePalette() {
   }
 }
 
-function paletteItems(): PaletteItem[] {
+async function paletteItems(): Promise<PaletteItem[]> {
   const items: PaletteItem[] = [];
   for (const a of baseActions()) {
-    items.push({ id: `cmd:${a.label}`, label: a.label, category: "commands", icon: a.icon, key: a.key, run: a.run });
+    items.push({ id: `cmd:${a.label}`, label: a.label, category: "commands", icon: a.icon, key: a.key, run: () => { a.run(); } });
   }
   for (const a of jumpActions()) {
-    items.push({ id: `room:${a.label}`, label: a.label, category: "rooms", icon: a.icon, key: a.key, run: a.run });
+    items.push({ id: `room:${a.label}`, label: a.label, category: "rooms", icon: a.icon, key: a.key, run: () => { a.run(); } });
   }
   for (const [id, pv] of panes) {
     items.push({ id: `pane:${id}`, label: pv.title || id, category: "panes", icon: "\u25a0", run: () => focusPane(id) });
   }
+  try {
+    const wsResult = await invoke<{ workspaces: { id: string; name: string }[] }>("cove://commands/workspace.list", {});
+    for (const ws of wsResult.workspaces ?? []) {
+      items.push({ id: `ws:${ws.id}`, label: ws.name, category: "workspaces", icon: "\u25c8", run: () => void switchWorkspace(ws.id) });
+    }
+  } catch { void 0; }
+  try {
+    const taskResult = await invoke<{ cards: { id: string; title: string; humanId: string }[] }>("cove://commands/task.list", { workspaceId: "default" });
+    for (const t of taskResult.cards ?? []) {
+      items.push({ id: `task:${t.id}`, label: `${t.humanId}: ${t.title}`, category: "tasks", icon: "#", run: () => void openTaskInPane(t.id) });
+    }
+  } catch { void 0; }
   return items;
 }
 
 function renderPalette() {
   const parsed = parseQuery(palInput.value);
-  const all = paletteItems();
+  const all = palCachedItems ?? [];
   palActions = filterAndSort(all, parsed);
+  if (parsed.category === "files" && parsed.text.length > 0 && parsed.text !== palFileQuery) {
+    if (palFileSearchTimer) clearTimeout(palFileSearchTimer);
+    palFileSearchTimer = setTimeout(() => void searchFiles(parsed.text), 200);
+  }
+  if (parsed.category === "files") {
+    palActions = [...palActions, ...palFileResults.filter((f) => !palActions.some((e) => e.id === f.id))];
+  }
   if (parsed.text.length === 0 && parsed.category === "all") {
     const mruIds = palMru.toList().map((e) => e.id).reverse();
-    const mruItems = mruIds.map((id) => palActions.find((i) => i.id ===id)).filter((x): x is PaletteItem => x !== undefined);
+    const mruItems = mruIds.map((id) => palActions.find((i) => i.id === id)).filter((x): x is PaletteItem => x !== undefined);
     const rest = palActions.filter((i) => !mruIds.includes(i.id));
     palActions = [...mruItems, ...rest];
   }
@@ -1382,7 +1417,7 @@ function renderPalette() {
     const empty = document.createElement("div");
     empty.className = "pal-empty";
     empty.style.cssText = "padding:16px;text-align:center;color:var(--muted);font-size:12px;";
-    empty.textContent = "No results";
+    empty.textContent = palCachedItems === null ? "Loading..." : "No results";
     palList.appendChild(empty);
     return;
   }
@@ -1394,11 +1429,65 @@ function renderPalette() {
     (el.querySelector(".ic") as HTMLElement).textContent = a.icon;
     (el.querySelector(".lbl") as HTMLElement).textContent = a.label;
     el.addEventListener("click", (e) => {
-      if (e.metaKey || e.ctrlKey) { closePalette(); a.run(); }
-      else { closePalette(); palMru.record(a.id); localStorage.setItem("cove.palette.mru", JSON.stringify(palMru.toList())); a.run(); }
+      const split = e.metaKey || e.ctrlKey;
+      closePalette();
+      palMru.record(a.id);
+      localStorage.setItem("cove.palette.mru", JSON.stringify(palMru.toList()));
+      a.run();
+      if (split) void splitActive("row");
     });
     palList.appendChild(el);
   });
+}
+
+async function searchFiles(query: string): Promise<void> {
+  const tag = ++palFileSearchTag;
+  palFileQuery = query;
+  try {
+    const result = await invoke<{ matches: { file: string; line: number; text: string }[] }>("cove://commands/search.query", { query, workspaceId: "default" });
+    if (tag !== palFileSearchTag) return;
+    const seen = new Set<string>();
+    palFileResults = (result.matches ?? []).filter((m) => {
+      if (seen.has(m.file)) return false;
+      seen.add(m.file);
+      return true;
+    }).slice(0, 20).map((m) => ({
+      id: `file:${m.file}`,
+      label: m.file,
+      category: "files" as const,
+      icon: "/",
+      run: () => void openFileInEditor(m.file),
+    }));
+    renderPalette();
+  } catch {
+    if (tag === palFileSearchTag) palFileResults = [];
+  }
+}
+
+async function switchWorkspace(wsId: string): Promise<void> {
+  try { await invoke("cove://commands/workspace.switch", { workspaceId: wsId }); await reload(); } catch { void 0; }
+}
+
+async function openTaskInPane(taskId: string): Promise<void> {
+  try {
+    const sp = (await invoke<{ paneId: string }>("app.paneSpawn", { command: "", cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: "", agentName: "", workspace: "", room: "" })).paneId;
+    const r = await invoke<{ roomId: string }>("app.layoutMutate", { op: "createRoom", newPaneId: sp, name: "Task", roomId: "", targetPaneId: "", orientation: "", paneId: "", dir: 0, paneType: "tasks-kanban" });
+    activeRoomId = r.roomId;
+    paneFilePaths.set(sp, taskId);
+    await reload();
+    focusPane(sp);
+  } catch { void 0; }
+}
+
+async function openFileInEditor(filePath: string): Promise<void> {
+  try {
+    const sp = (await invoke<{ paneId: string }>("app.paneSpawn", { command: "", cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: "", agentName: "", workspace: "", room: "" })).paneId;
+    const r = await invoke<{ roomId: string }>("app.layoutMutate", { op: "createRoom", newPaneId: sp, name: filePath.split("/").pop() || "Editor", roomId: "", targetPaneId: "", orientation: "", paneId: "", dir: 0, paneType: "editor" });
+    activeRoomId = r.roomId;
+    paneFilePaths.set(sp, filePath);
+    await reload();
+    focusPane(sp);
+  } catch { void 0; }
 }
 
 
@@ -1416,9 +1505,11 @@ palInput.addEventListener("keydown", (e) => {
   else if (e.key === "Enter") {
     e.preventDefault();
     const a = palActions[palSel];
+    const split = e.metaKey || e.ctrlKey;
     if (a) { palMru.record(a.id); localStorage.setItem("cove.palette.mru", JSON.stringify(palMru.toList())); }
     closePalette();
     if (a) a.run();
+    if (split && a) void splitActive("row");
   }
   else if (e.key === "ArrowDown") { e.preventDefault(); palSel = Math.min(palActions.length - 1, palSel + 1); renderPalette(); }
   else if (e.key === "ArrowUp") { e.preventDefault(); palSel = Math.max(0, palSel - 1); renderPalette(); }
