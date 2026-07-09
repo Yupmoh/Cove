@@ -24,6 +24,8 @@ import { browserWebviewRegistry, renderBrowserPane } from "./browser-pane";
 import { buildAutomationJs, type AutomationExecEvent } from "./automation-snapshot";
 import { renderDiffViewerPane } from "./diff-viewer-pane";
 import { renderMarkdownPane } from "./markdown-pane";
+import { renderPdfPane } from "./pdf-pane";
+import { renderVideoPane } from "./video-pane";
 import { partitionPinned, togglePin, reorderRoom, buildMiniDiagram, accentForPaneType, visibleRoomIds, buildWingModel, filterRoomsByWing, type MiniDiagramNode } from "./room-tabs";
 import { groupByWorkspace, moveSelection, selectedNote, kindIcon, kindColor, type NoteListItem, type NavState } from "./notepad-sidebar";
 import { parseQuery, filterAndSort, MruTracker, cycleCategory, categoryLabel, type PaletteItem } from "./omni-palette";
@@ -719,6 +721,8 @@ function renderNode(node: MosaicNode): HTMLElement {
     if (active.paneType === "search") return renderSearchPaneWrapper(active.documentId);
     if (active.paneType === "browser") return renderBrowserPaneWrapper(active.documentId, active.title ?? "about:blank");
     if (active.paneType === "diff") return renderDiffViewerPaneWrapper(active.documentId, active.title ?? "");
+    if (active.paneType === "pdf") return renderPdfPane(paneFilePaths.get(active.documentId) ?? active.title ?? active.documentId);
+    if (active.paneType === "video") return renderVideoPane(paneFilePaths.get(active.documentId) ?? active.title ?? active.documentId);
     if (isEmpty) return emptyPaneStrip(node.paneId);
     const activeEl = getPane(subs[activeIdx].documentId).el;
     if (subs.length <= 1) return activeEl;

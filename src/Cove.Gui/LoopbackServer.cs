@@ -68,6 +68,12 @@ public sealed class LoopbackServer : IAsyncDisposable
                     return;
                 }
 
+                if (path == "/media")
+                {
+                    await ServeMediaAsync(stream, target, headers, _cts.Token);
+                    return;
+                }
+
                 await ServeStaticAsync(stream, path, _cts.Token);
             }
             catch (Exception ex) { Console.Error.WriteLine($"connection handler ended: {ex.Message}"); }
@@ -99,10 +105,76 @@ public sealed class LoopbackServer : IAsyncDisposable
         ".map" => "application/json",
         ".svg" => "image/svg+xml",
         ".png" => "image/png",
+        ".jpg" or ".jpeg" => "image/jpeg",
+        ".gif" => "image/gif",
+        ".webp" => "image/webp",
         ".woff2" => "font/woff2",
         ".wasm" => "application/wasm",
+        ".pdf" => "application/pdf",
+        ".mp4" or ".m4v" => "video/mp4",
+        ".webm" => "video/webm",
+        ".ogg" or ".ogv" => "video/ogg",
+        ".mov" => "video/quicktime",
         _ => "application/octet-stream",
     };
+
+    private async Task ServeMediaAsync(Stream stream, string target, Dictionary<string, string> headers, CancellationToken ct)
+    {
+        var filePath = ParseMediaPath(target);
+        if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
+        {
+            Console.Error.WriteLine($"media not found: {filePath}");
+            await stream.WriteAsync(Encoding.ASCII.GetBytes("HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"), ct);
+            return;
+        }
+
+        var length = new FileInfo(filePath).Length;
+        headers.TryGetValue("range", out var rangeHeader);
+        var range = MediaRange.Resolve(rangeHeader, length);
+
+        if (range.StatusCode == 416)
+        {
+            var invalid = $"HTTP/1.1 416 Range Not Satisfiable\r\nContent-Range: bytes */{length}\r\nAccept-Ranges: bytes\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+            await stream.WriteAsync(Encoding.ASCII.GetBytes(invalid), ct);
+            return;
+        }
+
+        var statusLine = range.IsPartial ? "206 Partial Content" : "200 OK";
+        var head = new StringBuilder();
+        head.Append($"HTTP/1.1 {statusLine}\r\n");
+        head.Append($"Content-Type: {ContentType(filePath)}\r\n");
+        head.Append("Accept-Ranges: bytes\r\n");
+        head.Append($"Content-Length: {range.Length}\r\n");
+        if (range.IsPartial)
+            head.Append($"Content-Range: bytes {range.Start}-{range.End}/{range.TotalLength}\r\n");
+        head.Append("Connection: close\r\n\r\n");
+        await stream.WriteAsync(Encoding.ASCII.GetBytes(head.ToString()), ct);
+
+        await using var file = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+        file.Seek(range.Start, SeekOrigin.Begin);
+        var remaining = range.Length;
+        var buffer = new byte[81920];
+        while (remaining > 0)
+        {
+            var toRead = (int)Math.Min(buffer.Length, remaining);
+            var read = await file.ReadAsync(buffer.AsMemory(0, toRead), ct);
+            if (read == 0) break;
+            await stream.WriteAsync(buffer.AsMemory(0, read), ct);
+            remaining -= read;
+        }
+    }
+
+    private static string ParseMediaPath(string target)
+    {
+        var q = target.Contains('?') ? target[(target.IndexOf('?') + 1)..] : "";
+        foreach (var kv in q.Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var eq = kv.Split('=', 2);
+            if (eq.Length == 2 && eq[0] == "path")
+                return Uri.UnescapeDataString(eq[1]);
+        }
+        return "";
+    }
 
     private static (string pane, ulong since) ParsePtyQuery(string target)
     {
