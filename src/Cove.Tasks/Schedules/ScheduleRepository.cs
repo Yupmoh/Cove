@@ -86,19 +86,32 @@ public sealed class ScheduleRepository
         return _channel.ExecuteAsync(conn => { UpdateInternal(conn, cardId, paused, skipNext, nextFireAt, lastFiredAt, pendingIntent); return System.Threading.Tasks.Task.CompletedTask; });
     }
 
+    private const string UpdateSql =
+        "UPDATE card_schedules SET " +
+        "paused = CASE WHEN @SetPaused = 1 THEN @Paused ELSE paused END, " +
+        "skip_next = CASE WHEN @SetSkipNext = 1 THEN @SkipNext ELSE skip_next END, " +
+        "next_fire_at = CASE WHEN @SetNextFireAt = 1 THEN @NextFireAt ELSE next_fire_at END, " +
+        "last_fired_at = CASE WHEN @SetLastFiredAt = 1 THEN @LastFiredAt ELSE last_fired_at END, " +
+        "pending_intent = CASE WHEN @SetPendingIntent = 1 THEN @PendingIntent ELSE pending_intent END, " +
+        "updated_at = @Now WHERE card_id = @CardId";
+
     private static void UpdateInternal(SqliteConnection conn, string cardId, bool? paused, bool? skipNext, string? nextFireAt, string? lastFiredAt, string? pendingIntent)
     {
-        var sets = new System.Collections.Generic.List<string>();
-        var p = new DynamicParameters();
-        p.Add("CardId", cardId);
-        p.Add("Now", System.DateTimeOffset.UtcNow.ToString("o"));
-        if (paused is not null) { sets.Add("paused = @Paused"); p.Add("Paused", paused.Value ? 1 : 0); }
-        if (skipNext is not null) { sets.Add("skip_next = @SkipNext"); p.Add("SkipNext", skipNext.Value ? 1 : 0); }
-        if (nextFireAt is not null) { sets.Add("next_fire_at = @NextFireAt"); p.Add("NextFireAt", nextFireAt); }
-        if (lastFiredAt is not null) { sets.Add("last_fired_at = @LastFiredAt"); p.Add("LastFiredAt", lastFiredAt); }
-        if (pendingIntent is not null) { sets.Add("pending_intent = @PendingIntent"); p.Add("PendingIntent", pendingIntent); }
-        sets.Add("updated_at = @Now");
-        conn.Execute($"UPDATE card_schedules SET {string.Join(", ", sets)} WHERE card_id = @CardId", p);
+        conn.Execute(UpdateSql, new
+        {
+            CardId = cardId,
+            Now = System.DateTimeOffset.UtcNow.ToString("o"),
+            SetPaused = paused is not null ? 1 : 0,
+            Paused = paused == true ? 1 : 0,
+            SetSkipNext = skipNext is not null ? 1 : 0,
+            SkipNext = skipNext == true ? 1 : 0,
+            SetNextFireAt = nextFireAt is not null ? 1 : 0,
+            NextFireAt = nextFireAt,
+            SetLastFiredAt = lastFiredAt is not null ? 1 : 0,
+            LastFiredAt = lastFiredAt,
+            SetPendingIntent = pendingIntent is not null ? 1 : 0,
+            PendingIntent = pendingIntent,
+        });
     }
 
     public System.Threading.Tasks.Task DeleteAsync(string cardId)
