@@ -16,6 +16,7 @@ public sealed class LayoutService
     }
 
     private readonly Dictionary<string, RoomState> _rooms = new();
+    private readonly List<string> _roomOrder = new();
     private readonly object _sync = new();
     public Action? OnChanged { get; set; }
 
@@ -32,6 +33,7 @@ public sealed class LayoutService
                 ActivePaneId = firstLeaf.PaneId,
                 ZoomedPaneId = null,
             };
+            _roomOrder.Add(roomId);
         }
         OnChanged?.Invoke();
         return roomId;
@@ -118,6 +120,7 @@ public sealed class LayoutService
                 if (collapsed is null)
                 {
                     _rooms.Remove(roomId);
+                    _roomOrder.Remove(roomId);
                 }
                 else
                 {
@@ -163,6 +166,7 @@ public sealed class LayoutService
             if (next is null)
             {
                 _rooms.Remove(roomId);
+                _roomOrder.Remove(roomId);
             }
             else
             {
@@ -221,19 +225,43 @@ public sealed class LayoutService
         OnChanged?.Invoke();
     }
 
+    public void ReorderRooms(IReadOnlyList<string> orderedRoomIds)
+    {
+        lock (_sync)
+        {
+            var known = new HashSet<string>(_rooms.Keys, StringComparer.Ordinal);
+            var next = new List<string>(_rooms.Count);
+            foreach (var id in orderedRoomIds)
+            {
+                if (known.Remove(id))
+                    next.Add(id);
+            }
+            foreach (var id in _roomOrder)
+            {
+                if (known.Remove(id))
+                    next.Add(id);
+            }
+            _roomOrder.Clear();
+            _roomOrder.AddRange(next);
+        }
+        OnChanged?.Invoke();
+    }
+
     public WorkspaceSnapshot ToSnapshot(string id, string name, string projectDir)
     {
         lock (_sync)
         {
             var rooms = new List<RoomSnapshot>(_rooms.Count);
-            foreach (var kv in _rooms)
+            foreach (var roomId in _roomOrder)
             {
+                if (!_rooms.TryGetValue(roomId, out var rs))
+                    continue;
                 rooms.Add(new RoomSnapshot
                 {
-                    Id = kv.Key,
-                    Name = kv.Value.Name,
-                    LayoutTree = kv.Value.Root,
-                    ZoomedPaneId = kv.Value.ZoomedPaneId,
+                    Id = roomId,
+                    Name = rs.Name,
+                    LayoutTree = rs.Root,
+                    ZoomedPaneId = rs.ZoomedPaneId,
                 });
             }
 
@@ -253,6 +281,7 @@ public sealed class LayoutService
         lock (_sync)
         {
             _rooms.Clear();
+            _roomOrder.Clear();
             foreach (var rs in ws.Rooms)
             {
                 var leaves = MosaicOps.Leaves(rs.LayoutTree);
@@ -263,6 +292,7 @@ public sealed class LayoutService
                     ActivePaneId = leaves.Count > 0 ? leaves[0].PaneId : null,
                     ZoomedPaneId = rs.ZoomedPaneId,
                 };
+                _roomOrder.Add(rs.Id);
             }
         }
     }

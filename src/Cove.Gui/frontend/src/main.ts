@@ -23,6 +23,7 @@ import { renderSearchPane } from "./search-pane";
 import { renderBrowserPane } from "./browser-pane";
 import { renderDiffViewerPane } from "./diff-viewer-pane";
 import { renderMarkdownPane } from "./markdown-pane";
+import { partitionPinned, togglePin, reorderRoom, buildMiniDiagram, accentForPaneType, type MiniDiagramNode } from "./room-tabs";
 
 const CREDIT_THRESHOLD = 131072;
 
@@ -181,6 +182,7 @@ const gridEl = document.getElementById("grid")!;
 const titleEl = document.getElementById("tb-title")!;
 const footEl = document.getElementById("foot-count")!;
 const paletteEl = document.getElementById("palette")!;
+const roomTabsEl = document.getElementById("room-tabs")!;
 const palInput = document.getElementById("pal-input") as HTMLInputElement;
 const palList = document.getElementById("pal-list")!;
 
@@ -849,6 +851,15 @@ function refreshTitles(): void {
     const nameEl = sessEl.querySelector<HTMLElement>(".name");
     if (nameEl) nameEl.textContent = name;
   });
+  const tabEls = roomTabsEl.querySelectorAll<HTMLElement>(".rtab");
+  (layout?.rooms ?? []).forEach((r) => {
+    const tab = Array.from(tabEls).find((el) => el.title === roomTabName(r) || el.querySelector(".rtab-name")?.textContent === roomTabName(r));
+    if (tab) {
+      const nameEl = tab.querySelector<HTMLElement>(".rtab-name");
+      if (nameEl) nameEl.textContent = roomTabName(r);
+      tab.title = roomTabName(r);
+    }
+  });
 }
 
 async function reload(): Promise<WorkspaceSnapshot> {
@@ -868,6 +879,7 @@ async function reload(): Promise<WorkspaceSnapshot> {
     focusedPaneId = leaves[0] ?? null;
   }
   renderRoom();
+  renderRoomTabs();
   renderSidebar();
   if (focusedPaneId) {
     panes.get(focusedPaneId)?.term.focus();
@@ -979,6 +991,7 @@ function renderSidebar(): void {
       const f = firstLeafOf(room);
       if (f) focusedPaneId = f;
       renderRoom();
+      renderRoomTabs();
       renderSidebar();
       if (f) focusPane(f);
     });
@@ -986,6 +999,250 @@ function renderSidebar(): void {
   }
   footEl.textContent = `${rooms.length} terminal${rooms.length === 1 ? "" : "s"}`;
   refreshTitles();
+}
+
+const pinnedRoomIds = new Set<string>(JSON.parse(localStorage.getItem("cove.pinnedRooms") ?? "[]"));
+function savePinnedRooms(): void { localStorage.setItem("cove.pinnedRooms", JSON.stringify([...pinnedRoomIds])); }
+
+function roomTabName(room: RoomSnapshot): string {
+  const leaves = collectLeafIds(room.layoutTree);
+  const first = leaves[0] ? panes.get(leaves[0]) : undefined;
+  return (first && first.title) || room.name;
+}
+
+function renderMiniDiagramFor(room: RoomSnapshot): HTMLElement {
+  const container = document.createElement("div");
+  container.className = "rtab-mini";
+  const node = layoutTreeToMiniNode(room.layoutTree);
+  const cells = buildMiniDiagram(node, { x: 0, y: 0, w: 18, h: 12 });
+  for (const c of cells) {
+    const cell = document.createElement("div");
+    cell.className = "rtab-mini-cell";
+    cell.style.cssText = `width:${Math.max(1, c.w)}px;height:${Math.max(1, c.h)}px;background:${c.accent};`;
+    container.appendChild(cell);
+  }
+  return container;
+}
+
+function layoutTreeToMiniNode(node: MosaicNode): MiniDiagramNode {
+  if (node.kind === "leaf") {
+    const subs = node.subtabs.length > 0 ? node.subtabs : [{ documentId: node.paneId, paneType: "terminal", title: null }];
+    const activeIdx = Math.min(Math.max(0, node.activeSubtab), subs.length - 1);
+    return { kind: "leaf", paneType: subs[activeIdx]?.paneType ?? "terminal" };
+  }
+  return {
+    kind: "split",
+    orientation: node.orientation,
+    ratio: node.ratio,
+    childA: layoutTreeToMiniNode(node.childA),
+    childB: layoutTreeToMiniNode(node.childB),
+  };
+}
+
+function renderRoomTabs(): void {
+  roomTabsEl.innerHTML = "";
+  const rooms = layout?.rooms ?? [];
+  if (rooms.length === 0) { roomTabsEl.style.display = "none"; return; }
+  roomTabsEl.style.display = "flex";
+
+  const { pinned, unpinned } = partitionPinned(rooms.map((r) => ({ id: r.id, name: r.name, pinned: pinnedRoomIds.has(r.id) })));
+  const roomMap = new Map(rooms.map((r) => [r.id, r]));
+
+  let dragSrcId: string | null = null;
+
+  const makeTab = (roomId: string): HTMLElement => {
+    const room = roomMap.get(roomId);
+    if (!room) return document.createElement("div");
+    const isPinned = pinnedRoomIds.has(roomId);
+    const tab = document.createElement("div");
+    tab.className = "rtab" + (roomId === activeRoomId ? " active" : "") + (isPinned ? " pinned" : "");
+    tab.draggable = true;
+    tab.title = roomTabName(room);
+
+    if (!isPinned) tab.appendChild(renderMiniDiagramFor(room));
+
+    const nameEl = document.createElement("span");
+    nameEl.className = "rtab-name";
+    nameEl.textContent = roomTabName(room);
+    tab.appendChild(nameEl);
+
+    const closeEl = document.createElement("span");
+    closeEl.className = "rtab-close";
+    closeEl.innerHTML = "&times;";
+    closeEl.title = "Close";
+    tab.appendChild(closeEl);
+
+    let clickCount = 0;
+    tab.addEventListener("click", (e) => {
+      if ((e.target as HTMLElement).classList.contains("rtab-close")) {
+        if (isPinned) return;
+        void closeRoom(roomId);
+        return;
+      }
+      if (roomId === activeRoomId) {
+        clickCount++;
+        if (clickCount >= 2) {
+          startRename(roomId, tab, nameEl);
+          clickCount = 0;
+        } else {
+          setTimeout(() => { clickCount = 0; }, 400);
+        }
+      } else {
+        activeRoomId = roomId;
+        const f = firstLeafOf(room);
+        if (f) focusedPaneId = f;
+        renderRoom();
+        renderRoomTabs();
+        renderSidebar();
+        if (f) focusPane(f);
+      }
+    });
+    tab.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      showRoomContextMenu(e, roomId, tab);
+    });
+    tab.addEventListener("dragstart", () => { dragSrcId = roomId; tab.classList.add("dragging"); });
+    tab.addEventListener("dragend", () => { tab.classList.remove("dragging"); dragSrcId = null; });
+    tab.addEventListener("dragover", (e) => { e.preventDefault(); tab.classList.add("drag-over"); });
+    tab.addEventListener("dragleave", () => { tab.classList.remove("drag-over"); });
+    tab.addEventListener("drop", (e) => {
+      e.preventDefault();
+      tab.classList.remove("drag-over");
+      if (dragSrcId && dragSrcId !== roomId) {
+        void reorderRooms(dragSrcId, roomId);
+      }
+    });
+    return tab;
+  };
+
+  for (const id of pinned) roomTabsEl.appendChild(makeTab(id));
+  if (pinned.length > 0 && unpinned.length > 0) {
+    const divider = document.createElement("div");
+    divider.className = "rtab-divider";
+    roomTabsEl.appendChild(divider);
+  }
+  for (const id of unpinned) roomTabsEl.appendChild(makeTab(id));
+
+  const addBtn = document.createElement("div");
+  addBtn.className = "tbtn";
+  addBtn.style.cssText = "margin-left:auto;flex-shrink:0;";
+  addBtn.innerHTML = "+";
+  addBtn.title = "New room (Cmd T)";
+  addBtn.addEventListener("click", () => void newRoom());
+  roomTabsEl.appendChild(addBtn);
+
+  updateEdgeFade();
+}
+
+function updateEdgeFade(): void {
+  roomTabsEl.classList.remove("edge-fade-left", "edge-fade-right");
+  if (roomTabsEl.scrollWidth > roomTabsEl.clientWidth) {
+    if (roomTabsEl.scrollLeft > 2) roomTabsEl.classList.add("edge-fade-left");
+    if (roomTabsEl.scrollLeft + roomTabsEl.clientWidth < roomTabsEl.scrollWidth - 2) roomTabsEl.classList.add("edge-fade-right");
+  }
+}
+roomTabsEl.addEventListener("scroll", updateEdgeFade);
+
+async function reorderRooms(fromId: string, toId: string): Promise<void> {
+  if (!layout) return;
+  const ids = layout.rooms.map((r) => r.id);
+  const fromIdx = ids.indexOf(fromId);
+  const toIdx = ids.indexOf(toId);
+  if (fromIdx < 0 || toIdx < 0) return;
+  const reordered = reorderRoom(layout.rooms, fromIdx, toIdx);
+  layout.rooms = reordered;
+  renderRoomTabs();
+  try {
+    const newOrder = reordered.map((r) => r.id);
+    await invoke("app.layoutMutate", { op: "reorder", roomIds: newOrder, roomId: "", targetPaneId: "", newPaneId: "", orientation: "", name: "", paneId: "", dir: 0 });
+  } catch { void 0; }
+}
+
+function startRename(roomId: string, tab: HTMLElement, nameEl: HTMLElement): void {
+  const room = layout?.rooms.find((r) => r.id === roomId);
+  if (!room) return;
+  const input = document.createElement("input");
+  input.className = "rtab-rename-input";
+  input.value = roomTabName(room);
+  input.spellcheck = false;
+  nameEl.replaceWith(input);
+  input.focus();
+  input.select();
+  const commit = async () => {
+    const newName = input.value.trim() || room.name;
+    if (newName !== room.name) {
+      room.name = newName;
+      try { await invoke("app.layoutMutate", { op: "rename", roomId, name: newName, paneId: "", targetPaneId: "", newPaneId: "", orientation: "", dir: 0 }); } catch { void 0; }
+    }
+    renderRoomTabs();
+    renderSidebar();
+  };
+  input.addEventListener("blur", commit);
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") input.blur();
+    if (e.key === "Escape") { renderRoomTabs(); }
+  });
+}
+
+function showRoomContextMenu(e: MouseEvent, roomId: string, tab: HTMLElement): void {
+  const existing = document.querySelector(".rtab-context-menu");
+  if (existing) existing.remove();
+  const menu = document.createElement("div");
+  menu.className = "rtab-context-menu pmenu";
+  menu.style.cssText = `position:fixed;top:${e.clientY}px;left:${e.clientX}px;z-index:50;`;
+  const room = layout?.rooms.find((r) => r.id === roomId);
+  if (!room) return;
+  const isPinned = pinnedRoomIds.has(roomId);
+
+  const pinItem = document.createElement("div");
+  pinItem.className = "pmenu-item";
+  pinItem.style.cssText = "padding:5px 10px;cursor:pointer;border-radius:4px;font-size:12px;";
+  pinItem.textContent = isPinned ? "Unpin" : "Pin";
+  pinItem.addEventListener("mouseenter", () => pinItem.style.background = "var(--panel)");
+  pinItem.addEventListener("mouseleave", () => pinItem.style.background = "none");
+  pinItem.addEventListener("click", () => {
+    if (isPinned) pinnedRoomIds.delete(roomId);
+    else pinnedRoomIds.add(roomId);
+    savePinnedRooms();
+    renderRoomTabs();
+    menu.remove();
+  });
+  menu.appendChild(pinItem);
+
+  const renameItem = document.createElement("div");
+  renameItem.className = "pmenu-item";
+  renameItem.style.cssText = "padding:5px 10px;cursor:pointer;border-radius:4px;font-size:12px;";
+  renameItem.textContent = "Rename";
+  renameItem.addEventListener("mouseenter", () => renameItem.style.background = "var(--panel)");
+  renameItem.addEventListener("mouseleave", () => renameItem.style.background = "none");
+  renameItem.addEventListener("click", () => { menu.remove(); startRename(roomId, tab, tab.querySelector(".rtab-name") as HTMLElement); });
+  menu.appendChild(renameItem);
+
+  const closeAllItem = document.createElement("div");
+  closeAllItem.className = "pmenu-item";
+  closeAllItem.style.cssText = "padding:5px 10px;cursor:pointer;border-radius:4px;font-size:12px;";
+  closeAllItem.textContent = "Close All (keep pinned)";
+  closeAllItem.addEventListener("mouseenter", () => closeAllItem.style.background = "var(--panel)");
+  closeAllItem.addEventListener("mouseleave", () => closeAllItem.style.background = "none");
+  closeAllItem.addEventListener("click", () => {
+    menu.remove();
+    void closeAllUnpinned();
+  });
+  menu.appendChild(closeAllItem);
+
+  document.body.appendChild(menu);
+  const close = (ev: MouseEvent) => {
+    if (!menu.contains(ev.target as Node)) { menu.remove(); document.removeEventListener("click", close); }
+  };
+  setTimeout(() => document.addEventListener("click", close), 0);
+}
+
+async function closeAllUnpinned(): Promise<void> {
+  if (!layout) return;
+  const toClose = layout.rooms.filter((r) => !pinnedRoomIds.has(r.id));
+  for (const room of toClose) {
+    await closeRoom(room.id);
+  }
 }
 
 interface Action { label: string; icon: string; key?: string; run: () => void; }

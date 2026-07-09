@@ -71,7 +71,7 @@ public sealed record EmitEventParams(string Event, System.Text.Json.JsonElement?
 public sealed record IpcEventEntry(string Event, long TimestampMs, System.Text.Json.JsonElement? Payload = null);
 public sealed record IpcEventLog(IpcEventEntry[] Events);
 
-public sealed record LayoutMutateParams(string Op, string? RoomId = null, string? TargetPaneId = null, string? NewPaneId = null, string? Orientation = null, string? Name = null, string? PaneId = null, int Dir = 1, string? PaneType = null);
+public sealed record LayoutMutateParams(string Op, string? RoomId = null, string? TargetPaneId = null, string? NewPaneId = null, string? Orientation = null, string? Name = null, string? PaneId = null, int Dir = 1, string? PaneType = null, System.Collections.Generic.IReadOnlyList<string>? RoomIds = null);
 public sealed record LayoutMutateResult(string? RoomId = null);
 public sealed record SessionStateResult(string PaneId, string Command, int Cols, int Rows, bool Alive, string? Cwd = null);
 public sealed record SearchParams(string PaneId, string Query, bool CaseSensitive = false);

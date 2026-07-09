@@ -52,6 +52,7 @@ internal static class LayoutCommands
                 "zoom" => MutateOk(() => layout.SetZoom(p.RoomId!, p.PaneId), p.RoomId, ctx),
                 "unzoom" => MutateOk(() => layout.SetZoom(p.RoomId!, null), p.RoomId, ctx),
                 "rename" => MutateOk(() => layout.RenameRoom(p.RoomId!, p.Name ?? ""), p.RoomId, ctx),
+                "reorder" => ReorderOk(() => layout.ReorderRooms(p.RoomIds ?? System.Array.Empty<string>()), ctx),
                 _ => ctx.Fail("invalid_params", $"unknown op {p.Op}"),
             });
         }
@@ -80,6 +81,12 @@ internal static class LayoutCommands
     {
         work();
         return ctx.Ok(new LayoutMutateResult(roomId), Cove.Protocol.CoveJsonContext.Default.LayoutMutateResult);
+    }
+
+    private static ControlResponse ReorderOk(Action work, EngineDispatchContext ctx)
+    {
+        work();
+        return ctx.Ok(new LayoutMutateResult(null), Cove.Protocol.CoveJsonContext.Default.LayoutMutateResult);
     }
 
     private static PaneLeaf NewLeaf(string id, string? paneType = null) => new PaneLeaf
