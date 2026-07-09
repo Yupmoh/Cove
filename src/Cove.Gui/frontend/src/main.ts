@@ -27,6 +27,7 @@ import { partitionPinned, togglePin, reorderRoom, buildMiniDiagram, accentForPan
 import { groupByWorkspace, moveSelection, selectedNote, kindIcon, kindColor, type NoteListItem, type NavState } from "./notepad-sidebar";
 import { parseQuery, filterAndSort, MruTracker, cycleCategory, categoryLabel, type PaletteItem } from "./omni-palette";
 import { buildEmptyState, EmptyStateMessages } from "./empty-states";
+import { DEFAULT_DRAFT, draftFromTheme, themeFromDraft, cssVarsFromTheme, isCustom, isBuiltin, canSaveDraft, canDelete, isValidHex, contrastRatio, contrastTier, THEME_COLOR_FIELDS, type ThemeDto, type ThemeDraft } from "./theme-editor";
 
 const CREDIT_THRESHOLD = 131072;
 
@@ -1553,9 +1554,9 @@ function closeSettings(): void {
   settingsEl.classList.remove("open");
   if (focusedPaneId) panes.get(focusedPaneId)?.term.focus();
 }
-
 function renderSettings(): void {
-  const tabs = [...new Set(configSchema.map((e) => e.tab))].sort();
+  const schemaTabs = [...new Set(configSchema.map((e) => e.tab))].sort();
+  const tabs = schemaTabs.includes("theme") ? schemaTabs : ["theme", ...schemaTabs];
   if (tabs.length === 0) {
     setTabsEl.innerHTML = "";
     setBodyEl.innerHTML = `<div style="padding:20px;color:var(--muted);text-align:center;">No settings available</div>`;
@@ -1573,6 +1574,10 @@ function renderSettings(): void {
   }
 
   setBodyEl.innerHTML = "";
+  if (activeSettingsTab === "theme") {
+    renderThemeEditor(setBodyEl);
+    return;
+  }
   const entries = configSchema.filter((e) => e.tab === activeSettingsTab);
   for (const entry of entries) {
     if (entry.control === "section") {
@@ -1653,6 +1658,207 @@ async function saveSetting(key: string, input: HTMLInputElement | HTMLSelectElem
   try {
     await invoke("cove://commands/config.set", { key, value });
     if (key.startsWith("terminal.")) { settings = await loadSettings(); applySettings(); }
+  } catch { void 0; }
+}
+let themeList: ThemeDto[] = [];
+let themeActiveName: string | null = null;
+let themeCustomNames: string[] = [];
+let themeDraft: ThemeDraft = { ...DEFAULT_DRAFT };
+let themeBuiltinNames: string[] = [];
+let themeAppliedVars: Record<string, string> | null = null;
+
+async function loadThemeData(): Promise<void> {
+  try {
+    const list = await invoke<{ themes: ThemeDto[] }>("cove://commands/theme.list", {});
+    themeList = list.themes ?? [];
+    themeBuiltinNames = themeList.filter((t) => t.name.startsWith("cove-") && !themeCustomNames.includes(t.name)).map((t) => t.name);
+  } catch { themeList = []; }
+  try {
+    const active = await invoke<{ theme: ThemeDto | null }>("cove://commands/theme.get-active", {});
+    themeActiveName = active.theme?.name ?? null;
+    if (active.theme) { themeDraft = draftFromTheme(active.theme); }
+  } catch { themeActiveName = null; }
+  themeCustomNames = themeList.filter((t) => !themeBuiltinNames.includes(t.name)).map((t) => t.name);
+}
+
+function applyThemeVars(theme: ThemeDto): void {
+  const vars = cssVarsFromTheme(theme);
+  const root = document.documentElement;
+  for (const [k, v] of Object.entries(vars)) { root.style.setProperty(k, v); }
+  themeAppliedVars = vars;
+}
+
+function revertThemeVars(): void {
+  if (!themeAppliedVars) return;
+  const root = document.documentElement;
+  for (const k of Object.keys(themeAppliedVars)) { root.style.removeProperty(k); }
+  themeAppliedVars = null;
+}
+
+function renderThemeEditor(container: HTMLElement): void {
+  void loadThemeData().then(() => renderThemeEditorBody(container));
+  container.innerHTML = `<div style="padding:20px;color:var(--muted);text-align:center;">Loading themes…</div>`;
+}
+
+function renderThemeEditorBody(container: HTMLElement): void {
+  container.innerHTML = "";
+
+  const dropdownRow = document.createElement("div");
+  dropdownRow.style.cssText = "padding:12px 0;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);";
+  const dropdownLabel = document.createElement("span");
+  dropdownLabel.textContent = "Active theme";
+  dropdownLabel.style.cssText = "font-size:12px;color:var(--muted);";
+  const dropdown = document.createElement("select");
+  dropdown.style.cssText = "background:var(--panel-2);border:1px solid var(--border);color:var(--fg);border-radius:6px;padding:4px 8px;min-width:160px;";
+  const noneOpt = document.createElement("option");
+  noneOpt.value = ""; noneOpt.textContent = "— none —"; dropdown.appendChild(noneOpt);
+  for (const t of themeList) {
+    const o = document.createElement("option");
+    o.value = t.name; o.textContent = t.name + (themeBuiltinNames.includes(t.name) ? "" : " (custom)");
+    dropdown.appendChild(o);
+  }
+  dropdown.value = themeActiveName ?? "";
+  dropdown.addEventListener("change", () => void onThemeSelect(dropdown.value));
+  dropdownRow.appendChild(dropdownLabel);
+  dropdownRow.appendChild(dropdown);
+
+  const deleteBtn = document.createElement("button");
+  deleteBtn.textContent = "Delete";
+  deleteBtn.style.cssText = "margin-left:auto;background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;";
+  deleteBtn.disabled = !canDelete(themeActiveName ?? "", themeCustomNames);
+  deleteBtn.addEventListener("click", () => void onThemeDelete(themeActiveName ?? ""));
+  dropdownRow.appendChild(deleteBtn);
+  container.appendChild(dropdownRow);
+
+  const editorHeader = document.createElement("div");
+  editorHeader.style.cssText = "padding:12px 0 4px;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;";
+  editorHeader.textContent = "Edit & preview";
+  container.appendChild(editorHeader);
+
+  const nameRow = document.createElement("div");
+  nameRow.className = "set-row";
+  const nameLabel = document.createElement("label");
+  nameLabel.textContent = "Theme name";
+  const nameInput = document.createElement("input");
+  nameInput.type = "text";
+  nameInput.value = themeDraft.name;
+  nameInput.style.cssText = "background:var(--panel-2);border:1px solid var(--border);color:var(--fg);border-radius:6px;padding:4px 8px;width:180px;";
+  nameInput.addEventListener("input", () => { themeDraft.name = nameInput.value; updateThemePreview(); });
+  nameLabel.appendChild(nameInput);
+  nameRow.appendChild(nameLabel);
+  container.appendChild(nameRow);
+
+  const typeRow = document.createElement("div");
+  typeRow.className = "set-row";
+  const typeLabel = document.createElement("label");
+  typeLabel.textContent = "Type";
+  const typeSelect = document.createElement("select");
+  for (const tp of ["dark", "light"]) { const o = document.createElement("option"); o.value = tp; o.textContent = tp; typeSelect.appendChild(o); }
+  typeSelect.value = themeDraft.type;
+  typeSelect.style.cssText = "background:var(--panel-2);border:1px solid var(--border);color:var(--fg);border-radius:6px;padding:4px 8px;width:120px;";
+  typeSelect.addEventListener("change", () => { themeDraft.type = typeSelect.value; updateThemePreview(); });
+  typeLabel.appendChild(typeSelect);
+  typeRow.appendChild(typeLabel);
+  container.appendChild(typeRow);
+
+  for (const field of THEME_COLOR_FIELDS) {
+    const row = document.createElement("div");
+    row.className = "set-row";
+    row.style.cssText = "flex-direction:row;align-items:center;gap:10px;";
+    const label = document.createElement("label");
+    label.style.cssText = "flex-direction:column;gap:2px;flex:1;";
+    const labelText = document.createElement("span");
+    labelText.textContent = field.label;
+    label.appendChild(labelText);
+    if (field.desc) { const d = document.createElement("span"); d.className = "set-desc"; d.textContent = field.desc; label.appendChild(d); }
+    const colorInput = document.createElement("input");
+    colorInput.type = "color";
+    colorInput.value = (themeDraft as unknown as Record<string, string>)[field.key];
+    colorInput.style.cssText = "width:40px;height:28px;border:1px solid var(--border);border-radius:6px;background:transparent;cursor:pointer;";
+    const hexInput = document.createElement("input");
+    hexInput.type = "text";
+    hexInput.value = (themeDraft as unknown as Record<string, string>)[field.key];
+    hexInput.style.cssText = "background:var(--panel-2);border:1px solid var(--border);color:var(--fg);border-radius:6px;padding:4px 8px;width:100px;font-family:monospace;";
+    colorInput.addEventListener("input", () => {
+      (themeDraft as unknown as Record<string, string>)[field.key] = colorInput.value;
+      hexInput.value = colorInput.value;
+      updateThemePreview();
+    });
+    hexInput.addEventListener("input", () => {
+      if (isValidHex(hexInput.value)) { colorInput.value = hexInput.value; (themeDraft as unknown as Record<string, string>)[field.key] = hexInput.value; updateThemePreview(); }
+    });
+    label.appendChild(hexInput);
+    row.appendChild(label);
+    row.appendChild(colorInput);
+    container.appendChild(row);
+  }
+
+  const contrastInfo = document.createElement("div");
+  contrastInfo.id = "theme-contrast";
+  contrastInfo.style.cssText = "padding:8px 0;font-size:11px;color:var(--muted);";
+  container.appendChild(contrastInfo);
+  updateThemePreview();
+
+  const actions = document.createElement("div");
+  actions.style.cssText = "padding:12px 0;display:flex;gap:10px;";
+  const saveBtn = document.createElement("button");
+  saveBtn.textContent = "Save as custom";
+  saveBtn.style.cssText = "background:var(--accent);border:none;color:#000;border-radius:6px;padding:6px 14px;font-size:12px;cursor:pointer;font-weight:600;";
+  saveBtn.addEventListener("click", () => void onThemeSave());
+  const resetBtn = document.createElement("button");
+  resetBtn.textContent = "Reset preview";
+  resetBtn.style.cssText = "background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:6px 14px;font-size:12px;cursor:pointer;";
+  resetBtn.addEventListener("click", () => { revertThemeVars(); if (themeActiveName) { const t = themeList.find((x) => x.name === themeActiveName); if (t) { themeDraft = draftFromTheme(t); } } else { themeDraft = { ...DEFAULT_DRAFT }; } renderThemeEditorBody(container); });
+  actions.appendChild(saveBtn);
+  actions.appendChild(resetBtn);
+  container.appendChild(actions);
+}
+
+function updateThemePreview(): void {
+  const theme = themeFromDraft(themeDraft);
+  applyThemeVars(theme);
+  const contrastEl = document.getElementById("theme-contrast");
+  if (contrastEl) {
+    const fgBg = contrastRatio(themeDraft.terminalForeground, themeDraft.terminalBackground);
+    const tier = contrastTier(fgBg);
+    contrastEl.textContent = `Terminal contrast: ${fgBg.toFixed(2)}:1 (${tier === "fail" ? "below AA" : tier})`;
+    contrastEl.style.color = tier === "fail" ? "#e06c75" : "var(--muted)";
+  }
+  const saveBtn = document.querySelector("#set-body button");
+  if (saveBtn && saveBtn.textContent === "Save as custom") {
+    saveBtn.setAttribute("data-valid", canSaveDraft(themeDraft) ? "1" : "0");
+  }
+}
+
+async function onThemeSelect(name: string): Promise<void> {
+  if (!name) { themeActiveName = null; revertThemeVars(); renderThemeEditor(setBodyEl); return; }
+  try {
+    const res = await invoke<{ theme: ThemeDto }>("cove://commands/theme.set-active", { name });
+    themeActiveName = name;
+    if (res.theme) { themeDraft = draftFromTheme(res.theme); applyThemeVars(res.theme); }
+    await loadThemeData();
+    renderThemeEditorBody(setBodyEl);
+  } catch { void 0; }
+}
+
+async function onThemeSave(): Promise<void> {
+  if (!canSaveDraft(themeDraft)) return;
+  try {
+    await invoke("cove://commands/theme.save-custom", themeDraft);
+    await invoke("cove://commands/theme.set-active", { name: themeDraft.name });
+    themeActiveName = themeDraft.name;
+    await loadThemeData();
+    renderThemeEditorBody(setBodyEl);
+  } catch { void 0; }
+}
+
+async function onThemeDelete(name: string): Promise<void> {
+  if (!canDelete(name, themeCustomNames)) return;
+  try {
+    await invoke("cove://commands/theme.delete-custom", { name });
+    if (themeActiveName === name) { themeActiveName = null; revertThemeVars(); }
+    await loadThemeData();
+    renderThemeEditorBody(setBodyEl);
   } catch { void 0; }
 }
 
