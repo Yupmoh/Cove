@@ -5,6 +5,7 @@ using Ryn.Ipc;
 using Ryn.Plugins.Badge;
 using Ryn.Plugins.GlobalShortcut;
 using Ryn.Plugins.MenuBar;
+using Ryn.Plugins.Notification;
 using Ryn.Plugins.WebViewPane;
 
 internal static class Program
@@ -46,6 +47,7 @@ internal static class Program
                 s.AddRynBadge();
                 s.AddRynGlobalShortcut();
                 s.AddRynWebViewPane();
+                s.AddRynNotification();
                 s.AddPerfResultsCommand();
             })
             .Build()
