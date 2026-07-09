@@ -3,6 +3,7 @@
     "app": true,
     "menubar": true,
     "globalShortcut": true,
-    "badge": true
+    "badge": true,
+    "webviewPane": true
   }
 }

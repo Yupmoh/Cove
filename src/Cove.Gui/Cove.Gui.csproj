@@ -19,6 +19,7 @@
       <PackageReference Include="Ryn.Plugins.MenuBar" />
       <PackageReference Include="Ryn.Plugins.Badge" />
       <PackageReference Include="Ryn.Plugins.GlobalShortcut" />
+      <PackageReference Include="Ryn.Plugins.WebViewPane" />
     </ItemGroup>
 
   <ItemGroup>
