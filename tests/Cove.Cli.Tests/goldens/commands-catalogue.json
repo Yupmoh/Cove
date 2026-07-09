@@ -390,6 +390,22 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/diagnostics.export",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/diagnostics.snapshot.list",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/diagnostics.snapshot.take",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/diagnostics.status",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/editor.get-state",
     "source": "core"
   },
@@ -666,6 +682,18 @@
   },
   {
     "command": "cove://commands/pane.write",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/perf.bundle.create",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/perf.bundle.delete",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/perf.bundle.list",
     "source": "core"
   },
   {
@@ -1276,6 +1304,22 @@
     "source": "core"
   },
   {
+    "command": "diagnostics export",
+    "source": "cli"
+  },
+  {
+    "command": "diagnostics snapshot",
+    "source": "cli"
+  },
+  {
+    "command": "diagnostics snapshots",
+    "source": "cli"
+  },
+  {
+    "command": "diagnostics status",
+    "source": "cli"
+  },
+  {
     "command": "docs generate",
     "source": "cli"
   },
@@ -1433,6 +1477,18 @@
   },
   {
     "command": "pane-types list",
+    "source": "cli"
+  },
+  {
+    "command": "perf bundle create",
+    "source": "cli"
+  },
+  {
+    "command": "perf bundle delete",
+    "source": "cli"
+  },
+  {
+    "command": "perf bundle list",
     "source": "cli"
   },
   {

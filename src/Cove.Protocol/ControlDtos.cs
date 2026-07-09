@@ -399,6 +399,14 @@ public sealed record AttributionEntryDto(string Id, string SessionId, string Too
 public sealed record AttributionListResult(System.Collections.Generic.IReadOnlyList<AttributionEntryDto> Entries);
 public sealed record ReviewDispatchParams(string TargetPaneId, string WorkspaceId, string SessionId, string? TaskRunId, string Message, string? CommitSha);
 public sealed record ReviewDispatchResultDto(string DispatchId, string TargetPaneId, string SessionId, string? TaskRunId, string DispatchedAt);
+public sealed record DiagnosticsStatusResult(bool Enabled, bool WebInspectorOptIn, int MaxSnapshots, double SnapshotIntervalSeconds, int SnapshotCount);
+public sealed record DiagnosticsSnapshotTakeParams(int? ActivePanes = null, int? ActiveWorkspaces = null, int? ActiveAgents = null);
+public sealed record DiagnosticsExportParams(string? Path = null);
+public sealed record DiagnosticsExportResult(string Path);
+public sealed record PerfBundleCreateParams(string? TracePath = null);
+public sealed record PerfBundleDeleteParams(string BundlePath);
+public sealed record PerfBundleDto(string Id, string BundlePath, string CreatedAt, long SizeBytes, int SnapshotCount, bool ContainsTrace);
+public sealed record PerfBundleListResult(System.Collections.Generic.IReadOnlyList<PerfBundleDto> Bundles);
 
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
@@ -692,5 +700,13 @@ public sealed record ReviewDispatchResultDto(string DispatchId, string TargetPan
 [JsonSerializable(typeof(AttributionListResult))]
 [JsonSerializable(typeof(ReviewDispatchParams))]
 [JsonSerializable(typeof(ReviewDispatchResultDto))]
+[JsonSerializable(typeof(DiagnosticsStatusResult))]
+[JsonSerializable(typeof(DiagnosticsSnapshotTakeParams))]
+[JsonSerializable(typeof(DiagnosticsExportParams))]
+[JsonSerializable(typeof(DiagnosticsExportResult))]
+[JsonSerializable(typeof(PerfBundleCreateParams))]
+[JsonSerializable(typeof(PerfBundleDeleteParams))]
+[JsonSerializable(typeof(PerfBundleDto))]
+[JsonSerializable(typeof(PerfBundleListResult))]
 [JsonSerializable(typeof(JsonElement))]
 public sealed partial class CoveJsonContext : JsonSerializerContext;

@@ -985,4 +985,50 @@ internal static class CliCommands
         var taskId = ArgValue(args, "--task") ?? "";
         return ctx.RouteCoreWithParamsAsync("cove://commands/capture.attach", $$"""{"captureId":"{{captureId}}","taskId":"{{taskId}}"}""");
     }
+
+    [CoveCommand("diagnostics status")]
+    public static Task<int> DiagnosticsStatus(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/diagnostics.status");
+
+    [CoveCommand("diagnostics snapshot")]
+    public static Task<int> DiagnosticsSnapshot(CommandContext ctx)
+    {
+        var args = ctx.Args;
+        var activePanes = ArgValue(args, "--panes") ?? "0";
+        var activeWorkspaces = ArgValue(args, "--workspaces") ?? "0";
+        var activeAgents = ArgValue(args, "--agents") ?? "0";
+        return ctx.RouteCoreWithParamsAsync("cove://commands/diagnostics.snapshot.take", $$"""{"activePanes":{{activePanes}},"activeWorkspaces":{{activeWorkspaces}},"activeAgents":{{activeAgents}}}""");
+    }
+
+    [CoveCommand("diagnostics snapshots")]
+    public static Task<int> DiagnosticsSnapshots(CommandContext ctx)
+        => ctx.RouteCoreWithParamsAsync("cove://commands/diagnostics.snapshot.list", null);
+
+    [CoveCommand("diagnostics export")]
+    public static Task<int> DiagnosticsExport(CommandContext ctx)
+    {
+        var args = ctx.Args;
+        var path = ArgValue(args, "--path") ?? (args.Length > 0 ? args[0] : "");
+        return ctx.RouteCoreWithParamsAsync("cove://commands/diagnostics.export", $$"""{"path":"{{path}}"}""");
+    }
+
+    [CoveCommand("perf bundle create")]
+    public static Task<int> PerfBundleCreate(CommandContext ctx)
+    {
+        var args = ctx.Args;
+        var tracePath = ArgValue(args, "--trace") ?? "";
+        return ctx.RouteCoreWithParamsAsync("cove://commands/perf.bundle.create", $$"""{"tracePath":"{{tracePath}}"}""");
+    }
+
+    [CoveCommand("perf bundle list")]
+    public static Task<int> PerfBundleList(CommandContext ctx)
+        => ctx.RouteCoreWithParamsAsync("cove://commands/perf.bundle.list", null);
+
+    [CoveCommand("perf bundle delete")]
+    public static Task<int> PerfBundleDelete(CommandContext ctx)
+    {
+        var args = ctx.Args;
+        var bundlePath = ArgValue(args, "--path") ?? (args.Length > 0 ? args[0] : "");
+        return ctx.RouteCoreWithParamsAsync("cove://commands/perf.bundle.delete", $$"""{"bundlePath":"{{bundlePath}}"}""");
+    }
 }

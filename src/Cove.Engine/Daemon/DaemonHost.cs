@@ -81,6 +81,8 @@ public sealed class DaemonHost
     private Cove.Engine.Browser.BrowserPaneManager? _browser;
     private Cove.Engine.Config.ConfigService? _config;
     private Cove.Engine.Captures.CaptureStore? _captures;
+    private Cove.Engine.Diagnostics.DiagnosticsHub? _diagnostics;
+    private Cove.Engine.Diagnostics.PerformanceBundleService? _perfBundles;
     private Cove.Engine.Workspaces.GitReadModel? _gitReadModel;
     private Cove.Engine.Search.SearchService? _searchService;
     private Cove.Engine.Theming.ThemeService? _themes;
@@ -175,6 +177,8 @@ public sealed class DaemonHost
         _browser = new Cove.Engine.Browser.BrowserPaneManager();
         _config = new Cove.Engine.Config.ConfigService(dataDir, logger);
         _captures = new Cove.Engine.Captures.CaptureStore(dataDir, logger);
+        _diagnostics = new Cove.Engine.Diagnostics.DiagnosticsHub(null, logger);
+        _perfBundles = new Cove.Engine.Diagnostics.PerformanceBundleService(_diagnostics, System.IO.Path.Combine(dataDir, "perf-bundles"), logger);
         _gitReadModel = new Cove.Engine.Workspaces.GitReadModel(new Cove.Engine.Workspaces.ProcessGitRunner(), logger);
         _searchService = new Cove.Engine.Search.SearchService(logger);
         _keybindings = new Cove.Engine.Keybindings.KeybindingEngine();
@@ -420,7 +424,7 @@ public sealed class DaemonHost
             await WriteResponseAsync(conn, Fail(req.Id, "not_ready", "sys/hello required before commands"), cancellationToken).ConfigureAwait(false);
             return false;
         }
-        ControlResponse? generated = await Cove.Engine.EngineCommandRouter.RouteAsync(req, _panes, _layout, _workspaces, _runCommands, _restoration, _snapshots, _skills, _agents, _launchProfiles, _adapterEnv, _hookServer, _hookRouter, _agentRouter, _activity, _sessions, _lifecycle, _launcher, _taskService, _dispatchSaga, _resumeSaga, _timeline, _blackboard, _noteFiles, _memory, _memoryRanker, _proposals, _consolidator, _edits, _corpus, _vaultSettings, _library, _reviews, _attribution, _reviewDispatcher, _paneTypes, _browser, _config, _manifestStore, _registry, _omniChat, _paneScopes, _stateBus, _extensions, _captures, _gitReadModel, _searchService, _themes, _keybindings, _browserAutomation, cancellationToken).ConfigureAwait(false);
+        ControlResponse? generated = await Cove.Engine.EngineCommandRouter.RouteAsync(req, _panes, _layout, _workspaces, _runCommands, _restoration, _snapshots, _skills, _agents, _launchProfiles, _adapterEnv, _hookServer, _hookRouter, _agentRouter, _activity, _sessions, _lifecycle, _launcher, _taskService, _dispatchSaga, _resumeSaga, _timeline, _blackboard, _noteFiles, _memory, _memoryRanker, _proposals, _consolidator, _edits, _corpus, _vaultSettings, _library, _reviews, _attribution, _reviewDispatcher, _paneTypes, _browser, _config, _manifestStore, _registry, _omniChat, _paneScopes, _stateBus, _extensions, _captures, _gitReadModel, _searchService, _themes, _keybindings, _browserAutomation, _diagnostics, _perfBundles, cancellationToken).ConfigureAwait(false);
         if (generated is not null)
         {
             if (generated.Ok && IsMutatingVerb(req.Uri))

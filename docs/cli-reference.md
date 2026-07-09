@@ -99,6 +99,10 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/config.get` | core |  |
 | `cove://commands/config.schema` | core |  |
 | `cove://commands/config.set` | core |  |
+| `cove://commands/diagnostics.export` | core |  |
+| `cove://commands/diagnostics.snapshot.list` | core |  |
+| `cove://commands/diagnostics.snapshot.take` | core |  |
+| `cove://commands/diagnostics.status` | core |  |
 | `cove://commands/editor.get-state` | core |  |
 | `cove://commands/editor.open` | core |  |
 | `cove://commands/editor.save` | core |  |
@@ -167,6 +171,9 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/pane.search` | core |  |
 | `cove://commands/pane.spawn` | core |  |
 | `cove://commands/pane.write` | core |  |
+| `cove://commands/perf.bundle.create` | core |  |
+| `cove://commands/perf.bundle.delete` | core |  |
+| `cove://commands/perf.bundle.list` | core |  |
 | `cove://commands/protocol.resolve` | core |  |
 | `cove://commands/registry.fetch` | core |  |
 | `cove://commands/resident.dock` | core |  |
@@ -318,6 +325,10 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/worktree.remove` | core |  |
 | `cove://hooks/_state` | core |  |
 | `cove://hooks/pane-states` | core |  |
+| `diagnostics export` | cli |  |
+| `diagnostics snapshot` | cli |  |
+| `diagnostics snapshots` | cli |  |
+| `diagnostics status` | cli |  |
 | `docs generate` | cli |  |
 | `editor get-state` | cli |  |
 | `editor open` | cli |  |
@@ -358,6 +369,9 @@ Generated from the command registry. Do not edit by hand.
 | `note write` | cli |  |
 | `pane list` | cli |  |
 | `pane-types list` | cli |  |
+| `perf bundle create` | cli |  |
+| `perf bundle delete` | cli |  |
+| `perf bundle list` | cli |  |
 | `protocol resolve` | cli |  |
 | `review add-comment` | cli |  |
 | `review audit` | cli |  |
@@ -436,4 +450,4 @@ Generated from the command registry. Do not edit by hand.
 | `viewer get-state` | cli |  |
 | `viewer open` | cli |  |
 
-Total: 431 commands
+Total: 445 commands
