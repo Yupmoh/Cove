@@ -139,6 +139,140 @@ export function buildFillEvalPayload(ref: string, value: string): string {
     " return JSON.stringify({ ok: true }); })()";
 }
 
+export function buildClearEvalPayload(ref: string): string {
+  return "(() => { const el = document.querySelector('" + refSelector(ref) + "');" +
+    " if (!el) return JSON.stringify({ ok: false, error: 'ref not found' });" +
+    " el.focus();" +
+    " if (el.isContentEditable) { el.textContent = ''; } else { el.value = ''; }" +
+    " el.dispatchEvent(new Event('input', { bubbles: true }));" +
+    " el.dispatchEvent(new Event('change', { bubbles: true }));" +
+    " return JSON.stringify({ ok: true }); })()";
+}
+
+export function buildTypeEvalPayload(ref: string, text: string): string {
+  const textJson = JSON.stringify(text);
+  return "(() => { const el = document.querySelector('" + refSelector(ref) + "');" +
+    " if (!el) return JSON.stringify({ ok: false, error: 'ref not found' });" +
+    " el.focus(); const t = " + textJson + ";" +
+    " for (const ch of t) {" +
+    "   if (el.isContentEditable) { el.textContent = (el.textContent || '') + ch; }" +
+    "   else { el.value = (el.value || '') + ch; }" +
+    "   el.dispatchEvent(new Event('input', { bubbles: true }));" +
+    " }" +
+    " el.dispatchEvent(new Event('change', { bubbles: true }));" +
+    " return JSON.stringify({ ok: true, value: (typeof el.value === 'string' ? el.value : null) }); })()";
+}
+
+export function buildPressEvalPayload(ref: string, key: string): string {
+  const keyJson = JSON.stringify(key);
+  return "(() => { const el = document.querySelector('" + refSelector(ref) + "') || document.activeElement || document.body;" +
+    " const key = " + keyJson + ";" +
+    " const opts = { key: key, bubbles: true, cancelable: true };" +
+    " el.dispatchEvent(new KeyboardEvent('keydown', opts));" +
+    " if (key.length === 1) el.dispatchEvent(new KeyboardEvent('keypress', opts));" +
+    " el.dispatchEvent(new KeyboardEvent('keyup', opts));" +
+    " return JSON.stringify({ ok: true, isTrusted: false }); })()";
+}
+
+export function buildSelectEvalPayload(ref: string, value: string): string {
+  const valueJson = JSON.stringify(value);
+  return "(() => { const el = document.querySelector('" + refSelector(ref) + "');" +
+    " if (!el) return JSON.stringify({ ok: false, error: 'ref not found' });" +
+    " const want = " + valueJson + ";" +
+    " const opt = Array.from(el.options || []).find((o) => o.value === want);" +
+    " if (!opt) return JSON.stringify({ ok: false, error: 'no matching option' });" +
+    " el.value = want;" +
+    " el.dispatchEvent(new Event('input', { bubbles: true }));" +
+    " el.dispatchEvent(new Event('change', { bubbles: true }));" +
+    " return JSON.stringify({ ok: true, value: el.value }); })()";
+}
+
+export function normalizeScroll(x: number | null | undefined, y: number | null | undefined): { x: number; y: number } {
+  return { x: typeof x === "number" ? x : 0, y: typeof y === "number" ? y : 0 };
+}
+
+export function buildScrollEvalPayload(ref: string | null, x: number | null, y: number | null): string {
+  const coords = normalizeScroll(x, y);
+  const target = ref
+    ? "document.querySelector('" + refSelector(ref) + "')"
+    : "null";
+  return "(() => { const el = " + target + ";" +
+    (ref
+      ? " if (!el) return JSON.stringify({ ok: false, error: 'ref not found' });" +
+        " el.scrollTo ? el.scrollTo(" + coords.x + ", " + coords.y + ") : (el.scrollLeft = " + coords.x + ", el.scrollTop = " + coords.y + ");"
+      : " window.scrollTo(" + coords.x + ", " + coords.y + ");") +
+    " return JSON.stringify({ ok: true, x: " + coords.x + ", y: " + coords.y + " }); })()";
+}
+
+export function clampWaitDeadline(ms: number | null | undefined): number {
+  const raw = typeof ms === "number" ? ms : 2000;
+  if (raw < 0) return 0;
+  if (raw > 8000) return 8000;
+  return raw;
+}
+
+export function buildWaitEvalPayload(ref: string | null, text: string | null, timeoutMs: number): string {
+  const deadline = clampWaitDeadline(timeoutMs);
+  const selector = ref ? JSON.stringify(refSelector(ref)) : "null";
+  const textJson = text ? JSON.stringify(text) : "null";
+  return "(() => new Promise((resolve) => {" +
+    " const selector = " + selector + "; const wantText = " + textJson + ";" +
+    " const deadline = Date.now() + " + deadline + ";" +
+    " const met = () => {" +
+    "   if (selector) { const el = document.querySelector(selector); if (!el) return false;" +
+    "     if (el.offsetWidth <= 0 && el.offsetHeight <= 0) return false; }" +
+    "   if (wantText) { return (document.body.innerText || '').indexOf(wantText) !== -1; }" +
+    "   return true;" +
+    " };" +
+    " const tick = () => {" +
+    "   if (met()) { resolve(JSON.stringify({ ok: true, found: true })); return; }" +
+    "   if (Date.now() >= deadline) { resolve(JSON.stringify({ ok: false, found: false, error: 'wait timed out' })); return; }" +
+    "   setTimeout(tick, 100);" +
+    " };" +
+    " tick();" +
+    " }))()";
+}
+
+export const GET_PROPS = ["text", "value", "href", "title", "checked", "disabled", "visible"] as const;
+export const IS_STATES = ["visible", "enabled", "checked", "editable"] as const;
+
+export function isValidGetProp(prop: string): boolean {
+  return (GET_PROPS as readonly string[]).includes(prop);
+}
+
+export function isValidIsState(state: string): boolean {
+  return (IS_STATES as readonly string[]).includes(state);
+}
+
+export function buildGetEvalPayload(ref: string, prop: string): string {
+  if (!isValidGetProp(prop)) throw new Error(`unknown property: ${prop}`);
+  const propJson = JSON.stringify(prop);
+  return "(() => { const el = document.querySelector('" + refSelector(ref) + "');" +
+    " if (!el) return JSON.stringify({ ok: false, error: 'ref not found' });" +
+    " const prop = " + propJson + "; let value = null;" +
+    " if (prop === 'text') value = (el.innerText || el.textContent || '').trim();" +
+    " else if (prop === 'value') value = typeof el.value === 'string' ? el.value : null;" +
+    " else if (prop === 'href') value = el.href || el.getAttribute('href');" +
+    " else if (prop === 'title') value = el.title || el.getAttribute('title');" +
+    " else if (prop === 'checked') value = el.checked === true;" +
+    " else if (prop === 'disabled') value = el.disabled === true || el.getAttribute('disabled') !== null;" +
+    " else if (prop === 'visible') value = el.offsetWidth > 0 || el.offsetHeight > 0;" +
+    " return JSON.stringify({ ok: true, prop: prop, value: value }); })()";
+}
+
+export function buildIsEvalPayload(ref: string, state: string): string {
+  if (!isValidIsState(state)) throw new Error(`unknown state: ${state}`);
+  const stateJson = JSON.stringify(state);
+  return "(() => { const el = document.querySelector('" + refSelector(ref) + "');" +
+    " if (!el) return JSON.stringify({ ok: false, error: 'ref not found' });" +
+    " const state = " + stateJson + "; let result = false;" +
+    " if (state === 'visible') result = el.offsetWidth > 0 || el.offsetHeight > 0;" +
+    " else if (state === 'enabled') result = !(el.disabled === true || el.getAttribute('disabled') !== null);" +
+    " else if (state === 'checked') result = el.checked === true;" +
+    " else if (state === 'editable') result = el.isContentEditable === true || (('value' in el) && !(el.disabled === true) && !(el.readOnly === true));" +
+    " return JSON.stringify({ ok: true, state: state, result: result }); })()";
+}
+
 export interface AutomationExecEvent {
   requestId: string;
   paneId: string;
@@ -148,6 +282,9 @@ export interface AutomationExecEvent {
   js?: string | null;
 }
 
+interface ScrollValue { x?: number | null; y?: number | null }
+interface WaitValue { text?: string | null; timeoutMs?: number | null }
+
 export function buildAutomationJs(ev: AutomationExecEvent): string {
   switch (ev.kind) {
     case "snapshot":
@@ -156,6 +293,26 @@ export function buildAutomationJs(ev: AutomationExecEvent): string {
       return buildClickEvalPayload(ev.ref ?? "");
     case "fill":
       return buildFillEvalPayload(ev.ref ?? "", ev.value ?? "");
+    case "clear":
+      return buildClearEvalPayload(ev.ref ?? "");
+    case "type":
+      return buildTypeEvalPayload(ev.ref ?? "", ev.value ?? "");
+    case "press":
+      return buildPressEvalPayload(ev.ref ?? "", ev.value ?? "");
+    case "select":
+      return buildSelectEvalPayload(ev.ref ?? "", ev.value ?? "");
+    case "scroll": {
+      const sv = (ev.value ? JSON.parse(ev.value) : {}) as ScrollValue;
+      return buildScrollEvalPayload(ev.ref ?? null, sv.x ?? null, sv.y ?? null);
+    }
+    case "wait": {
+      const wv = (ev.value ? JSON.parse(ev.value) : {}) as WaitValue;
+      return buildWaitEvalPayload(ev.ref ?? null, wv.text ?? null, wv.timeoutMs ?? 2000);
+    }
+    case "get":
+      return buildGetEvalPayload(ev.ref ?? "", ev.value ?? "");
+    case "is":
+      return buildIsEvalPayload(ev.ref ?? "", ev.value ?? "");
     case "eval":
       if (!ev.js) throw new Error("eval action requires js");
       return ev.js;

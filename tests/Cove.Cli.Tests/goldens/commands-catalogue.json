@@ -229,6 +229,11 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/browser.clear",
+    "description": "clear a ref input/textarea/contenteditable and dispatch input\u002Bchange",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/browser.click",
     "source": "core"
   },
@@ -253,11 +258,26 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/browser.get",
+    "description": "read a whitelisted property (text,value,href,title,checked,disabled,visible) from a ref",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/browser.is",
+    "description": "test a whitelisted state (visible,enabled,checked,editable) of a ref",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/browser.navigate",
     "source": "core"
   },
   {
     "command": "cove://commands/browser.open",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/browser.press",
+    "description": "dispatch synthetic keydown/keypress/keyup for a named key (isTrusted=false, cannot fire browser default actions)",
     "source": "core"
   },
   {
@@ -269,11 +289,31 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/browser.scroll",
+    "description": "scroll a ref element (or the window when ref is omitted) to absolute coordinates x,y \u2014 a missing axis defaults to 0",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/browser.select",
+    "description": "select an option in a \u003Cselect\u003E ref by its value",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/browser.setUserAgent",
     "source": "core"
   },
   {
     "command": "cove://commands/browser.snapshot",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/browser.type",
+    "description": "append text char-by-char into a ref with synthetic input events",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/browser.wait",
+    "description": "poll the page until a ref exists or text becomes visible, up to timeoutMs (default 2000, capped 8000ms under the bridge timeout)",
     "source": "core"
   },
   {

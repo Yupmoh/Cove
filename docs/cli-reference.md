@@ -61,18 +61,26 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/blackboard.show` | core |  |
 | `cove://commands/browser.automation.result` | core |  |
 | `cove://commands/browser.back` | core |  |
+| `cove://commands/browser.clear` | core | clear a ref input/textarea/contenteditable and dispatch input+change |
 | `cove://commands/browser.click` | core |  |
 | `cove://commands/browser.close` | core |  |
 | `cove://commands/browser.create` | core |  |
 | `cove://commands/browser.eval` | core |  |
 | `cove://commands/browser.fill` | core |  |
 | `cove://commands/browser.forward` | core |  |
+| `cove://commands/browser.get` | core | read a whitelisted property (text,value,href,title,checked,disabled,visible) from a ref |
+| `cove://commands/browser.is` | core | test a whitelisted state (visible,enabled,checked,editable) of a ref |
 | `cove://commands/browser.navigate` | core |  |
 | `cove://commands/browser.open` | core |  |
+| `cove://commands/browser.press` | core | dispatch synthetic keydown/keypress/keyup for a named key (isTrusted=false, cannot fire browser default actions) |
 | `cove://commands/browser.reload` | core |  |
 | `cove://commands/browser.screenshot` | core |  |
+| `cove://commands/browser.scroll` | core | scroll a ref element (or the window when ref is omitted) to absolute coordinates x,y — a missing axis defaults to 0 |
+| `cove://commands/browser.select` | core | select an option in a <select> ref by its value |
 | `cove://commands/browser.setUserAgent` | core |  |
 | `cove://commands/browser.snapshot` | core |  |
+| `cove://commands/browser.type` | core | append text char-by-char into a ref with synthetic input events |
+| `cove://commands/browser.wait` | core | poll the page until a ref exists or text becomes visible, up to timeoutMs (default 2000, capped 8000ms under the bridge timeout) |
 | `cove://commands/canvas.action` | core |  |
 | `cove://commands/capture.attach` | core |  |
 | `cove://commands/capture.delete` | core |  |
@@ -428,4 +436,4 @@ Generated from the command registry. Do not edit by hand.
 | `viewer get-state` | cli |  |
 | `viewer open` | cli |  |
 
-Total: 423 commands
+Total: 431 commands

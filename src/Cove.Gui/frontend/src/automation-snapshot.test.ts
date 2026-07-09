@@ -1,5 +1,28 @@
 import { describe, expect, it } from "vitest";
-import { buildClickEvalPayload, buildFillEvalPayload, buildSnapshotEvalPayload, collectSnapshot, findByText, findRef, isValidRef } from "./automation-snapshot";
+import {
+  buildAutomationJs,
+  buildClearEvalPayload,
+  buildClickEvalPayload,
+  buildFillEvalPayload,
+  buildGetEvalPayload,
+  buildIsEvalPayload,
+  buildPressEvalPayload,
+  buildScrollEvalPayload,
+  buildSelectEvalPayload,
+  buildSnapshotEvalPayload,
+  buildTypeEvalPayload,
+  buildWaitEvalPayload,
+  clampWaitDeadline,
+  collectSnapshot,
+  findByText,
+  findRef,
+  GET_PROPS,
+  isValidGetProp,
+  isValidIsState,
+  isValidRef,
+  IS_STATES,
+  normalizeScroll,
+} from "./automation-snapshot";
 
 interface FakeElement {
   tagName: string;
@@ -145,5 +168,109 @@ describe("eval payloads", () => {
     expect(() => buildClickEvalPayload("e5\"] , body [x=\"")).toThrow(/invalid automation ref/);
     expect(isValidRef("e12")).toBe(true);
     expect(isValidRef("12")).toBe(false);
+  });
+});
+
+describe("interaction payloads", () => {
+  const attacks = ["\"", "`", "</script>", "\n", "\\", "');alert(1);('"];
+
+  it("clear payload targets a validated ref and dispatches events", () => {
+    const payload = buildClearEvalPayload("e3");
+    expect(payload).toContain('[data-cove-ref="e3"]');
+    expect(payload).toContain("input");
+    expect(payload).toContain("change");
+    expect(() => buildClearEvalPayload("e3\"]x")).toThrow(/invalid automation ref/);
+  });
+
+  it("type payload json-encodes text so injection strings cannot break out", () => {
+    for (const attack of attacks) {
+      const payload = buildTypeEvalPayload("e1", attack);
+      expect(payload).toContain(JSON.stringify(attack));
+      expect(payload).toContain('[data-cove-ref="e1"]');
+    }
+  });
+
+  it("press payload json-encodes the key name", () => {
+    for (const attack of attacks) {
+      const payload = buildPressEvalPayload("e1", attack);
+      expect(payload).toContain(JSON.stringify(attack));
+      expect(payload).toContain("KeyboardEvent");
+    }
+    expect(buildPressEvalPayload("e1", "Enter")).toContain("keydown");
+  });
+
+  it("select payload json-encodes the option value and reports no match", () => {
+    for (const attack of attacks) {
+      const payload = buildSelectEvalPayload("e1", attack);
+      expect(payload).toContain(JSON.stringify(attack));
+    }
+    expect(buildSelectEvalPayload("e1", "x")).toContain("no matching option");
+  });
+
+  it("scroll payload embeds numeric coordinates only", () => {
+    const win = buildScrollEvalPayload(null, 0, 250);
+    expect(win).toContain("250");
+    expect(win).toContain("scrollTo");
+    const elp = buildScrollEvalPayload("e2", 10, 20);
+    expect(elp).toContain('[data-cove-ref="e2"]');
+    expect(() => buildScrollEvalPayload("e2\"]x", 0, 0)).toThrow(/invalid automation ref/);
+  });
+});
+
+describe("introspection payloads and helpers", () => {
+  it("clamps wait deadlines under the bridge timeout", () => {
+    expect(clampWaitDeadline(undefined)).toBe(2000);
+    expect(clampWaitDeadline(500)).toBe(500);
+    expect(clampWaitDeadline(50000)).toBe(8000);
+    expect(clampWaitDeadline(-10)).toBe(0);
+  });
+
+  it("wait payload json-encodes the target text and stays under 8s", () => {
+    for (const attack of ["</script>", "`", "\"", "\n"]) {
+      const payload = buildWaitEvalPayload(null, attack, 3000);
+      expect(payload).toContain(JSON.stringify(attack));
+    }
+    const withRef = buildWaitEvalPayload("e7", null, 90000);
+    expect(withRef).toContain('data-cove-ref');
+    expect(withRef).toContain("8000");
+  });
+
+  it("get whitelist rejects unknown props", () => {
+    expect(GET_PROPS).toContain("value");
+    expect(isValidGetProp("value")).toBe(true);
+    expect(isValidGetProp("outerHTML")).toBe(false);
+    expect(buildGetEvalPayload("e1", "value")).toContain('[data-cove-ref="e1"]');
+    expect(() => buildGetEvalPayload("e1", "outerHTML")).toThrow(/unknown property/);
+  });
+
+  it("is whitelist rejects unknown states", () => {
+    expect(IS_STATES).toContain("visible");
+    expect(isValidIsState("editable")).toBe(true);
+    expect(isValidIsState("frobbed")).toBe(false);
+    expect(buildIsEvalPayload("e1", "checked")).toContain('[data-cove-ref="e1"]');
+    expect(() => buildIsEvalPayload("e1", "frobbed")).toThrow(/unknown state/);
+  });
+
+  it("normalizeScroll defaults missing axes to zero", () => {
+    expect(normalizeScroll(undefined, undefined)).toEqual({ x: 0, y: 0 });
+    expect(normalizeScroll(null, 40)).toEqual({ x: 0, y: 40 });
+    expect(normalizeScroll(15, null)).toEqual({ x: 15, y: 0 });
+  });
+});
+
+describe("buildAutomationJs dispatch", () => {
+  it("routes each new verb to its payload builder", () => {
+    expect(buildAutomationJs({ requestId: "r", paneId: "p", kind: "clear", ref: "e1" })).toContain("data-cove-ref");
+    expect(buildAutomationJs({ requestId: "r", paneId: "p", kind: "type", ref: "e1", value: "hi" })).toContain(JSON.stringify("hi"));
+    expect(buildAutomationJs({ requestId: "r", paneId: "p", kind: "press", ref: "e1", value: "Enter" })).toContain("KeyboardEvent");
+    expect(buildAutomationJs({ requestId: "r", paneId: "p", kind: "select", ref: "e1", value: "o" })).toContain("no matching option");
+    expect(buildAutomationJs({ requestId: "r", paneId: "p", kind: "scroll", value: JSON.stringify({ x: 0, y: 12 }) })).toContain("12");
+    expect(buildAutomationJs({ requestId: "r", paneId: "p", kind: "wait", ref: "e1", value: JSON.stringify({ timeoutMs: 1000 }) })).toContain("1000");
+    expect(buildAutomationJs({ requestId: "r", paneId: "p", kind: "get", ref: "e1", value: "text" })).toContain("data-cove-ref");
+    expect(buildAutomationJs({ requestId: "r", paneId: "p", kind: "is", ref: "e1", value: "visible" })).toContain("data-cove-ref");
+  });
+
+  it("throws on an unknown verb", () => {
+    expect(() => buildAutomationJs({ requestId: "r", paneId: "p", kind: "teleport" })).toThrow(/unknown automation kind/);
   });
 });

@@ -370,6 +370,16 @@ public sealed record BrowserAutomationFillParams(string PaneId, string Ref, stri
 public sealed record BrowserAutomationEvalParams(string PaneId, string Js);
 public sealed record BrowserScreenshotParams(string PaneId);
 public sealed record BrowserSetUserAgentParams(string PaneId, string UserAgent);
+public sealed record BrowserAutomationClearParams(string PaneId, string Ref);
+public sealed record BrowserAutomationTypeParams(string PaneId, string Ref, string Text);
+public sealed record BrowserAutomationPressParams(string PaneId, string Ref, string Key);
+public sealed record BrowserAutomationSelectParams(string PaneId, string Ref, string Value);
+public sealed record BrowserAutomationScrollParams(string PaneId, string? Ref = null, int? X = null, int? Y = null);
+public sealed record BrowserAutomationWaitParams(string PaneId, string? Ref = null, string? Text = null, int? TimeoutMs = null);
+public sealed record BrowserAutomationGetParams(string PaneId, string Ref, string Prop);
+public sealed record BrowserAutomationIsParams(string PaneId, string Ref, string State);
+public sealed record BrowserScrollValue(int? X, int? Y);
+public sealed record BrowserWaitValue(string? Text, int? TimeoutMs);
 public sealed record ReviewAddCommentParams(string CommitSha, string FilePath, int Line, string Author, string Body, string? ParentId);
 public sealed record ReviewListCommentsParams(string CommitSha, string? FilePath, string? State);
 public sealed record ReviewTransitionParams(string CommentId, string Actor);
@@ -653,6 +663,16 @@ public sealed record ReviewDispatchResultDto(string DispatchId, string TargetPan
 [JsonSerializable(typeof(BrowserAutomationEvalParams))]
 [JsonSerializable(typeof(BrowserScreenshotParams))]
 [JsonSerializable(typeof(BrowserSetUserAgentParams))]
+[JsonSerializable(typeof(BrowserAutomationClearParams))]
+[JsonSerializable(typeof(BrowserAutomationTypeParams))]
+[JsonSerializable(typeof(BrowserAutomationPressParams))]
+[JsonSerializable(typeof(BrowserAutomationSelectParams))]
+[JsonSerializable(typeof(BrowserAutomationScrollParams))]
+[JsonSerializable(typeof(BrowserAutomationWaitParams))]
+[JsonSerializable(typeof(BrowserAutomationGetParams))]
+[JsonSerializable(typeof(BrowserAutomationIsParams))]
+[JsonSerializable(typeof(BrowserScrollValue))]
+[JsonSerializable(typeof(BrowserWaitValue))]
 [JsonSerializable(typeof(ReviewAddCommentParams))]
 [JsonSerializable(typeof(ReviewListCommentsParams))]
 [JsonSerializable(typeof(ReviewTransitionParams))]
