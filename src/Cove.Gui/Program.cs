@@ -37,6 +37,7 @@ internal static class Program
             .ConfigureServices(s =>
             {
                 s.AddSingleton(link);
+                s.AddSingleton<EngineEventForwarder>();
                 s.AddSingleton<CoveGuiCommands>();
                 s.AddRynCommands();
                 s.AddAppCommands();

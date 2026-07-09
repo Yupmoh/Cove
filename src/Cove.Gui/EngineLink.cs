@@ -12,12 +12,15 @@ public sealed class EngineLink : IAsyncDisposable
     private readonly SemaphoreSlim _connectGate = new(1, 1);
     private readonly SemaphoreSlim _writeGate = new(1, 1);
     private readonly ConcurrentDictionary<string, TaskCompletionSource<ControlResponse>> _pending = new();
+    private System.Action<string, JsonElement>? _onEngineEvent;
     private Stream? _stream;
     private uint _seq;
     private int _idCounter;
 
     public EngineLink(Func<CancellationToken, Task<Stream>> dial, string clientVersion, string channel)
     { _dial = dial; _clientVersion = clientVersion; _channel = channel; }
+
+    public void SetEngineEventHandler(System.Action<string, JsonElement> handler) { _onEngineEvent = handler; }
 
     public async Task<ControlResponse> RequestAsync(string uri, JsonElement? paramsEl, CancellationToken ct)
     {
@@ -77,6 +80,15 @@ public sealed class EngineLink : IAsyncDisposable
                     var e = JsonSerializer.Deserialize(f.Payload, CoveJsonContext.Default.ControlErrorFrame)!;
                     Console.Error.WriteLine($"control error frame: {e.Code} {e.Message}");
                     if (e.StreamId is null) break;
+                }
+                else if (f.Type == FrameType.Event)
+                {
+                    try
+                    {
+                        var evt = JsonSerializer.Deserialize(f.Payload, CoveJsonContext.Default.ControlEvent);
+                        if (evt is not null) _onEngineEvent?.Invoke(evt.Channel, evt.Payload);
+                    }
+                    catch (Exception ex) { Console.Error.WriteLine($"event forward failed: {ex.Message}"); }
                 }
             }
         }

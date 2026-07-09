@@ -202,4 +202,20 @@ public sealed class ConfigHotReloadTests
         }
         finally { try { Directory.Delete(dir, true); } catch { } }
     }
+
+    [Fact]
+    public void OnboardingCompleted_RoundTripSurvivesAutoDetectJson()
+    {
+        var dir = NewDir();
+        try
+        {
+            var cfg1 = new ConfigService(dir, NullLogger.Instance);
+            cfg1.Set("onboarding.completed", "true");
+            var raw = File.ReadAllText(Path.Combine(dir, "config.json"));
+            var cfg2 = new ConfigService(dir, NullLogger.Instance);
+            var readBack = cfg2.Get("onboarding.completed");
+            Assert.True(string.Equals(readBack, "true", System.StringComparison.Ordinal), $"expected exact 'true' but got '{readBack}' (raw: {raw})");
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
 }

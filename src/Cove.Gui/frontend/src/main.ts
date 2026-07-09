@@ -2022,7 +2022,7 @@ let onboardingState: OnboardingState = { ...INITIAL_ONBOARDING_STATE };
 async function maybeShowOnboarding(): Promise<void> {
   try {
     const seen = await invoke<{ ok: boolean; value?: string }>("app.configGet", { key: "onboarding.completed" });
-    const hasSeen = seen.ok && seen.value === "true";
+    const hasSeen = seen.ok && seen.value?.toLowerCase() === "true";
     if (!shouldShowOnboarding(hasSeen)) return;
     onboardingEl.classList.add("open");
     renderOnboarding();
@@ -2312,6 +2312,16 @@ function setupBadge(): void {
   });
   window.__ryn.on("dock.badge.clear", () => { needsInputPanes.clear(); updateBadge(); });
 }
+
+window.__ryn.on("engine.event", (data: unknown) => {
+  const evt = data as { channel?: string; payload?: { key?: string } };
+  if (evt?.channel === "config.changed" && evt.payload?.key) {
+    const key = evt.payload.key;
+    if (key.startsWith("appearance.")) { void applyAppearance(key); }
+    if (key.startsWith("terminal.")) { void loadSettings().then((s) => { settings = s; applySettings(); }); }
+    if (settingsEl.classList.contains("open")) { renderSettings(); }
+  }
+});
 
 const notepadSidebarEl = document.getElementById("notepad-sidebar")!;
 const nsBodyEl = document.getElementById("ns-body")!;
