@@ -11,7 +11,7 @@ import { renderMarkdownNote } from "./markdown-note";
 import { renderSketchNote } from "./sketch-note";
 import { renderCanvasNote } from "./canvas-note";
 import { renderHtmlNote } from "./html-note";
-import { renderNotepadPane } from "./notepad-pane";
+import { renderNotepadPane, openNote } from "./notepad-pane";
 import { renderMermaidNote } from "./mermaid-note";
 import { renderSessionPicker } from "./session-picker";
 import { renderLibraryPopover } from "./library-popover";
@@ -24,6 +24,7 @@ import { renderBrowserPane } from "./browser-pane";
 import { renderDiffViewerPane } from "./diff-viewer-pane";
 import { renderMarkdownPane } from "./markdown-pane";
 import { partitionPinned, togglePin, reorderRoom, buildMiniDiagram, accentForPaneType, type MiniDiagramNode } from "./room-tabs";
+import { groupByWorkspace, moveSelection, selectedNote, kindIcon, kindColor, type NoteListItem, type NavState } from "./notepad-sidebar";
 
 const CREDIT_THRESHOLD = 131072;
 
@@ -1300,6 +1301,7 @@ function baseActions(): Action[] {
     { label: "Split down", icon: "\u2500", key: "Cmd Shift D", run: () => void splitActive("col") },
     { label: "Close pane", icon: "\u00d7", key: "Cmd W", run: () => void closeFocused() },
     { label: "Toggle sidebar", icon: "\u25e7", key: "Cmd B", run: toggleSidebar },
+    { label: "Toggle notepad sidebar", icon: "\u270e", key: "Cmd Shift N", run: toggleNotepadSidebar },
     { label: "Increase font size", icon: "+", key: "Cmd =", run: () => { settings.fontSize = Math.min(24, settings.fontSize + 1); applySettings(); } },
     { label: "Decrease font size", icon: "-", key: "Cmd -", run: () => { settings.fontSize = Math.max(9, settings.fontSize - 1); applySettings(); } },
     { label: "Reset font size", icon: "\u21ba", key: "Cmd 0", run: () => { settings.fontSize = 13; applySettings(); } },
@@ -1485,6 +1487,7 @@ window.addEventListener("keydown", (e) => {
   else if (k === "b" && e.shiftKey) { e.preventDefault(); void newBrowserRoom("https://duckduckgo.com"); }
   else if (k === "w") { e.preventDefault(); void closeFocused(); }
   else if (k === "b") { e.preventDefault(); toggleSidebar(); }
+  else if (k === "n" && e.shiftKey) { e.preventDefault(); toggleNotepadSidebar(); }
   else if (k === "]") { e.preventDefault(); cycleFocus(1); }
   else if (k === "[") { e.preventDefault(); cycleFocus(-1); }
   else if (k === "=" || k === "+") { e.preventDefault(); settings.fontSize = Math.min(24, settings.fontSize + 1); applySettings(); }
@@ -1601,6 +1604,145 @@ function setupBadge(): void {
   });
   window.__ryn.on("dock.badge.clear", () => { needsInputPanes.clear(); updateBadge(); });
 }
+
+const notepadSidebarEl = document.getElementById("notepad-sidebar")!;
+const nsBodyEl = document.getElementById("ns-body")!;
+let notepadSidebarOpen = false;
+let notepadSidebarCollapsed = localStorage.getItem("cove.notepad.collapsed") === "true";
+let notepadGroups: { workspaceId: string; workspaceName: string; notes: NoteListItem[] }[] = [];
+let notepadNav: NavState = { groupIdx: -1, noteIdx: -1 };
+const collapsedGroups = new Set<string>(JSON.parse(localStorage.getItem("cove.notepad.collapsedGroups") ?? "[]"));
+
+function openNotepadSidebar(): void {
+  notepadSidebarOpen = true;
+  notepadSidebarEl.classList.add("open");
+  if (notepadSidebarCollapsed) notepadSidebarEl.classList.add("collapsed");
+  notepadSidebarEl.tabIndex = 0;
+  notepadSidebarEl.focus();
+  void loadNotepadNotes();
+}
+function closeNotepadSidebar(): void {
+  notepadSidebarOpen = false;
+  notepadSidebarEl.classList.remove("open");
+}
+function toggleNotepadSidebar(): void {
+  if (notepadSidebarOpen) closeNotepadSidebar();
+  else openNotepadSidebar();
+}
+
+async function loadNotepadNotes(): Promise<void> {
+  try {
+    const res = await invoke<{ notes: NoteListItem[] }>("cove://commands/note.list", { workspaceId: "default" });
+    notepadGroups = groupByWorkspace(res.notes ?? [], { default: "Default" });
+  } catch {
+    notepadGroups = [];
+  }
+  renderNotepadSidebar();
+}
+
+function renderNotepadSidebar(): void {
+  nsBodyEl.innerHTML = "";
+  if (notepadGroups.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "ns-empty";
+    empty.innerHTML = `No notes yet<div class="ns-empty-action" id="ns-empty-create">Create a note</div>`;
+    nsBodyEl.appendChild(empty);
+    const createAction = empty.querySelector("#ns-empty-create");
+    if (createAction) createAction.addEventListener("click", () => void createNote());
+    return;
+  }
+
+  for (let gi = 0; gi < notepadGroups.length; gi++) {
+    const group = notepadGroups[gi];
+    const groupEl = document.createElement("div");
+    groupEl.className = "ns-group" + (collapsedGroups.has(group.workspaceId) ? " collapsed" : "");
+
+    const head = document.createElement("div");
+    head.className = "ns-group-head";
+    head.innerHTML = `<span class="chevron">\u25bc</span><span class="ns-group-name"></span><span class="ns-group-count"></span>`;
+    head.querySelector(".ns-group-name")!.textContent = group.workspaceName;
+    head.querySelector(".ns-group-count")!.textContent = String(group.notes.length);
+    head.addEventListener("click", () => {
+      if (collapsedGroups.has(group.workspaceId)) collapsedGroups.delete(group.workspaceId);
+      else collapsedGroups.add(group.workspaceId);
+      localStorage.setItem("cove.notepad.collapsedGroups", JSON.stringify([...collapsedGroups]));
+      renderNotepadSidebar();
+    });
+    groupEl.appendChild(head);
+
+    const notesEl = document.createElement("div");
+    notesEl.className = "ns-group-notes";
+    for (let ni = 0; ni < group.notes.length; ni++) {
+      const note = group.notes[ni];
+      const noteEl = document.createElement("div");
+      const isSelected = gi === notepadNav.groupIdx && ni === notepadNav.noteIdx;
+      noteEl.className = "ns-note" + (isSelected ? " selected" : "");
+      noteEl.innerHTML = `<span class="ns-note-icon"></span><span class="ns-note-title"></span>`;
+      const iconEl = noteEl.querySelector(".ns-note-icon") as HTMLElement;
+      iconEl.textContent = kindIcon(note.kind);
+      iconEl.style.color = kindColor(note.kind);
+      noteEl.querySelector(".ns-note-title")!.textContent = note.title || "Untitled";
+      noteEl.addEventListener("click", () => {
+        notepadNav = { groupIdx: gi, noteIdx: ni };
+        void openNoteInPane(note.id, note.workspaceId);
+        renderNotepadSidebar();
+      });
+      notesEl.appendChild(noteEl);
+    }
+    groupEl.appendChild(notesEl);
+    nsBodyEl.appendChild(groupEl);
+  }
+}
+
+async function openNoteInPane(noteId: string, workspaceId: string): Promise<void> {
+  try {
+    const sp = (await invoke<{ paneId: string }>("app.paneSpawn", { command: "", cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: "", agentName: "", workspace: "", room: "" })).paneId;
+    const r = await invoke<{ roomId: string }>("app.layoutMutate", { op: "createRoom", newPaneId: sp, name: "Note", roomId: "", targetPaneId: "", orientation: "", paneId: "", dir: 0, paneType: "notepad" });
+    activeRoomId = r.roomId;
+    await reload();
+    focusPane(sp);
+    await waitForElement(".notepad-editor", 3000);
+    await openNote(workspaceId, noteId);
+  } catch { void 0; }
+}
+
+function waitForElement(selector: string, timeoutMs: number): Promise<HTMLElement | null> {
+  return new Promise((resolve) => {
+    const existing = document.querySelector<HTMLElement>(selector);
+    if (existing) { resolve(existing); return; }
+    const start = Date.now();
+    const interval = setInterval(() => {
+      const el = document.querySelector<HTMLElement>(selector);
+      if (el) { clearInterval(interval); resolve(el); }
+      else if (Date.now() - start > timeoutMs) { clearInterval(interval); resolve(null); }
+    }, 50);
+  });
+}
+
+async function createNote(): Promise<void> {
+  try {
+    await invoke("cove://commands/note.create", { title: "Untitled", workspaceId: "default", source: "user", content: "", kind: "markdown" });
+    await loadNotepadNotes();
+  } catch { void 0; }
+}
+
+notepadSidebarEl.querySelector("#ns-close")!.addEventListener("click", closeNotepadSidebar);
+notepadSidebarEl.querySelector("#ns-new")!.addEventListener("click", () => void createNote());
+notepadSidebarEl.querySelector("#ns-collapse")!.addEventListener("click", () => {
+  notepadSidebarCollapsed = !notepadSidebarCollapsed;
+  localStorage.setItem("cove.notepad.collapsed", String(notepadSidebarCollapsed));
+  notepadSidebarEl.classList.toggle("collapsed", notepadSidebarCollapsed);
+});
+
+notepadSidebarEl.addEventListener("keydown", (e) => {
+  if (e.key === "ArrowDown") { e.preventDefault(); notepadNav = moveSelection(notepadGroups, notepadNav, "down"); renderNotepadSidebar(); }
+  else if (e.key === "ArrowUp") { e.preventDefault(); notepadNav = moveSelection(notepadGroups, notepadNav, "up"); renderNotepadSidebar(); }
+  else if (e.key === "Enter") {
+    e.preventDefault();
+    const note = selectedNote(notepadGroups, notepadNav);
+    if (note) void openNoteInPane(note.id, note.workspaceId);
+  } else if (e.key === "Escape") { closeNotepadSidebar(); }
+});
 
 (async () => {
   settings = await loadSettings();

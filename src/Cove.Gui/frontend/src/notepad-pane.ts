@@ -113,7 +113,7 @@ function buildEditor(): HTMLElement {
   return editor;
 }
 
-async function openNote(workspaceId: string, noteId: string): Promise<void> {
+export async function openNote(workspaceId: string, noteId: string): Promise<void> {
   currentNoteId = noteId;
   currentWorkspaceId = workspaceId;
 
