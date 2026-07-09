@@ -5,11 +5,11 @@ Cove is built on the Ryn framework, which is maintained by the same author. Wher
 | ID | Item | Needed by | Blocking? |
 |---|---|---|---|
 | RYN-01 | Backpressure-aware event delivery + flow-control primitive in the shell PTY plugin | M1 terminal | No |
-| RYN-02 | Native application menu bar (macOS App/Edit/Window) | M8 chrome | No |
-| RYN-03 | Global shortcuts / hotkeys plugin | M8 chrome | No |
+| RYN-02 | Native application menu bar (macOS App/Edit/Window) | M8 chrome | **SHIPPED — Ryn.Plugins.MenuBar 0.11.0** |
+| RYN-03 | Global shortcuts / hotkeys plugin | M8 chrome | **SHIPPED — Ryn.Plugins.GlobalShortcut 0.11.0** |
 | RYN-04 | Windows Authenticode signing in the bundler | M8 release | No |
 | RYN-05 | Linux GUI verification on real hardware + fixes | All GUI milestones | No |
-| RYN-06 | Multiple webviews per window / native pane embedding | M7 browser | No |
+| RYN-06 | Multiple webviews per window / native pane embedding | M7 browser | **SHIPPED — Ryn.Plugins.WebViewPane 0.11.0** |
 | RYN-07 | HTTP Range + off-thread static serving | M6/M7 media | No |
 
 ## RYN-01 — Lossless event delivery + shell flow control
@@ -18,11 +18,11 @@ Owner: Moh (Ryn maintainer). The framework's event batcher drops chunks on overf
 
 ## RYN-02 — Native application menu bar
 
-Owner: Moh (Ryn maintainer). The framework has tray menus but no application menu bar; on macOS this is below the platform baseline. Needed by the M8 chrome milestone. Until then, Cove exposes commands through the in-window command palette.
+**SHIPPED in Ryn 0.11.0** as `Ryn.Plugins.MenuBar`: `SetMenu`/`Reset`, `MenuItemClicked`/`RoleActivated`, role items dispatching through the macOS responder chain, accelerator parsing, `CreateDefault`/`ExpandTopLevelRoles`. Wired in Cove's Program.cs (`AddRynMenuBar`); main.ts already defines a menu. Remaining Cove work: full menu IA + keybinding-engine accelerator sync (MC-P04).
 
 ## RYN-03 — Global shortcuts / hotkeys
 
-Owner: Moh (Ryn maintainer). No app-wide keybinds exist outside the focused webview. Needed by M8 for a global show/hide toggle. In-page keybinds work today.
+**SHIPPED in Ryn 0.11.0** as `Ryn.Plugins.GlobalShortcut`: `Register`/`Unregister`/`IsRegistered`/`UnregisterAll` with cross-platform accelerator parsing. Wired in Cove's Program.cs (`AddRynGlobalShortcut`). Remaining Cove work: bind the global show/hide toggle + default chord map dispatch (MC-P13).
 
 ## RYN-04 — Windows Authenticode signing
 
@@ -34,7 +34,7 @@ Owner: Moh (Ryn maintainer). The Linux GUI is unverified on real hardware and th
 
 ## RYN-06 — Multiple webviews per window
 
-Owner: Moh (Ryn maintainer). One webview per window means a real embedded-browser pane is not achievable without upstream work. Needed by the M7 browser milestone, which picks a concrete strategy there.
+**SHIPPED in Ryn 0.11.0** as `Ryn.Plugins.WebViewPane`: secondary native webviews (WKWebView/WebView2) positioned as rectangles inside the window — open/close/list/navigate/back/forward/reload/setBounds/setZoom/setDevTools/url/eval/execute + navigated/titleChanged/loadStateChanged/domReady/faviconChanged/closed events, per-pane sessions via `StoragePath`. This replaced the CEF plan entirely (M7-P01/P03/P04/P05 obsolete). Still absent at the pane level: screenshot capture, UA override, extensions, CDP, throttle/occlusion/crash events (see post-1.0 backlog §1).
 
 ## RYN-07 — HTTP Range + off-thread static serving
 
