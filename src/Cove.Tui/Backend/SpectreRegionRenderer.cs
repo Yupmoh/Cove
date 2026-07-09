@@ -1,7 +1,7 @@
 using System.Text;
+using Cove.Tui.Vt;
 using Spectre.Console;
 using Spectre.Console.Rendering;
-using Cove.Tui.Vt;
 
 namespace Cove.Tui.Backend;
 

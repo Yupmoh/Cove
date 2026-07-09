@@ -157,8 +157,12 @@ public sealed class VtInputDecoder
             var code = paramList.Count > 0 ? paramList[0] : 0;
             var name = code switch
             {
-                1 => KeyName.Home, 2 => KeyName.Insert, 3 => KeyName.Delete,
-                4 => KeyName.End, 5 => KeyName.PageUp, 6 => KeyName.PageDown,
+                1 => KeyName.Home,
+                2 => KeyName.Insert,
+                3 => KeyName.Delete,
+                4 => KeyName.End,
+                5 => KeyName.PageUp,
+                6 => KeyName.PageDown,
                 _ => KeyName.Unknown
             };
             return (new VtInputEvent.Key(KeyModifiers.None, name, code), consumed);
@@ -166,8 +170,12 @@ public sealed class VtInputDecoder
 
         var arrowName = kind switch
         {
-            'A' => KeyName.Up, 'B' => KeyName.Down, 'C' => KeyName.Right, 'D' => KeyName.Left,
-            'H' => KeyName.Home, 'F' => KeyName.End,
+            'A' => KeyName.Up,
+            'B' => KeyName.Down,
+            'C' => KeyName.Right,
+            'D' => KeyName.Left,
+            'H' => KeyName.Home,
+            'F' => KeyName.End,
             _ => KeyName.Unknown
         };
         if (arrowName != KeyName.Unknown)
@@ -185,11 +193,16 @@ public sealed class VtInputDecoder
             return (new VtInputEvent.Unknown("\x1bO"), 2);
         var name = data[start + 2] switch
         {
-            (byte)'A' => KeyName.Up, (byte)'B' => KeyName.Down,
-            (byte)'C' => KeyName.Right, (byte)'D' => KeyName.Left,
-            (byte)'H' => KeyName.Home, (byte)'F' => KeyName.End,
-            (byte)'P' => KeyName.F1, (byte)'Q' => KeyName.F2,
-            (byte)'R' => KeyName.F3, (byte)'S' => KeyName.F4,
+            (byte)'A' => KeyName.Up,
+            (byte)'B' => KeyName.Down,
+            (byte)'C' => KeyName.Right,
+            (byte)'D' => KeyName.Left,
+            (byte)'H' => KeyName.Home,
+            (byte)'F' => KeyName.End,
+            (byte)'P' => KeyName.F1,
+            (byte)'Q' => KeyName.F2,
+            (byte)'R' => KeyName.F3,
+            (byte)'S' => KeyName.F4,
             _ => KeyName.Unknown
         };
         return (new VtInputEvent.Key(KeyModifiers.None, name, 0), 3);
@@ -208,7 +221,10 @@ public sealed class VtInputDecoder
         var buttonNum = button & 3;
         mods = buttonNum switch
         {
-            0 => MouseModifiers.Left, 1 => MouseModifiers.Middle, 2 => MouseModifiers.Right, _ => MouseModifiers.None
+            0 => MouseModifiers.Left,
+            1 => MouseModifiers.Middle,
+            2 => MouseModifiers.Right,
+            _ => MouseModifiers.None
         };
         if ((button & 4) != 0) mods |= MouseModifiers.Shift;
         if ((button & 8) != 0) mods |= MouseModifiers.Alt;
@@ -223,14 +239,33 @@ public sealed class VtInputDecoder
     {
         return keyCode switch
         {
-            13 => KeyName.Enter, 32 => KeyName.Space, 9 => KeyName.Tab, 127 => KeyName.Backspace,
+            13 => KeyName.Enter,
+            32 => KeyName.Space,
+            9 => KeyName.Tab,
+            127 => KeyName.Backspace,
             27 => KeyName.Escape,
-            57344 => KeyName.Up, 57345 => KeyName.Down, 57346 => KeyName.Right, 57347 => KeyName.Left,
-            57348 => KeyName.Home, 57349 => KeyName.End, 57350 => KeyName.PageUp, 57351 => KeyName.PageDown,
-            57352 => KeyName.Insert, 57353 => KeyName.Delete,
-            57356 => KeyName.F1, 57357 => KeyName.F2, 57358 => KeyName.F3, 57359 => KeyName.F4,
-            57360 => KeyName.F5, 57361 => KeyName.F6, 57362 => KeyName.F7, 57363 => KeyName.F8,
-            57364 => KeyName.F9, 57365 => KeyName.F10, 57366 => KeyName.F11, 57367 => KeyName.F12,
+            57344 => KeyName.Up,
+            57345 => KeyName.Down,
+            57346 => KeyName.Right,
+            57347 => KeyName.Left,
+            57348 => KeyName.Home,
+            57349 => KeyName.End,
+            57350 => KeyName.PageUp,
+            57351 => KeyName.PageDown,
+            57352 => KeyName.Insert,
+            57353 => KeyName.Delete,
+            57356 => KeyName.F1,
+            57357 => KeyName.F2,
+            57358 => KeyName.F3,
+            57359 => KeyName.F4,
+            57360 => KeyName.F5,
+            57361 => KeyName.F6,
+            57362 => KeyName.F7,
+            57363 => KeyName.F8,
+            57364 => KeyName.F9,
+            57365 => KeyName.F10,
+            57366 => KeyName.F11,
+            57367 => KeyName.F12,
             _ => KeyName.Unknown
         };
     }

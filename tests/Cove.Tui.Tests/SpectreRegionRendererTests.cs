@@ -1,6 +1,6 @@
-using Spectre.Console;
 using Cove.Tui.Backend;
 using Cove.Tui.Vt;
+using Spectre.Console;
 using Xunit;
 
 namespace Cove.Tui.Tests;

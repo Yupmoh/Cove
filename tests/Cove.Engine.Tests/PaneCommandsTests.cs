@@ -42,7 +42,7 @@ public sealed class PaneCommandsTests
         try
         {
             var search = new Cove.Engine.Search.SearchService(Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
-            var prm = JsonDocument.Parse($$"""{"query":"hello","path":"{{dir.Replace("\\","\\\\")}}","regex":false,"wholeWord":false,"caseInsensitive":true}""").RootElement.Clone();
+            var prm = JsonDocument.Parse($$"""{"query":"hello","path":"{{dir.Replace("\\", "\\\\")}}","regex":false,"wholeWord":false,"caseInsensitive":true}""").RootElement.Clone();
             var resp = await EngineCommandRouter.RouteAsync(new ControlRequest("r1", "cove://commands/search.query", prm), searchService: search);
             Assert.True(resp!.Ok);
         }

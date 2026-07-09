@@ -1,6 +1,6 @@
 using Cove.Platform;
-using Cove.Tui.Attach;
 using Cove.Protocol;
+using Cove.Tui.Attach;
 
 namespace Cove.Cli;
 
