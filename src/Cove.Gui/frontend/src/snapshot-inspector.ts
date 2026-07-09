@@ -1,4 +1,5 @@
 import { invoke } from "./invoke";
+import { diffRowSets, isTaskLikeKey, type RowDiff } from "./snapshot-row-diff";
 
 interface SnapshotListItem {
   id: string;
@@ -157,6 +158,12 @@ function buildDiffRow(diff: SnapshotDiffItem): HTMLElement {
   keyEl.textContent = diff.key;
   row.appendChild(keyEl);
 
+  const rowDiffs = diffRowSets(diff.oldValue, diff.newValue);
+  if (rowDiffs && (isTaskLikeKey(diff.key) || rowDiffs.length > 0)) {
+    row.appendChild(buildRowTable(rowDiffs));
+    return row;
+  }
+
   const changeColor = diff.changeType === "added" ? "#4ade80" : diff.changeType === "removed" ? "#ef4444" : "#fbbf24";
   const changeSymbol = diff.changeType === "added" ? "+" : diff.changeType === "removed" ? "-" : "~";
 
@@ -174,4 +181,54 @@ function buildDiffRow(diff: SnapshotDiffItem): HTMLElement {
   }
 
   return row;
+}
+
+function buildRowTable(rowDiffs: RowDiff[]): HTMLElement {
+  const table = document.createElement("div");
+  table.style.cssText = "margin-top:4px;display:flex;flex-direction:column;gap:2px;";
+
+  const changed = rowDiffs.filter((r) => r.changeType !== "unchanged");
+  if (changed.length === 0) {
+    const empty = document.createElement("div");
+    empty.style.cssText = "color:#6b7d8f;font-size:11px;padding:2px 0;";
+    empty.textContent = `${rowDiffs.length} rows · no row changes`;
+    table.appendChild(empty);
+    return table;
+  }
+
+  for (const rd of changed) {
+    const rowEl = document.createElement("div");
+    rowEl.style.cssText = "display:flex;flex-direction:column;padding:3px 6px;border-left:2px solid #1e2d3f;";
+
+    const badgeColor = rd.changeType === "added" ? "#4ade80" : rd.changeType === "removed" ? "#ef4444" : "#fbbf24";
+    const label = document.createElement("div");
+    label.style.cssText = `color:${badgeColor};font-size:11px;`;
+    const fields = rd.changedFields.length > 0 ? ` [${rd.changedFields.join(", ")}]` : "";
+    label.textContent = `${rd.changeType.toUpperCase()} · row ${rd.id}${fields}`;
+    rowEl.appendChild(label);
+
+    if (rd.changeType === "changed") {
+      for (const field of rd.changedFields) {
+        const line = document.createElement("div");
+        line.style.cssText = "font-size:11px;white-space:pre-wrap;word-break:break-all;";
+        const before = rd.before ? JSON.stringify(rd.before[field]) : "∅";
+        const after = rd.after ? JSON.stringify(rd.after[field]) : "∅";
+        line.innerHTML = `<span style="color:#6b7d8f;">${field}:</span> <span style="color:#ef4444;">${escapeHtml(before)}</span> <span style="color:#6b7d8f;">→</span> <span style="color:#4ade80;">${escapeHtml(after)}</span>`;
+        rowEl.appendChild(line);
+      }
+    } else {
+      const payload = rd.changeType === "added" ? rd.after : rd.before;
+      const line = document.createElement("div");
+      line.style.cssText = `font-size:11px;white-space:pre-wrap;word-break:break-all;color:${rd.changeType === "added" ? "#4ade80" : "#ef4444"};`;
+      line.textContent = JSON.stringify(payload);
+      rowEl.appendChild(line);
+    }
+
+    table.appendChild(rowEl);
+  }
+  return table;
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
