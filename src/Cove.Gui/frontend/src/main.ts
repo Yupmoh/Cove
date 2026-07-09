@@ -20,6 +20,7 @@ import { renderDiffReviewPane } from "./diff-review-pane";
 import { renderEditorPane } from "./editor-pane";
 import { renderSourceControlPane } from "./source-control-pane";
 import { renderSearchPane } from "./search-pane";
+import { renderBrowserPane } from "./browser-pane";
 
 const CREDIT_THRESHOLD = 131072;
 
@@ -637,6 +638,17 @@ function renderSearchPaneWrapper(paneId: string): HTMLElement {
   });
   return placeholder;
 }
+function renderBrowserPaneWrapper(paneId: string, url: string): HTMLElement {
+  const placeholder = document.createElement("div");
+  placeholder.className = "browser-pane-placeholder";
+  placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
+  renderBrowserPane(paneId, url).then(el => {
+    placeholder.replaceWith(el);
+  }).catch(e => {
+    placeholder.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to load browser: ${(e as Error).message}</div>`;
+  });
+  return placeholder;
+}
 function renderNode(node: MosaicNode): HTMLElement {
   if (node.kind === "leaf") {
     const subs = node.subtabs.length > 0 ? node.subtabs : [{ documentId: node.paneId, paneType: "terminal", title: null }];
@@ -661,6 +673,7 @@ function renderNode(node: MosaicNode): HTMLElement {
     if (active.paneType === "image") return renderImagePane(active.documentId);
     if (active.paneType === "git") return renderGitPaneWrapper(active.documentId);
     if (active.paneType === "search") return renderSearchPaneWrapper(active.documentId);
+    if (active.paneType === "browser") return renderBrowserPaneWrapper(active.documentId, active.title ?? "about:blank");
     if (isEmpty) return emptyPaneStrip(node.paneId);
     const activeEl = getPane(subs[activeIdx].documentId).el;
     if (subs.length <= 1) return activeEl;
@@ -897,6 +910,14 @@ async function newRoom(): Promise<void> {
   focusPane(sp);
 }
 
+async function newBrowserRoom(url: string): Promise<void> {
+  const bp = await invoke<{ paneId: string; currentUrl: string }>("cove://commands/browser.create", { url });
+  const r = await invoke<{ roomId: string }>("app.layoutMutate", { op: "createRoom", newPaneId: bp.paneId, name: "Browser", roomId: "", targetPaneId: "", orientation: "", paneId: "", dir: 0, paneType: "browser" });
+  activeRoomId = r.roomId;
+  await reload();
+  focusPane(bp.paneId);
+}
+
 async function closeRoom(roomId: string): Promise<void> {
   const room = layout?.rooms.find((r) => r.id === roomId);
   if (!room) return;
@@ -946,6 +967,7 @@ interface Action { label: string; icon: string; key?: string; run: () => void; }
 function baseActions(): Action[] {
   return [
     { label: "New terminal", icon: "+", key: "Cmd T", run: () => void newRoom() },
+    { label: "New browser", icon: "\uD83C\uDF10", run: () => void newBrowserRoom("https://duckduckgo.com") },
     { label: "Split right", icon: "\u2502", key: "Cmd D", run: () => void splitActive("row") },
     { label: "Split down", icon: "\u2500", key: "Cmd Shift D", run: () => void splitActive("col") },
     { label: "Close pane", icon: "\u00d7", key: "Cmd W", run: () => void closeFocused() },
@@ -1132,6 +1154,7 @@ window.addEventListener("keydown", (e) => {
   else if (k === "z" && !e.shiftKey) { e.preventDefault(); void toggleZoom(); }
   else if (k === "d" && e.shiftKey) { e.preventDefault(); void splitActive("col"); }
   else if (k === "d") { e.preventDefault(); void splitActive("row"); }
+  else if (k === "b" && e.shiftKey) { e.preventDefault(); void newBrowserRoom("https://duckduckgo.com"); }
   else if (k === "w") { e.preventDefault(); void closeFocused(); }
   else if (k === "b") { e.preventDefault(); toggleSidebar(); }
   else if (k === "]") { e.preventDefault(); cycleFocus(1); }
@@ -1162,6 +1185,7 @@ function setupMenuBar(): void {
       label: "File",
       items: [
         { id: "new-room", label: "New Room", accelerator: "CmdOrCtrl+T" },
+        { id: "new-browser", label: "New Browser", accelerator: "CmdOrCtrl+Shift+B" },
         { separator: true },
         { id: "close-pane", label: "Close Pane", accelerator: "CmdOrCtrl+W" },
       ],
@@ -1210,6 +1234,7 @@ function setupMenuBar(): void {
     if (!id) return;
     switch (id) {
       case "new-room": void newRoom(); break;
+      case "new-browser": void newBrowserRoom("https://duckduckgo.com"); break;
       case "close-pane": void closeFocused(); break;
       case "toggle-sidebar": toggleSidebar(); break;
       case "toggle-zen": document.body.classList.toggle("zen-mode"); fitAll(); break;

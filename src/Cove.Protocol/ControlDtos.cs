@@ -71,7 +71,7 @@ public sealed record EmitEventParams(string Event, System.Text.Json.JsonElement?
 public sealed record IpcEventEntry(string Event, long TimestampMs, System.Text.Json.JsonElement? Payload = null);
 public sealed record IpcEventLog(IpcEventEntry[] Events);
 
-public sealed record LayoutMutateParams(string Op, string? RoomId = null, string? TargetPaneId = null, string? NewPaneId = null, string? Orientation = null, string? Name = null, string? PaneId = null, int Dir = 1);
+public sealed record LayoutMutateParams(string Op, string? RoomId = null, string? TargetPaneId = null, string? NewPaneId = null, string? Orientation = null, string? Name = null, string? PaneId = null, int Dir = 1, string? PaneType = null);
 public sealed record LayoutMutateResult(string? RoomId = null);
 public sealed record SessionStateResult(string PaneId, string Command, int Cols, int Rows, bool Alive, string? Cwd = null);
 public sealed record SearchParams(string PaneId, string Query, bool CaseSensitive = false);
@@ -343,6 +343,7 @@ public sealed record BrowserOpenParams(string PaneId, string Url);
 public sealed record BrowserNavigateParams(string PaneId, string Url);
 public sealed record BrowserPaneRefParams(string PaneId);
 public sealed record BrowserPaneDto(string PaneId, string CurrentUrl, System.Collections.Generic.IReadOnlyList<string> History, int HistoryIndex, bool CanGoBack, bool CanGoForward);
+public sealed record BrowserCreateParams(string Url, string? Title = null, string? WorkspaceId = null);
 public sealed record ReviewAddCommentParams(string CommitSha, string FilePath, int Line, string Author, string Body, string? ParentId);
 public sealed record ReviewListCommentsParams(string CommitSha, string? FilePath, string? State);
 public sealed record ReviewTransitionParams(string CommentId, string Actor);
@@ -599,6 +600,7 @@ public sealed record ReviewDispatchResultDto(string DispatchId, string TargetPan
 [JsonSerializable(typeof(BrowserNavigateParams))]
 [JsonSerializable(typeof(BrowserPaneRefParams))]
 [JsonSerializable(typeof(BrowserPaneDto))]
+[JsonSerializable(typeof(BrowserCreateParams))]
 [JsonSerializable(typeof(ReviewAddCommentParams))]
 [JsonSerializable(typeof(ReviewListCommentsParams))]
 [JsonSerializable(typeof(ReviewTransitionParams))]

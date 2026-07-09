@@ -229,6 +229,10 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/browser.create",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/browser.forward",
     "source": "core"
   },

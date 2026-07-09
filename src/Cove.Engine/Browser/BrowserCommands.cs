@@ -86,6 +86,18 @@ public static class BrowserCommands
         return Task.FromResult(ctx.Ok());
     }
 
+    [CoveCommand("cove://commands/browser.create")]
+    public static Task<ControlResponse> CreateBrowserPane(EngineDispatchContext ctx)
+    {
+        if (ctx.Browser is not { } mgr)
+            return Task.FromResult(ctx.Fail("not_ready", "browser manager not available"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.BrowserCreateParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "browser create params required"));
+
+        string paneId = "pane-" + System.Guid.NewGuid().ToString("N");
+        var pane = mgr.Open(paneId, p.Url);
+        return Task.FromResult(ctx.Ok(ToDto(pane), CoveJsonContext.Default.BrowserPaneDto));
+    }
     private static BrowserPaneDto ToDto(BrowserPane pane) =>
         new(pane.PaneId, pane.CurrentUrl, pane.History.ToList(), pane.HistoryIndex, pane.CanGoBack, pane.CanGoForward);
 }

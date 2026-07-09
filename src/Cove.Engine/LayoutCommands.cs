@@ -40,8 +40,8 @@ internal static class LayoutCommands
         {
             return Task.FromResult(p.Op switch
             {
-                "createRoom" => ctx.Ok(new LayoutMutateResult(layout.CreateRoom(p.Name ?? "main", NewLeaf(p.NewPaneId!))), Cove.Protocol.CoveJsonContext.Default.LayoutMutateResult),
-                "split" => MutateOk(() => layout.SplitPane(p.RoomId!, p.TargetPaneId!, Orient(p.Orientation), NewLeaf(p.NewPaneId!)), p.RoomId, ctx),
+                "createRoom" => ctx.Ok(new LayoutMutateResult(layout.CreateRoom(p.Name ?? "main", NewLeaf(p.NewPaneId!, p.PaneType))), Cove.Protocol.CoveJsonContext.Default.LayoutMutateResult),
+                "split" => MutateOk(() => layout.SplitPane(p.RoomId!, p.TargetPaneId!, Orient(p.Orientation), NewLeaf(p.NewPaneId!, p.PaneType)), p.RoomId, ctx),
                 "close" => MutateOk(() => layout.ClosePane(p.RoomId!, p.PaneId!), p.RoomId, ctx),
                 "addSubtab" => MutateOk(() => layout.AddSubtab(p.RoomId!, p.PaneId!, p.NewPaneId!), p.RoomId, ctx),
                 "activateSubtab" => MutateOk(() => layout.ActivateSubtab(p.RoomId!, p.PaneId!, p.Dir), p.RoomId, ctx),
@@ -82,10 +82,26 @@ internal static class LayoutCommands
         return ctx.Ok(new LayoutMutateResult(roomId), Cove.Protocol.CoveJsonContext.Default.LayoutMutateResult);
     }
 
-    private static PaneLeaf NewLeaf(string id) => new PaneLeaf
+    private static PaneLeaf NewLeaf(string id, string? paneType = null) => new PaneLeaf
     {
         PaneId = id,
-        Subtabs = new[] { new Subtab(id, PaneType.Terminal) },
+        Subtabs = new[] { new Subtab(id, ParsePaneType(paneType)) },
+    };
+
+    private static PaneType ParsePaneType(string? s) => s switch
+    {
+        "terminal" or null or "" => PaneType.Terminal,
+        "empty" => PaneType.Empty,
+        "editor" => PaneType.Editor,
+        "markdown" => PaneType.Markdown,
+        "search" => PaneType.Search,
+        "sourceControl" or "git" => PaneType.SourceControl,
+        "browser" => PaneType.Browser,
+        "image" => PaneType.Image,
+        "diff" => PaneType.Diff,
+        "pdf" => PaneType.Pdf,
+        "video" => PaneType.Video,
+        _ => PaneType.Terminal,
     };
 
     private static SplitOrientation Orient(string? s) => (s is "column" or "col" or "vertical") ? SplitOrientation.Column : SplitOrientation.Row;
