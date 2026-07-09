@@ -25,6 +25,7 @@ import { renderDiffViewerPane } from "./diff-viewer-pane";
 import { renderMarkdownPane } from "./markdown-pane";
 import { partitionPinned, togglePin, reorderRoom, buildMiniDiagram, accentForPaneType, type MiniDiagramNode } from "./room-tabs";
 import { groupByWorkspace, moveSelection, selectedNote, kindIcon, kindColor, type NoteListItem, type NavState } from "./notepad-sidebar";
+import { parseQuery, filterAndSort, MruTracker, cycleCategory, categoryLabel, type PaletteItem } from "./omni-palette";
 
 const CREDIT_THRESHOLD = 131072;
 
@@ -1323,7 +1324,8 @@ function jumpActions(): Action[] {
 }
 
 let palSel = 0;
-let palActions: Action[] = [];
+let palActions: PaletteItem[] = [];
+const palMru = new MruTracker(JSON.parse(localStorage.getItem("cove.palette.mru") ?? "[]"));
 
 function openPalette() {
   paletteEl.classList.add("open");
@@ -1341,19 +1343,60 @@ function closePalette() {
   }
 }
 
+function paletteItems(): PaletteItem[] {
+  const items: PaletteItem[] = [];
+  for (const a of baseActions()) {
+    items.push({ id: `cmd:${a.label}`, label: a.label, category: "commands", icon: a.icon, key: a.key, run: a.run });
+  }
+  for (const a of jumpActions()) {
+    items.push({ id: `room:${a.label}`, label: a.label, category: "rooms", icon: a.icon, key: a.key, run: a.run });
+  }
+  for (const [id, pv] of panes) {
+    items.push({ id: `pane:${id}`, label: pv.title || id, category: "panes", icon: "\u25a0", run: () => focusPane(id) });
+  }
+  return items;
+}
+
 function renderPalette() {
-  const q = palInput.value.trim().toLowerCase();
-  const all = baseActions().concat(jumpActions());
-  palActions = q ? all.filter((a) => a.label.toLowerCase().includes(q)) : all;
+  const parsed = parseQuery(palInput.value);
+  const all = paletteItems();
+  palActions = filterAndSort(all, parsed);
+  if (parsed.text.length === 0 && parsed.category === "all") {
+    const mruIds = palMru.toList().map((e) => e.id).reverse();
+    const mruItems = mruIds.map((id) => palActions.find((i) => i.id ===id)).filter((x): x is PaletteItem => x !== undefined);
+    const rest = palActions.filter((i) => !mruIds.includes(i.id));
+    palActions = [...mruItems, ...rest];
+  }
   if (palSel >= palActions.length) palSel = Math.max(0, palActions.length - 1);
   palList.innerHTML = "";
+
+  if (parsed.category !== "all" || parsed.text.length > 0) {
+    const catBar = document.createElement("div");
+    catBar.className = "pal-cat-bar";
+    catBar.style.cssText = "display:flex;gap:4px;padding:4px 8px;border-bottom:1px solid var(--border);font-size:11px;color:var(--muted);";
+    catBar.textContent = parsed.category === "all" ? `Results for "${parsed.text}"` : `${categoryLabel(parsed.category)}: "${parsed.text}"`;
+    palList.appendChild(catBar);
+  }
+
+  if (palActions.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "pal-empty";
+    empty.style.cssText = "padding:16px;text-align:center;color:var(--muted);font-size:12px;";
+    empty.textContent = "No results";
+    palList.appendChild(empty);
+    return;
+  }
+
   palActions.forEach((a, i) => {
     const el = document.createElement("div");
     el.className = "pal-item" + (i === palSel ? " sel" : "");
     el.innerHTML = `<span class="ic"></span><span class="lbl"></span>${a.key ? `<span class="key">${a.key}</span>` : ""}`;
     (el.querySelector(".ic") as HTMLElement).textContent = a.icon;
     (el.querySelector(".lbl") as HTMLElement).textContent = a.label;
-    el.addEventListener("click", () => { closePalette(); a.run(); });
+    el.addEventListener("click", (e) => {
+      if (e.metaKey || e.ctrlKey) { closePalette(); a.run(); }
+      else { closePalette(); palMru.record(a.id); localStorage.setItem("cove.palette.mru", JSON.stringify(palMru.toList())); a.run(); }
+    });
     palList.appendChild(el);
   });
 }
@@ -1370,7 +1413,13 @@ document.getElementById("tb-pal")!.addEventListener("click", openPalette);
 palInput.addEventListener("input", () => { palSel = 0; renderPalette(); });
 palInput.addEventListener("keydown", (e) => {
   if (e.key === "Escape") { e.preventDefault(); closePalette(); }
-  else if (e.key === "Enter") { e.preventDefault(); const a = palActions[palSel]; closePalette(); if (a) a.run(); }
+  else if (e.key === "Enter") {
+    e.preventDefault();
+    const a = palActions[palSel];
+    if (a) { palMru.record(a.id); localStorage.setItem("cove.palette.mru", JSON.stringify(palMru.toList())); }
+    closePalette();
+    if (a) a.run();
+  }
   else if (e.key === "ArrowDown") { e.preventDefault(); palSel = Math.min(palActions.length - 1, palSel + 1); renderPalette(); }
   else if (e.key === "ArrowUp") { e.preventDefault(); palSel = Math.max(0, palSel - 1); renderPalette(); }
 });
@@ -1479,6 +1528,7 @@ window.addEventListener("keydown", (e) => {
   const k = e.key.toLowerCase();
   if (k === "k") { e.preventDefault(); paletteEl.classList.contains("open") ? closePalette() : openPalette(); return; }
   if (paletteEl.classList.contains("open")) return;
+  if (k === "t" && e.shiftKey) { e.preventDefault(); openPalette(); return; }
   if (k === "t") { e.preventDefault(); void newRoom(); }
   else if (k === "z" && e.shiftKey) { e.preventDefault(); document.body.classList.toggle("zen-mode"); fitAll(); }
   else if (k === "z" && !e.shiftKey) { e.preventDefault(); void toggleZoom(); }
