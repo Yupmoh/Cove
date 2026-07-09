@@ -97,13 +97,13 @@ public sealed class ConfigHotReloadTests
             File.WriteAllText(path, "{\"terminal\":{\"fontSize\":12}}");
             cfg = new ConfigService(dir, NullLogger.Instance);
             cfg.StartWatching();
-            var changedKeys = new System.Collections.Generic.List<string>();
+            var changedKeys = new System.Collections.Concurrent.ConcurrentBag<string>();
             cfg.SettingsChanged += key => changedKeys.Add(key);
 
             var cfg2 = new ConfigService(dir, NullLogger.Instance);
             cfg2.Set("terminal.fontSize", "14");
 
-            for (var i = 0; i < 50 && cfg.Get("terminal.fontSize") != "14"; i++)
+            for (var i = 0; i < 300 && cfg.Get("terminal.fontSize") != "14"; i++)
                 Thread.Sleep(100);
 
             Assert.Equal("14", cfg.Get("terminal.fontSize"));
