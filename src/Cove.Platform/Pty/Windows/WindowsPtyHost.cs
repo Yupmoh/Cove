@@ -15,7 +15,7 @@ public sealed class WindowsPtyHost : IPtyHost
     {
         if (!OperatingSystem.IsWindows())
             throw new PlatformNotSupportedException("WindowsPtyHost runs on Windows only.");
-        _logger.LogError("ConPTY spawn is not yet wired (scheduled: M0 T7 Windows CI).");
-        throw new NotImplementedException("ConPTY spawn is wired and validated in M0 T7 (Windows CI).");
+        _logger.LogError("ConPTY spawn is not implemented; Windows PTY host is a stub (tracked: M9-P19 cross-platform hardening).");
+        throw new NotImplementedException("ConPTY spawn is not implemented; Windows PTY host is a stub (tracked: M9-P19 cross-platform hardening).");
     }
 }

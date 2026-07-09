@@ -121,7 +121,7 @@ public sealed class SnapshotService
         var currentContent = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var file in Directory.EnumerateFiles(_snapshotsDir, "*.json", SearchOption.AllDirectories))
         {
-            var rel = Path.GetRelativePath(_snapshotsDir, file);
+            var rel = Path.GetRelativePath(_snapshotsDir, file).Replace('\\', '/');
             currentContent[rel] = await File.ReadAllTextAsync(file).ConfigureAwait(false);
         }
         await TakeAsync(currentContent, SnapshotTrigger.PreRestore).ConfigureAwait(false);
@@ -136,7 +136,7 @@ public sealed class SnapshotService
         var content = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var file in Directory.EnumerateFiles(_snapshotsDir, "*.json", SearchOption.AllDirectories))
         {
-            var rel = Path.GetRelativePath(_snapshotsDir, file);
+            var rel = Path.GetRelativePath(_snapshotsDir, file).Replace('\\', '/');
             content[rel] = await File.ReadAllTextAsync(file).ConfigureAwait(false);
         }
         return content;
@@ -164,7 +164,7 @@ public sealed class SnapshotService
         {
             foreach (var file in Directory.EnumerateFiles(_snapshotsDir, "*.json", SearchOption.AllDirectories))
             {
-                var rel = Path.GetRelativePath(_snapshotsDir, file);
+                var rel = Path.GetRelativePath(_snapshotsDir, file).Replace('\\', '/');
                 currentFiles.Add(rel);
             }
         }

@@ -22,6 +22,8 @@ internal static partial class AdapterLog
 
     [ZLoggerMessage(LogLevel.Warning, "skill remove failed adapter={adapter} path={path} error={error}")]
     public static partial void SkillRemoveFailed(this ILogger logger, string adapter, string path, string error);
+    [ZLoggerMessage(LogLevel.Warning, "hook skipped no bash found adapter={adapter} event={hookEvent}")]
+    public static partial void HookSkippedNoBash(this ILogger logger, string adapter, string hookEvent);
 
     [ZLoggerMessage(LogLevel.Warning, "manifest validation failed adapter={adapter} field={field} code={code}")]
     public static partial void ManifestValidationFailed(this ILogger logger, string adapter, string field, string code);

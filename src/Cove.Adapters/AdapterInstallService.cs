@@ -158,9 +158,16 @@ public sealed class AdapterInstallService
         if (!File.Exists(hookPath))
             return;
 
+        var bashExe = BashLocator.Find();
+        if (bashExe is null)
+        {
+            _logger?.HookSkippedNoBash(adapterName, @event);
+            return;
+        }
+
         var psi = new System.Diagnostics.ProcessStartInfo
         {
-            FileName = "/bin/bash",
+            FileName = bashExe,
             WorkingDirectory = adapterDir,
             RedirectStandardOutput = true,
             RedirectStandardError = true,

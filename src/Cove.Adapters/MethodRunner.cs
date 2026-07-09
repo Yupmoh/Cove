@@ -19,12 +19,7 @@ public sealed class MethodRunner
         _bashResolver = bashResolver ?? DefaultBashResolver;
     }
 
-    private static string? DefaultBashResolver()
-    {
-        if (OperatingSystem.IsWindows())
-            return null;
-        return "/bin/bash";
-    }
+    private static string? DefaultBashResolver() => BashLocator.Find();
 
     public async Task<MethodResult> RunAsync(
         string adapterDir,
