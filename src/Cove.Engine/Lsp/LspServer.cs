@@ -8,7 +8,7 @@ namespace Cove.Engine.Lsp;
 public sealed record LspRequest(int Id, string Method, JsonElement? Params);
 public sealed record LspResponse(int Id, JsonElement? Result, JsonElement? Error);
 public sealed record LspNotification(string Method, JsonElement? Params);
-public sealed record LspServerConfig(string Command, string[] Args, string[] Languages);
+public sealed record LspServerConfig(string Command, string[] Args, string[] Languages, string? RootUri = null, string? InitializationOptionsJson = null);
 
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 [JsonSerializable(typeof(LspRequest))]
@@ -68,7 +68,9 @@ public sealed class LspServer : IAsyncDisposable
 
     private async Task<bool> InitializeAsync(CancellationToken ct)
     {
-        var initParams = $$"""{"processId":{{Environment.ProcessId}},"rootUri":"","capabilities":{} }""";
+        var rootUriJson = _config.RootUri is { } root ? "\"" + System.Text.Json.JsonEncodedText.Encode(root).ToString() + "\"" : "null";
+        var initOptionsFragment = _config.InitializationOptionsJson is { } opts ? ",\"initializationOptions\":" + opts : "";
+        var initParams = "{\"processId\":" + Environment.ProcessId + ",\"rootUri\":" + rootUriJson + ",\"capabilities\":{\"textDocument\":{\"publishDiagnostics\":{}}}" + initOptionsFragment + "}";
         using var doc = System.Text.Json.JsonDocument.Parse(initParams);
         var result = await SendRequestAsync("initialize", doc.RootElement.Clone(), ct);
         if (result is null)
@@ -121,6 +123,30 @@ public sealed class LspServer : IAsyncDisposable
         await _process.StandardInput.BaseStream.WriteAsync(content, ct);
         await _process.StandardInput.BaseStream.FlushAsync(ct);
     }
+    private async Task WriteServerRequestReplyAsync(string rawId, string resultJson, CancellationToken ct)
+    {
+        if (_process is null) return;
+        var json = "{\"jsonrpc\":\"2.0\",\"id\":" + rawId + ",\"result\":" + resultJson + "}";
+        var content = System.Text.Encoding.UTF8.GetBytes(json);
+        var header = System.Text.Encoding.ASCII.GetBytes($"Content-Length: {content.Length}\r\n\r\n");
+        await _process.StandardInput.BaseStream.WriteAsync(header, ct);
+        await _process.StandardInput.BaseStream.WriteAsync(content, ct);
+        await _process.StandardInput.BaseStream.FlushAsync(ct);
+    }
+
+    private async Task ReplyToServerRequestAsync(string rawId, string method, JsonElement? paramEl, CancellationToken ct)
+    {
+        if (method == "workspace/configuration")
+        {
+            var itemCount = paramEl is { } p && p.TryGetProperty("items", out var items) && items.ValueKind == JsonValueKind.Array
+                ? items.GetArrayLength()
+                : 1;
+            var nulls = string.Join(',', System.Linq.Enumerable.Repeat("null", itemCount));
+            await WriteServerRequestReplyAsync(rawId, "[" + nulls + "]", ct);
+            return;
+        }
+        await WriteServerRequestReplyAsync(rawId, "null", ct);
+    }
 
 
     public System.Collections.Generic.IAsyncEnumerable<LspNotification> Notifications => _notifications.Reader.ReadAllAsync();
@@ -162,7 +188,15 @@ public sealed class LspServer : IAsyncDisposable
                 {
                     using var doc = JsonDocument.Parse(content.AsMemory(0, totalRead));
                     var root = doc.RootElement;
-                    if (root.TryGetProperty("id", out var idEl) && idEl.TryGetInt32(out var id))
+                    var hasId = root.TryGetProperty("id", out var idEl);
+                    var hasMethod = root.TryGetProperty("method", out var methodEl);
+                    if (hasId && hasMethod)
+                    {
+                        var serverMethod = methodEl.GetString() ?? "";
+                        var serverParams = root.TryGetProperty("params", out var sp) ? sp.Clone() : (JsonElement?)null;
+                        await ReplyToServerRequestAsync(idEl.GetRawText(), serverMethod, serverParams, _cts.Token);
+                    }
+                    else if (hasId && idEl.TryGetInt32(out var id))
                     {
                         TaskCompletionSource<JsonElement?>? tcs;
                         lock (_pending) _pending.Remove(id, out tcs);
@@ -174,7 +208,7 @@ public sealed class LspServer : IAsyncDisposable
                                 tcs.TrySetResult(root.TryGetProperty("result", out var result) ? result.Clone() : null);
                         }
                     }
-                    else if (root.TryGetProperty("method", out var methodEl))
+                    else if (hasMethod)
                     {
                         var method = methodEl.GetString() ?? "";
                         var paramEl = root.TryGetProperty("params", out var p) ? p.Clone() : (JsonElement?)null;
