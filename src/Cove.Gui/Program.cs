@@ -33,6 +33,7 @@ internal static class Program
                 o.Width = 1100;
                 o.Height = 720;
                 o.TitleBarStyle = TitleBarStyle.Hidden;
+                o.Backdrop = BackdropMaterial.Blur;
                 o.DevTools = Environment.GetEnvironmentVariable("COVE_DEVTOOLS") == "1";
             })
             .ConfigureServices(s =>
