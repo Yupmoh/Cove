@@ -38,6 +38,8 @@ import { toolbarTiles } from "./toolbar-tiles";
 import { clusterTools } from "./title-cluster";
 import { initialZenState, toggleZen, type ChromeVisibility, type ZenState } from "./zen-mode";
 import { eventToChord, buildChordMap, resolveDispatch, defaultBindings, type ResolvedBinding } from "./keymap-dispatch";
+import { initHud, toggleHud, recordFrame, hudMetrics, readJsHeapBytes, hudLines, type HudState, type JsHeapProbe } from "./perf-hud";
+import { parseSnapshotExport, snapshotRows, summarizeSnapshots, formatBytes as formatSnapshotBytes, type DiagnosticsSnapshot } from "./diagnostics-snapshot";
 
 const CREDIT_THRESHOLD = 131072;
 
@@ -1331,6 +1333,7 @@ function baseActions(): Action[] {
     { label: "Toggle sidebar", icon: "\u25e7", key: "Cmd B", run: toggleSidebar },
     { label: "Toggle notepad sidebar", icon: "\u270e", key: "Cmd Shift N", run: toggleNotepadSidebar },
     { label: "Toggle window backdrop", icon: "\u25d0", run: () => void toggleBackdrop() },
+    { label: "Toggle performance HUD", icon: "\ud83d\udcc8", run: doTogglePerfHud },
     { label: "Increase font size", icon: "+", key: "Cmd =", run: () => { settings.fontSize = Math.min(24, settings.fontSize + 1); applySettings(); } },
     { label: "Decrease font size", icon: "-", key: "Cmd -", run: () => { settings.fontSize = Math.max(9, settings.fontSize - 1); applySettings(); } },
     { label: "Reset font size", icon: "\u21ba", key: "Cmd 0", run: () => { settings.fontSize = 13; applySettings(); } },
@@ -1632,6 +1635,104 @@ function renderSettings(): void {
     void loadSettingValue(entry, row);
     setBodyEl.appendChild(row);
   }
+  if (activeSettingsTab === "diagnostics") renderDiagnosticsExtras(setBodyEl);
+}
+
+function diagnosticsSectionHeader(text: string): HTMLElement {
+  const header = document.createElement("div");
+  header.className = "set-section-header";
+  header.style.cssText = "padding:12px 0 4px;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border);";
+  header.textContent = text;
+  return header;
+}
+
+function renderDiagnosticsExtras(container: HTMLElement): void {
+  container.appendChild(diagnosticsSectionHeader("Performance overlay"));
+
+  const hudRow = document.createElement("div");
+  hudRow.className = "set-row";
+  const hudLabel = document.createElement("label");
+  const hudLabelText = document.createElement("span");
+  hudLabelText.textContent = "Live HUD";
+  const hudDesc = document.createElement("span");
+  hudDesc.className = "set-desc";
+  hudDesc.textContent = "In-page GUI frame rate, frame time, and webview JS heap. Off by default; also toggleable from the command palette.";
+  hudLabel.appendChild(hudLabelText);
+  hudLabel.appendChild(hudDesc);
+  const hudToggle = document.createElement("button");
+  hudToggle.className = "diag-toggle" + (perfHudState.enabled ? " on" : "");
+  hudToggle.textContent = perfHudState.enabled ? "On" : "Off";
+  hudToggle.addEventListener("click", () => doTogglePerfHud());
+  hudRow.appendChild(hudLabel);
+  hudRow.appendChild(hudToggle);
+  container.appendChild(hudRow);
+
+  container.appendChild(diagnosticsSectionHeader("Snapshot inspector"));
+  const snapCaption = document.createElement("div");
+  snapCaption.className = "diag-caption";
+  snapCaption.textContent = "Paste an exported diagnostics snapshot (a single object or an array — the same JSON the engine writes to diagnostics-snapshots.json inside a performance bundle).";
+  container.appendChild(snapCaption);
+
+  const textarea = document.createElement("textarea");
+  textarea.className = "diag-input";
+  textarea.placeholder = '{ "takenAt": "…", "managedMemoryBytes": … }';
+  container.appendChild(textarea);
+
+  const renderBtn = document.createElement("button");
+  renderBtn.className = "diag-btn";
+  renderBtn.textContent = "Inspect snapshot";
+  container.appendChild(renderBtn);
+
+  const output = document.createElement("div");
+  output.className = "diag-snap";
+  container.appendChild(output);
+
+  renderBtn.addEventListener("click", () => renderSnapshotInspection(textarea.value, output));
+
+  container.appendChild(diagnosticsSectionHeader("Not yet available"));
+  const note = document.createElement("div");
+  note.className = "diag-note";
+  note.textContent = "Live snapshot capture/prune/export, performance-bundle create/list/delete, and in-page flame graphs require an engine control-plane route that does not exist yet — the diagnostics backend is not wired to cove:// commands. Per-pane element inspection is available now from any browser pane menu (DevTools).";
+  container.appendChild(note);
+}
+
+function renderSnapshotInspection(text: string, output: HTMLElement): void {
+  output.innerHTML = "";
+  const result = parseSnapshotExport(text);
+  if (!result.ok) {
+    const err = document.createElement("div");
+    err.className = "diag-error";
+    err.textContent = result.error ?? "Could not read snapshot.";
+    output.appendChild(err);
+    return;
+  }
+
+  const summary = summarizeSnapshots(result.snapshots);
+  const summaryEl = document.createElement("div");
+  summaryEl.className = "diag-caption";
+  summaryEl.textContent = `${summary.count} snapshot${summary.count === 1 ? "" : "s"} · peak managed memory ${formatSnapshotBytes(summary.peakManagedMemoryBytes)}`;
+  output.appendChild(summaryEl);
+
+  for (const snapshot of result.snapshots) appendSnapshotCard(snapshot, output);
+}
+
+function appendSnapshotCard(snapshot: DiagnosticsSnapshot, output: HTMLElement): void {
+  const card = document.createElement("div");
+  card.className = "diag-snap-card";
+  for (const row of snapshotRows(snapshot)) {
+    const rowEl = document.createElement("div");
+    rowEl.className = "diag-snap-row";
+    const key = document.createElement("span");
+    key.className = "k";
+    key.textContent = row.label;
+    const value = document.createElement("span");
+    value.className = "v";
+    value.textContent = row.value;
+    rowEl.appendChild(key);
+    rowEl.appendChild(value);
+    card.appendChild(rowEl);
+  }
+  output.appendChild(card);
 }
 
 async function loadSettingValue(entry: ConfigSchemaEntry, row: HTMLElement): Promise<void> {
@@ -2315,6 +2416,53 @@ function doToggleZen(): void {
   document.body.classList.toggle("zen-mode", zenState.active);
   applyChrome(t.visibility);
   fitAll();
+}
+
+const perfHudEl = document.getElementById("perf-hud")!;
+let perfHudState: HudState = initHud();
+let perfHudRaf: number | null = null;
+
+function readJsHeapProbe(): JsHeapProbe | null {
+  const probe = (performance as unknown as { memory?: JsHeapProbe }).memory;
+  return probe ?? null;
+}
+
+function renderPerfHud(): void {
+  const lines = hudLines(hudMetrics(perfHudState), readJsHeapBytes(readJsHeapProbe()));
+  perfHudEl.innerHTML = "";
+  for (const line of lines) {
+    const row = document.createElement("div");
+    row.className = "hud-row";
+    const label = document.createElement("span");
+    label.className = "hud-label";
+    label.textContent = line.label;
+    const value = document.createElement("span");
+    value.className = "hud-value";
+    value.textContent = line.value;
+    row.appendChild(label);
+    row.appendChild(value);
+    perfHudEl.appendChild(row);
+  }
+  const caption = document.createElement("div");
+  caption.className = "hud-caption";
+  caption.textContent = "GUI render loop (requestAnimationFrame); JS heap from the webview.";
+  perfHudEl.appendChild(caption);
+}
+
+function perfHudFrame(ts: number): void {
+  perfHudState = recordFrame(perfHudState, ts);
+  renderPerfHud();
+  perfHudRaf = perfHudState.enabled ? requestAnimationFrame(perfHudFrame) : null;
+}
+
+function doTogglePerfHud(): void {
+  perfHudState = toggleHud(perfHudState);
+  perfHudEl.classList.toggle("open", perfHudState.enabled);
+  if (perfHudState.enabled) {
+    renderPerfHud();
+    if (perfHudRaf === null) perfHudRaf = requestAnimationFrame(perfHudFrame);
+  }
+  if (settingsEl.classList.contains("open") && activeSettingsTab === "diagnostics") renderSettings();
 }
 
 function runAction(action: string): void {
