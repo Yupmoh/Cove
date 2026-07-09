@@ -33,6 +33,11 @@ import { categorizeBindings, isReservedChord, isValidChord, chordDisplay, canRec
 import { ONBOARDING_STEPS, INITIAL_ONBOARDING_STATE, nextStep, prevStep, dismiss as dismissOnboarding, currentStepData, isLastStep, isFirstStep, progressPercent, selectAdapter, setTelemetryOptIn, shouldShowOnboarding, type OnboardingState } from "./onboarding";
 import { initBackdrop, setBackdropMaterial, nextToggleMaterial, coerceMaterial, BACKDROP_PREF_KEY, type BackdropDeps, type BackdropMaterial } from "./backdrop";
 import { NotificationBridge, type NotificationBridgeDeps, type NotificationDeliverPayload } from "./notifications";
+import { buildMenu, menuChordSet } from "./menu-model";
+import { toolbarTiles } from "./toolbar-tiles";
+import { clusterTools } from "./title-cluster";
+import { initialZenState, toggleZen, type ChromeVisibility, type ZenState } from "./zen-mode";
+import { eventToChord, buildChordMap, resolveDispatch, defaultBindings, type ResolvedBinding } from "./keymap-dispatch";
 
 const CREDIT_THRESHOLD = 131072;
 
@@ -1517,12 +1522,7 @@ async function openFileInEditor(filePath: string): Promise<void> {
 function toggleSidebar() { document.body.classList.toggle("sidebar-hidden"); fitAll(); }
 
 document.getElementById("side-add")!.addEventListener("click", () => void newRoom());
-document.getElementById("tb-split-r")!.addEventListener("click", () => void splitActive("row"));
-document.getElementById("tb-split-d")!.addEventListener("click", () => void splitActive("col"));
 document.getElementById("tb-sidebar")!.addEventListener("click", toggleSidebar);
-document.getElementById("tb-pal")!.addEventListener("click", openPalette);
-document.getElementById("tb-find")!.addEventListener("click", openPalette);
-document.getElementById("tb-settings")!.addEventListener("click", openSettings);
 document.body.classList.add(navigator.platform.toUpperCase().includes("MAC") ? "platform-mac" : "platform-other");
 window.__ryn.on("window.focused", () => document.body.classList.remove("window-inactive"));
 window.__ryn.on("window.blurred", () => document.body.classList.add("window-inactive"));
@@ -2026,7 +2026,7 @@ async function onKeybindSet(action: string, chord: string, container: HTMLElemen
   }
   try {
     const res = await invoke<{ success: boolean; warning?: { warning: string } | null }>("cove://commands/keybind.set", { chord: normalized, actionType: "app-command", action });
-    if (res.success) { await loadKeybindData(); renderKeyboardEditorBody(container); }
+    if (res.success) { await loadKeybindData(); await reloadKeymap(); renderKeyboardEditorBody(container); }
   } catch { void 0; }
 }
 
@@ -2034,6 +2034,7 @@ async function onKeybindClear(chord: string, container: HTMLElement): Promise<vo
   try {
     await invoke("cove://commands/keybind.clear", { chord });
     await loadKeybindData();
+    await reloadKeymap();
     renderKeyboardEditorBody(container);
   } catch { void 0; }
 }
@@ -2202,118 +2203,247 @@ async function spawnAgent(a: AdapterInfo): Promise<void> {
   focusPane(sp);
 }
 
-window.addEventListener("keydown", (e) => {
-  if (!e.metaKey) return;
-  const k = e.key.toLowerCase();
-  if (k === "k") { e.preventDefault(); paletteEl.classList.contains("open") ? closePalette() : openPalette(); return; }
-  if (paletteEl.classList.contains("open")) return;
-  if (k === "t" && e.shiftKey) { e.preventDefault(); openPalette(); return; }
-  if (k === "t") { e.preventDefault(); void newRoom(); }
-  else if (k === "z" && e.shiftKey) { e.preventDefault(); document.body.classList.toggle("zen-mode"); fitAll(); }
-  else if (k === "z" && !e.shiftKey) { e.preventDefault(); void toggleZoom(); }
-  else if (k === "d" && e.shiftKey) { e.preventDefault(); void splitActive("col"); }
-  else if (k === "d") { e.preventDefault(); void splitActive("row"); }
-  else if (k === "b" && e.shiftKey) { e.preventDefault(); void newBrowserRoom("https://duckduckgo.com"); }
-  else if (k === "w") { e.preventDefault(); void closeFocused(); }
-  else if (k === "b") { e.preventDefault(); toggleSidebar(); }
-  else if (k === "n" && e.shiftKey) { e.preventDefault(); toggleNotepadSidebar(); }
-  else if (k === "]") { e.preventDefault(); cycleFocus(1); }
-  else if (k === "[") { e.preventDefault(); cycleFocus(-1); }
-  else if (k === "=" || k === "+") { e.preventDefault(); settings.fontSize = Math.min(24, settings.fontSize + 1); applySettings(); }
-  else if (k === "-") { e.preventDefault(); settings.fontSize = Math.max(9, settings.fontSize - 1); applySettings(); }
-  else if (k === "0") { e.preventDefault(); settings.fontSize = 13; applySettings(); }
-  else if (k === ",") { e.preventDefault(); openSettings(); }
-  else if (k === "f") { e.preventDefault(); openFind(); }
-  else if (k === "l") { e.preventDefault(); launcherEl.classList.contains("open") ? closeLauncher() : openLauncher(); }
-  else if (k >= "1" && k <= "9") {
-    const i = Number(k) - 1;
-    const rooms = layout?.rooms ?? [];
-    if (rooms[i]) {
-      e.preventDefault();
-      activeRoomId = rooms[i].id;
-      const f = firstLeafOf(rooms[i]);
-      if (f) { focusedPaneId = f; renderRoom(); renderSidebar(); focusPane(f); }
-    }
+let resolvedBindings: ResolvedBinding[] = defaultBindings();
+let chordMap = buildChordMap(resolvedBindings);
+let menuChords = menuChordSet(bindingsAsActionChords());
+const menuIdToAction = new Map<string, string>();
+
+function bindingsAsActionChords(): { action: string; chord: string }[] {
+  return resolvedBindings.map((b) => ({ action: b.action, chord: b.chord }));
+}
+
+async function reloadKeymap(): Promise<void> {
+  const merged = new Map<string, ResolvedBinding>();
+  for (const b of defaultBindings()) merged.set(normalizeChordStr(b.chord), b);
+  try {
+    const res = await invoke<{ bindings: { chord: string; actionType: string; action: string }[] }>("cove://commands/keybind.list", {});
+    for (const b of res.bindings ?? []) merged.set(normalizeChordStr(b.chord), { chord: b.chord, actionType: b.actionType, action: b.action });
+  } catch (e) {
+    console.warn("keybind.list unavailable, using default keymap", e);
   }
+  resolvedBindings = [...merged.values()];
+  chordMap = buildChordMap(resolvedBindings);
+  menuChords = menuChordSet(bindingsAsActionChords());
+  refreshMenu();
+}
+
+window.addEventListener("keydown", (e) => {
+  const chord = eventToChord({ metaKey: e.metaKey, ctrlKey: e.ctrlKey, altKey: e.altKey, shiftKey: e.shiftKey, key: e.key });
+  if (!chord) return;
+  const decision = resolveDispatch(chord, chordMap, menuChords);
+  if (decision.kind !== "dispatch") return;
+  if (paletteEl.classList.contains("open") && decision.action !== "tool.palette") return;
+  e.preventDefault();
+  runAction(decision.action);
 }, true);
 
 window.addEventListener("resize", () => fitAll());
-function setupMenuBar(): void {
-  const menu = [
-    { role: "appMenu" },
-    {
-      label: "File",
-      items: [
-        { id: "new-room", label: "New Room", accelerator: "CmdOrCtrl+T" },
-        { id: "new-browser", label: "New Browser", accelerator: "CmdOrCtrl+Shift+B" },
-        { separator: true },
-        { id: "close-pane", label: "Close Pane", accelerator: "CmdOrCtrl+W" },
-      ],
-    },
-    { role: "editMenu" },
-    {
-      label: "View",
-      items: [
-        { id: "toggle-sidebar", label: "Toggle Sidebar", accelerator: "CmdOrCtrl+B" },
-        { id: "toggle-zen", label: "Toggle Zen Mode", accelerator: "CmdOrCtrl+Shift+Z" },
-        { id: "toggle-backdrop", label: "Toggle Window Backdrop" },
-        { separator: true },
-        { id: "zoom-in", label: "Zoom In", accelerator: "CmdOrCtrl+=" },
-        { id: "zoom-out", label: "Zoom Out", accelerator: "CmdOrCtrl+-" },
-        { id: "zoom-reset", label: "Reset Zoom", accelerator: "CmdOrCtrl+0" },
-      ],
-    },
-    {
-      label: "Pane",
-      items: [
-        { id: "split-right", label: "Split Right", accelerator: "CmdOrCtrl+D" },
-        { id: "split-down", label: "Split Down", accelerator: "CmdOrCtrl+Shift+D" },
-        { separator: true },
-        { id: "next-pane", label: "Next Pane", accelerator: "CmdOrCtrl+]" },
-        { id: "prev-pane", label: "Previous Pane", accelerator: "CmdOrCtrl+[" },
-        { separator: true },
-        { id: "zoom-pane", label: "Zoom Pane", accelerator: "CmdOrCtrl+Z" },
-      ],
-    },
-    {
-      label: "Go",
-      items: [
-        { id: "command-palette", label: "Command Palette…", accelerator: "CmdOrCtrl+K" },
-        { id: "launcher", label: "Launcher…", accelerator: "CmdOrCtrl+L" },
-        { separator: true },
-        { id: "find", label: "Find…", accelerator: "CmdOrCtrl+F" },
-        { separator: true },
-        { id: "settings", label: "Settings…", accelerator: "CmdOrCtrl+," },
-      ],
-    },
-    { role: "windowMenu" },
-  ];
-  invoke("menubar.setMenu", { items: menu }).catch(() => void 0);
 
+function toggleToolbar(): void { document.body.classList.toggle("toolbar-hidden"); fitAll(); }
+
+async function openToolRoom(paneType: string, name: string): Promise<void> {
+  try {
+    const sp = (await invoke<{ paneId: string }>("app.paneSpawn", { command: "", cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: "", agentName: "", workspace: "", room: "" })).paneId;
+    const r = await invoke<{ roomId: string }>("app.layoutMutate", { op: "createRoom", newPaneId: sp, name, roomId: "", targetPaneId: "", orientation: "", paneId: "", dir: 0, paneType });
+    activeRoomId = r.roomId;
+    await reload();
+    focusPane(sp);
+  } catch (e) { console.warn("openToolRoom failed", paneType, e); }
+}
+
+function scrollActivePane(toTop: boolean): void {
+  if (!focusedPaneId) { console.warn("scroll requested with no focused pane"); return; }
+  const pv = panes.get(focusedPaneId);
+  if (!pv) { console.warn("scroll requested for unknown pane", focusedPaneId); return; }
+  if (toTop) pv.term.scrollToTop();
+  else pv.term.scrollToBottom();
+}
+
+function nextRoom(dir: number): void {
+  const rooms = layout?.rooms ?? [];
+  if (rooms.length === 0) { console.warn("room cycle requested with no rooms"); return; }
+  const idx = rooms.findIndex((r) => r.id === activeRoomId);
+  const next = rooms[((idx < 0 ? 0 : idx) + dir + rooms.length) % rooms.length];
+  activeRoomId = next.id;
+  const f = firstLeafOf(next);
+  if (f) { focusedPaneId = f; renderRoom(); renderSidebar(); renderRoomTabs(); focusPane(f); }
+}
+
+function pinActiveRoom(): void {
+  if (!activeRoomId) { console.warn("pin requested with no active room"); return; }
+  if (pinnedRoomIds.has(activeRoomId)) pinnedRoomIds.delete(activeRoomId);
+  else pinnedRoomIds.add(activeRoomId);
+  savePinnedRooms();
+  renderRoomTabs();
+}
+
+async function newWorkspace(): Promise<void> {
+  const name = typeof prompt === "function" ? prompt("New workspace name") : null;
+  if (!name || !name.trim()) { console.warn("workspace create cancelled or empty name"); return; }
+  try {
+    await invoke("cove://commands/workspace.create", { name: name.trim(), projectDir: "", collectionId: "" });
+    await reload();
+  } catch (e) { console.warn("workspace.create failed", e); }
+}
+
+async function switchWorkspaceByIndex(n: number): Promise<void> {
+  try {
+    const res = await invoke<{ workspaces: { id: string }[] }>("cove://commands/workspace.list", {});
+    const ws = (res.workspaces ?? [])[n - 1];
+    if (!ws) { console.warn("no workspace at index", n); return; }
+    await switchWorkspace(ws.id);
+  } catch (e) { console.warn("workspace switch by index failed", e); }
+}
+
+let zenState: ZenState = initialZenState();
+function currentChrome(): ChromeVisibility {
+  return {
+    leftSidebarHidden: document.body.classList.contains("sidebar-hidden"),
+    toolbarHidden: document.body.classList.contains("toolbar-hidden"),
+    notepadOpen: notepadSidebarOpen,
+  };
+}
+function applyChrome(v: ChromeVisibility): void {
+  document.body.classList.toggle("sidebar-hidden", v.leftSidebarHidden);
+  document.body.classList.toggle("toolbar-hidden", v.toolbarHidden);
+  if (v.notepadOpen && !notepadSidebarOpen) openNotepadSidebar();
+  else if (!v.notepadOpen && notepadSidebarOpen) closeNotepadSidebar();
+}
+function doToggleZen(): void {
+  const t = toggleZen(zenState, currentChrome());
+  zenState = t.state;
+  document.body.classList.toggle("zen-mode", zenState.active);
+  applyChrome(t.visibility);
+  fitAll();
+}
+
+function runAction(action: string): void {
+  if (action.startsWith("workspace.switch-")) {
+    const n = Number(action.slice("workspace.switch-".length));
+    if (Number.isFinite(n)) void switchWorkspaceByIndex(n);
+    return;
+  }
+  switch (action) {
+    case "room.new": void newRoom(); break;
+    case "room.close": if (activeRoomId) void closeRoom(activeRoomId); break;
+    case "room.next": nextRoom(1); break;
+    case "room.prev": nextRoom(-1); break;
+    case "room.pin": pinActiveRoom(); break;
+    case "room.omni-jump": openPalette(); break;
+    case "pane.close": void closeFocused(); break;
+    case "pane.split-right": void splitActive("row"); break;
+    case "pane.split-down": void splitActive("col"); break;
+    case "pane.focus-next": cycleFocus(1); break;
+    case "pane.focus-prev": cycleFocus(-1); break;
+    case "pane.find": openFind(); break;
+    case "pane.scroll-top": scrollActivePane(true); break;
+    case "pane.scroll-bottom": scrollActivePane(false); break;
+    case "pane.maximize": void toggleZoom(); break;
+    case "workspace.create": void newWorkspace(); break;
+    case "view.toggle-sidebar": toggleSidebar(); break;
+    case "view.toggle-notepad": toggleNotepadSidebar(); break;
+    case "view.toggle-toolbar": toggleToolbar(); break;
+    case "view.zen-mode": doToggleZen(); break;
+    case "view.zoom-in": settings.fontSize = Math.min(24, settings.fontSize + 1); applySettings(); break;
+    case "view.zoom-out": settings.fontSize = Math.max(9, settings.fontSize - 1); applySettings(); break;
+    case "view.zoom-reset": settings.fontSize = 13; applySettings(); break;
+    case "view.toggle-backdrop": void toggleBackdrop(); break;
+    case "tool.git": void openToolRoom("git", "Source Control"); break;
+    case "tool.search": void openToolRoom("search", "Search"); break;
+    case "tool.tasks": void openToolRoom("tasks-list", "Tasks"); break;
+    case "tool.library": void openToolRoom("library", "Library"); break;
+    case "tool.browser": void newBrowserRoom("https://duckduckgo.com"); break;
+    case "tool.notepad": toggleNotepadSidebar(); break;
+    case "tool.palette": paletteEl.classList.contains("open") ? closePalette() : openPalette(); break;
+    case "tool.launcher": launcherEl.classList.contains("open") ? closeLauncher() : openLauncher(); break;
+    case "app.settings": openSettings(); break;
+    case "app.update": openSettings(); break;
+    default: console.warn("unhandled keymap action", action); break;
+  }
+}
+
+function refreshMenu(): void {
+  const menu = buildMenu(bindingsAsActionChords());
+  menuIdToAction.clear();
+  for (const section of menu) {
+    for (const item of section.items ?? []) {
+      if (item.id && item.action) menuIdToAction.set(item.id, item.action);
+    }
+  }
+  invoke("menubar.setMenu", { items: menu }).catch(() => void 0);
+}
+
+function setupMenuBar(): void {
   window.__ryn.on("menubar.itemClicked", (data: unknown) => {
     const id = data as string;
     if (!id) return;
-    switch (id) {
-      case "new-room": void newRoom(); break;
-      case "new-browser": void newBrowserRoom("https://duckduckgo.com"); break;
-      case "close-pane": void closeFocused(); break;
-      case "toggle-sidebar": toggleSidebar(); break;
-      case "toggle-zen": document.body.classList.toggle("zen-mode"); fitAll(); break;
-      case "toggle-backdrop": void toggleBackdrop(); break;
-      case "zoom-in": settings.fontSize = Math.min(24, settings.fontSize + 1); applySettings(); break;
-      case "zoom-out": settings.fontSize = Math.max(9, settings.fontSize - 1); applySettings(); break;
-      case "zoom-reset": settings.fontSize = 13; applySettings(); break;
-      case "split-right": void splitActive("row"); break;
-      case "split-down": void splitActive("col"); break;
-      case "next-pane": cycleFocus(1); break;
-      case "prev-pane": cycleFocus(-1); break;
-      case "zoom-pane": void toggleZoom(); break;
-      case "command-palette": paletteEl.classList.contains("open") ? closePalette() : openPalette(); break;
-      case "launcher": launcherEl.classList.contains("open") ? closeLauncher() : openLauncher(); break;
-      case "find": openFind(); break;
-      case "settings": openSettings(); break;
-    }
+    const action = menuIdToAction.get(id);
+    if (!action) { console.warn("menu item without an action", id); return; }
+    runAction(action);
   });
+  refreshMenu();
+}
+
+function setupToolbar(): void {
+  const tilesEl = document.getElementById("tb-tiles");
+  if (!tilesEl) { console.warn("toolbar tiles container missing"); return; }
+  tilesEl.innerHTML = "";
+  for (const tile of toolbarTiles()) {
+    const el = document.createElement("div");
+    el.className = "tbtn tb-tile";
+    el.setAttribute("data-webview-ignore", "");
+    el.title = `${tile.label} (${tile.letter})`;
+    const ic = document.createElement("span");
+    ic.className = "tb-tile-ic";
+    ic.textContent = tile.icon;
+    const lbl = document.createElement("span");
+    lbl.className = "tb-tile-lbl";
+    lbl.textContent = tile.label;
+    el.appendChild(ic);
+    el.appendChild(lbl);
+    el.addEventListener("click", () => runAction(tile.action));
+    tilesEl.appendChild(el);
+  }
+  const search = document.getElementById("tb-search") as HTMLInputElement | null;
+  if (search) {
+    search.addEventListener("focus", () => { search.blur(); openPalette(); });
+    search.addEventListener("keydown", (e) => { e.preventDefault(); search.blur(); openPalette(); });
+  }
+}
+
+let clusterUpdateStaged = false;
+function renderTitleCluster(): void {
+  const cluster = document.getElementById("tb-cluster");
+  if (!cluster) { console.warn("title cluster container missing"); return; }
+  cluster.innerHTML = "";
+  for (const tool of clusterTools({ updateStaged: clusterUpdateStaged })) {
+    if (tool.id === "find-anything") {
+      const find = document.createElement("div");
+      find.className = "tb-find-anything";
+      find.title = tool.title;
+      const ic = document.createElement("span");
+      ic.className = "tb-find-ic";
+      ic.textContent = tool.icon;
+      const ph = document.createElement("span");
+      ph.className = "tb-find-ph";
+      ph.textContent = "find anything…";
+      find.appendChild(ic);
+      find.appendChild(ph);
+      find.addEventListener("click", () => runAction(tool.action));
+      cluster.appendChild(find);
+    } else {
+      const btn = document.createElement("div");
+      btn.className = "tbtn tb-cluster-btn" + (tool.id === "update" ? " tb-update" : "");
+      btn.title = tool.title;
+      btn.textContent = tool.icon;
+      btn.addEventListener("click", () => runAction(tool.action));
+      cluster.appendChild(btn);
+    }
+  }
+}
+
+function setupTitleCluster(): void {
+  renderTitleCluster();
 }
 
 const engineEventHandlers = new Map<string, (payload: unknown) => void>();
@@ -2587,6 +2717,9 @@ notepadSidebarEl.addEventListener("keydown", (e) => {
   applySettings();
   void applyAppearance(null);
   setupMenuBar();
+  void reloadKeymap();
+  setupToolbar();
+  setupTitleCluster();
   setupBadge();
   setupNotifications();
   void setupBackdrop();
