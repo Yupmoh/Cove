@@ -124,6 +124,26 @@ export function switchWing(wings: WingModel, wingId: string): WingModel {
   return { ...wings, activeWingId: wingId };
 }
 
+export interface WingInfo { id: string; name: string; }
+export interface RoomWingSummary { id: string; wingId: string; pinned: boolean; }
+
+export function buildWingModel(wings: WingInfo[], rooms: RoomWingSummary[], activeWingId: string | null): WingModel {
+  const wingRooms = new Map<string, string[]>();
+  for (const r of rooms)
+  {
+    const list = wingRooms.get(r.wingId) ?? [];
+    list.push(r.id);
+    wingRooms.set(r.wingId, list);
+  }
+  const built = wings.map((w) => ({ id: w.id, name: w.name, roomIds: wingRooms.get(w.id) ?? [] }));
+  return { wings: built, activeWingId: activeWingId ?? built[0]?.id ?? null };
+}
+
+export function filterRoomsByWing<T extends { id: string }>(rooms: T[], visibleIds: string[]): T[] {
+  const set = new Set(visibleIds);
+  return rooms.filter((r) => set.has(r.id));
+}
+
 export const WingSwitcherState = {
   Collapsed: "collapsed",
   Expanded: "expanded",

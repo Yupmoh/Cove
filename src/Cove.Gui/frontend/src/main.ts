@@ -23,7 +23,7 @@ import { renderSearchPane } from "./search-pane";
 import { renderBrowserPane } from "./browser-pane";
 import { renderDiffViewerPane } from "./diff-viewer-pane";
 import { renderMarkdownPane } from "./markdown-pane";
-import { partitionPinned, togglePin, reorderRoom, buildMiniDiagram, accentForPaneType, type MiniDiagramNode } from "./room-tabs";
+import { partitionPinned, togglePin, reorderRoom, buildMiniDiagram, accentForPaneType, visibleRoomIds, buildWingModel, filterRoomsByWing, type MiniDiagramNode } from "./room-tabs";
 import { groupByWorkspace, moveSelection, selectedNote, kindIcon, kindColor, type NoteListItem, type NavState } from "./notepad-sidebar";
 import { parseQuery, filterAndSort, MruTracker, cycleCategory, categoryLabel, type PaletteItem } from "./omni-palette";
 import { buildEmptyState, EmptyStateMessages } from "./empty-states";
@@ -1020,15 +1020,21 @@ interface WingInfo { id: string; name: string; }
 let wings: WingInfo[] = [];
 let activeWingId: string | null = "main";
 let wingSwitcherExpanded = false;
+let roomWingSummaries: { id: string; wingId: string; pinned: boolean }[] = [];
 async function loadWings(): Promise<void> {
   try {
     const res = await invoke<{ wings: { id: string; name: string }[] }>("cove://commands/wing.list", { workspaceId: "default" });
     wings = res.wings ?? [{ id: "main", name: "main" }];
   } catch { wings = [{ id: "main", name: "main" }]; }
+  try {
+    const list = await invoke<{ rooms: { id: string; wingId: string; pinned: boolean }[] }>("cove://commands/room.list", { workspaceId: "default" });
+    roomWingSummaries = list.rooms ?? [];
+  } catch { roomWingSummaries = []; }
 }
 async function switchWingActive(wingId: string): Promise<void> {
   activeWingId = wingId;
   try { await invoke("cove://commands/wing.switch", { workspaceId: "default", wingId }); } catch { void 0; }
+  await loadWings();
   await reload();
   renderRoomTabs();
 }
@@ -1070,7 +1076,10 @@ function layoutTreeToMiniNode(node: MosaicNode): MiniDiagramNode {
 
 function renderRoomTabs(): void {
   roomTabsEl.innerHTML = "";
-  const rooms = layout?.rooms ?? [];
+  const allRooms = layout?.rooms ?? [];
+  const wingModel = buildWingModel(wings, roomWingSummaries, activeWingId);
+  const visibleIds = visibleRoomIds(wingModel);
+  const rooms = visibleIds.length > 0 || wings.length > 1 ? filterRoomsByWing(allRooms, visibleIds) : allRooms;
   if (rooms.length === 0) { roomTabsEl.style.display = "none"; return; }
   roomTabsEl.style.display = "flex";
 

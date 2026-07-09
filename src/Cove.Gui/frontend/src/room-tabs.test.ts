@@ -10,6 +10,8 @@ import {
   switchWing,
   WingSwitcherState,
   toggleWingSwitcher,
+  buildWingModel,
+  filterRoomsByWing,
   type TabRoom,
   type MiniDiagramNode,
   type WingModel,
@@ -149,6 +151,42 @@ describe("wing model", () => {
   });
   it("switchWing changes active wing", () => {
     expect(visibleRoomIds(switchWing(wings, "research"))).toEqual(["r3"]);
+  });
+});
+
+describe("buildWingModel", () => {
+  it("groups rooms by wing from summaries", () => {
+    const wings = [{ id: "main", name: "Main" }, { id: "research", name: "Research" }];
+    const rooms = [
+      { id: "r1", wingId: "main", pinned: false },
+      { id: "r2", wingId: "main", pinned: true },
+      { id: "r3", wingId: "research", pinned: false },
+    ];
+    const model = buildWingModel(wings, rooms, "main");
+    expect(model.wings[0].roomIds).toEqual(["r1", "r2"]);
+    expect(model.wings[1].roomIds).toEqual(["r3"]);
+    expect(model.activeWingId).toBe("main");
+  });
+  it("defaults activeWingId to first wing when null", () => {
+    const model = buildWingModel([{ id: "main", name: "Main" }], [], null);
+    expect(model.activeWingId).toBe("main");
+  });
+  it("handles rooms in wings with no declared wing list entry", () => {
+    const model = buildWingModel([{ id: "main", name: "Main" }], [{ id: "r1", wingId: "ghost", pinned: false }], "main");
+    expect(model.wings[0].roomIds).toEqual([]);
+  });
+});
+
+describe("filterRoomsByWing", () => {
+  const rooms = [{ id: "r1" }, { id: "r2" }, { id: "r3" }];
+  it("returns only rooms whose id is in visibleIds", () => {
+    expect(filterRoomsByWing(rooms, ["r1", "r3"])).toEqual([{ id: "r1" }, { id: "r3" }]);
+  });
+  it("returns empty when visibleIds is empty", () => {
+    expect(filterRoomsByWing(rooms, [])).toEqual([]);
+  });
+  it("preserves order of input rooms", () => {
+    expect(filterRoomsByWing(rooms, ["r3", "r1"])).toEqual([{ id: "r1" }, { id: "r3" }]);
   });
 });
 
