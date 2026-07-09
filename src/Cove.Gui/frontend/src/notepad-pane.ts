@@ -169,7 +169,14 @@ export async function openNote(workspaceId: string, noteId: string): Promise<voi
       textarea.scrollTop = viewport.scrollY;
     });
   } catch (e) {
-    editor.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to open note: ${(e as Error).message}</div>`;
+    const msg = (e as Error).message ?? "";
+    if (msg.includes("not_found") || msg.includes("not found")) {
+      editor.innerHTML = "";
+      editor.style.cssText = "flex:1;display:flex;align-items:center;justify-content:center;color:#6b7d8f;font-size:14px;";
+      editor.textContent = "This note was deleted";
+    } else {
+      editor.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to open note: ${msg}</div>`;
+    }
   }
 }
 

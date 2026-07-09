@@ -26,6 +26,7 @@ import { renderMarkdownPane } from "./markdown-pane";
 import { partitionPinned, togglePin, reorderRoom, buildMiniDiagram, accentForPaneType, type MiniDiagramNode } from "./room-tabs";
 import { groupByWorkspace, moveSelection, selectedNote, kindIcon, kindColor, type NoteListItem, type NavState } from "./notepad-sidebar";
 import { parseQuery, filterAndSort, MruTracker, cycleCategory, categoryLabel, type PaletteItem } from "./omni-palette";
+import { buildEmptyState, EmptyStateMessages } from "./empty-states";
 
 const CREDIT_THRESHOLD = 131072;
 
@@ -815,6 +816,12 @@ function renderRoom(): void {
         }
       }
     }
+  }
+  if (!room || !room.layoutTree) {
+    const empty = buildEmptyState({ message: EmptyStateMessages.noRooms, actionLabel: "New terminal", actionIcon: "+" });
+    const action = empty.querySelector(".cove-empty-action");
+    if (action) action.addEventListener("click", () => void newRoom());
+    gridEl.appendChild(empty);
   }
   for (const [id, pv] of panes) {
     pv.el.classList.toggle("focused", id === focusedPaneId);
