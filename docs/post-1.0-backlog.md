@@ -27,7 +27,7 @@ Superseded, never to be built: M7-P01/P03/P04/P05 (CEF hosting) — replaced by 
 | Feature IDs | Packet | Description |
 |---|---|---|
 | TM-62 | MP-P05 | LSP host end-to-end — protocol host built + tested; needs a real `typescript-language-server` binary wired. Blocks symbol-level editor features (go-to-def/find-refs/rename, symbol breadcrumbs). |
-| KN-103 | M6-P22 | SemanticEmbedder needs the Model2Vec model asset; lexical+hotness ships as the working path. |
+| KN-103 | M6-P22 | SKIPPED by owner decision (2026-07-09): semantic recall delegated to a pluggable external memory backend (see plans spec) instead of a bundled model; lexical+hotness is the shipping built-in. |
 | KN-104 | M6-P13 | PNG export needs SkiaSharp or equivalent. |
 
 ## 3. CI secrets
