@@ -2303,6 +2303,8 @@ function setupMenuBar(): void {
   });
 }
 
+const engineEventHandlers = new Map<string, (payload: unknown) => void>();
+
 function setupBadge(): void {
   const needsInputPanes = new Set<string>();
   function updateBadge(): void {
@@ -2312,15 +2314,15 @@ function setupBadge(): void {
     else
       invoke("badge.setCount", count).catch(() => void 0);
   }
-  window.__ryn.on("dock.badge", (data: unknown) => {
-    const evt = data as { paneId?: string };
+  engineEventHandlers.set("dock.badge", (payload) => {
+    const evt = payload as { paneId?: string };
     if (evt?.paneId) { needsInputPanes.add(evt.paneId); updateBadge(); }
   });
-  window.__ryn.on("needs-input.clear", (data: unknown) => {
-    const evt = data as { paneId?: string };
+  engineEventHandlers.set("needs-input.clear", (payload) => {
+    const evt = payload as { paneId?: string };
     if (evt?.paneId) { needsInputPanes.delete(evt.paneId); updateBadge(); }
   });
-  window.__ryn.on("dock.badge.clear", () => { needsInputPanes.clear(); updateBadge(); });
+  engineEventHandlers.set("dock.badge.clear", () => { needsInputPanes.clear(); updateBadge(); });
 }
 
 window.__ryn.on("engine.event", (data: unknown) => {
@@ -2335,6 +2337,9 @@ window.__ryn.on("engine.event", (data: unknown) => {
   }
   if (evt?.channel === "browser.automation.exec") {
     void handleAutomationExec(evt.payload as AutomationExecEvent);
+  }
+  if (evt?.channel) {
+    engineEventHandlers.get(evt.channel)?.(evt.payload);
   }
 });
 
