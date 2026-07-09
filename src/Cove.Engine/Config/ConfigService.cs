@@ -253,18 +253,20 @@ public sealed class ConfigService : System.IDisposable
         if (_watcher is not null) return;
         var dir = Path.GetDirectoryName(_path);
         if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir)) return;
-        _watcher = new FileSystemWatcher(dir, Path.GetFileName(_path))
+        _watcher = new FileSystemWatcher(dir)
         {
             NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.Size,
             EnableRaisingEvents = true,
         };
         _watcher.Changed += OnFileChanged;
         _watcher.Created += OnFileChanged;
-        _watcher.Renamed += (sender, e) => OnFileChanged(sender, e);
+        _watcher.Renamed += OnFileChanged;
     }
 
     private void OnFileChanged(object sender, FileSystemEventArgs e)
     {
+        if (!string.Equals(Path.GetFileName(e.FullPath), Path.GetFileName(_path), StringComparison.Ordinal))
+            return;
         var changed = ReloadAndCollectChanges();
         foreach (var key in changed)
             SettingsChanged?.Invoke(key);
@@ -420,6 +422,7 @@ public sealed class ConfigService : System.IDisposable
         {
             _watcher.Changed -= OnFileChanged;
             _watcher.Created -= OnFileChanged;
+            _watcher.Renamed -= OnFileChanged;
             _watcher.Dispose();
         }
     }

@@ -13,6 +13,11 @@ public sealed class CoveDataDir
         Root = root;
     }
 
+    public static CoveDataDir ForRoot(CoveChannel channel, string root)
+    {
+        return new CoveDataDir(channel, Path.GetFullPath(ExpandHome(root)));
+    }
+
     public static CoveDataDir Resolve(CoveChannel channel)
     {
         var overrideDir = Environment.GetEnvironmentVariable("COVE_DATA_DIR");

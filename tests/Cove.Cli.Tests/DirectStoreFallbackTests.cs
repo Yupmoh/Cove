@@ -13,11 +13,9 @@ public sealed class DirectStoreFallbackTests
         var dir = Path.Combine(Path.GetTempPath(), "cove-direct-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         File.WriteAllText(Path.Combine(dir, "config.json"), "{\"theme\":\"dracula\",\"terminal\":{\"fontSize\":16}}");
-        var prev = System.Environment.GetEnvironmentVariable("COVE_DATA_DIR");
-        System.Environment.SetEnvironmentVariable("COVE_DATA_DIR", dir);
         try
         {
-            var paths = new Cove.Engine.Daemon.DaemonPaths(CoveDataDir.Resolve(CoveChannel.Stable));
+            var paths = new Cove.Engine.Daemon.DaemonPaths(CoveDataDir.ForRoot(CoveChannel.Stable, dir));
             var endpoint = Cove.Platform.Ipc.ControlEndpointFactory.FromSocketPath(paths.DataDir.SocketPath);
             var stdout = new System.IO.StringWriter();
             var ctx = new CommandContext(paths, endpoint, stdout, args: new[] { "theme" });
@@ -27,7 +25,6 @@ public sealed class DirectStoreFallbackTests
         }
         finally
         {
-            System.Environment.SetEnvironmentVariable("COVE_DATA_DIR", prev);
             try { Directory.Delete(dir, true); } catch { }
         }
     }
@@ -38,11 +35,9 @@ public sealed class DirectStoreFallbackTests
         var dir = Path.Combine(Path.GetTempPath(), "cove-direct-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         File.WriteAllText(Path.Combine(dir, "config.json"), "{\"terminal\":{\"fontSize\":16}}");
-        var prev = System.Environment.GetEnvironmentVariable("COVE_DATA_DIR");
-        System.Environment.SetEnvironmentVariable("COVE_DATA_DIR", dir);
         try
         {
-            var paths = new Cove.Engine.Daemon.DaemonPaths(CoveDataDir.Resolve(CoveChannel.Stable));
+            var paths = new Cove.Engine.Daemon.DaemonPaths(CoveDataDir.ForRoot(CoveChannel.Stable, dir));
             var endpoint = Cove.Platform.Ipc.ControlEndpointFactory.FromSocketPath(paths.DataDir.SocketPath);
             var stdout = new System.IO.StringWriter();
             var ctx = new CommandContext(paths, endpoint, stdout, args: new[] { "terminal.fontSize" });
@@ -52,7 +47,6 @@ public sealed class DirectStoreFallbackTests
         }
         finally
         {
-            System.Environment.SetEnvironmentVariable("COVE_DATA_DIR", prev);
             try { Directory.Delete(dir, true); } catch { }
         }
     }
@@ -63,11 +57,9 @@ public sealed class DirectStoreFallbackTests
         var dir = Path.Combine(Path.GetTempPath(), "cove-direct-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         File.WriteAllText(Path.Combine(dir, "config.json"), "{\"theme\":\"dracula\"}");
-        var prev = System.Environment.GetEnvironmentVariable("COVE_DATA_DIR");
-        System.Environment.SetEnvironmentVariable("COVE_DATA_DIR", dir);
         try
         {
-            var paths = new Cove.Engine.Daemon.DaemonPaths(CoveDataDir.Resolve(CoveChannel.Stable));
+            var paths = new Cove.Engine.Daemon.DaemonPaths(CoveDataDir.ForRoot(CoveChannel.Stable, dir));
             var endpoint = Cove.Platform.Ipc.ControlEndpointFactory.FromSocketPath(paths.DataDir.SocketPath);
             var stderr = new System.IO.StringWriter();
             var ctx = new CommandContext(paths, endpoint, new System.IO.StringWriter(), stderr, args: new[] { "nonexistent" });
@@ -77,7 +69,6 @@ public sealed class DirectStoreFallbackTests
         }
         finally
         {
-            System.Environment.SetEnvironmentVariable("COVE_DATA_DIR", prev);
             try { Directory.Delete(dir, true); } catch { }
         }
     }
