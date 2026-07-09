@@ -1004,6 +1004,23 @@ function renderSidebar(): void {
 const pinnedRoomIds = new Set<string>(JSON.parse(localStorage.getItem("cove.pinnedRooms") ?? "[]"));
 function savePinnedRooms(): void { localStorage.setItem("cove.pinnedRooms", JSON.stringify([...pinnedRoomIds])); }
 
+interface WingInfo { id: string; name: string; }
+let wings: WingInfo[] = [];
+let activeWingId: string | null = "main";
+let wingSwitcherExpanded = false;
+async function loadWings(): Promise<void> {
+  try {
+    const res = await invoke<{ wings: { id: string; name: string }[] }>("cove://commands/wing.list", { workspaceId: "default" });
+    wings = res.wings ?? [{ id: "main", name: "main" }];
+  } catch { wings = [{ id: "main", name: "main" }]; }
+}
+async function switchWingActive(wingId: string): Promise<void> {
+  activeWingId = wingId;
+  try { await invoke("cove://commands/wing.switch", { workspaceId: "default", wingId }); } catch { void 0; }
+  await reload();
+  renderRoomTabs();
+}
+
 function roomTabName(room: RoomSnapshot): string {
   const leaves = collectLeafIds(room.layoutTree);
   const first = leaves[0] ? panes.get(leaves[0]) : undefined;
@@ -1122,6 +1139,34 @@ function renderRoomTabs(): void {
     roomTabsEl.appendChild(divider);
   }
   for (const id of unpinned) roomTabsEl.appendChild(makeTab(id));
+
+  if (wings.length > 1 || wingSwitcherExpanded) {
+    const switcher = document.createElement("div");
+    switcher.id = "wing-switcher";
+    if (!wingSwitcherExpanded) {
+      const toggle = document.createElement("div");
+      toggle.className = "wing-btn";
+      toggle.textContent = "\u27e8";
+      toggle.title = "Wings";
+      toggle.addEventListener("click", () => { wingSwitcherExpanded = true; renderRoomTabs(); });
+      switcher.appendChild(toggle);
+    } else {
+      for (const wing of wings) {
+        const btn = document.createElement("div");
+        btn.className = "wing-btn" + (wing.id === activeWingId ? " active" : "");
+        btn.textContent = wing.name;
+        btn.addEventListener("click", () => void switchWingActive(wing.id));
+        switcher.appendChild(btn);
+      }
+      const collapse = document.createElement("div");
+      collapse.className = "wing-btn";
+      collapse.textContent = "\u27e9";
+      collapse.title = "Collapse wings";
+      collapse.addEventListener("click", () => { wingSwitcherExpanded = false; renderRoomTabs(); });
+      switcher.appendChild(collapse);
+    }
+    roomTabsEl.appendChild(switcher);
+  }
 
   const addBtn = document.createElement("div");
   addBtn.className = "tbtn";
@@ -1562,6 +1607,7 @@ function setupBadge(): void {
   applySettings();
   setupMenuBar();
   setupBadge();
+  void loadWings();
   const snap = await reload();
   if (snap.rooms.length === 0) {
     await newRoom();
