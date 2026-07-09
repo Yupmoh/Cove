@@ -90,6 +90,12 @@ public sealed class ConfigService : System.IDisposable
         return key switch
         {
             "theme" => (true, _config.Theme),
+            "appearance.uiScale" => (true, _config.Appearance.UiScale),
+            "appearance.layoutGap" => (true, _config.Appearance.LayoutGap),
+            "appearance.iconSet" => (true, _config.Appearance.IconSet),
+            "appearance.wallpaper" => (true, _config.Appearance.Wallpaper),
+            "appearance.accent" => (true, _config.Appearance.Accent),
+            "appearance.paneLight" => (true, _config.Appearance.PaneLight),
             "terminal.fontFamily" => (true, _config.Terminal.FontFamily),
             "terminal.fontSize" => (true, _config.Terminal.FontSize),
             "terminal.lineHeight" => (true, _config.Terminal.LineHeight),
@@ -134,6 +140,12 @@ public sealed class ConfigService : System.IDisposable
             switch (key)
             {
                 case "theme": _config.Theme = value; break;
+                case "appearance.uiScale": _config.Appearance.UiScale = AutoDetectDouble(value); break;
+                case "appearance.layoutGap": _config.Appearance.LayoutGap = AutoDetectInt(value); break;
+                case "appearance.iconSet": _config.Appearance.IconSet = value; break;
+                case "appearance.wallpaper": _config.Appearance.Wallpaper = value; break;
+                case "appearance.accent": _config.Appearance.Accent = value; break;
+                case "appearance.paneLight": _config.Appearance.PaneLight = AutoDetectBool(value); break;
                 case "terminal.fontFamily": _config.Terminal.FontFamily = value; break;
                 case "terminal.fontSize": _config.Terminal.FontSize = AutoDetectInt(value); break;
                 case "terminal.lineHeight": _config.Terminal.LineHeight = AutoDetectDouble(value); break;

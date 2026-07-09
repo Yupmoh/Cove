@@ -35,6 +35,9 @@ public sealed class CoveConfig
     [Setting("Theme", "appearance", "select", "Active theme name", Options = new[] { "cove-harbor", "cove-daybreak", "cove-midnight", "cove-shoal", "cove-beacon", "cove-chalk" })]
     public string Theme { get; set; } = "cove";
 
+    [Setting("Appearance", "appearance", "section", "Appearance settings")]
+    public AppearanceSection Appearance { get; set; } = new();
+
     [Setting("Terminal", "terminal", "section", "Terminal settings")]
     public TerminalSection Terminal { get; set; } = new();
     [Setting("Markdown Editor", "terminal", "section", "Markdown editor settings")]
@@ -72,6 +75,9 @@ public sealed class CoveConfig
                 case "theme":
                     if (prop.Value.ValueKind == JsonValueKind.String)
                         cfg.Theme = prop.Value.GetString() ?? "cove";
+                    break;
+                case "appearance":
+                    cfg.Appearance = AppearanceSection.Read(prop.Value);
                     break;
                 case "terminal":
                     cfg.Terminal = TerminalSection.Read(prop.Value);
@@ -217,6 +223,8 @@ public sealed class CoveConfig
     {
         writer.WriteStartObject();
         writer.WriteString("theme", Theme);
+        writer.WritePropertyName("appearance");
+        Appearance.WriteTo(writer);
         writer.WritePropertyName("terminal");
         Terminal.WriteTo(writer);
         writer.WritePropertyName("markdown_editor");
@@ -246,6 +254,53 @@ public sealed class CoveConfig
             writer.WritePropertyName(kv.Key);
             kv.Value.WriteTo(writer);
         }
+        writer.WriteEndObject();
+    }
+}
+
+public sealed class AppearanceSection
+{
+    [Setting("UI Scale", "appearance", "number", "Interface scale multiplier (0.8-1.5)")]
+    public double UiScale { get; set; } = 1.0;
+    [Setting("Layout Gap", "appearance", "number", "Gap between panes in pixels")]
+    public int LayoutGap { get; set; } = 4;
+    [Setting("Icon Set", "appearance", "select", "Icon set style", Options = new[] { "default", "outline", "filled" })]
+    public string IconSet { get; set; } = "default";
+    [Setting("Wallpaper", "appearance", "text", "Wallpaper image path or URL")]
+    public string Wallpaper { get; set; } = "";
+    [Setting("Accent Override", "appearance", "text", "Override accent color hex (empty for theme default)")]
+    public string Accent { get; set; } = "";
+    [Setting("Pane Light", "appearance", "toggle", "Lighten inactive panes")]
+    public bool PaneLight { get; set; } = false;
+
+    public static AppearanceSection Read(JsonElement el)
+    {
+        var s = new AppearanceSection();
+        if (el.ValueKind != JsonValueKind.Object) return s;
+        foreach (var prop in el.EnumerateObject())
+        {
+            switch (prop.Name)
+            {
+                case "uiScale": s.UiScale = ConfigValueCoercion.AsDouble(prop.Value, s.UiScale); break;
+                case "layoutGap": s.LayoutGap = ConfigValueCoercion.AsInt(prop.Value, s.LayoutGap); break;
+                case "iconSet": if (prop.Value.ValueKind == JsonValueKind.String) s.IconSet = prop.Value.GetString() ?? s.IconSet; break;
+                case "wallpaper": if (prop.Value.ValueKind == JsonValueKind.String) s.Wallpaper = prop.Value.GetString() ?? s.Wallpaper; break;
+                case "accent": if (prop.Value.ValueKind == JsonValueKind.String) s.Accent = prop.Value.GetString() ?? s.Accent; break;
+                case "paneLight": s.PaneLight = ConfigValueCoercion.AsBool(prop.Value, s.PaneLight); break;
+            }
+        }
+        return s;
+    }
+
+    public void WriteTo(Utf8JsonWriter writer)
+    {
+        writer.WriteStartObject();
+        writer.WriteNumber("uiScale", UiScale);
+        writer.WriteNumber("layoutGap", LayoutGap);
+        writer.WriteString("iconSet", IconSet);
+        writer.WriteString("wallpaper", Wallpaper);
+        writer.WriteString("accent", Accent);
+        writer.WriteBoolean("paneLight", PaneLight);
         writer.WriteEndObject();
     }
 }

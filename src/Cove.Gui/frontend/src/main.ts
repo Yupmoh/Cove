@@ -1663,7 +1663,19 @@ async function saveSetting(key: string, input: HTMLInputElement | HTMLSelectElem
   try {
     await invoke("cove://commands/config.set", { key, value });
     if (key.startsWith("terminal.")) { settings = await loadSettings(); applySettings(); }
+    if (key.startsWith("appearance.")) { await applyAppearance(key); }
   } catch { void 0; }
+}
+
+async function applyAppearance(changedKey: string | null): Promise<void> {
+  const get = async (k: string): Promise<string> => { try { const r = await invoke<{ ok: boolean; value?: string }>("app.configGet", { key: k }); return r.ok ? r.value ?? "" : ""; } catch { return ""; } };
+  const root = document.documentElement;
+  if (changedKey === null || changedKey === "appearance.uiScale") { const scale = parseFloat(await get("appearance.uiScale")) || 1; root.style.setProperty("--ui-scale", String(scale)); document.body.style.fontSize = `${13 * scale}px`; }
+  if (changedKey === null || changedKey === "appearance.layoutGap") { const gap = parseInt(await get("appearance.layoutGap")) || 4; root.style.setProperty("--layout-gap", `${gap}px`); gridEl.style.gap = `${gap}px`; }
+  if (changedKey === null || changedKey === "appearance.accent") { const accent = await get("appearance.accent"); if (accent) { root.style.setProperty("--accent", accent); root.style.setProperty("--accent-dim", accent); } }
+  if (changedKey === null || changedKey === "appearance.wallpaper") { const wp = await get("appearance.wallpaper"); if (wp) { document.body.style.backgroundImage = `url("${wp}")`; document.body.style.backgroundSize = "cover"; } else { document.body.style.backgroundImage = ""; } }
+  if (changedKey === null || changedKey === "appearance.paneLight") { const pl = await get("appearance.paneLight") === "true"; root.style.setProperty("--pane-light", pl ? "1" : "0"); }
+  if (changedKey === null || changedKey === "appearance.iconSet") { const ic = (await get("appearance.iconSet")) || "default"; document.body.classList.remove("icon-set-outline", "icon-set-filled"); if (ic === "outline") document.body.classList.add("icon-set-outline"); else if (ic === "filled") document.body.classList.add("icon-set-filled"); }
 }
 let themeList: ThemeDto[] = [];
 let themeActiveName: string | null = null;
@@ -1898,8 +1910,7 @@ function renderKeyboardEditor(container: HTMLElement): void {
 
 function renderKeyboardEditorBody(container: HTMLElement): void {
   container.innerHTML = "";
-  const customActions = keybindList.filter((b) => !DEFAULT_ACTIONS.has(b.action)).map((b) => b.action);
-  const categories = categorizeBindings(keybindList, keybindConflicts, customActions);
+  const categories = categorizeBindings(keybindList, keybindConflicts, []);
 
   if (keybindConflicts.length > 0) {
     const warn = document.createElement("div");
@@ -1923,7 +1934,6 @@ function renderKeyboardEditorBody(container: HTMLElement): void {
       label.style.cssText = "flex-direction:column;gap:2px;flex:1;";
       const labelText = document.createElement("span");
       labelText.textContent = row.description ?? row.action;
-      if (row.isCustom) { const tag = document.createElement("span"); tag.textContent = " (custom)"; tag.style.color = "var(--muted)"; tag.style.fontWeight = "400"; labelText.appendChild(tag); }
       label.appendChild(labelText);
       const actionLabel = document.createElement("span");
       actionLabel.className = "set-desc";
@@ -1969,7 +1979,6 @@ function renderKeyboardEditorBody(container: HTMLElement): void {
   }
 }
 
-const DEFAULT_ACTIONS: Set<string> = new Set();
 
 function captureChord(e: KeyboardEvent): string {
   const parts: string[] = [];
@@ -2342,6 +2351,7 @@ notepadSidebarEl.addEventListener("keydown", (e) => {
 (async () => {
   settings = await loadSettings();
   applySettings();
+  void applyAppearance(null);
   setupMenuBar();
   setupBadge();
   void loadWings();

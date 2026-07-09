@@ -160,4 +160,46 @@ public sealed class ConfigHotReloadTests
         }
         finally { try { Directory.Delete(dir, true); } catch { } }
     }
+
+    [Fact]
+    public void AppearanceSettings_RoundTripAcrossInstances()
+    {
+        var dir = NewDir();
+        try
+        {
+            var cfg1 = new ConfigService(dir, NullLogger.Instance);
+            cfg1.Set("appearance.uiScale", "1.25");
+            cfg1.Set("appearance.layoutGap", "6");
+            cfg1.Set("appearance.iconSet", "outline");
+            cfg1.Set("appearance.wallpaper", "/path/to/wp.png");
+            cfg1.Set("appearance.accent", "#ff5500");
+            cfg1.Set("appearance.paneLight", "true");
+
+            var cfg2 = new ConfigService(dir, NullLogger.Instance);
+            Assert.Equal("1.25", cfg2.Get("appearance.uiScale"));
+            Assert.Equal("6", cfg2.Get("appearance.layoutGap"));
+            Assert.Equal("outline", cfg2.Get("appearance.iconSet"));
+            Assert.Equal("/path/to/wp.png", cfg2.Get("appearance.wallpaper"));
+            Assert.Equal("#ff5500", cfg2.Get("appearance.accent"));
+            Assert.Equal("true", cfg2.Get("appearance.paneLight"));
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
+
+    [Fact]
+    public void AppearanceSettings_DefaultsWhenAbsent()
+    {
+        var dir = NewDir();
+        try
+        {
+            var cfg = new ConfigService(dir, NullLogger.Instance);
+            Assert.Equal("1", cfg.Get("appearance.uiScale"));
+            Assert.Equal("4", cfg.Get("appearance.layoutGap"));
+            Assert.Equal("default", cfg.Get("appearance.iconSet"));
+            Assert.Equal("", cfg.Get("appearance.wallpaper"));
+            Assert.Equal("", cfg.Get("appearance.accent"));
+            Assert.Equal("false", cfg.Get("appearance.paneLight"));
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
 }
