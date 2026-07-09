@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Ryn.Core;
 
 namespace Cove.Gui;
@@ -14,13 +15,19 @@ public sealed class EngineEventForwarder
         _windows = windows;
         _link.SetEngineEventHandler(Forward);
     }
-
     private void Forward(string channel, JsonElement payload)
     {
         var window = _windows.Windows.Count > 0 ? _windows.Windows[0] : null;
-        if (window is null) return;
-        var payloadJson = payload.GetRawText();
-        var js = $"window.__ryn._emit('engine.event', {{ channel: {JsonSerializer.Serialize(channel)}, payload: {payloadJson} }});";
-        _ = window.EvaluateJavaScriptAsync(js);
+        if (window is not RynWindow rynWindow) return;
+        var webView = rynWindow.WebView;
+        if (webView is null) return;
+        var evt = new EngineEventPayload(channel, payload);
+        webView.EmitEvent("engine.event", JsonSerializer.Serialize(evt, EngineEventPayloadJsonContext.Default.EngineEventPayload));
     }
 }
+
+public sealed record EngineEventPayload(string Channel, JsonElement Payload);
+
+[JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
+[JsonSerializable(typeof(EngineEventPayload))]
+public sealed partial class EngineEventPayloadJsonContext : JsonSerializerContext { }
