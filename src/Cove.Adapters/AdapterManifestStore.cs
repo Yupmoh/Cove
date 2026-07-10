@@ -40,12 +40,13 @@ public sealed class AdapterManifestStore
         try
         {
             var json = File.ReadAllText(manifestPath);
-            var manifest = JsonSerializer.Deserialize(json, AdaptersJsonContext.Default.AdapterManifest);
-            if (manifest is null)
+            var parsed = JsonSerializer.Deserialize(json, AdaptersJsonContext.Default.AdapterManifest);
+            if (parsed is null)
             {
                 _logger?.ManifestParsedNull(adapter);
                 return null;
             }
+            var manifest = NormalizeCollections(parsed);
             lock (_lock)
             {
                 _cache[adapter] = (manifest, lastWrite);
@@ -68,6 +69,15 @@ public sealed class AdapterManifestStore
             return null;
         }
     }
+
+    private static AdapterManifest NormalizeCollections(AdapterManifest manifest) => manifest with
+    {
+        Hooks = manifest.Hooks ?? new Dictionary<string, string>(),
+        HookEnvelopes = manifest.HookEnvelopes ?? new Dictionary<string, HookEnvelopeDeclaration>(),
+        Install = manifest.Install ?? new Dictionary<string, InstallRecipe>(),
+        WellKnownPaths = manifest.WellKnownPaths ?? [],
+        SuggestedFlags = manifest.SuggestedFlags ?? [],
+    };
 
     public IReadOnlyList<AdapterManifest> LoadAll()
     {

@@ -48,6 +48,28 @@ public sealed class AdapterManifestStoreTests
     }
 
     [Fact]
+    public void Load_NormalizesNullCollections_WhenOmitted()
+    {
+        var root = NewDir();
+        try
+        {
+            var adapterDir = Path.Combine(root, "codex");
+            WriteManifest(adapterDir, "codex", "codex");
+            var store = new AdapterManifestStore(root);
+
+            var manifest = store.Load("codex");
+
+            Assert.NotNull(manifest);
+            Assert.NotNull(manifest!.Hooks);
+            Assert.NotNull(manifest.HookEnvelopes);
+            Assert.NotNull(manifest.Install);
+            Assert.NotNull(manifest.WellKnownPaths);
+            Assert.NotNull(manifest.SuggestedFlags);
+        }
+        finally { try { Directory.Delete(root, true); } catch { } }
+    }
+
+    [Fact]
     public void Load_ReturnsNull_WhenMissing()
     {
         var root = NewDir();
