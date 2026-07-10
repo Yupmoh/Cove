@@ -32,7 +32,7 @@ internal static class Program
                 o.Title = "Cove";
                 o.Width = 1100;
                 o.Height = 720;
-                o.TitleBarStyle = TitleBarStyle.Hidden;
+                o.TitleBarStyle = TitleBarStyle.Overlay;
                 o.Backdrop = BackdropMaterial.Blur;
                 o.DevTools = Environment.GetEnvironmentVariable("COVE_DEVTOOLS") == "1";
             })

@@ -28,6 +28,9 @@ import { renderPdfPane } from "./pdf-pane";
 import { renderVideoPane } from "./video-pane";
 import { partitionPinned, togglePin, reorderRoom, buildMiniDiagram, accentForPaneType, visibleRoomIds, buildWingModel, filterRoomsByWing, type MiniDiagramNode } from "./room-tabs";
 import { groupByWorkspace, moveSelection, selectedNote, kindIcon, kindColor, type NoteListItem, type NavState } from "./notepad-sidebar";
+import { initialSidebarModel, selectMode, toggleSide, setCollapsed, setWidth, collapsedOf, modeOf, widthOf, SIDEBAR_MODES, SIDEBAR_MODE_META, type SidebarModel, type SidebarSide, type SidebarMode } from "./sidebar-model";
+import { buildWorkspaceTree, type TreeLeaf, type TreeRoomInput } from "./workspace-tree";
+import { buildAgentRows, agentStateCounts, AGENT_STATE_META, type AgentCard, type AgentRow } from "./agents-model";
 import { parseQuery, filterAndSort, MruTracker, cycleCategory, categoryLabel, type PaletteItem } from "./omni-palette";
 import { buildEmptyState, EmptyStateMessages } from "./empty-states";
 import { DEFAULT_DRAFT, draftFromTheme, themeFromDraft, cssVarsFromTheme, isCustom, isBuiltin, canSaveDraft, canDelete, isValidHex, contrastRatio, contrastTier, THEME_COLOR_FIELDS, type ThemeDto, type ThemeDraft } from "./theme-editor";
@@ -49,13 +52,13 @@ import { initialPerfBundlesState, applyBundleList, beginCreate, finishCreate, su
 
 const CREDIT_THRESHOLD = 131072;
 
-const THEME_BG = "#0b1622";
+const THEME_BG = "#1e1e2e";
 const THEME = {
   background: THEME_BG,
-  foreground: "#e5e9f0",
-  cursor: "#4cc2d6",
+  foreground: "#cdd6f4",
+  cursor: "#f5e0dc",
   cursorAccent: THEME_BG,
-  selectionBackground: "#2b6d7a",
+  selectionBackground: "#585b70",
 };
 function themeBackgroundWithOpacity(opacity: number): string {
   const n = opacity >= 0 && opacity <= 1 ? opacity : 1;
@@ -199,12 +202,18 @@ function normalizeChord(e: KeyboardEvent): string {
   return parts.join("+");
 }
 
-const sessionsEl = document.getElementById("sessions")!;
 const gridEl = document.getElementById("grid")!;
 const titleEl = document.getElementById("tb-title")!;
-const footEl = document.getElementById("foot-count")!;
 const paletteEl = document.getElementById("palette")!;
 const roomTabsEl = document.getElementById("room-tabs")!;
+const leftSidebarEl = document.getElementById("left-sidebar")!;
+const rightSidebarEl = document.getElementById("right-sidebar")!;
+const leftRailEl = document.getElementById("left-rail")!;
+const rightRailEl = document.getElementById("right-rail")!;
+const leftContentEl = document.getElementById("left-content")!;
+const rightContentEl = document.getElementById("right-content")!;
+const leftResizeEl = document.getElementById("left-resize")!;
+const rightResizeEl = document.getElementById("right-resize")!;
 const palInput = document.getElementById("pal-input") as HTMLInputElement;
 const palList = document.getElementById("pal-list")!;
 
@@ -871,16 +880,6 @@ function refreshTitles(): void {
     const label = (focused && focused.title) || room.name;
     titleEl.innerHTML = `${label}` + (count > 1 ? ` <span class="sub">${count} panes</span>` : "");
   }
-  const sessEls = sessionsEl.querySelectorAll<HTMLElement>(".sess");
-  (layout?.rooms ?? []).forEach((r, i) => {
-    const sessEl = sessEls[i];
-    if (!sessEl) return;
-    const leaves = collectLeafIds(r.layoutTree);
-    const first = leaves[0] ? panes.get(leaves[0]) : undefined;
-    const name = (first && first.title) || r.name;
-    const nameEl = sessEl.querySelector<HTMLElement>(".name");
-    if (nameEl) nameEl.textContent = name;
-  });
   const tabEls = roomTabsEl.querySelectorAll<HTMLElement>(".rtab");
   (layout?.rooms ?? []).forEach((r) => {
     const tab = Array.from(tabEls).find((el) => el.title === roomTabName(r) || el.querySelector(".rtab-name")?.textContent === roomTabName(r));
@@ -999,36 +998,350 @@ async function closeRoom(roomId: string): Promise<void> {
   if (!layout || layout.rooms.length === 0) await newRoom();
 }
 
+let sidebarModel: SidebarModel = initialSidebarModel();
+const collapsedTreeRooms = new Set<string>(JSON.parse(localStorage.getItem("cove.tree.collapsedRooms") ?? "[]"));
+let treeWorkspaceCollapsed = localStorage.getItem("cove.tree.workspaceCollapsed") === "true";
+let agentCards: AgentCard[] = [];
+const needsInputPanes = new Set<string>();
+let agentPollTimer: ReturnType<typeof setInterval> | null = null;
+
+function sideEl(side: SidebarSide): { root: HTMLElement; rail: HTMLElement; content: HTMLElement } {
+  return side === "left"
+    ? { root: leftSidebarEl, rail: leftRailEl, content: leftContentEl }
+    : { root: rightSidebarEl, rail: rightRailEl, content: rightContentEl };
+}
+
 function renderSidebar(): void {
-  sessionsEl.innerHTML = "";
-  const rooms = layout?.rooms ?? [];
-  for (const room of rooms) {
-    const sessEl = document.createElement("div");
-    sessEl.className = "sess" + (room.id === activeRoomId ? " active" : "");
-    const leaves = collectLeafIds(room.layoutTree);
-    const count = leaves.length;
-    sessEl.innerHTML = `<span class="dot"></span><span class="name"></span><span class="n"></span><span class="x">&times;</span>`;
-    const nameEl = sessEl.querySelector<HTMLElement>(".name");
-    if (nameEl) {
-      const first = leaves[0] ? panes.get(leaves[0]) : undefined;
-      nameEl.textContent = (first && first.title) || room.name;
-    }
-    const nEl = sessEl.querySelector<HTMLElement>(".n");
-    if (nEl) nEl.textContent = count > 1 ? String(count) : "";
-    sessEl.addEventListener("click", (e) => {
-      if ((e.target as HTMLElement).classList.contains("x")) { void closeRoom(room.id); return; }
-      activeRoomId = room.id;
-      const f = firstLeafOf(room);
-      if (f) focusedPaneId = f;
-      renderRoom();
-      renderRoomTabs();
-      renderSidebar();
-      if (f) focusPane(f);
-    });
-    sessionsEl.appendChild(sessEl);
+  renderSidebarContent("left");
+  renderSidebarContent("right");
+}
+
+function applySidebarModel(): void {
+  for (const side of ["left", "right"] as SidebarSide[]) {
+    const { root, content } = sideEl(side);
+    root.classList.toggle("collapsed", collapsedOf(sidebarModel, side));
+    content.style.width = `${widthOf(sidebarModel, side)}px`;
+    renderRail(side);
+    renderSidebarContent(side);
   }
-  footEl.textContent = `${rooms.length} terminal${rooms.length === 1 ? "" : "s"}`;
-  refreshTitles();
+  fitAll();
+}
+
+function renderRail(side: SidebarSide): void {
+  const { rail } = sideEl(side);
+  rail.innerHTML = "";
+  const activeMode = modeOf(sidebarModel, side);
+  for (const meta of SIDEBAR_MODES) {
+    const btn = document.createElement("div");
+    btn.className = "sb-mode" + (meta.mode === activeMode ? " active" : "") + (meta.functional ? "" : " stub");
+    btn.textContent = meta.icon;
+    btn.title = meta.label;
+    btn.setAttribute("role", "button");
+    btn.setAttribute("aria-label", meta.label);
+    btn.addEventListener("click", () => onRailClick(side, meta.mode));
+    rail.appendChild(btn);
+  }
+}
+
+function onRailClick(side: SidebarSide, mode: SidebarMode): void {
+  const wasActive = modeOf(sidebarModel, side) === mode;
+  const wasCollapsed = collapsedOf(sidebarModel, side);
+  if (wasActive && !wasCollapsed) {
+    sidebarModel = toggleSide(sidebarModel, side);
+  } else {
+    sidebarModel = selectMode(sidebarModel, side, mode);
+  }
+  persistSidebarModel();
+  applySidebarModel();
+}
+
+function toggleLeftSidebar(): void {
+  sidebarModel = toggleSide(sidebarModel, "left");
+  persistSidebarModel();
+  applySidebarModel();
+}
+
+function toggleRightSidebar(): void {
+  sidebarModel = toggleSide(sidebarModel, "right");
+  persistSidebarModel();
+  applySidebarModel();
+}
+
+function revealSidebarMode(mode: SidebarMode): void {
+  const side: SidebarSide = modeOf(sidebarModel, "right") === mode ? "right"
+    : modeOf(sidebarModel, "left") === mode ? "left" : "right";
+  sidebarModel = selectMode(sidebarModel, side, mode);
+  sidebarModel = setCollapsed(sidebarModel, side, false);
+  persistSidebarModel();
+  applySidebarModel();
+}
+
+function renderSidebarContent(side: SidebarSide): void {
+  const { content } = sideEl(side);
+  if (collapsedOf(sidebarModel, side)) { content.innerHTML = ""; return; }
+  const mode = modeOf(sidebarModel, side);
+  content.innerHTML = "";
+  if (mode === "workspaces") renderWorkspacesContent(content);
+  else if (mode === "agents") renderAgentsContent(content);
+  else if (mode === "notepad") renderNotepadContent(content);
+  else renderStubContent(content, mode);
+}
+
+function sidebarHead(title: string, actions: { icon: string; title: string; run: () => void }[]): HTMLElement {
+  const head = document.createElement("div");
+  head.className = "sb-head";
+  const label = document.createElement("span");
+  label.textContent = title;
+  head.appendChild(label);
+  if (actions.length > 0) {
+    const wrap = document.createElement("div");
+    wrap.className = "sb-head-actions";
+    for (const a of actions) {
+      const act = document.createElement("span");
+      act.className = "sb-act";
+      act.textContent = a.icon;
+      act.title = a.title;
+      act.addEventListener("click", (e) => { e.stopPropagation(); a.run(); });
+      wrap.appendChild(act);
+    }
+    head.appendChild(wrap);
+  }
+  return head;
+}
+
+function renderStubContent(container: HTMLElement, mode: SidebarMode): void {
+  container.appendChild(sidebarHead(SIDEBAR_MODE_META[mode].label, []));
+  const empty = buildEmptyState({ message: `${SIDEBAR_MODE_META[mode].label} is coming soon.`, actionLabel: "", actionIcon: "" });
+  container.appendChild(empty);
+}
+
+function roomLeaves(room: RoomSnapshot): TreeLeaf[] {
+  const collect = (node: MosaicNode): TreeLeaf[] => {
+    if (node.kind === "leaf") {
+      const subs = node.subtabs.length > 0 ? node.subtabs : [{ documentId: node.paneId, paneType: "terminal", title: null }];
+      return subs.map((s) => {
+        const pv = panes.get(s.documentId);
+        return { paneId: s.documentId, paneType: s.paneType, title: (pv && (pv.customTitle || pv.title)) || s.title || "" };
+      });
+    }
+    return [...collect(node.childA), ...collect(node.childB)];
+  };
+  return collect(room.layoutTree);
+}
+
+function renderWorkspacesContent(container: HTMLElement): void {
+  container.appendChild(sidebarHead("Workspace", [{ icon: "+", title: "New terminal (Cmd T)", run: () => void newRoom() }]));
+  const list = document.createElement("div");
+  list.className = "sb-list";
+  const rooms: TreeRoomInput[] = (layout?.rooms ?? []).map((r) => ({ id: r.id, name: roomTabName(r), leaves: roomLeaves(r) }));
+  const rows = buildWorkspaceTree({
+    workspaceName: layout?.name || "Workspace",
+    activeRoomId,
+    focusedPaneId,
+    rooms,
+    collapsedRoomIds: collapsedTreeRooms,
+    workspaceCollapsed: treeWorkspaceCollapsed,
+  });
+  if (rooms.length === 0) {
+    list.appendChild(buildEmptyState({ message: EmptyStateMessages.noRooms, actionLabel: "New terminal", actionIcon: "+" }));
+    const action = list.querySelector(".cove-empty-action");
+    if (action) action.addEventListener("click", () => void newRoom());
+    container.appendChild(list);
+    return;
+  }
+  for (const row of rows) {
+    const rowEl = document.createElement("div");
+    rowEl.className = `tree-row kind-${row.kind}` + (row.active ? " active" : "") + (row.collapsed ? " collapsed" : "");
+    if (row.expandable) {
+      const chev = document.createElement("span");
+      chev.className = "tw-chevron";
+      chev.textContent = "▾";
+      rowEl.appendChild(chev);
+    } else {
+      const spacer = document.createElement("span");
+      spacer.className = "tw-chevron tw-spacer";
+      spacer.textContent = row.kind === "pane" ? "" : "";
+      rowEl.appendChild(spacer);
+    }
+    if (row.kind === "pane" || row.kind === "room") {
+      const dot = document.createElement("span");
+      dot.className = "tw-dot";
+      rowEl.appendChild(dot);
+    }
+    const label = document.createElement("span");
+    label.className = "tw-label";
+    label.textContent = row.label;
+    label.style.paddingLeft = `${row.depth * 8}px`;
+    rowEl.appendChild(label);
+    if (row.count > 1 && row.kind !== "pane") {
+      const count = document.createElement("span");
+      count.className = "tw-count";
+      count.textContent = String(row.count);
+      rowEl.appendChild(count);
+    }
+    rowEl.addEventListener("click", () => onTreeRowClick(row.kind, row.roomId, row.paneId, row.expandable));
+    list.appendChild(rowEl);
+  }
+  container.appendChild(list);
+}
+
+function onTreeRowClick(kind: string, roomId: string | null, paneId: string | null, expandable: boolean): void {
+  if (kind === "workspace") {
+    treeWorkspaceCollapsed = !treeWorkspaceCollapsed;
+    localStorage.setItem("cove.tree.workspaceCollapsed", String(treeWorkspaceCollapsed));
+    renderSidebarContent("left");
+    renderSidebarContent("right");
+    return;
+  }
+  if (kind === "pane" && paneId) { revealPane(paneId); return; }
+  if (kind === "room" && roomId) {
+    const room = layout?.rooms.find((r) => r.id === roomId);
+    if (!room) { console.warn("tree click: unknown room", roomId); return; }
+    if (expandable && roomId === activeRoomId) {
+      if (collapsedTreeRooms.has(roomId)) collapsedTreeRooms.delete(roomId);
+      else collapsedTreeRooms.add(roomId);
+      localStorage.setItem("cove.tree.collapsedRooms", JSON.stringify([...collapsedTreeRooms]));
+    }
+    activeRoomId = roomId;
+    const f = firstLeafOf(room);
+    if (f) focusedPaneId = f;
+    renderRoom();
+    renderRoomTabs();
+    renderSidebar();
+    if (f) focusPane(f);
+  }
+}
+
+function renderAgentsContent(container: HTMLElement): void {
+  container.appendChild(sidebarHead("Agents", [{ icon: "↻", title: "Refresh", run: () => void refreshAgents() }]));
+  const list = document.createElement("div");
+  list.className = "sb-list";
+  const rows = buildAgentRows(agentCards, needsInputPanes);
+  if (rows.length === 0) {
+    list.appendChild(buildEmptyState({ message: "No active agents.", actionLabel: "", actionIcon: "" }));
+    container.appendChild(list);
+    return;
+  }
+  const counts = agentStateCounts(rows);
+  let lastState: string | null = null;
+  for (const row of rows) {
+    if (row.state !== lastState) {
+      lastState = row.state;
+      const groupHead = document.createElement("div");
+      groupHead.className = "sb-group-head";
+      groupHead.textContent = `${AGENT_STATE_META[row.state].label} (${counts[row.state]})`;
+      list.appendChild(groupHead);
+    }
+    list.appendChild(agentRowEl(row));
+  }
+  container.appendChild(list);
+}
+
+function agentRowEl(row: AgentRow): HTMLElement {
+  const el = document.createElement("div");
+  el.className = `agent-row state-${row.state}`;
+  const dot = document.createElement("span");
+  dot.className = "ag-dot";
+  dot.style.background = AGENT_STATE_META[row.state].color;
+  el.appendChild(dot);
+  const body = document.createElement("div");
+  body.className = "ag-body";
+  const name = document.createElement("div");
+  name.className = "ag-name";
+  name.textContent = row.name;
+  const meta = document.createElement("div");
+  meta.className = "ag-meta";
+  meta.textContent = [row.adapter, AGENT_STATE_META[row.state].label].filter((s) => s.length > 0).join(" · ");
+  body.appendChild(name);
+  body.appendChild(meta);
+  el.appendChild(body);
+  el.title = `${row.name} — ${row.adapter}`;
+  el.addEventListener("click", () => revealPane(row.paneId));
+  return el;
+}
+
+async function refreshAgents(): Promise<void> {
+  try {
+    const res = await invoke<{ cards: AgentCard[] }>("cove://commands/activity.list", {});
+    agentCards = res.cards ?? [];
+  } catch { agentCards = []; }
+  if (agentsVisible()) renderSidebarContent(agentsSide()!);
+}
+
+function agentsSide(): SidebarSide | null {
+  if (modeOf(sidebarModel, "left") === "agents") return "left";
+  if (modeOf(sidebarModel, "right") === "agents") return "right";
+  return null;
+}
+function agentsVisible(): boolean {
+  const side = agentsSide();
+  return side !== null && !collapsedOf(sidebarModel, side);
+}
+
+const SIDEBAR_PREF_KEYS = {
+  leftMode: "sidebar.leftMode",
+  rightMode: "sidebar.rightMode",
+  leftCollapsed: "sidebar.leftCollapsed",
+  rightCollapsed: "sidebar.rightCollapsed",
+  leftWidth: "sidebar.leftWidth",
+  rightWidth: "sidebar.rightWidth",
+};
+
+function persistSidebarModel(): void {
+  const entries: [string, string][] = [
+    [SIDEBAR_PREF_KEYS.leftMode, sidebarModel.leftMode],
+    [SIDEBAR_PREF_KEYS.rightMode, sidebarModel.rightMode],
+    [SIDEBAR_PREF_KEYS.leftCollapsed, String(sidebarModel.leftCollapsed)],
+    [SIDEBAR_PREF_KEYS.rightCollapsed, String(sidebarModel.rightCollapsed)],
+    [SIDEBAR_PREF_KEYS.leftWidth, String(sidebarModel.leftWidth)],
+    [SIDEBAR_PREF_KEYS.rightWidth, String(sidebarModel.rightWidth)],
+  ];
+  for (const [k, v] of entries) invoke("app.configSet", { key: k, value: v }).catch((e) => console.warn("sidebar configSet failed", k, e));
+}
+
+async function loadSidebarModel(): Promise<void> {
+  const get = async (k: string): Promise<string | null> => {
+    try { const r = await invoke<{ ok: boolean; value?: string }>("app.configGet", { key: k }); return r.ok ? r.value ?? null : null; } catch { return null; }
+  };
+  const validMode = (v: string | null): SidebarMode | null => (v && SIDEBAR_MODES.some((m) => m.mode === v)) ? v as SidebarMode : null;
+  const lm = validMode(await get(SIDEBAR_PREF_KEYS.leftMode));
+  const rm = validMode(await get(SIDEBAR_PREF_KEYS.rightMode));
+  if (lm) sidebarModel.leftMode = lm;
+  if (rm && rm !== sidebarModel.leftMode) sidebarModel.rightMode = rm;
+  sidebarModel.leftCollapsed = (await get(SIDEBAR_PREF_KEYS.leftCollapsed)) === "true";
+  sidebarModel.rightCollapsed = (await get(SIDEBAR_PREF_KEYS.rightCollapsed)) === "true";
+  sidebarModel = setWidth(sidebarModel, "left", Number(await get(SIDEBAR_PREF_KEYS.leftWidth)) || sidebarModel.leftWidth);
+  sidebarModel = setWidth(sidebarModel, "right", Number(await get(SIDEBAR_PREF_KEYS.rightWidth)) || sidebarModel.rightWidth);
+}
+
+function wireSidebarResize(handle: HTMLElement, side: SidebarSide): void {
+  handle.addEventListener("mousedown", (e) => {
+    e.preventDefault();
+    handle.classList.add("dragging");
+    const startX = e.clientX;
+    const startW = widthOf(sidebarModel, side);
+    const onMove = (m: MouseEvent) => {
+      const delta = side === "left" ? m.clientX - startX : startX - m.clientX;
+      const { content } = sideEl(side);
+      const next = startW + delta;
+      sidebarModel = setWidth(sidebarModel, side, next);
+      content.style.width = `${widthOf(sidebarModel, side)}px`;
+      fitAll();
+    };
+    const onUp = () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      handle.classList.remove("dragging");
+      persistSidebarModel();
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  });
+}
+
+function startAgentPolling(): void {
+  void refreshAgents();
+  if (agentPollTimer === null) agentPollTimer = setInterval(() => { if (agentsVisible()) void refreshAgents(); }, 3000);
 }
 
 const pinnedRoomIds = new Set<string>(JSON.parse(localStorage.getItem("cove.pinnedRooms") ?? "[]"));
@@ -1338,8 +1651,10 @@ function baseActions(): Action[] {
     { label: "Split right", icon: "\u2502", key: "Cmd D", run: () => void splitActive("row") },
     { label: "Split down", icon: "\u2500", key: "Cmd Shift D", run: () => void splitActive("col") },
     { label: "Close pane", icon: "\u00d7", key: "Cmd W", run: () => void closeFocused() },
-    { label: "Toggle sidebar", icon: "\u25e7", key: "Cmd B", run: toggleSidebar },
-    { label: "Toggle notepad sidebar", icon: "\u270e", key: "Cmd Shift N", run: toggleNotepadSidebar },
+    { label: "Toggle left sidebar", icon: "\u25e7", key: "Cmd B", run: toggleLeftSidebar },
+    { label: "Toggle right sidebar", icon: "\u25e8", key: "Cmd Shift A", run: toggleRightSidebar },
+    { label: "Show notepad", icon: "\u270e", run: () => revealSidebarMode("notepad") },
+    { label: "Show agents", icon: "\u25c9", run: () => revealSidebarMode("agents") },
     { label: "Toggle window backdrop", icon: "\u25d0", run: () => void toggleBackdrop() },
     { label: "Toggle performance HUD", icon: "\ud83d\udcc8", run: doTogglePerfHud },
     { label: "Increase font size", icon: "+", key: "Cmd =", run: () => { settings.fontSize = Math.min(24, settings.fontSize + 1); applySettings(); } },
@@ -1530,9 +1845,10 @@ async function openFileInEditor(filePath: string): Promise<void> {
 }
 
 
-function toggleSidebar() { document.body.classList.toggle("sidebar-hidden"); fitAll(); }
+function toggleSidebar() { toggleLeftSidebar(); }
 
-document.getElementById("side-add")!.addEventListener("click", () => void newRoom());
+wireSidebarResize(leftResizeEl, "left");
+wireSidebarResize(rightResizeEl, "right");
 document.getElementById("tb-sidebar")!.addEventListener("click", toggleSidebar);
 document.body.classList.add(navigator.platform.toUpperCase().includes("MAC") ? "platform-mac" : "platform-other");
 window.__ryn.on("window.focused", () => document.body.classList.remove("window-inactive"));
@@ -1991,7 +2307,7 @@ async function loadThemeData(): Promise<void> {
   try {
     const list = await invoke<{ themes: ThemeDto[] }>("cove://commands/theme.list", {});
     themeList = list.themes ?? [];
-    themeBuiltinNames = themeList.filter((t) => t.name.startsWith("cove-") && !themeCustomNames.includes(t.name)).map((t) => t.name);
+    themeBuiltinNames = themeList.filter((t) => (t.name.startsWith("cove-") || t.name === "catppuccin-mocha") && !themeCustomNames.includes(t.name)).map((t) => t.name);
   } catch { themeList = []; }
   try {
     const active = await invoke<{ theme: ThemeDto | null }>("cove://commands/theme.get-active", {});
@@ -2428,7 +2744,7 @@ settingsEl.addEventListener("keydown", (e) => { if (e.key === "Escape") closeSet
 
 const findEl = document.getElementById("findbar")!;
 const findInput = document.getElementById("find-input") as HTMLInputElement;
-const findDecor = { matchBackground: "#2b6d7a", activeMatchBackground: "#4cc2d6", matchOverviewRuler: "#4cc2d6", activeMatchColorOverviewRuler: "#4cc2d6" };
+const findDecor = { matchBackground: "#6c5b8e", activeMatchBackground: "#cba6f7", matchOverviewRuler: "#cba6f7", activeMatchColorOverviewRuler: "#cba6f7" };
 function activeSearch(): SearchAddon | null { return focusedPaneId ? (panes.get(focusedPaneId)?.search ?? null) : null; }
 function openFind() { findEl.classList.add("open"); findInput.focus(); findInput.select(); }
 function closeFind() { findEl.classList.remove("open"); activeSearch()?.clearDecorations(); if (focusedPaneId) panes.get(focusedPaneId)?.term.focus(); }
@@ -2469,7 +2785,7 @@ async function loadLauncherAgents(): Promise<void> {
     for (const a of result.adapters ?? []) {
       const tile = document.createElement("div");
       tile.className = "launch-tile";
-      tile.innerHTML = `<span class="ic" style="color:${a.accent || "#4cc2d6"}">&#9881;</span><span class="lbl">${a.displayName || a.name}</span>`;
+      tile.innerHTML = `<span class="ic" style="color:${a.accent || "#cba6f7"}">&#9881;</span><span class="lbl">${a.displayName || a.name}</span>`;
       tile.addEventListener("click", () => { closeLauncher(); void spawnAgent(a); });
       launchAgentsEl.appendChild(tile);
     }
@@ -2579,16 +2895,17 @@ async function switchWorkspaceByIndex(n: number): Promise<void> {
 let zenState: ZenState = initialZenState();
 function currentChrome(): ChromeVisibility {
   return {
-    leftSidebarHidden: document.body.classList.contains("sidebar-hidden"),
+    leftSidebarHidden: collapsedOf(sidebarModel, "left"),
+    rightSidebarHidden: collapsedOf(sidebarModel, "right"),
     toolbarHidden: document.body.classList.contains("toolbar-hidden"),
-    notepadOpen: notepadSidebarOpen,
   };
 }
 function applyChrome(v: ChromeVisibility): void {
-  document.body.classList.toggle("sidebar-hidden", v.leftSidebarHidden);
+  sidebarModel = setCollapsed(sidebarModel, "left", v.leftSidebarHidden);
+  sidebarModel = setCollapsed(sidebarModel, "right", v.rightSidebarHidden);
   document.body.classList.toggle("toolbar-hidden", v.toolbarHidden);
-  if (v.notepadOpen && !notepadSidebarOpen) openNotepadSidebar();
-  else if (!v.notepadOpen && notepadSidebarOpen) closeNotepadSidebar();
+  persistSidebarModel();
+  applySidebarModel();
 }
 function doToggleZen(): void {
   const t = toggleZen(zenState, currentChrome());
@@ -2668,8 +2985,8 @@ function runAction(action: string): void {
     case "pane.scroll-bottom": scrollActivePane(false); break;
     case "pane.maximize": void toggleZoom(); break;
     case "workspace.create": void newWorkspace(); break;
-    case "view.toggle-sidebar": toggleSidebar(); break;
-    case "view.toggle-notepad": toggleNotepadSidebar(); break;
+    case "view.toggle-sidebar": toggleLeftSidebar(); break;
+    case "view.toggle-notepad": toggleRightSidebar(); break;
     case "view.toggle-toolbar": toggleToolbar(); break;
     case "view.zen-mode": doToggleZen(); break;
     case "view.zoom-in": settings.fontSize = Math.min(24, settings.fontSize + 1); applySettings(); break;
@@ -2681,7 +2998,7 @@ function runAction(action: string): void {
     case "tool.tasks": void openToolRoom("tasks-list", "Tasks"); break;
     case "tool.library": void openToolRoom("library", "Library"); break;
     case "tool.browser": void newBrowserRoom("https://duckduckgo.com"); break;
-    case "tool.notepad": toggleNotepadSidebar(); break;
+    case "tool.notepad": revealSidebarMode("notepad"); break;
     case "tool.palette": paletteEl.classList.contains("open") ? closePalette() : openPalette(); break;
     case "tool.launcher": launcherEl.classList.contains("open") ? closeLauncher() : openLauncher(); break;
     case "app.settings": openSettings(); break;
@@ -2776,24 +3093,24 @@ function setupTitleCluster(): void {
 
 const engineEventHandlers = new Map<string, (payload: unknown) => void>();
 
+function onNeedsInputChanged(): void {
+  const count = needsInputPanes.size;
+  if (count === 0) invoke("badge.clear", {}).catch(() => void 0);
+  else invoke("badge.setCount", count).catch(() => void 0);
+  if (agentsVisible()) renderSidebarContent(agentsSide()!);
+}
+
 function setupBadge(): void {
-  const needsInputPanes = new Set<string>();
-  function updateBadge(): void {
-    const count = needsInputPanes.size;
-    if (count === 0)
-      invoke("badge.clear", {}).catch(() => void 0);
-    else
-      invoke("badge.setCount", count).catch(() => void 0);
-  }
   engineEventHandlers.set("dock.badge", (payload) => {
     const evt = payload as { paneId?: string };
-    if (evt?.paneId) { needsInputPanes.add(evt.paneId); updateBadge(); }
+    if (evt?.paneId) { needsInputPanes.add(evt.paneId); onNeedsInputChanged(); }
   });
   engineEventHandlers.set("needs-input.clear", (payload) => {
     const evt = payload as { paneId?: string };
-    if (evt?.paneId) { needsInputPanes.delete(evt.paneId); updateBadge(); }
+    if (evt?.paneId) { needsInputPanes.delete(evt.paneId); onNeedsInputChanged(); }
   });
-  engineEventHandlers.set("dock.badge.clear", () => { needsInputPanes.clear(); updateBadge(); });
+  engineEventHandlers.set("dock.badge.clear", () => { needsInputPanes.clear(); onNeedsInputChanged(); });
+  engineEventHandlers.set("state.changed", () => { if (agentsVisible()) void refreshAgents(); });
 }
 
 let backdropMaterial: BackdropMaterial = "none";
@@ -2901,29 +3218,23 @@ async function handleAutomationExec(ev: AutomationExecEvent): Promise<void> {
   }
 }
 
-const notepadSidebarEl = document.getElementById("notepad-sidebar")!;
-const nsBodyEl = document.getElementById("ns-body")!;
-let notepadSidebarOpen = false;
-let notepadSidebarCollapsed = localStorage.getItem("cove.notepad.collapsed") === "true";
 let notepadGroups: { workspaceId: string; workspaceName: string; notes: NoteListItem[] }[] = [];
 let notepadNav: NavState = { groupIdx: -1, noteIdx: -1 };
+let notepadLoaded = false;
 const collapsedGroups = new Set<string>(JSON.parse(localStorage.getItem("cove.notepad.collapsedGroups") ?? "[]"));
 
-function openNotepadSidebar(): void {
-  notepadSidebarOpen = true;
-  notepadSidebarEl.classList.add("open");
-  if (notepadSidebarCollapsed) notepadSidebarEl.classList.add("collapsed");
-  notepadSidebarEl.tabIndex = 0;
-  notepadSidebarEl.focus();
-  void loadNotepadNotes();
+function notepadSide(): SidebarSide | null {
+  if (modeOf(sidebarModel, "left") === "notepad") return "left";
+  if (modeOf(sidebarModel, "right") === "notepad") return "right";
+  return null;
 }
-function closeNotepadSidebar(): void {
-  notepadSidebarOpen = false;
-  notepadSidebarEl.classList.remove("open");
+function notepadVisible(): boolean {
+  const side = notepadSide();
+  return side !== null && !collapsedOf(sidebarModel, side);
 }
-function toggleNotepadSidebar(): void {
-  if (notepadSidebarOpen) closeNotepadSidebar();
-  else openNotepadSidebar();
+function rerenderNotepad(): void {
+  const side = notepadSide();
+  if (side && !collapsedOf(sidebarModel, side)) renderSidebarContent(side);
 }
 
 async function loadNotepadNotes(): Promise<void> {
@@ -2933,16 +3244,24 @@ async function loadNotepadNotes(): Promise<void> {
   } catch {
     notepadGroups = [];
   }
-  renderNotepadSidebar();
+  notepadLoaded = true;
+  rerenderNotepad();
 }
 
-function renderNotepadSidebar(): void {
-  nsBodyEl.innerHTML = "";
+function renderNotepadContent(container: HTMLElement): void {
+  container.appendChild(sidebarHead("Notes", [{ icon: "+", title: "New note", run: () => void createNote() }]));
+  const body = document.createElement("div");
+  body.className = "sb-list ns-body";
+  container.appendChild(body);
+  container.tabIndex = 0;
+  container.addEventListener("keydown", onNotepadKey);
+  if (!notepadLoaded) { void loadNotepadNotes(); }
+
   if (notepadGroups.length === 0) {
     const empty = document.createElement("div");
     empty.className = "ns-empty";
     empty.innerHTML = `No notes yet<div class="ns-empty-action" id="ns-empty-create">Create a note</div>`;
-    nsBodyEl.appendChild(empty);
+    body.appendChild(empty);
     const createAction = empty.querySelector("#ns-empty-create");
     if (createAction) createAction.addEventListener("click", () => void createNote());
     return;
@@ -2962,7 +3281,7 @@ function renderNotepadSidebar(): void {
       if (collapsedGroups.has(group.workspaceId)) collapsedGroups.delete(group.workspaceId);
       else collapsedGroups.add(group.workspaceId);
       localStorage.setItem("cove.notepad.collapsedGroups", JSON.stringify([...collapsedGroups]));
-      renderNotepadSidebar();
+      rerenderNotepad();
     });
     groupEl.appendChild(head);
 
@@ -2981,12 +3300,23 @@ function renderNotepadSidebar(): void {
       noteEl.addEventListener("click", () => {
         notepadNav = { groupIdx: gi, noteIdx: ni };
         void openNoteInPane(note.id, note.workspaceId);
-        renderNotepadSidebar();
+        rerenderNotepad();
       });
       notesEl.appendChild(noteEl);
     }
     groupEl.appendChild(notesEl);
-    nsBodyEl.appendChild(groupEl);
+    body.appendChild(groupEl);
+  }
+}
+
+function onNotepadKey(e: KeyboardEvent): void {
+  if (!notepadVisible()) return;
+  if (e.key === "ArrowDown") { e.preventDefault(); notepadNav = moveSelection(notepadGroups, notepadNav, "down"); rerenderNotepad(); }
+  else if (e.key === "ArrowUp") { e.preventDefault(); notepadNav = moveSelection(notepadGroups, notepadNav, "up"); rerenderNotepad(); }
+  else if (e.key === "Enter") {
+    e.preventDefault();
+    const note = selectedNote(notepadGroups, notepadNav);
+    if (note) void openNoteInPane(note.id, note.workspaceId);
   }
 }
 
@@ -3022,28 +3352,12 @@ async function createNote(): Promise<void> {
   } catch { void 0; }
 }
 
-notepadSidebarEl.querySelector("#ns-close")!.addEventListener("click", closeNotepadSidebar);
-notepadSidebarEl.querySelector("#ns-new")!.addEventListener("click", () => void createNote());
-notepadSidebarEl.querySelector("#ns-collapse")!.addEventListener("click", () => {
-  notepadSidebarCollapsed = !notepadSidebarCollapsed;
-  localStorage.setItem("cove.notepad.collapsed", String(notepadSidebarCollapsed));
-  notepadSidebarEl.classList.toggle("collapsed", notepadSidebarCollapsed);
-});
-
-notepadSidebarEl.addEventListener("keydown", (e) => {
-  if (e.key === "ArrowDown") { e.preventDefault(); notepadNav = moveSelection(notepadGroups, notepadNav, "down"); renderNotepadSidebar(); }
-  else if (e.key === "ArrowUp") { e.preventDefault(); notepadNav = moveSelection(notepadGroups, notepadNav, "up"); renderNotepadSidebar(); }
-  else if (e.key === "Enter") {
-    e.preventDefault();
-    const note = selectedNote(notepadGroups, notepadNav);
-    if (note) void openNoteInPane(note.id, note.workspaceId);
-  } else if (e.key === "Escape") { closeNotepadSidebar(); }
-});
-
 (async () => {
   settings = await loadSettings();
   applySettings();
   void applyAppearance(null);
+  await loadSidebarModel();
+  applySidebarModel();
   setupMenuBar();
   void reloadKeymap();
   setupToolbar();
@@ -3056,5 +3370,6 @@ notepadSidebarEl.addEventListener("keydown", (e) => {
   if (snap.rooms.length === 0) {
     await newRoom();
   }
+  startAgentPolling();
   void maybeShowOnboarding();
 })();
