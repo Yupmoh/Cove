@@ -132,7 +132,7 @@ export function menuIA(): MenuSection[] {
   ];
 }
 
-export function buildMenu(bindings: ActionChord[]): MenuSection[] {
+export function buildMenu(bindings: ActionChord[], omitCustomAccelerators = false): MenuSection[] {
   const accel = buildAcceleratorMap(bindings);
   return menuIA().map((section) => {
     if (!section.items) return section;
@@ -141,7 +141,7 @@ export function buildMenu(bindings: ActionChord[]): MenuSection[] {
       items: section.items.map((item) => {
         if (!item.action) return item;
         const a = accel[item.action];
-        return a ? { ...item, accelerator: a } : { ...item };
+        return a && !omitCustomAccelerators ? { ...item, accelerator: a } : { ...item };
       }),
     };
   });
