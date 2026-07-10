@@ -17,16 +17,13 @@ public static class RestoreChooserCommands
             return ctx.Fail("not_ready", "pane registry unavailable");
 
         var chooser = new RestoreChooserService(restoration);
-        var wsDir = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(restoration.StatePath)!, "workspaces", "default");
-        var (savedLayout, sessions) = WorkspacePersistence.Load(wsDir, restoration.Logger);
+        var workspacesRoot = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(restoration.StatePath)!, "workspaces");
         var items = new List<RestoreChoiceItem>();
-        if (savedLayout is { } layout)
-        {
-            foreach (var room in layout.Rooms)
+        foreach (var entry in WorkspaceStartup.Enumerate(workspacesRoot, restoration.Logger))
+            foreach (var room in entry.Snapshot.Rooms)
                 foreach (var leaf in MosaicOps.Leaves(room.LayoutTree))
-                    if (sessions.TryGetValue(leaf.PaneId, out var d))
-                        items.Add(new RestoreChoiceItem("default", room.Id, d.PaneId, d.Command, WasRunning(panes, d.PaneId), false));
-        }
+                    if (entry.Sessions.TryGetValue(leaf.PaneId, out var d))
+                        items.Add(new RestoreChoiceItem(entry.Snapshot.Id, room.Id, d.PaneId, d.Command, WasRunning(panes, d.PaneId), false));
 
         var result = chooser.Evaluate(items);
         return await Task.FromResult(ctx.Ok(result, RestoreChooserVerbJsonContext.Default.RestoreChooserResult));
@@ -49,21 +46,20 @@ public static class RestoreChooserCommands
         if (p.AutoRestoreOnLaunch)
             chooser.SaveSettings(new RestoreSettings(true));
 
-        var wsDir = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(restoration.StatePath)!, "workspaces", "default");
-        var (savedLayout, sessions) = WorkspacePersistence.Load(wsDir, restoration.Logger);
+        var workspacesRoot = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(restoration.StatePath)!, "workspaces");
         var selected = new HashSet<string>(p.SelectedPaneIds ?? [], StringComparer.Ordinal);
         var restored = new List<string>();
 
-        if (savedLayout is { } sl)
+        foreach (var entry in WorkspaceStartup.Enumerate(workspacesRoot, restoration.Logger))
         {
-            layout.LoadSnapshot(sl);
-            foreach (var room in sl.Rooms)
+            layout.LoadSnapshot(entry.Snapshot);
+            foreach (var room in entry.Snapshot.Rooms)
                 foreach (var leaf in MosaicOps.Leaves(room.LayoutTree))
-                    if (sessions.TryGetValue(leaf.PaneId, out var d) && selected.Contains(d.PaneId))
+                    if (entry.Sessions.TryGetValue(leaf.PaneId, out var d) && selected.Contains(d.PaneId))
                     {
                         try
                         {
-                            panes.RespawnAs(d.PaneId, d.Command, d.Args, d.Cwd, 80, 24, WorkspacePersistence.LoadScrollback(d.PaneId, wsDir));
+                            panes.RespawnAs(d.PaneId, d.Command, d.Args, d.Cwd, 80, 24, WorkspacePersistence.LoadScrollback(d.PaneId, entry.WorkspaceDir));
                             restored.Add(d.PaneId);
                         }
                         catch { }
@@ -84,18 +80,17 @@ public static class RestoreChooserCommands
         if (ctx.Layout is not { } layout)
             return ctx.Fail("not_ready", "layout service unavailable");
 
-        var wsDir = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(restoration.StatePath)!, "workspaces", "default");
-        var (savedLayout, sessions) = WorkspacePersistence.Load(wsDir, restoration.Logger);
-        if (savedLayout is { } sl)
+        var workspacesRoot = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(restoration.StatePath)!, "workspaces");
+        foreach (var entry in WorkspaceStartup.Enumerate(workspacesRoot, restoration.Logger))
         {
-            foreach (var room in sl.Rooms)
+            foreach (var room in entry.Snapshot.Rooms)
                 foreach (var leaf in MosaicOps.Leaves(room.LayoutTree))
-                    if (sessions.TryGetValue(leaf.PaneId, out var d))
+                    if (entry.Sessions.TryGetValue(leaf.PaneId, out var d))
                     {
-                        try { panes.RespawnAs(d.PaneId, d.Command, d.Args, d.Cwd, 80, 24, WorkspacePersistence.LoadScrollback(d.PaneId, wsDir)); }
+                        try { panes.RespawnAs(d.PaneId, d.Command, d.Args, d.Cwd, 80, 24, WorkspacePersistence.LoadScrollback(d.PaneId, entry.WorkspaceDir)); }
                         catch { }
                     }
-            layout.LoadSnapshot(sl);
+            layout.LoadSnapshot(entry.Snapshot);
         }
         restoration.MarkLaunching();
         return await Task.FromResult(ctx.Ok());
