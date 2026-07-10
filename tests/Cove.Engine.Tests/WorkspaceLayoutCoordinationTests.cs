@@ -64,7 +64,7 @@ public sealed class WorkspaceLayoutCoordinationTests
         var snap = get!.Data!.Value.Deserialize(Cove.Persistence.CoveJsonContext.Default.WorkspaceSnapshot)!;
         Assert.Equal(a, snap.Id);
         Assert.Equal("Alpha", snap.Name);
-        Assert.Equal("/tmp/alpha", snap.ProjectDir);
+        Assert.Equal(Path.GetFullPath("/tmp/alpha"), snap.ProjectDir);
     }
 
     [Fact]
