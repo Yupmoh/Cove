@@ -66,6 +66,29 @@ describe("buildMenu", () => {
   });
 });
 
+describe("buildMenu enabled workaround", () => {
+  it("marks every actionable leaf as enabled", () => {
+    const menu = buildMenu([]);
+    const view = menu.find((s) => s.label === "View")!;
+    for (const item of view.items!) {
+      if (item.separator) continue;
+      expect(item.enabled).toBe(true);
+    }
+  });
+  it("does not mark separators as enabled", () => {
+    const menu = buildMenu([]);
+    const view = menu.find((s) => s.label === "View")!;
+    const sep = view.items!.find((i) => i.separator);
+    expect(sep).toBeDefined();
+    expect(sep!.enabled).toBeUndefined();
+  });
+  it("leaves role-only top-level sections without an items array", () => {
+    const menu = buildMenu([]);
+    const appMenu = menu.find((s) => s.role === "appMenu")!;
+    expect(appMenu.items).toBeUndefined();
+  });
+});
+
 describe("menuActionIds", () => {
   it("collects every action referenced by the menu", () => {
     const ids = menuActionIds();

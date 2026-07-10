@@ -5,6 +5,7 @@ export interface MenuLeaf {
   role?: string;
   separator?: boolean;
   accelerator?: string;
+  enabled?: boolean;
 }
 
 export interface MenuSection {
@@ -141,7 +142,8 @@ export function buildMenu(bindings: ActionChord[], omitCustomAccelerators = fals
       items: section.items.map((item) => {
         if (!item.action) return item;
         const a = accel[item.action];
-        return a && !omitCustomAccelerators ? { ...item, accelerator: a } : { ...item };
+        const withAccel = a && !omitCustomAccelerators ? { ...item, accelerator: a } : { ...item };
+        return { ...withAccel, enabled: true };
       }),
     };
   });

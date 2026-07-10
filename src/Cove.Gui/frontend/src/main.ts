@@ -26,9 +26,11 @@ import { renderDiffViewerPane } from "./diff-viewer-pane";
 import { renderMarkdownPane } from "./markdown-pane";
 import { renderPdfPane } from "./pdf-pane";
 import { renderVideoPane } from "./video-pane";
-import { partitionPinned, togglePin, reorderRoom, buildMiniDiagram, accentForPaneType, visibleRoomIds, buildWingModel, filterRoomsByWing, type MiniDiagramNode } from "./room-tabs";
+import { partitionPinned, reorderRoom, glyphForPaneType, visibleRoomIds, buildWingModel, filterRoomsByWing } from "./room-tabs";
 import { groupByWorkspace, moveSelection, selectedNote, kindIcon, kindColor, type NoteListItem, type NavState } from "./notepad-sidebar";
-import { initialSidebarModel, selectMode, toggleSide, setCollapsed, setWidth, collapsedOf, modeOf, widthOf, SIDEBAR_MODES, SIDEBAR_MODE_META, type SidebarModel, type SidebarSide, type SidebarMode } from "./sidebar-model";
+import { initialSidebarModel, selectLeftMode, toggleSide, setCollapsed, setWidth, collapsedOf, widthOf, SIDEBAR_MODES, SIDEBAR_MODE_META, type SidebarModel, type SidebarSide, type SidebarMode } from "./sidebar-model";
+import { buildWorkspaceBoxes, type WorkspaceBoxInput } from "./workspace-boxes";
+import { clampMenuPosition, normalizeItems, firstSelectableIndex, moveSelection as ctxMoveSelection, activeItem, type ContextMenuItem, type ContextMenuModel } from "./context-menu";
 import { buildWorkspaceTree, type TreeLeaf, type TreeRoomInput } from "./workspace-tree";
 import { buildAgentRows, agentStateCounts, AGENT_STATE_META, type AgentCard, type AgentRow } from "./agents-model";
 import { parseQuery, filterAndSort, MruTracker, cycleCategory, categoryLabel, type PaletteItem } from "./omni-palette";
@@ -40,12 +42,13 @@ import { initBackdrop, setBackdropMaterial, nextToggleMaterial, coerceMaterial, 
 import { NotificationBridge, type NotificationBridgeDeps, type NotificationDeliverPayload } from "./notifications";
 import { buildMenu, menuChordSet } from "./menu-model";
 import { toolbarTiles } from "./toolbar-tiles";
+import { shouldShowLauncher, buildLauncherTiles, type LauncherAdapter, type LauncherBuiltin } from "./box-launcher";
 import { clusterTools } from "./title-cluster";
 import { initialZenState, toggleZen, type ChromeVisibility, type ZenState } from "./zen-mode";
 import { eventToChord, buildChordMap, resolveDispatch, defaultBindings, type ResolvedBinding } from "./keymap-dispatch";
 import { enqueuePaneWrite } from "./write-queue";
 
-const RYN_MENUBAR_EVENTS_BROKEN = true;
+const RYN_MENUBAR_EVENTS_BROKEN = false;
 import { initHud, toggleHud, recordFrame, hudMetrics, readJsHeapBytes, hudLines, type HudState, type JsHeapProbe } from "./perf-hud";
 import { parseSnapshotExport, snapshotRows, summarizeSnapshots, formatBytes as formatSnapshotBytes, type DiagnosticsSnapshot } from "./diagnostics-snapshot";
 import { initialPerfBundlesState, applyBundleList, beginCreate, finishCreate, surfaceError, requestDelete, cancelDelete, bundleRows, PERF_BUNDLES_EMPTY_TEXT, type PerfBundlesState, type PerfBundleListResult, type PerfBundleDto } from "./perf-bundles";
@@ -209,7 +212,7 @@ const roomTabsEl = document.getElementById("room-tabs")!;
 const leftSidebarEl = document.getElementById("left-sidebar")!;
 const rightSidebarEl = document.getElementById("right-sidebar")!;
 const leftRailEl = document.getElementById("left-rail")!;
-const rightRailEl = document.getElementById("right-rail")!;
+const leftWsbarEl = document.getElementById("left-wsbar")!;
 const leftContentEl = document.getElementById("left-content")!;
 const rightContentEl = document.getElementById("right-content")!;
 const leftResizeEl = document.getElementById("left-resize")!;
@@ -314,6 +317,33 @@ function makePane(paneId: string, since: number): PaneView {
   el.appendChild(host);
   term.open(host);
 
+  header.addEventListener("contextmenu", (e) => {
+    focusPane(paneId);
+    openContextMenuAt(e, [
+      { id: "pane.split-right", label: "Split Right" },
+      { id: "pane.split-down", label: "Split Down" },
+      { id: "pane.maximize", label: "Maximize" },
+      { id: "sep", label: "", separator: true },
+      { id: "pane.close", label: "Close", danger: true },
+    ], (id) => runAction(id));
+  });
+  host.addEventListener("contextmenu", (e) => {
+    focusPane(paneId);
+    const hasSel = term.hasSelection();
+    openContextMenuAt(e, [
+      { id: "copy", label: "Copy", disabled: !hasSel },
+      { id: "paste", label: "Paste" },
+      { id: "clear", label: "Clear" },
+      { id: "sep", label: "", separator: true },
+      { id: "find", label: "Find in Pane" },
+    ], (id) => {
+      if (id === "copy") { const s = term.getSelection(); if (s && navigator.clipboard) void navigator.clipboard.writeText(s); }
+      else if (id === "paste") { if (navigator.clipboard && navigator.clipboard.readText) void navigator.clipboard.readText().then((t) => { if (t) void invoke("app.paneWrite", { paneId, dataBase64: toBase64Utf8(t) }); }); }
+      else if (id === "clear") term.clear();
+      else if (id === "find") openFind();
+    });
+  });
+
   const ws = new WebSocket(`ws://${location.host}/pty?pane=${encodeURIComponent(paneId)}&since=${since}`);
   const pv: PaneView = { paneId, term, fit: fitAddon, ws, el, consumed: 0, lastAck: 0, title: "", customTitle: "", headerTitleEl: titleSpan, search: searchAddon };
 
@@ -393,6 +423,76 @@ function closePaneMenus(): void {
   document.querySelectorAll(".pmenu").forEach((m) => m.remove());
 }
 document.addEventListener("click", closePaneMenus);
+
+document.addEventListener("contextmenu", (e) => e.preventDefault());
+
+let ctxMenuEl: HTMLElement | null = null;
+let ctxKeyHandler: ((e: KeyboardEvent) => void) | null = null;
+let ctxAwayHandler: ((e: MouseEvent) => void) | null = null;
+
+function closeContextMenu(): void {
+  if (ctxMenuEl) { ctxMenuEl.remove(); ctxMenuEl = null; }
+  if (ctxKeyHandler) { document.removeEventListener("keydown", ctxKeyHandler, true); ctxKeyHandler = null; }
+  if (ctxAwayHandler) { document.removeEventListener("mousedown", ctxAwayHandler, true); ctxAwayHandler = null; }
+}
+
+function showContextMenu(model: ContextMenuModel, onSelect: (id: string) => void): void {
+  closeContextMenu();
+  const items = normalizeItems(model.items);
+  if (items.length === 0) return;
+  const menu = document.createElement("div");
+  menu.className = "ctx-menu";
+  let selected = firstSelectableIndex(items);
+  const rowEls: HTMLElement[] = [];
+  const paint = () => rowEls.forEach((el, i) => el.classList.toggle("sel", i === selected));
+  const choose = (index: number) => {
+    const item = activeItem(items, index);
+    if (!item) return;
+    closeContextMenu();
+    onSelect(item.id);
+  };
+  items.forEach((item, i) => {
+    if (item.separator) {
+      const sep = document.createElement("div");
+      sep.className = "ctx-sep";
+      rowEls.push(sep);
+      menu.appendChild(sep);
+      return;
+    }
+    const rowEl = document.createElement("div");
+    rowEl.className = "ctx-item" + (item.danger ? " danger" : "") + (item.disabled ? " disabled" : "");
+    rowEl.textContent = item.label;
+    rowEls.push(rowEl);
+    if (!item.disabled) {
+      rowEl.addEventListener("mouseenter", () => { selected = i; paint(); });
+      rowEl.addEventListener("click", () => choose(i));
+    }
+    menu.appendChild(rowEl);
+  });
+  paint();
+  menu.style.cssText = "position:fixed;left:-9999px;top:-9999px;";
+  document.body.appendChild(menu);
+  const size = { width: menu.offsetWidth, height: menu.offsetHeight };
+  const pos = clampMenuPosition({ x: model.x, y: model.y }, size, { width: window.innerWidth, height: window.innerHeight });
+  menu.style.left = `${pos.x}px`;
+  menu.style.top = `${pos.y}px`;
+  ctxMenuEl = menu;
+  ctxKeyHandler = (e) => {
+    if (e.key === "Escape") { e.preventDefault(); closeContextMenu(); }
+    else if (e.key === "ArrowDown") { e.preventDefault(); selected = ctxMoveSelection(items, selected, 1); paint(); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); selected = ctxMoveSelection(items, selected, -1); paint(); }
+    else if (e.key === "Enter") { e.preventDefault(); choose(selected); }
+  };
+  document.addEventListener("keydown", ctxKeyHandler, true);
+  ctxAwayHandler = (ev) => { if (ctxMenuEl && !ctxMenuEl.contains(ev.target as Node)) closeContextMenu(); };
+  setTimeout(() => { if (ctxAwayHandler) document.addEventListener("mousedown", ctxAwayHandler, true); }, 0);
+}
+
+function openContextMenuAt(e: MouseEvent, items: ContextMenuItem[], onSelect: (id: string) => void): void {
+  e.preventDefault();
+  e.stopPropagation();
+  showContextMenu({ items, x: e.clientX, y: e.clientY }, onSelect);
+}
 
 function isColumn(orientation: number | string): boolean {
   return orientation === 1 || orientation === "Column" || orientation === "column";
@@ -848,10 +948,14 @@ function renderRoom(): void {
     }
   }
   if (!room || !room.layoutTree) {
-    const empty = buildEmptyState({ message: EmptyStateMessages.noRooms, actionLabel: "New terminal", actionIcon: "+" });
-    const action = empty.querySelector(".cove-empty-action");
-    if (action) action.addEventListener("click", () => void newRoom());
-    gridEl.appendChild(empty);
+    if (shouldShowLauncher((layout?.rooms ?? []).length)) {
+      gridEl.appendChild(renderBoxLauncher());
+    } else {
+      const empty = buildEmptyState({ message: EmptyStateMessages.noRooms, actionLabel: "New terminal", actionIcon: "+" });
+      const action = empty.querySelector(".cove-empty-action");
+      if (action) action.addEventListener("click", () => void newRoom());
+      gridEl.appendChild(empty);
+    }
   }
   for (const [id, pv] of panes) {
     pv.el.classList.toggle("focused", id === focusedPaneId);
@@ -910,6 +1014,7 @@ async function reload(): Promise<WorkspaceSnapshot> {
   renderRoom();
   renderRoomTabs();
   renderSidebar();
+  renderWorkspaceStrip();
   if (focusedPaneId) {
     panes.get(focusedPaneId)?.term.focus();
   }
@@ -995,7 +1100,6 @@ async function closeRoom(roomId: string): Promise<void> {
   }
   if (activeRoomId === roomId) activeRoomId = null;
   await reload();
-  if (!layout || layout.rooms.length === 0) await newRoom();
 }
 
 let sidebarModel: SidebarModel = initialSidebarModel();
@@ -1004,11 +1108,60 @@ let treeWorkspaceCollapsed = localStorage.getItem("cove.tree.workspaceCollapsed"
 let agentCards: AgentCard[] = [];
 const needsInputPanes = new Set<string>();
 let agentPollTimer: ReturnType<typeof setInterval> | null = null;
+let workspaceBoxItems: WorkspaceBoxInput[] = [];
 
-function sideEl(side: SidebarSide): { root: HTMLElement; rail: HTMLElement; content: HTMLElement } {
+async function loadWorkspaceBoxes(): Promise<void> {
+  try {
+    const res = await invoke<{ workspaces: { id: string; name: string }[] }>("cove://commands/workspace.list", {});
+    workspaceBoxItems = (res.workspaces ?? []).map((w) => ({ id: w.id, name: w.name }));
+  } catch { workspaceBoxItems = []; }
+  renderWorkspaceStrip();
+}
+
+function renderWorkspaceStrip(): void {
+  leftWsbarEl.innerHTML = "";
+  const expanded = !collapsedOf(sidebarModel, "left");
+  leftWsbarEl.classList.toggle("expanded", expanded);
+  const boxes = buildWorkspaceBoxes(workspaceBoxItems, layout?.id ?? null);
+  for (const box of boxes) {
+    const boxEl = document.createElement("div");
+    boxEl.className = "sb-wsbox" + (box.active ? " active" : "");
+    boxEl.title = box.name || box.id;
+    const badge = document.createElement("span");
+    badge.className = "sb-wsbox-badge";
+    badge.textContent = box.initial;
+    boxEl.appendChild(badge);
+    if (expanded) {
+      const name = document.createElement("span");
+      name.className = "sb-wsbox-name";
+      name.textContent = box.name || box.id;
+      boxEl.appendChild(name);
+    }
+    boxEl.addEventListener("click", () => { if (!box.active) void switchWorkspace(box.id); });
+    boxEl.addEventListener("contextmenu", (e) => {
+      openContextMenuAt(e, [
+        { id: "rename", label: "Rename", disabled: true },
+        { id: "close", label: "Close", danger: true },
+      ], (id) => {
+        if (id === "close") void deleteWorkspace(box.id);
+      });
+    });
+    leftWsbarEl.appendChild(boxEl);
+  }
+}
+
+async function deleteWorkspace(wsId: string): Promise<void> {
+  try {
+    await invoke("cove://commands/workspace.delete", { id: wsId });
+    await loadWorkspaceBoxes();
+    await reload();
+  } catch (e) { console.warn("workspace.delete failed", wsId, e); }
+}
+
+function sideEl(side: SidebarSide): { root: HTMLElement; content: HTMLElement } {
   return side === "left"
-    ? { root: leftSidebarEl, rail: leftRailEl, content: leftContentEl }
-    : { root: rightSidebarEl, rail: rightRailEl, content: rightContentEl };
+    ? { root: leftSidebarEl, content: leftContentEl }
+    : { root: rightSidebarEl, content: rightContentEl };
 }
 
 function renderSidebar(): void {
@@ -1021,16 +1174,16 @@ function applySidebarModel(): void {
     const { root, content } = sideEl(side);
     root.classList.toggle("collapsed", collapsedOf(sidebarModel, side));
     content.style.width = `${widthOf(sidebarModel, side)}px`;
-    renderRail(side);
     renderSidebarContent(side);
   }
+  renderLeftRail();
+  renderWorkspaceStrip();
   fitAll();
 }
 
-function renderRail(side: SidebarSide): void {
-  const { rail } = sideEl(side);
-  rail.innerHTML = "";
-  const activeMode = modeOf(sidebarModel, side);
+function renderLeftRail(): void {
+  leftRailEl.innerHTML = "";
+  const activeMode = sidebarModel.leftMode;
   for (const meta of SIDEBAR_MODES) {
     const btn = document.createElement("div");
     btn.className = "sb-mode" + (meta.mode === activeMode ? " active" : "") + (meta.functional ? "" : " stub");
@@ -1038,18 +1191,18 @@ function renderRail(side: SidebarSide): void {
     btn.title = meta.label;
     btn.setAttribute("role", "button");
     btn.setAttribute("aria-label", meta.label);
-    btn.addEventListener("click", () => onRailClick(side, meta.mode));
-    rail.appendChild(btn);
+    btn.addEventListener("click", () => onRailClick(meta.mode));
+    leftRailEl.appendChild(btn);
   }
 }
 
-function onRailClick(side: SidebarSide, mode: SidebarMode): void {
-  const wasActive = modeOf(sidebarModel, side) === mode;
-  const wasCollapsed = collapsedOf(sidebarModel, side);
+function onRailClick(mode: SidebarMode): void {
+  const wasActive = sidebarModel.leftMode === mode;
+  const wasCollapsed = collapsedOf(sidebarModel, "left");
   if (wasActive && !wasCollapsed) {
-    sidebarModel = toggleSide(sidebarModel, side);
+    sidebarModel = toggleSide(sidebarModel, "left");
   } else {
-    sidebarModel = selectMode(sidebarModel, side, mode);
+    sidebarModel = selectLeftMode(sidebarModel, mode);
   }
   persistSidebarModel();
   applySidebarModel();
@@ -1068,10 +1221,13 @@ function toggleRightSidebar(): void {
 }
 
 function revealSidebarMode(mode: SidebarMode): void {
-  const side: SidebarSide = modeOf(sidebarModel, "right") === mode ? "right"
-    : modeOf(sidebarModel, "left") === mode ? "left" : "right";
-  sidebarModel = selectMode(sidebarModel, side, mode);
-  sidebarModel = setCollapsed(sidebarModel, side, false);
+  sidebarModel = selectLeftMode(sidebarModel, mode);
+  persistSidebarModel();
+  applySidebarModel();
+}
+
+function revealAgentsSidebar(): void {
+  sidebarModel = setCollapsed(sidebarModel, "right", false);
   persistSidebarModel();
   applySidebarModel();
 }
@@ -1079,10 +1235,10 @@ function revealSidebarMode(mode: SidebarMode): void {
 function renderSidebarContent(side: SidebarSide): void {
   const { content } = sideEl(side);
   if (collapsedOf(sidebarModel, side)) { content.innerHTML = ""; return; }
-  const mode = modeOf(sidebarModel, side);
   content.innerHTML = "";
+  if (side === "right") { renderAgentsContent(content); return; }
+  const mode = sidebarModel.leftMode;
   if (mode === "workspaces") renderWorkspacesContent(content);
-  else if (mode === "agents") renderAgentsContent(content);
   else if (mode === "notepad") renderNotepadContent(content);
   else renderStubContent(content, mode);
 }
@@ -1180,6 +1336,17 @@ function renderWorkspacesContent(container: HTMLElement): void {
       rowEl.appendChild(count);
     }
     rowEl.addEventListener("click", () => onTreeRowClick(row.kind, row.roomId, row.paneId, row.expandable));
+    if (row.kind !== "workspace") {
+      rowEl.addEventListener("contextmenu", (e) => {
+        openContextMenuAt(e, [
+          { id: "focus", label: "Focus" },
+          { id: "close", label: "Close", danger: true },
+        ], (id) => {
+          if (id === "focus") focusTreeRow(row.kind, row.roomId, row.paneId);
+          else if (id === "close") closeTreeRow(row.kind, row.roomId, row.paneId);
+        });
+      });
+    }
     list.appendChild(rowEl);
   }
   container.appendChild(list);
@@ -1210,6 +1377,26 @@ function onTreeRowClick(kind: string, roomId: string | null, paneId: string | nu
     renderSidebar();
     if (f) focusPane(f);
   }
+}
+
+function focusTreeRow(kind: string, roomId: string | null, paneId: string | null): void {
+  if (kind === "pane" && paneId) { revealPane(paneId); return; }
+  if (kind === "room" && roomId) {
+    const room = layout?.rooms.find((r) => r.id === roomId);
+    if (!room) { console.warn("tree focus: unknown room", roomId); return; }
+    activeRoomId = roomId;
+    const f = firstLeafOf(room);
+    if (f) focusedPaneId = f;
+    renderRoom();
+    renderRoomTabs();
+    renderSidebar();
+    if (f) focusPane(f);
+  }
+}
+
+function closeTreeRow(kind: string, roomId: string | null, paneId: string | null): void {
+  if (kind === "pane" && paneId) { focusPane(paneId); void closeFocused(); return; }
+  if (kind === "room" && roomId) { void closeRoom(roomId); }
 }
 
 function renderAgentsContent(container: HTMLElement): void {
@@ -1257,6 +1444,15 @@ function agentRowEl(row: AgentRow): HTMLElement {
   el.appendChild(body);
   el.title = `${row.name} — ${row.adapter}`;
   el.addEventListener("click", () => revealPane(row.paneId));
+  el.addEventListener("contextmenu", (e) => {
+    openContextMenuAt(e, [
+      { id: "reveal", label: "Reveal pane" },
+      { id: "copy-id", label: "Copy pane id" },
+    ], (id) => {
+      if (id === "reveal") revealPane(row.paneId);
+      else if (id === "copy-id") { if (navigator.clipboard) void navigator.clipboard.writeText(row.paneId); }
+    });
+  });
   return el;
 }
 
@@ -1265,22 +1461,15 @@ async function refreshAgents(): Promise<void> {
     const res = await invoke<{ cards: AgentCard[] }>("cove://commands/activity.list", {});
     agentCards = res.cards ?? [];
   } catch { agentCards = []; }
-  if (agentsVisible()) renderSidebarContent(agentsSide()!);
+  if (agentsVisible()) renderSidebarContent("right");
 }
 
-function agentsSide(): SidebarSide | null {
-  if (modeOf(sidebarModel, "left") === "agents") return "left";
-  if (modeOf(sidebarModel, "right") === "agents") return "right";
-  return null;
-}
 function agentsVisible(): boolean {
-  const side = agentsSide();
-  return side !== null && !collapsedOf(sidebarModel, side);
+  return !collapsedOf(sidebarModel, "right");
 }
 
 const SIDEBAR_PREF_KEYS = {
   leftMode: "sidebar.leftMode",
-  rightMode: "sidebar.rightMode",
   leftCollapsed: "sidebar.leftCollapsed",
   rightCollapsed: "sidebar.rightCollapsed",
   leftWidth: "sidebar.leftWidth",
@@ -1290,7 +1479,6 @@ const SIDEBAR_PREF_KEYS = {
 function persistSidebarModel(): void {
   const entries: [string, string][] = [
     [SIDEBAR_PREF_KEYS.leftMode, sidebarModel.leftMode],
-    [SIDEBAR_PREF_KEYS.rightMode, sidebarModel.rightMode],
     [SIDEBAR_PREF_KEYS.leftCollapsed, String(sidebarModel.leftCollapsed)],
     [SIDEBAR_PREF_KEYS.rightCollapsed, String(sidebarModel.rightCollapsed)],
     [SIDEBAR_PREF_KEYS.leftWidth, String(sidebarModel.leftWidth)],
@@ -1305,9 +1493,7 @@ async function loadSidebarModel(): Promise<void> {
   };
   const validMode = (v: string | null): SidebarMode | null => (v && SIDEBAR_MODES.some((m) => m.mode === v)) ? v as SidebarMode : null;
   const lm = validMode(await get(SIDEBAR_PREF_KEYS.leftMode));
-  const rm = validMode(await get(SIDEBAR_PREF_KEYS.rightMode));
   if (lm) sidebarModel.leftMode = lm;
-  if (rm && rm !== sidebarModel.leftMode) sidebarModel.rightMode = rm;
   sidebarModel.leftCollapsed = (await get(SIDEBAR_PREF_KEYS.leftCollapsed)) === "true";
   sidebarModel.rightCollapsed = (await get(SIDEBAR_PREF_KEYS.rightCollapsed)) === "true";
   sidebarModel = setWidth(sidebarModel, "left", Number(await get(SIDEBAR_PREF_KEYS.leftWidth)) || sidebarModel.leftWidth);
@@ -1376,35 +1562,6 @@ function roomTabName(room: RoomSnapshot): string {
   return (first && first.title) || room.name;
 }
 
-function renderMiniDiagramFor(room: RoomSnapshot): HTMLElement {
-  const container = document.createElement("div");
-  container.className = "rtab-mini";
-  const node = layoutTreeToMiniNode(room.layoutTree);
-  const cells = buildMiniDiagram(node, { x: 0, y: 0, w: 18, h: 12 });
-  for (const c of cells) {
-    const cell = document.createElement("div");
-    cell.className = "rtab-mini-cell";
-    cell.style.cssText = `width:${Math.max(1, c.w)}px;height:${Math.max(1, c.h)}px;background:${c.accent};`;
-    container.appendChild(cell);
-  }
-  return container;
-}
-
-function layoutTreeToMiniNode(node: MosaicNode): MiniDiagramNode {
-  if (node.kind === "leaf") {
-    const subs = node.subtabs.length > 0 ? node.subtabs : [{ documentId: node.paneId, paneType: "terminal", title: null }];
-    const activeIdx = Math.min(Math.max(0, node.activeSubtab), subs.length - 1);
-    return { kind: "leaf", paneType: subs[activeIdx]?.paneType ?? "terminal" };
-  }
-  return {
-    kind: "split",
-    orientation: node.orientation,
-    ratio: node.ratio,
-    childA: layoutTreeToMiniNode(node.childA),
-    childB: layoutTreeToMiniNode(node.childB),
-  };
-}
-
 function renderRoomTabs(): void {
   roomTabsEl.innerHTML = "";
   const allRooms = layout?.rooms ?? [];
@@ -1428,7 +1585,10 @@ function renderRoomTabs(): void {
     tab.draggable = true;
     tab.title = roomTabName(room);
 
-    if (!isPinned) tab.appendChild(renderMiniDiagramFor(room));
+    const glyph = document.createElement("span");
+    glyph.className = "rtab-glyph";
+    glyph.textContent = glyphForPaneType(roomLeaves(room)[0]?.paneType ?? "terminal");
+    tab.appendChild(glyph);
 
     const nameEl = document.createElement("span");
     nameEl.className = "rtab-name";
@@ -1467,8 +1627,19 @@ function renderRoomTabs(): void {
       }
     });
     tab.addEventListener("contextmenu", (e) => {
-      e.preventDefault();
-      showRoomContextMenu(e, roomId, tab);
+      const pinned = pinnedRoomIds.has(roomId);
+      openContextMenuAt(e, [
+        { id: "rename", label: "Rename" },
+        { id: "pin", label: pinned ? "Unpin" : "Pin" },
+        { id: "sep", label: "", separator: true },
+        { id: "close", label: "Close", danger: true, disabled: pinned },
+        { id: "close-others", label: "Close Others" },
+      ], (id) => {
+        if (id === "rename") startRename(roomId, tab, tab.querySelector(".rtab-name") as HTMLElement);
+        else if (id === "pin") { if (pinned) pinnedRoomIds.delete(roomId); else pinnedRoomIds.add(roomId); savePinnedRooms(); renderRoomTabs(); }
+        else if (id === "close") void closeRoom(roomId);
+        else if (id === "close-others") void closeOtherRooms(roomId);
+      });
     });
     tab.addEventListener("dragstart", () => { dragSrcId = roomId; tab.classList.add("dragging"); });
     tab.addEventListener("dragend", () => { tab.classList.remove("dragging"); dragSrcId = null; });
@@ -1483,6 +1654,13 @@ function renderRoomTabs(): void {
     });
     return tab;
   };
+
+  const homeBtn = document.createElement("div");
+  homeBtn.className = "rbox-ctl rbox-home";
+  homeBtn.textContent = "⌂";
+  homeBtn.title = "Workspace overview";
+  homeBtn.addEventListener("click", () => revealSidebarMode("workspaces"));
+  roomTabsEl.appendChild(homeBtn);
 
   for (const id of pinned) roomTabsEl.appendChild(makeTab(id));
   if (pinned.length > 0 && unpinned.length > 0) {
@@ -1521,12 +1699,25 @@ function renderRoomTabs(): void {
   }
 
   const addBtn = document.createElement("div");
-  addBtn.className = "tbtn";
-  addBtn.style.cssText = "margin-left:auto;flex-shrink:0;";
-  addBtn.innerHTML = "+";
+  addBtn.className = "rbox-ctl rbox-add";
+  addBtn.style.cssText = "margin-left:auto;";
+  addBtn.textContent = "+";
   addBtn.title = "New room (Cmd T)";
   addBtn.addEventListener("click", () => void newRoom());
   roomTabsEl.appendChild(addBtn);
+
+  const boxCtls: { icon: string; title: string; action: string }[] = [
+    { icon: "◧", title: "Split right (Cmd D)", action: "pane.split-right" },
+    { icon: "⊟", title: "Split down (Cmd Shift D)", action: "pane.split-down" },
+  ];
+  for (const ctl of boxCtls) {
+    const b = document.createElement("div");
+    b.className = "rbox-ctl";
+    b.textContent = ctl.icon;
+    b.title = ctl.title;
+    b.addEventListener("click", () => runAction(ctl.action));
+    roomTabsEl.appendChild(b);
+  }
 
   updateEdgeFade();
 }
@@ -1581,62 +1772,9 @@ function startRename(roomId: string, tab: HTMLElement, nameEl: HTMLElement): voi
   });
 }
 
-function showRoomContextMenu(e: MouseEvent, roomId: string, tab: HTMLElement): void {
-  const existing = document.querySelector(".rtab-context-menu");
-  if (existing) existing.remove();
-  const menu = document.createElement("div");
-  menu.className = "rtab-context-menu pmenu";
-  menu.style.cssText = `position:fixed;top:${e.clientY}px;left:${e.clientX}px;z-index:50;`;
-  const room = layout?.rooms.find((r) => r.id === roomId);
-  if (!room) return;
-  const isPinned = pinnedRoomIds.has(roomId);
-
-  const pinItem = document.createElement("div");
-  pinItem.className = "pmenu-item";
-  pinItem.style.cssText = "padding:5px 10px;cursor:pointer;border-radius:4px;font-size:12px;";
-  pinItem.textContent = isPinned ? "Unpin" : "Pin";
-  pinItem.addEventListener("mouseenter", () => pinItem.style.background = "var(--panel)");
-  pinItem.addEventListener("mouseleave", () => pinItem.style.background = "none");
-  pinItem.addEventListener("click", () => {
-    if (isPinned) pinnedRoomIds.delete(roomId);
-    else pinnedRoomIds.add(roomId);
-    savePinnedRooms();
-    renderRoomTabs();
-    menu.remove();
-  });
-  menu.appendChild(pinItem);
-
-  const renameItem = document.createElement("div");
-  renameItem.className = "pmenu-item";
-  renameItem.style.cssText = "padding:5px 10px;cursor:pointer;border-radius:4px;font-size:12px;";
-  renameItem.textContent = "Rename";
-  renameItem.addEventListener("mouseenter", () => renameItem.style.background = "var(--panel)");
-  renameItem.addEventListener("mouseleave", () => renameItem.style.background = "none");
-  renameItem.addEventListener("click", () => { menu.remove(); startRename(roomId, tab, tab.querySelector(".rtab-name") as HTMLElement); });
-  menu.appendChild(renameItem);
-
-  const closeAllItem = document.createElement("div");
-  closeAllItem.className = "pmenu-item";
-  closeAllItem.style.cssText = "padding:5px 10px;cursor:pointer;border-radius:4px;font-size:12px;";
-  closeAllItem.textContent = "Close All (keep pinned)";
-  closeAllItem.addEventListener("mouseenter", () => closeAllItem.style.background = "var(--panel)");
-  closeAllItem.addEventListener("mouseleave", () => closeAllItem.style.background = "none");
-  closeAllItem.addEventListener("click", () => {
-    menu.remove();
-    void closeAllUnpinned();
-  });
-  menu.appendChild(closeAllItem);
-
-  document.body.appendChild(menu);
-  const close = (ev: MouseEvent) => {
-    if (!menu.contains(ev.target as Node)) { menu.remove(); document.removeEventListener("click", close); }
-  };
-  setTimeout(() => document.addEventListener("click", close), 0);
-}
-
-async function closeAllUnpinned(): Promise<void> {
+async function closeOtherRooms(keepRoomId: string): Promise<void> {
   if (!layout) return;
-  const toClose = layout.rooms.filter((r) => !pinnedRoomIds.has(r.id));
+  const toClose = layout.rooms.filter((r) => r.id !== keepRoomId);
   for (const room of toClose) {
     await closeRoom(room.id);
   }
@@ -1654,7 +1792,7 @@ function baseActions(): Action[] {
     { label: "Toggle left sidebar", icon: "\u25e7", key: "Cmd B", run: toggleLeftSidebar },
     { label: "Toggle right sidebar", icon: "\u25e8", key: "Cmd Shift A", run: toggleRightSidebar },
     { label: "Show notepad", icon: "\u270e", run: () => revealSidebarMode("notepad") },
-    { label: "Show agents", icon: "\u25c9", run: () => revealSidebarMode("agents") },
+    { label: "Show agents", icon: "\u25c9", run: revealAgentsSidebar },
     { label: "Toggle window backdrop", icon: "\u25d0", run: () => void toggleBackdrop() },
     { label: "Toggle performance HUD", icon: "\ud83d\udcc8", run: doTogglePerfHud },
     { label: "Increase font size", icon: "+", key: "Cmd =", run: () => { settings.fontSize = Math.min(24, settings.fontSize + 1); applySettings(); } },
@@ -2799,6 +2937,59 @@ async function spawnAgent(a: AdapterInfo): Promise<void> {
   focusPane(sp);
 }
 
+let launcherAdapters: LauncherAdapter[] = [];
+async function loadLauncherAdapters(): Promise<void> {
+  try {
+    const result = await invoke<AdapterListResult>("app.adapterList", {});
+    launcherAdapters = (result.adapters ?? []).map((a) => ({ name: a.name, displayName: a.displayName, accent: a.accent, binary: a.binary }));
+  } catch { launcherAdapters = []; }
+  if ((layout?.rooms ?? []).length === 0) renderRoom();
+}
+
+function builtinLauncherDefs(): LauncherBuiltin[] {
+  return toolbarTiles().map((t) => ({ id: t.id, label: t.label, icon: t.icon, action: t.action }));
+}
+
+function renderBoxLauncher(): HTMLElement {
+  const wrap = document.createElement("div");
+  wrap.className = "box-launcher";
+  const title = document.createElement("div");
+  title.className = "box-launcher-title";
+  title.textContent = "Open something in this workspace";
+  wrap.appendChild(title);
+  const grid = document.createElement("div");
+  grid.className = "box-launcher-grid";
+  for (const tile of buildLauncherTiles(launcherAdapters, builtinLauncherDefs())) {
+    const el = document.createElement("div");
+    el.className = "box-launch-tile" + (tile.disabled ? " disabled" : "");
+    el.title = tile.note ? `${tile.label} — ${tile.note}` : tile.label;
+    const ic = document.createElement("span");
+    ic.className = "box-launch-ic";
+    ic.textContent = tile.icon;
+    if (tile.accent) ic.style.color = tile.accent;
+    const lbl = document.createElement("span");
+    lbl.className = "box-launch-lbl";
+    lbl.textContent = tile.label;
+    el.appendChild(ic);
+    el.appendChild(lbl);
+    if (tile.note) {
+      const note = document.createElement("span");
+      note.className = "box-launch-note";
+      note.textContent = tile.note;
+      el.appendChild(note);
+    }
+    if (!tile.disabled) {
+      el.addEventListener("click", () => {
+        if (tile.kind === "adapter") void spawnAgent({ name: tile.adapterName, displayName: tile.label, accent: tile.accent, binary: tile.binary });
+        else runAction(tile.action);
+      });
+    }
+    grid.appendChild(el);
+  }
+  wrap.appendChild(grid);
+  return wrap;
+}
+
 let resolvedBindings: ResolvedBinding[] = defaultBindings();
 let chordMap = buildChordMap(resolvedBindings);
 let menuChords = menuChordSet(bindingsAsActionChords());
@@ -3097,7 +3288,7 @@ function onNeedsInputChanged(): void {
   const count = needsInputPanes.size;
   if (count === 0) invoke("badge.clear", {}).catch(() => void 0);
   else invoke("badge.setCount", count).catch(() => void 0);
-  if (agentsVisible()) renderSidebarContent(agentsSide()!);
+  if (agentsVisible()) renderSidebarContent("right");
 }
 
 function setupBadge(): void {
@@ -3223,18 +3414,11 @@ let notepadNav: NavState = { groupIdx: -1, noteIdx: -1 };
 let notepadLoaded = false;
 const collapsedGroups = new Set<string>(JSON.parse(localStorage.getItem("cove.notepad.collapsedGroups") ?? "[]"));
 
-function notepadSide(): SidebarSide | null {
-  if (modeOf(sidebarModel, "left") === "notepad") return "left";
-  if (modeOf(sidebarModel, "right") === "notepad") return "right";
-  return null;
-}
 function notepadVisible(): boolean {
-  const side = notepadSide();
-  return side !== null && !collapsedOf(sidebarModel, side);
+  return sidebarModel.leftMode === "notepad" && !collapsedOf(sidebarModel, "left");
 }
 function rerenderNotepad(): void {
-  const side = notepadSide();
-  if (side && !collapsedOf(sidebarModel, side)) renderSidebarContent(side);
+  if (notepadVisible()) renderSidebarContent("left");
 }
 
 async function loadNotepadNotes(): Promise<void> {
@@ -3366,10 +3550,9 @@ async function createNote(): Promise<void> {
   setupNotifications();
   void setupBackdrop();
   void loadWings();
-  const snap = await reload();
-  if (snap.rooms.length === 0) {
-    await newRoom();
-  }
+  void loadWorkspaceBoxes();
+  void loadLauncherAdapters();
+  await reload();
   startAgentPolling();
   void maybeShowOnboarding();
 })();
