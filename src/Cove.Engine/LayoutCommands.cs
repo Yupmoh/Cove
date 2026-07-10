@@ -127,6 +127,8 @@ internal static class LayoutCommands
         "diff" => PaneType.Diff,
         "pdf" => PaneType.Pdf,
         "video" => PaneType.Video,
+        "tasks-list" => PaneType.Tasks,
+        "notepad" => PaneType.Notepad,
         _ => PaneType.Terminal,
     };
 

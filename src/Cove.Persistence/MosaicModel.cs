@@ -21,6 +21,8 @@ public enum PaneType
     Pdf,
     Video,
     Achievements,
+    Tasks,
+    Notepad,
 }
 
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "kind")]
@@ -85,6 +87,8 @@ public sealed class PaneTypeConverter : JsonConverter<PaneType>
         new("pdf", PaneType.Pdf),
         new("video", PaneType.Video),
         new("achievements", PaneType.Achievements),
+        new("tasks-list", PaneType.Tasks),
+        new("notepad", PaneType.Notepad),
     };
 
     public override PaneType Read(ref Utf8JsonReader reader, System.Type typeToConvert, JsonSerializerOptions options)
