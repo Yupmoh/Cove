@@ -63,7 +63,7 @@ public static class MosaicOps
         }
     }
 
-    public static MosaicNode Split(MosaicNode root, string targetPaneId, SplitOrientation orient, PaneLeaf newLeaf, double ratio = 0.5)
+    public static MosaicNode Split(MosaicNode root, string targetPaneId, SplitOrientation orient, PaneLeaf newLeaf, double ratio = 0.5, bool before = false)
     {
         var found = false;
         var result = Replace(root);
@@ -82,8 +82,8 @@ public static class MosaicOps
                     {
                         Orientation = orient,
                         Ratio = ratio,
-                        ChildA = leaf,
-                        ChildB = newLeaf,
+                        ChildA = before ? newLeaf : leaf,
+                        ChildB = before ? leaf : newLeaf,
                     };
                 }
                 return leaf;

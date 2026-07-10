@@ -239,6 +239,24 @@ public sealed class LayoutService
         return arr;
     }
 
+    public void MovePane(string roomId, string paneId, string targetPaneId, SplitOrientation orientation, int dir)
+    {
+        lock (_sync)
+        {
+            var (_, room) = GetRoomOrThrow(roomId);
+            if (paneId == targetPaneId)
+                throw new InvalidOperationException("cannot move a pane onto itself");
+            var source = MosaicOps.Find(room.Root, paneId) ?? throw new KeyNotFoundException($"unknown pane {paneId}");
+            if (MosaicOps.Find(room.Root, targetPaneId) is null)
+                throw new KeyNotFoundException($"unknown pane {targetPaneId}");
+            var without = MosaicOps.Close(room.Root, paneId) ?? throw new InvalidOperationException("cannot move the only pane in a room");
+            room.Root = MosaicOps.Split(without, targetPaneId, orientation, source, before: dir < 0);
+            room.ActivePaneId = paneId;
+            room.ZoomedPaneId = null;
+        }
+        OnChanged?.Invoke();
+    }
+
     public void ClosePane(string roomId, string paneId)
     {
         lock (_sync)
