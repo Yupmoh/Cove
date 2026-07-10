@@ -1,3 +1,5 @@
+using System;
+using System.IO;
 using System.Text.Json;
 using Cove.Engine;
 using Cove.Engine.Workspaces;
@@ -66,5 +68,67 @@ public sealed class WorkspaceCommandsTests
         var resp = await Route(manager, "cove://commands/workspace.create", prm);
         Assert.False(resp!.Ok);
         Assert.Equal("bad_params", resp.Error!.Code);
+    }
+
+    [Fact]
+    public async Task Create_MissingPath_Fails()
+    {
+        await using var manager = new WorkspaceManager();
+        var prm = JsonSerializer.SerializeToElement(
+            new WorkspaceCreateParams("proj", ""), WorkspacesJsonContext.Default.WorkspaceCreateParams);
+        var resp = await Route(manager, "cove://commands/workspace.create", prm);
+        Assert.False(resp!.Ok);
+        Assert.Equal("bad_params", resp.Error!.Code);
+    }
+
+    [Fact]
+    public async Task Create_MissingPathMember_Fails()
+    {
+        await using var manager = new WorkspaceManager();
+        var prm = JsonDocument.Parse("{\"name\":\"proj\"}").RootElement.Clone();
+        var resp = await Route(manager, "cove://commands/workspace.create", prm);
+        Assert.False(resp!.Ok);
+        Assert.Equal("bad_params", resp.Error!.Code);
+    }
+
+    [Fact]
+    public async Task Create_CreatesDirectory_AndPersistsResolvedPath()
+    {
+        await using var manager = new WorkspaceManager();
+        var dir = Path.Combine(Path.GetTempPath(), "cove-create-" + Guid.NewGuid().ToString("N"), "nested");
+        try
+        {
+            Assert.False(Directory.Exists(dir));
+            var prm = JsonSerializer.SerializeToElement(
+                new WorkspaceCreateParams("proj", dir), WorkspacesJsonContext.Default.WorkspaceCreateParams);
+            var resp = await Route(manager, "cove://commands/workspace.create", prm);
+            Assert.True(resp!.Ok);
+            Assert.True(Directory.Exists(dir));
+
+            var listed = await Route(manager, "cove://commands/workspace.list", null);
+            var ws = listed!.Data!.Value.GetProperty("workspaces")[0];
+            Assert.Equal(Path.GetFullPath(dir), ws.GetProperty("projectDir").GetString());
+        }
+        finally { try { Directory.Delete(Path.GetDirectoryName(dir)!, true); } catch { } }
+    }
+
+    [Fact]
+    public async Task Create_ExpandsTilde()
+    {
+        await using var manager = new WorkspaceManager();
+        var leaf = "cove-tilde-" + Guid.NewGuid().ToString("N");
+        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        var expected = Path.Combine(home, leaf);
+        try
+        {
+            var prm = JsonSerializer.SerializeToElement(
+                new WorkspaceCreateParams("proj", "~/" + leaf), WorkspacesJsonContext.Default.WorkspaceCreateParams);
+            var resp = await Route(manager, "cove://commands/workspace.create", prm);
+            Assert.True(resp!.Ok);
+            var listed = await Route(manager, "cove://commands/workspace.list", null);
+            var ws = listed!.Data!.Value.GetProperty("workspaces")[0];
+            Assert.Equal(expected, ws.GetProperty("projectDir").GetString());
+        }
+        finally { try { Directory.Delete(expected, true); } catch { } }
     }
 }

@@ -1,10 +1,14 @@
 using Cove.Persistence;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Cove.Engine.Workspaces;
 
 public enum WorkspaceChangeKind { Created, Switched, Deleted, Updated }
 
 public sealed record WorkspaceChange(WorkspaceChangeKind Kind, string WorkspaceId);
+
+public readonly record struct WorkspaceCreateOutcome(WorkspaceModel? Workspace, string? ErrorCode, string? ErrorMessage);
 
 public sealed class WorkspaceManager : IAsyncDisposable
 {
@@ -14,21 +18,78 @@ public sealed class WorkspaceManager : IAsyncDisposable
     private readonly Action<WorkspaceChange>? _emit;
     private readonly Func<string> _newId;
     private readonly WorktreeService _worktrees;
+    private readonly ILogger _logger;
     private readonly Dictionary<string, GitWatchService> _watchers = new(StringComparer.Ordinal);
     public WorkspaceManager(
         RegistryModel? registry = null,
         IEnumerable<WorkspaceModel>? workspaces = null,
         Action<WorkspaceChange>? emit = null,
         Func<string>? newId = null,
-        IGitRunner? gitRunner = null)
+        IGitRunner? gitRunner = null,
+        ILogger? logger = null)
     {
         _newId = newId ?? (() => Guid.NewGuid().ToString("N"));
         _emit = emit;
+        _logger = logger ?? NullLogger.Instance;
         _worktrees = new WorktreeService(gitRunner ?? new ProcessGitRunner());
         _registry = new Actor<RegistryModel>(registry ?? new RegistryModel());
         if (workspaces is not null)
             foreach (var workspace in workspaces)
                 _workspaces[workspace.Id] = new Actor<WorkspaceModel>(workspace);
+    }
+
+    public static bool TryResolveProjectDir(string? raw, out string resolved, out string? error)
+    {
+        resolved = "";
+        error = null;
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            error = "path is required";
+            return false;
+        }
+        var trimmed = raw.Trim();
+        if (trimmed == "~"
+            || trimmed.StartsWith("~/", StringComparison.Ordinal)
+            || trimmed.StartsWith("~\\", StringComparison.Ordinal))
+        {
+            var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            trimmed = trimmed.Length <= 1 ? home : Path.Combine(home, trimmed[2..]);
+        }
+        try
+        {
+            resolved = Path.GetFullPath(trimmed);
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            error = "invalid path: " + ex.Message;
+            return false;
+        }
+        return true;
+    }
+
+    public async Task<WorkspaceCreateOutcome> CreateValidatedWorkspaceAsync(string? name, string? rawProjectDir, string? collectionId = null)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            _logger.LogWarning("workspace.create rejected: empty name");
+            return new WorkspaceCreateOutcome(null, "bad_params", "name is required");
+        }
+        if (!TryResolveProjectDir(rawProjectDir, out var resolved, out var pathError))
+        {
+            _logger.LogWarning("workspace.create rejected: invalid path {Path}", rawProjectDir);
+            return new WorkspaceCreateOutcome(null, "bad_params", pathError ?? "path is required");
+        }
+        try
+        {
+            Directory.CreateDirectory(resolved);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
+        {
+            _logger.LogWarning(ex, "workspace.create could not create directory {Path}", resolved);
+            return new WorkspaceCreateOutcome(null, "invalid_path", "could not create directory: " + ex.Message);
+        }
+        var workspace = await CreateWorkspaceAsync(name, resolved, collectionId).ConfigureAwait(false);
+        return new WorkspaceCreateOutcome(workspace, null, null);
     }
 
     public RegistryModel Registry => _registry.State;

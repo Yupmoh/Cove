@@ -11,11 +11,12 @@ public static class WorkspaceCommands
         if (ctx.Workspaces is not { } manager)
             return ctx.Fail("no_workspaces", "workspace manager unavailable");
         if (ctx.Request.Params is not JsonElement el
-            || el.Deserialize(WorkspacesJsonContext.Default.WorkspaceCreateParams) is not { } p
-            || string.IsNullOrWhiteSpace(p.Name))
+            || el.Deserialize(WorkspacesJsonContext.Default.WorkspaceCreateParams) is not { } p)
             return ctx.Fail("bad_params", "name is required");
 
-        var workspace = await manager.CreateWorkspaceAsync(p.Name, p.ProjectDir ?? "", p.CollectionId).ConfigureAwait(false);
+        var outcome = await manager.CreateValidatedWorkspaceAsync(p.Name, p.ProjectDir, p.CollectionId).ConfigureAwait(false);
+        if (outcome.Workspace is not { } workspace)
+            return ctx.Fail(outcome.ErrorCode ?? "bad_params", outcome.ErrorMessage ?? "invalid params");
         return ctx.Ok(new WorkspaceIdResult(workspace.Id), WorkspacesJsonContext.Default.WorkspaceIdResult);
     }
 

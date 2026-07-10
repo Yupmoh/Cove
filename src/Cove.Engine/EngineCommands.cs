@@ -19,7 +19,13 @@ internal static class EngineCommands
             return Task.FromResult(ctx.Fail("not_ready", "pane registry unavailable"));
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.SpawnParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "spawn params required"));
-        PaneInfo info = reg.Spawn(p);
+        string? workspaceDir = null;
+        if (ctx.Workspaces is { } wm
+            && wm.Registry.FocusedWorkspaceId is { } focusedId
+            && wm.Get(focusedId) is { } focusedActor
+            && !string.IsNullOrEmpty(focusedActor.State.ProjectDir))
+            workspaceDir = focusedActor.State.ProjectDir;
+        PaneInfo info = reg.Spawn(p, workspaceDir);
         if (ctx.AgentRouter is { } router && p.Adapter is { } adapter)
             router.Register(info.PaneId, adapter, p.AgentName, p.Workspace, p.Room, mcpAccessScope: p.McpAccessScope, mcpVisible: p.McpVisible);
         return Task.FromResult(ctx.Ok(info, CoveJsonContext.Default.PaneInfo));

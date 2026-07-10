@@ -117,7 +117,7 @@ public sealed class DaemonHost
         var shellDir = ShellIntegration.Install(dataDir);
         _panes = new PaneRegistry(_ptyHost, logger, spawnEnv, shellDir);
         _layout = new Cove.Engine.Layout.LayoutService();
-        _workspaces = new Cove.Engine.Workspaces.WorkspaceManager();
+        _workspaces = new Cove.Engine.Workspaces.WorkspaceManager(logger: logger);
         _runCommands = new Cove.Engine.Workspaces.RunCommandService(new Cove.Engine.Workspaces.RunCommandStore(System.IO.Path.Combine(dataDir, "run-commands"), logger), new Cove.Engine.Workspaces.PtyRunCommandSessionFactory(_ptyHost, spawnEnv, shellDir, logger), logger: logger);
         _restoration = new Cove.Engine.Restart.RestorationService(dataDir, logger, emitProgress: e => BroadcastEvent("restore.progress", e, Cove.Engine.Restart.RestorationJsonContext.Default.RestoreProgressEvent));
         _snapshots = new Cove.Engine.Snapshots.SnapshotService(dataDir, System.IO.Path.Combine(dataDir, "snapshots"), new Cove.Engine.Workspaces.ProcessGitRunner(), logger);

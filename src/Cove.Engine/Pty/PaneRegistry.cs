@@ -47,11 +47,12 @@ public sealed class PaneRegistry : IDisposable, Cove.Engine.Agents.IPaneWriter
     }
 
     public string? ProjectDir { get => _projectDir; set => _projectDir = value; }
-    public PaneInfo Spawn(SpawnParams p)
+    public PaneInfo Spawn(SpawnParams p, string? defaultCwd = null)
     {
         string paneId = "pane-" + System.Guid.NewGuid().ToString("N");
         string? inherited = (!string.IsNullOrEmpty(p.InheritCwdFrom) && TryGet(p.InheritCwdFrom!, out var src)) ? src.Cwd : null;
-        string cwd = ResolveWorkingDirectory(inherited, p.Cwd, _projectDir);
+        string? fallback = !string.IsNullOrEmpty(defaultCwd) ? defaultCwd : _projectDir;
+        string cwd = ResolveWorkingDirectory(inherited, p.Cwd, fallback);
         return SpawnCore(paneId, p.Command, p.Args ?? System.Array.Empty<string>(), cwd, p.Cols, p.Rows, p.Env);
     }
 
