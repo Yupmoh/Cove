@@ -49,7 +49,7 @@ public sealed record PaneLeaf : MosaicNode
 
 public sealed record Subtab(string DocumentId, PaneType PaneType, string? Title = null);
 
-public sealed record PaneDescriptor(string PaneId, string Command, string[] Args, string Cwd, string? Title = null);
+public sealed record PaneDescriptor(string PaneId, string Command, string[] Args, string Cwd, string? Title = null, string? Adapter = null, string? AgentName = null, string? SessionId = null);
 
 public sealed record RoomSnapshot
 {

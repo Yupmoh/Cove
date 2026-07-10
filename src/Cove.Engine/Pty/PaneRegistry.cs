@@ -17,6 +17,8 @@ internal sealed class PaneSession
     public int Rows { get; set; }
     public string? Cwd { get; set; }
     public string? Title { get; set; }
+    public string? Adapter { get; set; }
+    public string? AgentName { get; set; }
     public required IPtySession Session { get; init; }
     public required PtyRingBuffer Ring { get; init; }
     public required PtyRingSignal Signal { get; init; }
@@ -53,11 +55,31 @@ public sealed class PaneRegistry : IDisposable, Cove.Engine.Agents.IPaneWriter
         string? inherited = (!string.IsNullOrEmpty(p.InheritCwdFrom) && TryGet(p.InheritCwdFrom!, out var src)) ? src.Cwd : null;
         string? fallback = !string.IsNullOrEmpty(defaultCwd) ? defaultCwd : _projectDir;
         string cwd = ResolveWorkingDirectory(inherited, p.Cwd, fallback);
-        return SpawnCore(paneId, p.Command, p.Args ?? System.Array.Empty<string>(), cwd, p.Cols, p.Rows, p.Env);
+        var info = SpawnCore(paneId, p.Command, p.Args ?? System.Array.Empty<string>(), cwd, p.Cols, p.Rows, p.Env);
+        Tag(paneId, p.Adapter, p.AgentName);
+        return info;
     }
 
-    public PaneInfo RespawnAs(string paneId, string command, string[] args, string cwd, int cols, int rows, byte[]? priorScrollback = null)
-        => SpawnCore(paneId, command, args, cwd, cols, rows, null, priorScrollback);
+    public PaneInfo RespawnAs(string paneId, string command, string[] args, string cwd, int cols, int rows, byte[]? priorScrollback = null, string? adapter = null, string? agentName = null)
+    {
+        var info = SpawnCore(paneId, command, args, cwd, cols, rows, null, priorScrollback);
+        Tag(paneId, adapter, agentName);
+        return info;
+    }
+
+    private void Tag(string paneId, string? adapter, string? agentName)
+    {
+        if (string.IsNullOrEmpty(adapter))
+            return;
+        lock (_sync)
+        {
+            if (_panes.TryGetValue(paneId, out var pane))
+            {
+                pane.Adapter = adapter;
+                pane.AgentName = agentName;
+            }
+        }
+    }
 
     private PaneInfo SpawnCore(string paneId, string command, string[] args, string cwd, int cols, int rows, System.Collections.Generic.IReadOnlyDictionary<string, string>? callerEnv, byte[]? priorScrollback = null)
     {
@@ -106,7 +128,7 @@ public sealed class PaneRegistry : IDisposable, Cove.Engine.Agents.IPaneWriter
             var arr = new PaneDescriptor[_panes.Count];
             int i = 0;
             foreach (var p in _panes.Values)
-                arr[i++] = new PaneDescriptor(p.PaneId, p.Command, p.Args, string.IsNullOrEmpty(p.Cwd) ? p.SpawnCwd : p.Cwd!, p.Title);
+                arr[i++] = new PaneDescriptor(p.PaneId, p.Command, p.Args, string.IsNullOrEmpty(p.Cwd) ? p.SpawnCwd : p.Cwd!, p.Title, p.Adapter, p.AgentName);
             return arr;
         }
     }

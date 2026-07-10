@@ -29,6 +29,7 @@ internal static class EngineCommands
         if (p.Adapter is { } adapter)
         {
             ctx.AgentRouter?.Register(info.PaneId, adapter, p.AgentName, p.Workspace, p.Room, mcpAccessScope: p.McpAccessScope, mcpVisible: p.McpVisible);
+            ctx.Sessions?.Register(info.PaneId, adapter, null);
             ctx.RecentSessions?.RecordStart(adapter, info.PaneId, p.Workspace ?? "", p.Cwd ?? workspaceDir ?? "", System.DateTimeOffset.UtcNow);
         }
         return Task.FromResult(ctx.Ok(info, CoveJsonContext.Default.PaneInfo));

@@ -62,6 +62,7 @@ public sealed class DaemonHost
     private Cove.Tasks.TaskService? _taskService;
     private Cove.Tasks.Dispatch.DispatchSaga? _dispatchSaga;
     private Cove.Tasks.Dispatch.ResumeSaga? _resumeSaga;
+    private Cove.Engine.Launch.AdapterResumeProtocol? _resumeProtocol;
     private Cove.Tasks.Scheduler.TaskSchedulerEngine? _scheduler;
     private Cove.Engine.Knowledge.TimelineStore? _timeline;
     private Cove.Engine.Knowledge.BlackboardStore? _blackboard;
@@ -143,6 +144,7 @@ public sealed class DaemonHost
             : new Cove.Adapters.HttpRegistryFetcher(Cove.Adapters.RegistryConstants.RegistryContentsUrl, logger);
         _registry = new Cove.Adapters.RegistryService(registryCachePath, fetcher);
         var resumeProtocol = new Cove.Engine.Launch.AdapterResumeProtocol(_manifestStore, new Cove.Adapters.MethodRunner(), logger);
+        _resumeProtocol = resumeProtocol;
         var resumeService = new Cove.Engine.Restart.AgentResumeService(resumeProtocol);
         _launcher = new Cove.Engine.Launch.LaunchOrchestrator(_manifestStore, new Cove.Adapters.MethodRunner(), new Cove.Adapters.BinaryDiscoveryService(), probedPath, resumeService, new Cove.Engine.Launch.LauncherOverrideStore(System.IO.Path.Combine(dataDir, "launcher-overrides"), logger), logger);
         _taskService = new Cove.Tasks.TaskService(dataDir, logger);
@@ -230,7 +232,28 @@ public sealed class DaemonHost
                 foreach (var leaf in Cove.Engine.Layout.MosaicOps.Leaves(room.LayoutTree))
                     if (entry.Sessions.TryGetValue(leaf.PaneId, out var d))
                     {
-                        try { _panes!.RespawnAs(d.PaneId, d.Command, d.Args, d.Cwd, 80, 24, Cove.Engine.Layout.WorkspacePersistence.LoadScrollback(d.PaneId, entry.WorkspaceDir)); if (!string.IsNullOrEmpty(d.Title)) _panes!.Rename(d.PaneId, d.Title!); }
+                        try
+                        {
+                            var command = d.Command;
+                            var args = d.Args;
+                            if (!string.IsNullOrEmpty(d.Adapter) && !string.IsNullOrEmpty(d.SessionId) && _resumeProtocol is { } rp)
+                            {
+                                try
+                                {
+                                    var rc = rp.BuildResumeCommandAsync(d.Adapter!, d.SessionId!, new Cove.Engine.Restart.LauncherOverrides { WorkingDir = d.Cwd }).GetAwaiter().GetResult();
+                                    command = rc.Command;
+                                    args = System.Linq.Enumerable.ToArray(rc.Args);
+                                }
+                                catch (System.Exception ex) { logger.LogWarning(ex, "resume command build failed for {PaneId}, respawning stored command", d.PaneId); }
+                            }
+                            _panes!.RespawnAs(d.PaneId, command, args, d.Cwd, 80, 24, Cove.Engine.Layout.WorkspacePersistence.LoadScrollback(d.PaneId, entry.WorkspaceDir), d.Adapter, d.AgentName);
+                            if (!string.IsNullOrEmpty(d.Title)) _panes!.Rename(d.PaneId, d.Title!);
+                            if (!string.IsNullOrEmpty(d.Adapter))
+                            {
+                                _agentRouter?.Register(d.PaneId, d.Adapter!, d.AgentName, sl.Id);
+                                _sessions?.Register(d.PaneId, d.Adapter!, d.SessionId);
+                            }
+                        }
                         catch (System.Exception ex) { logger.LogWarning(ex, "respawn on restore failed for {PaneId}", d.PaneId); }
                     }
             _layout!.LoadSnapshot(sl);
@@ -681,7 +704,10 @@ public sealed class DaemonHost
             var wsDir = System.IO.Path.Combine(workspacesRoot, wsId);
             var snap = layout.ToSnapshot(wsId, name, dir);
             var leafIds = new System.Collections.Generic.HashSet<string>(layout.LeafPaneIds(wsId), System.StringComparer.Ordinal);
-            var descs = panes.Descriptors().Where(d => leafIds.Contains(d.PaneId)).ToArray();
+            var descs = panes.Descriptors()
+                .Where(d => leafIds.Contains(d.PaneId))
+                .Select(d => _sessions?.GetState(d.PaneId) is { } ss && !string.IsNullOrEmpty(ss.SessionId) ? d with { SessionId = ss.SessionId } : d)
+                .ToArray();
             Cove.Engine.Layout.WorkspacePersistence.Save(snap, descs, wsDir);
         }
         catch (System.Exception ex) { logger.LogWarning(ex, "workspace persist failed"); }
