@@ -32,8 +32,8 @@ import { groupByWorkspace, moveSelection, selectedNote, kindIcon, kindColor, typ
 import { initialSidebarModel, selectLeftMode, toggleSide, setCollapsed, setWidth, collapsedOf, widthOf, SIDEBAR_MODES, SIDEBAR_MODE_META, type SidebarModel, type SidebarSide, type SidebarMode } from "./sidebar-model";
 import { nextWorkspaceName, type WorkspaceBoxInput } from "./workspace-boxes";
 import { clampMenuPosition, normalizeItems, firstSelectableIndex, moveSelection as ctxMoveSelection, activeItem, type ContextMenuItem, type ContextMenuModel } from "./context-menu";
-import { buildWorkspaceTree, workspaceTreeEmptyMessage, type TreeLeaf, type TreeRoomInput } from "./workspace-tree";
-import { buildAgentRows, agentStateCounts, AGENT_STATE_META, type AgentCard, type AgentRow, type AgentState } from "./agents-model";
+import { buildWorkspaceTree, workspaceTreeEmptyMessage, PANE_TYPE_LABELS, type TreeLeaf, type TreeRoomInput, type TreeRow } from "./workspace-tree";
+import { buildAgentRows, AGENT_STATE_META, type AgentCard, type AgentState } from "./agents-model";
 import { splitWorkspaceCards, workspaceAccent, sortFsEntries, joinPath, dirBasename, type FsEntry, type WorkspaceCardEntry } from "./workspace-cards";
 import { parseQuery, filterAndSort, MruTracker, cycleCategory, categoryLabel, type PaletteItem } from "./omni-palette";
 import { buildEmptyState, EmptyStateMessages } from "./empty-states";
@@ -247,15 +247,9 @@ const gridEl = document.getElementById("grid")!;
 const paletteEl = document.getElementById("palette")!;
 const roomTabsEl = document.getElementById("room-tabs")!;
 const leftSidebarEl = document.getElementById("left-sidebar")!;
-const rightSidebarEl = document.getElementById("right-sidebar")!;
 const leftRailEl = document.getElementById("left-rail")!;
 const leftContentEl = document.getElementById("left-content")!;
-const rightContentEl = document.getElementById("right-content")!;
 const leftResizeEl = document.getElementById("left-resize")!;
-const rightResizeEl = document.getElementById("right-resize")!;
-const rightReopenEl = document.getElementById("right-reopen")!;
-rightReopenEl.innerHTML = iconSvg("agents");
-rightReopenEl.addEventListener("click", () => toggleRightSidebar());
 const palInput = document.getElementById("pal-input") as HTMLInputElement;
 const palList = document.getElementById("pal-list")!;
 
@@ -835,11 +829,14 @@ function renderImagePane(paneId: string): HTMLElement {
   el.appendChild(controls);
   return el;
 }
+function activeProjectDir(): string {
+  return workspaceBoxItems.find((w) => w.id === (layout?.id ?? null))?.projectDir ?? "";
+}
 function renderGitPaneWrapper(paneId: string): HTMLElement {
   const placeholder = document.createElement("div");
   placeholder.className = "git-pane-placeholder";
   placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
-  renderSourceControlPane("default", (path) => { void openFileInEditor(path); }).then(el => {
+  renderSourceControlPane(activeProjectDir(), (path) => { void openFileInEditor(path); }).then(el => {
     placeholder.replaceWith(el);
   }).catch(e => {
     placeholder.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to load source control: ${(e as Error).message}</div>`;
@@ -1407,24 +1404,19 @@ async function deleteWorkspace(wsId: string): Promise<void> {
   } catch (e) { console.warn("workspace.delete failed", wsId, e); }
 }
 
-function sideEl(side: SidebarSide): { root: HTMLElement; content: HTMLElement } {
-  return side === "left"
-    ? { root: leftSidebarEl, content: leftContentEl }
-    : { root: rightSidebarEl, content: rightContentEl };
+function sideEl(_side: SidebarSide): { root: HTMLElement; content: HTMLElement } {
+  return { root: leftSidebarEl, content: leftContentEl };
 }
 
 function renderSidebar(): void {
   renderSidebarContent("left");
-  renderSidebarContent("right");
 }
 
 function applySidebarModel(): void {
-  for (const side of ["left", "right"] as SidebarSide[]) {
-    const { root, content } = sideEl(side);
-    root.classList.toggle("collapsed", collapsedOf(sidebarModel, side));
-    content.style.width = `${widthOf(sidebarModel, side)}px`;
-    renderSidebarContent(side);
-  }
+  const { root, content } = sideEl("left");
+  root.classList.toggle("collapsed", collapsedOf(sidebarModel, "left"));
+  content.style.width = `${widthOf(sidebarModel, "left")}px`;
+  renderSidebarContent("left");
   renderLeftRail();
   fitAll();
 }
@@ -1462,29 +1454,17 @@ function toggleLeftSidebar(): void {
   applySidebarModel();
 }
 
-function toggleRightSidebar(): void {
-  sidebarModel = toggleSide(sidebarModel, "right");
-  persistSidebarModel();
-  applySidebarModel();
-}
-
 function revealSidebarMode(mode: SidebarMode): void {
   sidebarModel = selectLeftMode(sidebarModel, mode);
   persistSidebarModel();
   applySidebarModel();
 }
 
-function revealAgentsSidebar(): void {
-  sidebarModel = setCollapsed(sidebarModel, "right", false);
-  persistSidebarModel();
-  applySidebarModel();
-}
-
 function renderSidebarContent(side: SidebarSide): void {
+  if (side !== "left") return;
   const { content } = sideEl(side);
   if (collapsedOf(sidebarModel, side)) { content.innerHTML = ""; return; }
   content.innerHTML = "";
-  if (side === "right") { renderAgentsContent(content); return; }
   const mode = sidebarModel.leftMode;
   if (mode === "workspaces") renderWorkspacesContent(content);
   else if (mode === "notepad") renderNotepadContent(content);
@@ -1611,6 +1591,62 @@ function agentStateByPane(): Map<string, AgentState> {
   return new Map(buildAgentRows(agentCards, needsInputPanes).map((r) => [r.paneId, r.state]));
 }
 
+function adapterDisplayLabel(adapterName: string): string {
+  return launcherAdapters.find((a) => a.name === adapterName)?.displayName ?? adapterName.replace(/-/g, " ");
+}
+
+function buildPaneCard(row: TreeRow, paneStates: Map<string, AgentState>): HTMLElement {
+  const paneId = row.paneId ?? "";
+  const cardEl = document.createElement("div");
+  cardEl.className = "pane-card";
+  cardEl.style.marginLeft = `${6 + (row.depth - 1) * 14}px`;
+  const titleRow = document.createElement("div");
+  titleRow.className = "pane-card-title";
+  const glyph = document.createElement("span");
+  glyph.className = "pc-ic";
+  glyph.innerHTML = iconSvg(iconForPaneType(row.paneType ?? "terminal"));
+  titleRow.appendChild(glyph);
+  const titleText = document.createElement("span");
+  titleText.className = "pc-title-text";
+  titleText.textContent = row.label;
+  titleRow.appendChild(titleText);
+  cardEl.appendChild(titleRow);
+
+  const metaRow = document.createElement("div");
+  metaRow.className = "pane-card-meta";
+  const agent = agentCards.find((c) => c.paneId === paneId);
+  const st = paneStates.get(paneId);
+  if (agent && st) {
+    cardEl.classList.add(`state-${st}`);
+    const dot = document.createElement("span");
+    dot.className = "pc-dot";
+    dot.style.background = AGENT_STATE_META[st].color;
+    metaRow.appendChild(dot);
+    const metaText = document.createElement("span");
+    metaText.textContent = `${adapterDisplayLabel(agent.adapter)} · ${AGENT_STATE_META[st].label}`;
+    metaRow.appendChild(metaText);
+  } else {
+    const metaText = document.createElement("span");
+    metaText.textContent = PANE_TYPE_LABELS[row.paneType ?? ""] ?? row.paneType ?? "pane";
+    metaRow.appendChild(metaText);
+  }
+  cardEl.appendChild(metaRow);
+
+  cardEl.addEventListener("click", () => { if (paneId) revealPane(paneId); });
+  cardEl.addEventListener("contextmenu", (e) => {
+    openContextMenuAt(e, [
+      { id: "focus", label: "Go to" },
+      { id: "copy-id", label: "Copy pane id" },
+      { id: "close", label: "Close", danger: true },
+    ], (id) => {
+      if (id === "focus") focusTreeRow("pane", row.roomId, paneId);
+      else if (id === "copy-id") { if (navigator.clipboard) void navigator.clipboard.writeText(paneId); }
+      else if (id === "close") closeTreeRow("pane", row.roomId, paneId);
+    });
+  });
+  return cardEl;
+}
+
 function renderWorkspacesContent(container: HTMLElement): void {
   container.appendChild(sidebarHead("Workspace", [{ icon: "+", title: "New workspace", run: () => void newWorkspace() }]));
   const emptyMessage = workspaceTreeEmptyMessage(workspaceBoxItems.length);
@@ -1716,6 +1752,10 @@ function renderActiveWorkspaceCard(ws: WorkspaceCardEntry): HTMLElement {
   }).filter((r) => r.kind !== "workspace");
   const paneStates = agentStateByPane();
   for (const row of rows) {
+    if (row.kind === "pane" && row.paneId) {
+      body.appendChild(buildPaneCard(row, paneStates));
+      continue;
+    }
     const rowEl = document.createElement("div");
     rowEl.className = `tree-row kind-${row.kind}` + (row.active ? " active" : "") + (row.collapsed ? " collapsed" : "");
     rowEl.style.paddingLeft = `${6 + (row.depth - 1) * 14}px`;
@@ -1738,17 +1778,6 @@ function renderActiveWorkspaceCard(ws: WorkspaceCardEntry): HTMLElement {
       spacer.className = "tw-chevron tw-spacer";
       rowEl.appendChild(spacer);
     }
-    const dot = document.createElement("span");
-    dot.className = "tw-dot";
-    if (row.kind === "pane" && row.paneId) {
-      const st = paneStates.get(row.paneId);
-      if (st) {
-        dot.style.background = AGENT_STATE_META[st].color;
-        dot.classList.add("tw-dot-agent");
-        rowEl.title = AGENT_STATE_META[st].label;
-      }
-    }
-    rowEl.appendChild(dot);
     const label = document.createElement("span");
     label.className = "tw-label";
     label.textContent = row.label;
@@ -1845,7 +1874,6 @@ function onTreeRowClick(kind: string, roomId: string | null, paneId: string | nu
     treeWorkspaceCollapsed = !treeWorkspaceCollapsed;
     localStorage.setItem("cove.tree.workspaceCollapsed", String(treeWorkspaceCollapsed));
     renderSidebarContent("left");
-    renderSidebarContent("right");
     return;
   }
   if (kind === "pane" && paneId) { revealPane(paneId); return; }
@@ -1882,76 +1910,16 @@ function closeTreeRow(kind: string, roomId: string | null, paneId: string | null
   if (kind === "room" && roomId) { void closeRoom(roomId); }
 }
 
-function renderAgentsContent(container: HTMLElement): void {
-  container.appendChild(sidebarHead("Agents", [
-    { icon: iconSvg("refresh"), title: "Refresh", run: () => void refreshAgents() },
-    { icon: iconSvg("chevron-right"), title: "Collapse", run: () => toggleRightSidebar() },
-  ]));
-  const list = document.createElement("div");
-  list.className = "sb-list";
-  const rows = buildAgentRows(agentCards, needsInputPanes);
-  if (rows.length === 0) {
-    list.appendChild(buildEmptyState({ message: "No active agents.", actionLabel: "", actionIcon: "" }));
-    container.appendChild(list);
-    return;
-  }
-  const counts = agentStateCounts(rows);
-  let lastState: string | null = null;
-  for (const row of rows) {
-    if (row.state !== lastState) {
-      lastState = row.state;
-      const groupHead = document.createElement("div");
-      groupHead.className = "sb-group-head";
-      groupHead.textContent = `${AGENT_STATE_META[row.state].label} (${counts[row.state]})`;
-      list.appendChild(groupHead);
-    }
-    list.appendChild(agentRowEl(row));
-  }
-  container.appendChild(list);
-}
-
-function agentRowEl(row: AgentRow): HTMLElement {
-  const el = document.createElement("div");
-  el.className = `agent-row state-${row.state}`;
-  const dot = document.createElement("span");
-  dot.className = "ag-dot";
-  dot.style.background = AGENT_STATE_META[row.state].color;
-  el.appendChild(dot);
-  const body = document.createElement("div");
-  body.className = "ag-body";
-  const name = document.createElement("div");
-  name.className = "ag-name";
-  name.textContent = row.name;
-  const meta = document.createElement("div");
-  meta.className = "ag-meta";
-  meta.textContent = [row.adapter, AGENT_STATE_META[row.state].label].filter((s) => s.length > 0).join(" · ");
-  body.appendChild(name);
-  body.appendChild(meta);
-  el.appendChild(body);
-  el.title = `${row.name} — ${row.adapter}`;
-  el.addEventListener("click", () => revealPane(row.paneId));
-  el.addEventListener("contextmenu", (e) => {
-    openContextMenuAt(e, [
-      { id: "reveal", label: "Reveal pane" },
-      { id: "copy-id", label: "Copy pane id" },
-    ], (id) => {
-      if (id === "reveal") revealPane(row.paneId);
-      else if (id === "copy-id") { if (navigator.clipboard) void navigator.clipboard.writeText(row.paneId); }
-    });
-  });
-  return el;
-}
-
 async function refreshAgents(): Promise<void> {
   try {
     const res = await invoke<{ cards: AgentCard[] }>("cove://commands/activity.list", {});
     agentCards = res.cards ?? [];
   } catch { agentCards = []; }
-  if (agentsVisible()) renderSidebarContent("right");
+  if (agentsVisible()) renderSidebarContent("left");
 }
 
 function agentsVisible(): boolean {
-  return !collapsedOf(sidebarModel, "right");
+  return !collapsedOf(sidebarModel, "left") && sidebarModel.leftMode === "workspaces";
 }
 
 const SIDEBAR_PREF_KEYS = {
@@ -2315,9 +2283,8 @@ function baseActions(): Action[] {
     { label: "Split down", icon: "\u2500", key: "Cmd Shift D", run: () => void splitActive("col") },
     { label: "Close pane", icon: "\u00d7", key: "Cmd W", run: () => void closeFocused() },
     { label: "Toggle left sidebar", icon: "\u25e7", key: "Cmd B", run: toggleLeftSidebar },
-    { label: "Toggle right sidebar", icon: "\u25e8", key: "Cmd Shift A", run: toggleRightSidebar },
     { label: "Show notepad", icon: "\u270e", run: () => revealSidebarMode("notepad") },
-    { label: "Show agents", icon: "\u25c9", run: revealAgentsSidebar },
+    { label: "Show workspaces", icon: "\u25c9", key: "Cmd Shift A", run: () => revealSidebarMode("workspaces") },
     { label: "Toggle window backdrop", icon: "\u25d0", run: () => void toggleBackdrop() },
     { label: "Toggle performance HUD", icon: "\ud83d\udcc8", run: doTogglePerfHud },
     { label: "Increase font size", icon: "+", key: "Cmd =", run: () => { settings.fontSize = Math.min(24, settings.fontSize + 1); applySettings(); } },
@@ -2517,7 +2484,6 @@ async function openFileInEditor(filePath: string): Promise<void> {
 
 
 wireSidebarResize(leftResizeEl, "left");
-wireSidebarResize(rightResizeEl, "right");
 document.body.classList.add(navigator.platform.toUpperCase().includes("MAC") ? "platform-mac" : "platform-other");
 window.__ryn.on("window.focused", () => document.body.classList.remove("window-inactive"));
 window.__ryn.on("window.blurred", () => document.body.classList.add("window-inactive"));
@@ -4298,7 +4264,7 @@ function runAction(action: string): void {
     case "pane.maximize": void toggleZoom(); break;
     case "workspace.create": void newWorkspace(); break;
     case "view.toggle-sidebar": toggleLeftSidebar(); break;
-    case "view.toggle-notepad": toggleRightSidebar(); break;
+    case "view.toggle-notepad": revealSidebarMode("notepad"); break;
     case "view.zen-mode": doToggleZen(); break;
     case "view.zoom-in": settings.fontSize = Math.min(24, settings.fontSize + 1); applySettings(); break;
     case "view.zoom-out": settings.fontSize = Math.max(9, settings.fontSize - 1); applySettings(); break;
@@ -4413,7 +4379,7 @@ function onNeedsInputChanged(): void {
   const count = needsInputPanes.size;
   if (count === 0) invoke("badge.clear", {}).catch(() => void 0);
   else invoke("badge.setCount", count).catch(() => void 0);
-  if (agentsVisible()) renderSidebarContent("right");
+  if (agentsVisible()) renderSidebarContent("left");
 }
 
 function setupBadge(): void {

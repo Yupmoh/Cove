@@ -136,13 +136,12 @@
       font-size: 12px; white-space: nowrap;
     }
     .tree-row:hover { background: var(--panel-2); color: var(--fg); }
-    .tree-row.active { background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--fg); }
+    .tree-row.active { color: var(--fg); }
     .tree-row.kind-workspace { font-weight: 650; color: var(--fg); text-transform: none; }
     .tree-row .tw-chevron { width: 12px; flex-shrink: 0; font-size: 9px; text-align: center; transition: transform 0.15s; }
     .tree-row.collapsed .tw-chevron { transform: rotate(-90deg); }
     .tree-row .tw-spacer { flex-shrink: 0; }
     .tree-row .tw-dot { width: 6px; height: 6px; border-radius: 50%; background: #45475a; flex-shrink: 0; }
-    .tree-row.active .tw-dot { background: var(--accent); box-shadow: 0 0 7px var(--accent-dim); }
     .tree-row .tw-label { flex: 1; overflow: hidden; text-overflow: ellipsis; }
     .tree-row .tw-count { font-size: 10px; color: var(--muted); }
     .ws-card-scroll { display: flex; flex-direction: column; gap: 8px; padding-top: 2px; }
@@ -160,7 +159,21 @@
     .ws-card-dir { font-size: 10.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .ws-card-body { padding: 2px 6px 8px; }
     .ws-card.drag-over { outline: 1.5px dashed var(--accent); outline-offset: -2px; }
-    .tree-row .tw-dot.tw-dot-agent { box-shadow: none; }
+    .pane-card {
+      display: flex; flex-direction: column; gap: 3px; margin: 3px 0 3px 6px;
+      padding: 7px 9px; border-radius: 8px; cursor: pointer;
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+    }
+    .pane-card:hover { border-color: color-mix(in srgb, var(--ws-accent) 45%, var(--border)); }
+    .pane-card-title { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--fg); min-width: 0; }
+    .pane-card-title .pc-ic { flex-shrink: 0; line-height: 0; color: var(--ws-accent); opacity: 0.9; }
+    .pane-card-title .pc-ic svg { width: 13px; height: 13px; display: block; }
+    .pane-card-title .pc-title-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pane-card-meta { display: flex; align-items: center; gap: 6px; padding-left: 20px; font-size: 10.5px; color: var(--muted); white-space: nowrap; overflow: hidden; }
+    .pane-card-meta .pc-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .pane-card.state-needs-input .pc-dot { animation: ag-pulse 1.4s ease-in-out infinite; }
+    @media (prefers-reduced-motion: reduce) { .pane-card-meta .pc-dot { animation: none !important; } }
     .ws-files-head {
       display: flex; align-items: center; gap: 6px; margin-top: 8px; padding: 4px 8px;
       font-size: 10px; font-weight: 700; letter-spacing: 0.9px; text-transform: uppercase;
@@ -560,11 +573,6 @@
     <div id="rooms-row"><div id="room-tabs"></div></div>
     <div id="grid"></div>
   </div>
-  <aside id="right-sidebar" class="dual-sidebar side-right" data-webview-ignore>
-    <div class="sb-resize" id="right-resize" title="Resize"></div>
-    <div class="sb-content" id="right-content"></div>
-    <div class="sb-reopen" id="right-reopen" title="Show agents"></div>
-  </aside>
   </div>
   <div id="palette">
     <div class="pal-box">

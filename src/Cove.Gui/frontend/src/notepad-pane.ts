@@ -1,4 +1,6 @@
+import type * as Monaco from "monaco-editor";
 import { invoke } from "./invoke";
+import { MonacoLoader } from "./monaco-loader";
 
 interface Note {
   id: string;
@@ -16,12 +18,44 @@ interface NoteGetStateResult { state: string | null; }
 
 let currentNoteId: string | null = null;
 let currentWorkspaceId: string | null = null;
+let noteEditor: Monaco.editor.IStandaloneCodeEditor | null = null;
 let viewport: { scrollX: number; scrollY: number; zoom: number } = { scrollX: 0, scrollY: 0, zoom: 1 };
+
+function cssColor(name: string, fallback: string): string {
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return /^#[0-9a-fA-F]{6}$/.test(v) ? v : fallback;
+}
+
+function isLightHex(hex: string): boolean {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 > 0.55;
+}
+
+export function defineCoveMonacoTheme(monaco: typeof Monaco): string {
+  const bg = cssColor("--panel", "#181825");
+  const fg = cssColor("--fg", "#cdd6f4");
+  const accent = cssColor("--accent", "#cba6f7");
+  monaco.editor.defineTheme("cove", {
+    base: isLightHex(bg) ? "vs" : "vs-dark",
+    inherit: true,
+    rules: [],
+    colors: {
+      "editor.background": bg,
+      "editor.foreground": fg,
+      "editorCursor.foreground": accent,
+      "editorLineNumber.foreground": cssColor("--muted", "#7f849c"),
+      "editor.selectionBackground": accent + "55",
+    },
+  });
+  return "cove";
+}
 
 export async function renderNotepadPane(workspaceId: string): Promise<HTMLElement> {
   const el = document.createElement("div");
   el.className = "notepad-pane";
-  el.style.cssText = "display:flex;height:100%;background:#0b1622;color:#e5e9f0;font-family:system-ui,sans-serif;";
+  el.style.cssText = "display:flex;height:100%;background:var(--panel);color:var(--fg);";
 
   currentWorkspaceId = workspaceId;
 
@@ -35,16 +69,16 @@ export async function renderNotepadPane(workspaceId: string): Promise<HTMLElemen
 async function buildSidebar(workspaceId: string): Promise<HTMLElement> {
   const sidebar = document.createElement("div");
   sidebar.className = "notepad-sidebar";
-  sidebar.style.cssText = "width:240px;border-right:1px solid #1e2d3f;display:flex;flex-direction:column;overflow:hidden;";
+  sidebar.style.cssText = "width:240px;border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;";
 
   const header = document.createElement("div");
-  header.style.cssText = "padding:8px 12px;font-size:12px;color:#6b7d8f;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #1e2d3f;";
+  header.style.cssText = "padding:8px 12px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;font-weight:700;border-bottom:1px solid var(--border);";
   header.textContent = "Notes";
   sidebar.appendChild(header);
 
   const newBtn = document.createElement("button");
   newBtn.textContent = "+ New Note";
-  newBtn.style.cssText = "margin:4px 8px;padding:4px 8px;background:#2563eb;border:1px solid #3b82f6;border-radius:4px;color:#fff;cursor:pointer;font-size:12px;";
+  newBtn.style.cssText = "margin:6px 8px;padding:5px 8px;background:var(--accent);border:none;border-radius:6px;color:#000;font-weight:600;cursor:pointer;font-size:12px;";
   newBtn.addEventListener("click", () => createNote(workspaceId));
   sidebar.appendChild(newBtn);
 
@@ -59,12 +93,16 @@ async function buildSidebar(workspaceId: string): Promise<HTMLElement> {
     }
     if ((result.notes || []).length === 0) {
       const empty = document.createElement("div");
-      empty.style.cssText = "padding:12px;color:#6b7d8f;font-size:12px;text-align:center;";
+      empty.style.cssText = "padding:12px;color:var(--muted);font-size:12px;text-align:center;";
       empty.textContent = "No notes yet";
       list.appendChild(empty);
     }
   } catch (e) {
-    list.innerHTML = `<div style="padding:12px;color:#ef4444;font-size:12px;">Failed to load: ${(e as Error).message}</div>`;
+    console.warn("note list failed", workspaceId, e);
+    const failed = document.createElement("div");
+    failed.style.cssText = "padding:12px;color:var(--muted);font-size:12px;";
+    failed.textContent = `Failed to load: ${(e as Error).message}`;
+    list.appendChild(failed);
   }
 
   sidebar.appendChild(list);
@@ -73,8 +111,8 @@ async function buildSidebar(workspaceId: string): Promise<HTMLElement> {
 
 function buildNoteRow(note: Note, workspaceId: string): HTMLElement {
   const row = document.createElement("div");
-  row.style.cssText = "padding:8px 12px;border-bottom:1px solid #14202e;cursor:pointer;display:flex;gap:8px;align-items:center;";
-  row.addEventListener("mouseenter", () => row.style.background = "#14202e");
+  row.style.cssText = "padding:8px 12px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;gap:8px;align-items:center;";
+  row.addEventListener("mouseenter", () => row.style.background = "var(--panel-2)");
   row.addEventListener("mouseleave", () => row.style.background = "");
 
   const icon = document.createElement("span");
@@ -86,12 +124,12 @@ function buildNoteRow(note: Note, workspaceId: string): HTMLElement {
   info.style.cssText = "flex:1;min-width:0;";
 
   const title = document.createElement("div");
-  title.style.cssText = "font-size:13px;color:#e5e9f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;";
+  title.style.cssText = "font-size:13px;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;";
   title.textContent = note.title || "Untitled";
   info.appendChild(title);
 
   const updated = document.createElement("div");
-  updated.style.cssText = "font-size:11px;color:#6b7d8f;";
+  updated.style.cssText = "font-size:11px;color:var(--muted);";
   updated.textContent = new Date(note.updatedAt || note.createdAt).toLocaleDateString();
   info.appendChild(updated);
 
@@ -106,7 +144,7 @@ function buildEditor(): HTMLElement {
   editor.style.cssText = "flex:1;display:flex;flex-direction:column;overflow:hidden;";
 
   const placeholder = document.createElement("div");
-  placeholder.style.cssText = "flex:1;display:flex;align-items:center;justify-content:center;color:#6b7d8f;font-size:14px;";
+  placeholder.style.cssText = "flex:1;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:14px;";
   placeholder.textContent = "Select a note to edit";
   editor.appendChild(placeholder);
 
@@ -118,7 +156,7 @@ export async function openNote(workspaceId: string, noteId: string): Promise<voi
   currentWorkspaceId = workspaceId;
 
   const editor = document.querySelector(".notepad-editor") as HTMLElement;
-  if (!editor) return;
+  if (!editor) { console.warn("open note without a notepad editor host", noteId); return; }
 
   try {
     const note = await invoke<{ id: string; title: string; content: string; kind: string }>("cove://commands/note.read", { workspaceId, id: noteId });
@@ -133,55 +171,70 @@ export async function openNote(workspaceId: string, noteId: string): Promise<voi
       try { viewport = JSON.parse(stateResult.state); } catch { viewport = { scrollX: 0, scrollY: 0, zoom: 1 }; }
     }
 
+    if (noteEditor) { noteEditor.dispose(); noteEditor = null; }
     editor.innerHTML = "";
 
     const toolbar = document.createElement("div");
-    toolbar.style.cssText = "padding:8px 12px;border-bottom:1px solid #1e2d3f;display:flex;gap:8px;align-items:center;";
+    toolbar.style.cssText = "padding:8px 12px;border-bottom:1px solid var(--border);display:flex;gap:8px;align-items:center;";
 
     const titleInput = document.createElement("input");
     titleInput.type = "text";
     titleInput.value = note.title;
-    titleInput.style.cssText = "flex:1;padding:4px 8px;background:#14202e;border:1px solid #2b3d52;border-radius:4px;color:#e5e9f0;font-size:14px;font-weight:600;";
+    titleInput.spellcheck = false;
+    titleInput.style.cssText = "flex:1;padding:5px 8px;background:var(--panel-2);border:1px solid var(--border);border-radius:6px;color:var(--fg);font-size:14px;font-weight:600;outline:none;";
     toolbar.appendChild(titleInput);
 
     const save = document.createElement("button");
     save.textContent = "Save";
-    save.style.cssText = "padding:4px 12px;background:#2563eb;border:1px solid #3b82f6;border-radius:4px;color:#fff;cursor:pointer;font-size:12px;";
-    save.addEventListener("click", () => saveCurrentNote(titleInput.value, textarea.value));
+    save.style.cssText = "padding:5px 14px;background:var(--accent);border:none;border-radius:6px;color:#000;font-weight:600;cursor:pointer;font-size:12px;";
+    save.addEventListener("click", () => saveCurrentNote(titleInput.value, noteEditor?.getValue() ?? ""));
     toolbar.appendChild(save);
 
     editor.appendChild(toolbar);
 
-    const textarea = document.createElement("textarea");
-    textarea.value = note.content;
-    textarea.style.cssText = "flex:1;padding:12px;background:#0b1622;border:none;color:#e5e9f0;font-family:'SF Mono',Monaco,monospace;font-size:13px;resize:none;outline:none;line-height:1.6;";
-    textarea.spellcheck = false;
+    const host = document.createElement("div");
+    host.style.cssText = "flex:1;min-height:0;position:relative;";
+    editor.appendChild(host);
 
-    textarea.addEventListener("scroll", () => {
-      viewport.scrollX = textarea.scrollLeft;
-      viewport.scrollY = textarea.scrollTop;
+    const monaco = await MonacoLoader.load();
+    const theme = defineCoveMonacoTheme(monaco);
+    noteEditor = monaco.editor.create(host, {
+      value: note.content,
+      language: note.kind === "markdown" ? "markdown" : "plaintext",
+      theme,
+      wordWrap: "on",
+      minimap: { enabled: false },
+      lineNumbers: "off",
+      folding: false,
+      fontSize: 13,
+      lineHeight: 21,
+      padding: { top: 12, bottom: 12 },
+      scrollBeyondLastLine: false,
+      automaticLayout: true,
+      renderLineHighlight: "none",
+      occurrencesHighlight: "off",
+      overviewRulerLanes: 0,
+      hideCursorInOverviewRuler: true,
+      scrollbar: { verticalScrollbarSize: 8, horizontalScrollbarSize: 8 },
     });
-
-    editor.appendChild(textarea);
-
-    requestAnimationFrame(() => {
-      textarea.scrollLeft = viewport.scrollX;
-      textarea.scrollTop = viewport.scrollY;
+    noteEditor.setScrollTop(viewport.scrollY);
+    noteEditor.onDidScrollChange((ev) => { viewport.scrollY = ev.scrollTop; viewport.scrollX = ev.scrollLeft; });
+    noteEditor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
+      void saveCurrentNote(titleInput.value, noteEditor?.getValue() ?? "");
     });
   } catch (e) {
     const msg = (e as Error).message ?? "";
-    if (msg.includes("not_found") || msg.includes("not found")) {
-      editor.innerHTML = "";
-      editor.style.cssText = "flex:1;display:flex;align-items:center;justify-content:center;color:#6b7d8f;font-size:14px;";
-      editor.textContent = "This note was deleted";
-    } else {
-      editor.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to open note: ${msg}</div>`;
-    }
+    console.warn("open note failed", noteId, msg);
+    editor.innerHTML = "";
+    const info = document.createElement("div");
+    info.style.cssText = "flex:1;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:14px;";
+    info.textContent = msg.includes("not_found") || msg.includes("not found") ? "This note was deleted" : `Failed to open note: ${msg}`;
+    editor.appendChild(info);
   }
 }
 
 async function saveCurrentNote(title: string, content: string): Promise<void> {
-  if (!currentWorkspaceId || !currentNoteId) return;
+  if (!currentWorkspaceId || !currentNoteId) { console.warn("save skipped: no open note"); return; }
   try {
     await invoke("cove://commands/note.write", {
       workspaceId: currentWorkspaceId,

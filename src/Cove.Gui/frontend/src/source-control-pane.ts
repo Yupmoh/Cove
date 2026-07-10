@@ -49,38 +49,38 @@ function hunkCount(patch: string | null): number {
   return count;
 }
 
-export async function renderSourceControlPane(workspaceId: string, openFile?: (path: string) => void): Promise<HTMLElement> {
+export async function renderSourceControlPane(repoRoot: string, openFile?: (path: string) => void): Promise<HTMLElement> {
   const el = document.createElement("div");
   el.className = "source-control-pane";
   el.tabIndex = 0;
-  el.style.cssText = "display:flex;flex-direction:column;height:100%;background:#0d1117;color:#e6edf3;font-family:system-ui,sans-serif;outline:none;";
+  el.style.cssText = "display:flex;flex-direction:column;height:100%;background:var(--panel);color:var(--fg);outline:none;";
 
   const header = document.createElement("div");
-  header.style.cssText = "padding:8px 12px;border-bottom:1px solid #21262d;display:flex;gap:8px;align-items:center;";
+  header.style.cssText = "padding:8px 12px;border-bottom:1px solid var(--border);display:flex;gap:8px;align-items:center;";
   const title = document.createElement("span");
   title.style.cssText = "font-size:14px;font-weight:600;";
   title.textContent = "Source Control";
   header.appendChild(title);
   const refreshBtn = document.createElement("button");
   refreshBtn.textContent = "↻";
-  refreshBtn.style.cssText = "background:#21262d;border:1px solid #30363d;color:#58a6ff;border-radius:3px;padding:2px 8px;cursor:pointer;";
+  refreshBtn.style.cssText = "background:var(--panel-2);border:1px solid var(--border);color:var(--accent);border-radius:5px;padding:2px 8px;cursor:pointer;";
   header.appendChild(refreshBtn);
   el.appendChild(header);
 
   const commitBox = document.createElement("div");
-  commitBox.style.cssText = "padding:8px 12px;border-bottom:1px solid #21262d;";
+  commitBox.style.cssText = "padding:8px 12px;border-bottom:1px solid var(--border);";
   const commitInput = document.createElement("textarea");
   commitInput.placeholder = "Commit message...";
-  commitInput.style.cssText = "width:100%;height:40px;padding:6px;background:#161b22;border:1px solid #30363d;border-radius:4px;color:#e6edf3;font-size:12px;resize:none;box-sizing:border-box;";
+  commitInput.style.cssText = "width:100%;height:40px;padding:6px;background:var(--panel-2);border:1px solid var(--border);border-radius:6px;color:var(--fg);font-size:12px;resize:none;box-sizing:border-box;outline:none;";
   commitBox.appendChild(commitInput);
   const commitBtnRow = document.createElement("div");
   commitBtnRow.style.cssText = "display:flex;gap:4px;margin-top:4px;";
   const commitBtn = document.createElement("button");
   commitBtn.textContent = "Commit";
-  commitBtn.style.cssText = "flex:1;padding:4px;background:#238636;border:none;color:#fff;border-radius:4px;font-size:12px;cursor:pointer;";
+  commitBtn.style.cssText = "flex:1;padding:4px;background:var(--accent);border:none;color:#000;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;";
   const amendBtn = document.createElement("button");
   amendBtn.textContent = "Amend";
-  amendBtn.style.cssText = "padding:4px 8px;background:#21262d;border:1px solid #30363d;color:#e6edf3;border-radius:4px;font-size:12px;cursor:pointer;";
+  amendBtn.style.cssText = "padding:4px 8px;background:var(--panel-2);border:1px solid var(--border);color:var(--fg);border-radius:6px;font-size:12px;cursor:pointer;";
   commitBtnRow.appendChild(commitBtn);
   commitBtnRow.appendChild(amendBtn);
   commitBox.appendChild(commitBtnRow);
@@ -91,7 +91,7 @@ export async function renderSourceControlPane(workspaceId: string, openFile?: (p
   el.appendChild(fileList);
 
   const navStatus = document.createElement("div");
-  navStatus.style.cssText = "padding:4px 12px;border-top:1px solid #21262d;font-size:11px;color:#6e7681;flex-shrink:0;";
+  navStatus.style.cssText = "padding:4px 12px;border-top:1px solid var(--border);font-size:11px;color:var(--muted);flex-shrink:0;";
   navStatus.textContent = "j/k file · n/p hunk · Enter open · Space review";
   el.appendChild(navStatus);
 
@@ -102,8 +102,8 @@ export async function renderSourceControlPane(workspaceId: string, openFile?: (p
 
   const paintFocus = () => {
     rows.forEach((r, i) => {
-      r.row.style.background = i === cursor.fileIndex ? "#1f2937" : "";
-      r.row.style.boxShadow = i === cursor.fileIndex ? "inset 3px 0 0 #58a6ff" : "";
+      r.row.style.background = i === cursor.fileIndex ? "var(--panel-2)" : "";
+      r.row.style.boxShadow = i === cursor.fileIndex ? "inset 3px 0 0 var(--accent)" : "";
     });
     const current = rows[cursor.fileIndex];
     if (current) {
@@ -117,7 +117,7 @@ export async function renderSourceControlPane(workspaceId: string, openFile?: (p
     const target = rows[index];
     if (!target || target.hunkCount > 0) return;
     try {
-      const diff = await invoke<ScmDiffResult>("cove://commands/scm.diff", { repoRoot: workspaceId, filePath: target.file.filePath, ref: "HEAD" });
+      const diff = await invoke<ScmDiffResult>("cove://commands/scm.diff", { repoRoot, filePath: target.file.filePath, ref: "HEAD" });
       target.hunkCount = hunkCount(diff.newContent);
     } catch {
       target.hunkCount = 0;
@@ -126,18 +126,18 @@ export async function renderSourceControlPane(workspaceId: string, openFile?: (p
 
   const refresh = async () => {
     try {
-      const result = await invoke<ScmStatusResult>("cove://commands/scm.status", { repoRoot: workspaceId });
-      rows = renderFileList(result.staged, result.unstaged, fileList, workspaceId, (idx) => {
+      const result = await invoke<ScmStatusResult>("cove://commands/scm.status", { repoRoot });
+      rows = renderFileList(result.staged, result.unstaged, fileList, repoRoot, (idx) => {
         cursor = { fileIndex: idx, hunkIndex: 0 };
         void ensureHunks(idx).then(paintFocus);
         paintFocus();
-      });
+      }, () => void refresh());
       cursor = initialCursor();
       await ensureHunks(0);
       paintFocus();
     } catch (e) {
       rows = [];
-      fileList.innerHTML = `<div style="padding:20px;color:#f85149;">Failed: ${(e as Error).message}</div>`;
+      fileList.innerHTML = `<div style="padding:20px;color:var(--muted);font-size:12px;">${repoRoot ? `Not a usable git repository: ${repoRoot}` : "This workspace has no directory"}</div>`;
     }
   };
 
@@ -166,8 +166,8 @@ export async function renderSourceControlPane(workspaceId: string, openFile?: (p
   });
 
   refreshBtn.addEventListener("click", refresh);
-  commitBtn.addEventListener("click", () => doCommit(commitInput.value, false, workspaceId, refresh));
-  amendBtn.addEventListener("click", () => doCommit(commitInput.value, true, workspaceId, refresh));
+  commitBtn.addEventListener("click", () => doCommit(commitInput.value, false, repoRoot, refresh));
+  amendBtn.addEventListener("click", () => doCommit(commitInput.value, true, repoRoot, refresh));
 
   await refresh();
   return el;
@@ -179,6 +179,7 @@ function renderFileList(
   container: HTMLElement,
   repoRoot: string,
   onFocus: (index: number) => void,
+  onChanged?: () => void,
 ): FileRow[] {
   container.innerHTML = "";
   const rows: FileRow[] = [];
@@ -186,12 +187,12 @@ function renderFileList(
   const addSection = (label: string, files: ScmFileStatus[], isStaged: boolean) => {
     if (files.length === 0) return;
     const header = document.createElement("div");
-    header.style.cssText = "padding:6px 12px;font-size:11px;color:#6e7681;text-transform:uppercase;font-weight:600;";
+    header.style.cssText = "padding:6px 12px;font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600;";
     header.textContent = `${label} (${files.length})`;
     container.appendChild(header);
     for (const file of files) {
       const index = rows.length;
-      const row = buildFileRow(file, repoRoot, isStaged, () => onFocus(index));
+      const row = buildFileRow(file, repoRoot, isStaged, () => onFocus(index), onChanged);
       rows.push({ file, isStaged, row, hunkCount: 0, reviewed: false });
       container.appendChild(row);
     }
@@ -202,14 +203,14 @@ function renderFileList(
 
   if (rows.length === 0) {
     const empty = document.createElement("div");
-    empty.style.cssText = "padding:20px;color:#6e7681;text-align:center;font-size:13px;";
+    empty.style.cssText = "padding:20px;color:var(--muted);text-align:center;font-size:13px;";
     empty.textContent = "No changes";
     container.appendChild(empty);
   }
   return rows;
 }
 
-function buildFileRow(file: ScmFileStatus, repoRoot: string, isStaged: boolean, onFocus: () => void): HTMLElement {
+function buildFileRow(file: ScmFileStatus, repoRoot: string, isStaged: boolean, onFocus: () => void, onChanged?: () => void): HTMLElement {
   const row = document.createElement("div");
   row.style.cssText = "padding:4px 12px;display:flex;gap:8px;align-items:center;cursor:pointer;";
 
@@ -220,16 +221,18 @@ function buildFileRow(file: ScmFileStatus, repoRoot: string, isStaged: boolean, 
   row.appendChild(statusEl);
 
   const nameEl = document.createElement("span");
-  nameEl.style.cssText = "flex:1;font-size:12px;color:#e6edf3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;";
+  nameEl.style.cssText = "flex:1;font-size:12px;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;";
   nameEl.textContent = file.filePath;
   row.appendChild(nameEl);
 
   const stageBtn = document.createElement("button");
   stageBtn.textContent = isStaged ? "−" : "+";
-  stageBtn.style.cssText = "padding:2px 6px;background:#21262d;border:1px solid #30363d;color:#e6edf3;border-radius:3px;font-size:11px;cursor:pointer;";
+  stageBtn.style.cssText = "padding:2px 6px;background:var(--panel-2);border:1px solid var(--border);color:var(--fg);border-radius:5px;font-size:11px;cursor:pointer;";
   stageBtn.addEventListener("click", (e) => {
     e.stopPropagation();
-    invoke("cove://commands/scm.stage", { repoRoot, filePath: file.filePath, unstage: isStaged }).catch(() => {});
+    invoke("cove://commands/scm.stage", { repoRoot, filePath: file.filePath, unstage: isStaged })
+      .then(() => { if (onChanged) onChanged(); })
+      .catch((err) => console.warn("scm stage failed", file.filePath, err));
   });
   row.appendChild(stageBtn);
 
@@ -242,12 +245,12 @@ function buildFileRow(file: ScmFileStatus, repoRoot: string, isStaged: boolean, 
 }
 
 async function doCommit(message: string, amend: boolean, repoRoot: string, onDone: () => void): Promise<void> {
-  if (!message.trim() && !amend) return;
+  if (!message.trim() && !amend) { console.warn("commit skipped: empty message"); return; }
   try {
     const result = await invoke<ScmCommitResult>("cove://commands/scm.commit", { repoRoot, message, amend, sign: false });
-    if (result.success) {
-      onDone();
-    }
-  } catch {
+    if (result.success) onDone();
+    else console.warn("scm commit reported failure", result.message);
+  } catch (err) {
+    console.warn("scm commit failed", err);
   }
 }
