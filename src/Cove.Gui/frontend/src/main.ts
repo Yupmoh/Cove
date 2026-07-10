@@ -21,7 +21,7 @@ import { renderDiffReviewPane } from "./diff-review-pane";
 import { renderEditorPane } from "./editor-pane";
 import { renderSourceControlPane } from "./source-control-pane";
 import { renderSearchPane } from "./search-pane";
-import { browserWebviewRegistry, renderBrowserPane } from "./browser-pane";
+import { browserWebviewRegistry, closeBrowserWebview, renderBrowserPane } from "./browser-pane";
 import { buildAutomationJs, type AutomationExecEvent } from "./automation-snapshot";
 import { renderDiffViewerPane } from "./diff-viewer-pane";
 import { renderMarkdownPane } from "./markdown-pane";
@@ -1177,6 +1177,7 @@ function findLeaf(node: MosaicNode, paneId: string): { paneId: string; activeSub
 async function closePaneById(paneId: string): Promise<void> {
   const room = layout?.rooms.find((r) => collectLeafIds(r.layoutTree).includes(paneId));
   if (!room) { console.warn("close requested for pane not in layout", paneId); return; }
+  await closeBrowserWebview(paneId);
   try { await invoke("app.paneKill", { paneId }); } catch (err) { console.warn("pane kill on exit failed", paneId, err); }
   try { await invoke("app.layoutMutate", { op: "close", roomId: room.id, paneId, targetPaneId: "", newPaneId: "", orientation: "", name: "", dir: 0 }); } catch (err) { console.warn("layout close on exit failed", paneId, err); }
   await reload();
@@ -1208,7 +1209,8 @@ async function splitActiveWith(dir: "row" | "col", kind: string): Promise<void> 
     const name = kind.slice("adapter:".length);
     const tile = detectedHarnessTiles(buildAdapterTiles(launcherAdapters)).find((t) => t.adapterName === name);
     if (!tile) { console.warn("split chooser: unknown adapter", name); return; }
-    paneId = (await invoke<{ paneId: string }>("app.paneSpawn", { command: tile.binary, cwd: "", inheritCwdFrom: target, cols: 80, rows: 24, adapter: tile.adapterName, agentName: tile.label, workspace: "", room: "" })).paneId;
+    const launch = await buildAdapterLaunch({ name: tile.adapterName, displayName: tile.label, accent: tile.accent, binary: tile.binary });
+    paneId = (await invoke<{ paneId: string }>("app.paneSpawn", { command: launch.command, args: launch.args, cwd: "", inheritCwdFrom: target, cols: 80, rows: 24, adapter: tile.adapterName, agentName: tile.label, workspace: "", room: "" })).paneId;
   } else if (kind === "browser") {
     paneId = (await invoke<{ paneId: string; currentUrl: string }>("cove://commands/browser.create", { url: "https://duckduckgo.com" })).paneId;
     paneType = "browser";
@@ -1320,6 +1322,7 @@ async function closeRoom(roomId: string): Promise<void> {
   if (!room) return;
   const leaves = collectLeafIds(room.layoutTree);
   for (const id of leaves) {
+    await closeBrowserWebview(id);
     try { await invoke("app.paneKill", { paneId: id }); } catch { void 0; }
   }
   try { await invoke("app.layoutMutate", { op: "closeRoom", roomId, paneId: "", targetPaneId: "", newPaneId: "", orientation: "", name: "", dir: 0 }); } catch { void 0; }
@@ -3864,7 +3867,8 @@ async function submitInspectFeedback(
 }
 
 async function spawnFeedbackAgent(tile: LauncherTile, prompt: string, roomName: string): Promise<void> {
-  const sp = (await invoke<{ paneId: string }>("app.paneSpawn", { command: tile.binary, args: [prompt], cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: tile.adapterName, agentName: tile.label, workspace: "", room: "" })).paneId;
+  const launch = await buildAdapterLaunch({ name: tile.adapterName, displayName: tile.label, accent: tile.accent, binary: tile.binary });
+  const sp = (await invoke<{ paneId: string }>("app.paneSpawn", { command: launch.command, args: [...launch.args, prompt], cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: tile.adapterName, agentName: tile.label, workspace: "", room: "" })).paneId;
   const r = await invoke<{ roomId: string }>("app.layoutMutate", { op: "createRoom", newPaneId: sp, name: roomName, roomId: "", targetPaneId: "", orientation: "", paneId: "", dir: 0, paneType: "terminal" });
   activeRoomId = r.roomId;
   await reload();

@@ -4,7 +4,7 @@ import { PaneCrashState, crashReasonText } from "./browser-crash";
 import { PermissionPromptQueue, formatPermissionKinds, permissionOrigin, type PermissionRequest } from "./browser-permissions";
 import { DownloadShelfState, downloadPercent, formatBytes, joinPath, type DownloadItem } from "./browser-downloads";
 
-export const browserWebviewRegistry = new Map<string, string>();
+export const browserWebviewRegistry = new Map<string, number>();
 
 export let browserDownloadsDir = "";
 export function setBrowserDownloadsDir(dir: string): void { browserDownloadsDir = dir; }
@@ -56,7 +56,21 @@ export class BrowserNavState {
   reloadUrl(): string { return this.current; }
 }
 
-interface WebViewPaneOpenResult { id: string }
+export function extractWebviewId(openResult: unknown): number | null {
+  if (typeof openResult === "number" && Number.isInteger(openResult)) return openResult;
+  if (openResult && typeof openResult === "object") {
+    const id = (openResult as { id?: unknown }).id;
+    if (typeof id === "number" && Number.isInteger(id)) return id;
+  }
+  return null;
+}
+
+export async function closeBrowserWebview(paneId: string): Promise<void> {
+  const id = browserWebviewRegistry.get(paneId);
+  if (id === undefined) return;
+  browserWebviewRegistry.delete(paneId);
+  await invoke("webviewPane.close", { id }).catch((err) => console.warn("webviewPane.close failed", paneId, err));
+}
 
 export async function renderBrowserPane(paneId: string, initialUrl: string, userAgent?: string): Promise<HTMLElement> {
   const el = document.createElement("div");
@@ -159,7 +173,7 @@ export async function renderBrowserPane(paneId: string, initialUrl: string, user
   const permQueue = new PermissionPromptQueue();
   const permTimers = new Map<string, ReturnType<typeof setTimeout>>();
   const downloads = new DownloadShelfState();
-  let webviewId: string | null = null;
+  let webviewId: number | null = null;
   let zoomLevel = 1.0;
   let devToolsOpen = false;
   let suspended = false;
@@ -187,11 +201,22 @@ export async function renderBrowserPane(paneId: string, initialUrl: string, user
 
   const openWebView = async (url: string) => {
     const storagePath = `/tmp/cove-webview-${paneId}`;
-    const openArgs: Record<string, unknown> = { url, x: 0, y: 0, width: 800, height: 600, storagePath, devTools: false, zoom: zoomLevel };
+    const rect = contentArea.getBoundingClientRect();
+    const openArgs: Record<string, unknown> = {
+      url,
+      x: Math.round(rect.x), y: Math.round(rect.y),
+      width: Math.max(1, Math.round(rect.width)), height: Math.max(1, Math.round(rect.height)),
+      storagePath, devTools: false, zoom: zoomLevel,
+    };
     if (userAgent && userAgent.length > 0) openArgs.userAgent = userAgent;
-    const result = await invoke<WebViewPaneOpenResult>("webviewPane.open", { options: openArgs });
-    webviewId = result.id;
-    browserWebviewRegistry.set(paneId, result.id);
+    const result = await invoke<unknown>("webviewPane.open", { options: openArgs });
+    const id = extractWebviewId(result);
+    if (id === null) {
+      console.error("webviewPane.open returned no usable id, pane stays blank", paneId, result);
+      return;
+    }
+    webviewId = id;
+    browserWebviewRegistry.set(paneId, id);
     syncBounds();
     const ro = new ResizeObserver(() => syncBounds());
     ro.observe(contentArea);
@@ -446,7 +471,7 @@ export async function renderBrowserPane(paneId: string, initialUrl: string, user
   visObserver.observe(el);
 
   window.__ryn.on("webviewPane.navigated", (data: unknown) => {
-    const evt = data as { id: string; url: string };
+    const evt = data as { id: number; url: string };
     if (evt.id !== webviewId) return;
     nav.navigate(evt.url);
     updateChrome();
@@ -455,20 +480,20 @@ export async function renderBrowserPane(paneId: string, initialUrl: string, user
   });
 
   window.__ryn.on("webviewPane.titleChanged", (data: unknown) => {
-    const evt = data as { id: string; title: string };
+    const evt = data as { id: number; title: string };
     if (evt.id !== webviewId) return;
     if (crashState.isCrashed) return;
     titleBar.textContent = evt.title;
   });
 
   window.__ryn.on("webviewPane.loadStateChanged", (data: unknown) => {
-    const evt = data as { id: string; state: string };
+    const evt = data as { id: number; state: string };
     if (evt.id !== webviewId) return;
     setLoading(evt.state === "started");
   });
 
   window.__ryn.on("webviewPane.faviconChanged", (data: unknown) => {
-    const evt = data as { id: string; dataUrl: string };
+    const evt = data as { id: number; dataUrl: string };
     if (evt.id !== webviewId) return;
     if (evt.dataUrl) {
       titleBar.style.backgroundImage = `url(${evt.dataUrl})`;
@@ -480,7 +505,7 @@ export async function renderBrowserPane(paneId: string, initialUrl: string, user
   });
 
   window.__ryn.on("webviewPane.closed", (data: unknown) => {
-    const evt = data as { id: string };
+    const evt = data as { id: number };
     if (evt.id !== webviewId) return;
     webviewId = null;
     contentArea.style.background = "#0d1117";
@@ -488,13 +513,13 @@ export async function renderBrowserPane(paneId: string, initialUrl: string, user
   });
 
   window.__ryn.on("webviewPane.processTerminated", (data: unknown) => {
-    const evt = data as { id: string; reason?: string };
+    const evt = data as { id: number; reason?: string };
     if (evt.id !== webviewId) return;
     enterCrash(evt.reason ?? null);
   });
 
   window.__ryn.on("webviewPane.permissionRequested", (data: unknown) => {
-    const evt = data as { id: string; requestId: string; kinds: string[]; url: string };
+    const evt = data as { id: number; requestId: string; kinds: string[]; url: string };
     if (evt.id !== webviewId) return;
     const req: PermissionRequest = { requestId: evt.requestId, kinds: evt.kinds ?? [], url: evt.url ?? nav.currentUrl };
     permQueue.add(req);
@@ -503,28 +528,28 @@ export async function renderBrowserPane(paneId: string, initialUrl: string, user
   });
 
   window.__ryn.on("webviewPane.downloadRequested", (data: unknown) => {
-    const evt = data as { id: string; downloadId: string; url: string; suggestedName: string };
+    const evt = data as { id: number; downloadId: string; url: string; suggestedName: string };
     if (evt.id !== webviewId) return;
     downloads.requested(evt.downloadId, evt.url, evt.suggestedName || "download");
     renderDownloadPrompt();
   });
 
   window.__ryn.on("webviewPane.downloadProgress", (data: unknown) => {
-    const evt = data as { id: string; downloadId: string; receivedBytes: number; totalBytes: number };
+    const evt = data as { id: number; downloadId: string; receivedBytes: number; totalBytes: number };
     if (evt.id !== webviewId) return;
     downloads.progress(evt.downloadId, evt.receivedBytes ?? 0, evt.totalBytes ?? 0);
     renderDownloadShelf();
   });
 
   window.__ryn.on("webviewPane.downloadCompleted", (data: unknown) => {
-    const evt = data as { id: string; downloadId: string; path?: string };
+    const evt = data as { id: number; downloadId: string; path?: string };
     if (evt.id !== webviewId) return;
     downloads.completed(evt.downloadId, evt.path);
     renderDownloadShelf();
   });
 
   window.__ryn.on("webviewPane.downloadFailed", (data: unknown) => {
-    const evt = data as { id: string; downloadId: string; reason?: string };
+    const evt = data as { id: number; downloadId: string; reason?: string };
     if (evt.id !== webviewId) return;
     downloads.failed(evt.downloadId, evt.reason ?? "download failed");
     renderDownloadShelf();
