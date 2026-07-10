@@ -11,7 +11,8 @@ public static class RegistryConstants
 }
 public sealed record Registry
 {
-    public int SchemaVersion { get; init; } = 1;
+    private readonly int _schemaVersion = 1;
+    public int SchemaVersion { get => _schemaVersion == 0 ? 1 : _schemaVersion; init => _schemaVersion = value; }
     public required IReadOnlyList<RegistryEntry> Adapters { get; init; }
 }
 

@@ -6,8 +6,10 @@ namespace Cove.Engine.Knowledge;
 
 public sealed class VaultSettings
 {
-    public string Depth { get; set; } = "standard";
-    public int Horizon { get; set; } = 30;
+    private string? _depth;
+    public string Depth { get => _depth ?? "standard"; set => _depth = value; }
+    private int? _horizon;
+    public int Horizon { get => _horizon ?? 30; set => _horizon = value; }
     public string? ExtractorVersion { get; set; }
 }
 

@@ -31,7 +31,8 @@ public abstract record MosaicNode;
 public sealed record SplitNode : MosaicNode
 {
     public required SplitOrientation Orientation { get; init; }
-    public double Ratio { get; init; } = 0.5;
+    private readonly double _ratio = 0.5;
+    public double Ratio { get => _ratio == 0 ? 0.5 : _ratio; init => _ratio = value; }
     public required MosaicNode ChildA { get; init; }
     public required MosaicNode ChildB { get; init; }
 }
@@ -39,7 +40,8 @@ public sealed record SplitNode : MosaicNode
 public sealed record PaneLeaf : MosaicNode
 {
     public required string PaneId { get; init; }
-    public IReadOnlyList<Subtab> Subtabs { get; init; } = System.Array.Empty<Subtab>();
+    private readonly IReadOnlyList<Subtab>? _subtabs;
+    public IReadOnlyList<Subtab> Subtabs { get => _subtabs ?? System.Array.Empty<Subtab>(); init => _subtabs = value; }
     public int ActiveSubtab { get; init; }
 }
 
@@ -57,12 +59,14 @@ public sealed record RoomSnapshot
 
 public sealed record WorkspaceSnapshot
 {
-    public int SchemaVersion { get; init; } = 1;
+    private readonly int _schemaVersion = 1;
+    public int SchemaVersion { get => _schemaVersion == 0 ? 1 : _schemaVersion; init => _schemaVersion = value; }
     public required string Id { get; init; }
     public required string Name { get; init; }
     public required string ProjectDir { get; init; }
     public string? ActiveRoomId { get; init; }
-    public IReadOnlyList<RoomSnapshot> Rooms { get; init; } = System.Array.Empty<RoomSnapshot>();
+    private readonly IReadOnlyList<RoomSnapshot>? _rooms;
+    public IReadOnlyList<RoomSnapshot> Rooms { get => _rooms ?? System.Array.Empty<RoomSnapshot>(); init => _rooms = value; }
 }
 
 public sealed class PaneTypeConverter : JsonConverter<PaneType>

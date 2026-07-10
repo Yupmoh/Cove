@@ -101,7 +101,8 @@ public sealed class SketchSvgSerializer
 
 public sealed record SketchScene
 {
-    public System.Collections.Generic.IReadOnlyList<SketchElement> Elements { get; init; } = [];
+    private readonly System.Collections.Generic.IReadOnlyList<SketchElement>? _elements;
+    public System.Collections.Generic.IReadOnlyList<SketchElement> Elements { get => _elements ?? []; init => _elements = value; }
     public SketchAppState? AppState { get; init; }
 }
 

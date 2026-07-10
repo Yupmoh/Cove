@@ -315,7 +315,8 @@ public sealed record NoteMeta
     public required string Title { get; init; }
     public required string WorkspaceId { get; init; }
     public required string Source { get; init; }
-    public string Kind { get; init; } = "markdown";
+    private readonly string? _kind;
+    public string Kind { get => _kind ?? "markdown"; init => _kind = value; }
     public System.DateTimeOffset CreatedAt { get; init; }
     public System.DateTimeOffset UpdatedAt { get; init; }
 }

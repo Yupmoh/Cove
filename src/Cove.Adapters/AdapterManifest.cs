@@ -51,8 +51,10 @@ public sealed record AdapterMethod
 
 public sealed record BinaryDiscovery
 {
-    public IReadOnlyList<string> Commands { get; init; } = [];
-    public IReadOnlyList<string> WellKnownPaths { get; init; } = [];
+    private readonly IReadOnlyList<string>? _commands;
+    public IReadOnlyList<string> Commands { get => _commands ?? []; init => _commands = value; }
+    private readonly IReadOnlyList<string>? _wellKnownPaths;
+    public IReadOnlyList<string> WellKnownPaths { get => _wellKnownPaths ?? []; init => _wellKnownPaths = value; }
     public string? VersionFlag { get; init; }
     public string? VersionRegex { get; init; }
 }
@@ -67,17 +69,20 @@ public sealed record AdapterRetention
 public sealed record SessionExtractor
 {
     public required string Script { get; init; }
-    public int SchemaVersion { get; init; } = 1;
+    private readonly int _schemaVersion = 1;
+    public int SchemaVersion { get => _schemaVersion == 0 ? 1 : _schemaVersion; init => _schemaVersion = value; }
 }
 
 public sealed record LauncherOptions
 {
-    public IReadOnlyDictionary<string, string> Static { get; init; } = new Dictionary<string, string>();
+    private readonly IReadOnlyDictionary<string, string>? _static;
+    public IReadOnlyDictionary<string, string> Static { get => _static ?? new Dictionary<string, string>(); init => _static = value; }
 }
 
 public sealed record RegistryEntry
 {
-    public int SchemaVersion { get; init; } = 1;
+    private readonly int _schemaVersion = 1;
+    public int SchemaVersion { get => _schemaVersion == 0 ? 1 : _schemaVersion; init => _schemaVersion = value; }
     public required string Name { get; init; }
     public required string DisplayName { get; init; }
     public required string Description { get; init; }
@@ -88,9 +93,12 @@ public sealed record RegistryEntry
     public string? MinAppVersion { get; init; }
     public bool Official { get; init; }
     public string? IconSvg { get; init; }
-    public IReadOnlyList<string> Models { get; init; } = [];
-    public IReadOnlyList<string> Platforms { get; init; } = [];
-    public IReadOnlyDictionary<string, InstallRecipe> Install { get; init; } = new Dictionary<string, InstallRecipe>();
+    private readonly IReadOnlyList<string>? _models;
+    public IReadOnlyList<string> Models { get => _models ?? []; init => _models = value; }
+    private readonly IReadOnlyList<string>? _platforms;
+    public IReadOnlyList<string> Platforms { get => _platforms ?? []; init => _platforms = value; }
+    private readonly IReadOnlyDictionary<string, InstallRecipe>? _install;
+    public IReadOnlyDictionary<string, InstallRecipe> Install { get => _install ?? new Dictionary<string, InstallRecipe>(); init => _install = value; }
 }
 
 public sealed record InstallRecipe
