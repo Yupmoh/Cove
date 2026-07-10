@@ -10,7 +10,7 @@ Verified against the Ryn source tree (Work/Ryn) on 2026-07-09. Only these remain
 
 | Feature IDs | Packet | Description |
 |---|---|---|
-| UX-03 | MC-P03 | Window vibrancy — no blur/acrylic/mica/NSVisualEffect API anywhere in Ryn; only `RynOptions.Transparent`. The portable opaque fallback is buildable now. |
+| UX-03 | MC-P03 | RESOLVED upstream: Ryn ships `SetBackdrop`/`GetBackdrop` with blur/acrylic/mica plus the `window.setBackdrop` IPC verb; the GUI launches with `BackdropMaterial.Blur` and exposes a backdrop toggle. Row kept for history — the 0.11-era "no vibrancy API" finding is stale. |
 | BR-23-41 | M7-P10-P14 | CDP-fidelity browser automation — WKWebView/WebView2 expose no CDP. `webviewPane.eval/execute` enables an injected-JS subset (no screenshot, no httpOnly cookies, `isTrusted=false`); adopting it is an owner decision. |
 | BR-53-57 | M7-P18 | CPU-throttle, occlusion, crash-recovery events — absent from WebViewPane. |
 | BR-58-60 (part) | M7-P19 | UA override + extensions — absent from WebViewPane. Per-pane sessions (≈incognito) work today via ephemeral `StoragePath`. |
