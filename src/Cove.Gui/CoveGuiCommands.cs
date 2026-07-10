@@ -55,9 +55,9 @@ public sealed class CoveGuiCommands
         => await Call("cove://commands/layout.get", null, ct);
 
     [RynCommand("app.layoutMutate")]
-    public async ValueTask<string> LayoutMutate(string op, string roomId, string targetPaneId, string newPaneId, string orientation, string name, string paneId, int dir, CancellationToken ct)
+    public async ValueTask<string> LayoutMutate(string op, string roomId, string targetPaneId, string newPaneId, string orientation, string name, string paneId, int dir, string paneType = "", CancellationToken ct = default)
     {
-        var mp = new LayoutMutateParams(op, N(roomId), N(targetPaneId), N(newPaneId), N(orientation), N(name), N(paneId), dir);
+        var mp = new LayoutMutateParams(op, N(roomId), N(targetPaneId), N(newPaneId), N(orientation), N(name), N(paneId), dir, N(paneType));
         var p = JsonSerializer.SerializeToElement(mp, CoveJsonContext.Default.LayoutMutateParams);
         return await Call("cove://commands/layout.mutate", p, ct);
     }
