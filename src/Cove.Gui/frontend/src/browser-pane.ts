@@ -12,10 +12,12 @@ export function setBrowserDownloadsDir(dir: string): void { browserDownloadsDir 
 const permissionAutoDenyMs = 30000;
 
 export function normalizeUrl(input: string): string {
-  if (input.length === 0) return "about:blank";
-  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(input)) return input;
-  if (input.startsWith("about:") || input.startsWith("file:")) return input;
-  return "https://" + input;
+  const trimmed = input.trim();
+  if (trimmed.length === 0) return "about:blank";
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed)) return trimmed;
+  if (trimmed.startsWith("about:") || trimmed.startsWith("file:")) return trimmed;
+  if (/\s/.test(trimmed) || !trimmed.includes(".")) return "https://duckduckgo.com/?q=" + encodeURIComponent(trimmed);
+  return "https://" + trimmed;
 }
 
 export class BrowserNavState {
@@ -200,12 +202,12 @@ export async function renderBrowserPane(paneId: string, initialUrl: string, user
     updateChrome();
     if (webviewId) {
       setLoading(true);
-      await invoke("webviewPane.navigate", { id: webviewId, url: nav.currentUrl }).catch(() => void 0);
+      await invoke("webviewPane.navigate", { id: webviewId, url: nav.currentUrl }).catch((err) => { console.warn("webview navigate failed", nav.currentUrl, err); setLoading(false); });
     } else {
       setLoading(true);
-      await openWebView(nav.currentUrl);
+      await openWebView(nav.currentUrl).catch((err) => { console.warn("webview open failed", nav.currentUrl, err); setLoading(false); });
     }
-    void invoke("cove://commands/browser.navigate", { paneId, url: nav.currentUrl }).catch(() => void 0);
+    void invoke("cove://commands/browser.navigate", { paneId, url: nav.currentUrl }).catch((err) => console.warn("engine browser.navigate failed", err));
   };
 
   const doBack = async () => {

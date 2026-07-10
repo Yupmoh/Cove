@@ -22,6 +22,15 @@ describe("normalizeUrl", () => {
   it("treats empty as about:blank", () => {
     expect(normalizeUrl("")).toBe("about:blank");
   });
+
+  it("turns search-looking input into a search query", () => {
+    expect(normalizeUrl("how to exit vim")).toBe("https://duckduckgo.com/?q=how%20to%20exit%20vim");
+    expect(normalizeUrl("coveterminal")).toBe("https://duckduckgo.com/?q=coveterminal");
+  });
+
+  it("trims whitespace around bare domains", () => {
+    expect(normalizeUrl("  google.com  ")).toBe("https://google.com");
+  });
 });
 
 describe("BrowserNavState", () => {
