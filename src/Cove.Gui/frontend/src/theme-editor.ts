@@ -25,14 +25,26 @@ export interface ThemeDraft {
   chromeAccent: string;
 }
 
+export const CATPPUCCIN_MOCHA: ThemeDto = {
+  name: "catppuccin-mocha",
+  type: "dark",
+  terminalBackground: "#1e1e2e",
+  terminalForeground: "#cdd6f4",
+  chromeSurface: "#181825",
+  chromeText: "#cdd6f4",
+  chromeAccent: "#cba6f7",
+};
+
+export const DEFAULT_THEME_NAME = "catppuccin-mocha";
+
 export const DEFAULT_DRAFT: ThemeDraft = {
   name: "",
   type: "dark",
-  terminalBackground: "#0b1622",
-  terminalForeground: "#e5e9f0",
-  chromeSurface: "#0e1c2e",
-  chromeText: "#e5e9f0",
-  chromeAccent: "#4cc2d6",
+  terminalBackground: "#1e1e2e",
+  terminalForeground: "#cdd6f4",
+  chromeSurface: "#181825",
+  chromeText: "#cdd6f4",
+  chromeAccent: "#cba6f7",
 };
 
 export function draftFromTheme(theme: ThemeDto): ThemeDraft {

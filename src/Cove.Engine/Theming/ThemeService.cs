@@ -26,6 +26,7 @@ public sealed class ThemeService
         _themesDir = System.IO.Path.Combine(dataDir, "themes");
         System.IO.Directory.CreateDirectory(_themesDir);
         _builtins = [
+            new Theme("catppuccin-mocha", "dark", "#1e1e2e", "#cdd6f4", "#181825", "#cdd6f4", "#cba6f7"),
             new Theme("cove-harbor", "dark", "#0b1622", "#e5e9f0", "#0b1622", "#e5e9f0", "#4a9eff"),
             new Theme("cove-daybreak", "light", "#ffffff", "#1a1a2e", "#ffffff", "#1a1a2e", "#2563eb"),
             new Theme("cove-midnight", "dark", "#0a0a1a", "#c0c0d0", "#0a0a1a", "#c0c0d0", "#7c3aed"),

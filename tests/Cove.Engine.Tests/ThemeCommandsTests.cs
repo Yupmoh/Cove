@@ -24,9 +24,9 @@ public sealed class ThemeCommandsTests
             var resp = await EngineCommandRouter.RouteAsync(new ControlRequest("r1", "cove://commands/theme.list"), themes: themes);
             Assert.True(resp!.Ok);
             var arr = resp.Data!.Value.GetProperty("themes");
-            Assert.Equal(6, arr.GetArrayLength());
+            Assert.Equal(7, arr.GetArrayLength());
             var first = arr[0];
-            Assert.Equal("cove-harbor", first.GetProperty("name").GetString());
+            Assert.Equal("catppuccin-mocha", first.GetProperty("name").GetString());
             Assert.Equal("dark", first.GetProperty("type").GetString());
         }
         finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
@@ -78,7 +78,7 @@ public sealed class ThemeCommandsTests
 
             var listResp = await EngineCommandRouter.RouteAsync(new ControlRequest("r2", "cove://commands/theme.list"), themes: themes);
             var arr = listResp!.Data!.Value.GetProperty("themes");
-            Assert.Equal(7, arr.GetArrayLength());
+            Assert.Equal(8, arr.GetArrayLength());
             Assert.Contains(arr.EnumerateArray(), t => t.GetProperty("name").GetString() == "my-theme");
 
             var reloaded = new ThemeService(dir);

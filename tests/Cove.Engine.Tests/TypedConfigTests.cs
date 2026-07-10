@@ -11,13 +11,13 @@ public sealed class TypedConfigTests
     private static string NewDir() => Path.Combine(Path.GetTempPath(), "cove-tcfg-" + Guid.NewGuid().ToString("N"));
 
     [Fact]
-    public void Theme_DefaultsToCove()
+    public void Theme_DefaultsToCatppuccinMocha()
     {
         var dir = NewDir();
         try
         {
             var cfg = new ConfigService(dir, NullLogger.Instance);
-            Assert.Equal("cove", cfg.GetTheme());
+            Assert.Equal("catppuccin-mocha", cfg.GetTheme());
         }
         finally { try { Directory.Delete(dir, true); } catch { } }
     }
@@ -109,7 +109,7 @@ public sealed class TypedConfigTests
             var path = Path.Combine(dir, "config.json");
             File.WriteAllText(path, "{ this is not valid json");
             var cfg = new ConfigService(dir, NullLogger.Instance);
-            Assert.Equal("cove", cfg.GetTheme());
+            Assert.Equal("catppuccin-mocha", cfg.GetTheme());
             Assert.False(cfg.IsWritable());
             cfg.SetTheme("dracula");
             Assert.False(cfg.IsWritable());

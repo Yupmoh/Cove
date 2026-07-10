@@ -9,11 +9,11 @@ public sealed class ThemeServiceTests
     private static string NewDir() => System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"cove-theme-{System.Guid.NewGuid():N}");
 
     [Fact]
-    public void ListBuiltins_Returns6Themes()
+    public void ListBuiltins_Returns7Themes()
     {
         var svc = new ThemeService(NewDir());
         var builtins = svc.ListBuiltins();
-        Assert.Equal(6, builtins.Count);
+        Assert.Equal(7, builtins.Count);
     }
 
     [Fact]
@@ -21,12 +21,26 @@ public sealed class ThemeServiceTests
     {
         var svc = new ThemeService(NewDir());
         var names = svc.ListBuiltins().Select(t => t.Name).ToList();
+        Assert.Contains("catppuccin-mocha", names);
         Assert.Contains("cove-harbor", names);
         Assert.Contains("cove-daybreak", names);
         Assert.Contains("cove-midnight", names);
         Assert.Contains("cove-shoal", names);
         Assert.Contains("cove-beacon", names);
         Assert.Contains("cove-chalk", names);
+    }
+
+    [Fact]
+    public void CatppuccinMocha_HasExpectedPalette()
+    {
+        var svc = new ThemeService(NewDir());
+        var theme = svc.Get("catppuccin-mocha");
+        Assert.NotNull(theme);
+        Assert.Equal("dark", theme!.Type);
+        Assert.Equal("#1e1e2e", theme.TerminalBackground);
+        Assert.Equal("#cdd6f4", theme.TerminalForeground);
+        Assert.Equal("#181825", theme.ChromeSurface);
+        Assert.Equal("#cba6f7", theme.ChromeAccent);
     }
 
     [Fact]
@@ -138,6 +152,13 @@ public sealed class ContrastValidatorTests
     {
         var ratio = ContrastValidator.ComputeContrastRatio("#888888", "#888888");
         Assert.Equal(1.0, ratio, 1);
+    }
+
+    [Fact]
+    public void CatppuccinMocha_TextOnSurface_MeetsAA()
+    {
+        var ratio = ContrastValidator.ComputeContrastRatio("#cdd6f4", "#181825");
+        Assert.True(ContrastValidator.MeetsAA(ratio), $"catppuccin-mocha contrast {ratio:F2} < 4.5");
     }
 
     [Fact]

@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
   DEFAULT_DRAFT,
+  DEFAULT_THEME_NAME,
+  CATPPUCCIN_MOCHA,
   draftFromTheme,
   themeFromDraft,
   cssVarsFromTheme,
@@ -39,6 +41,28 @@ describe("cssVarsFromTheme", () => {
     expect(vars["--panel"]).toBe("#0b1622");
     expect(vars["--fg"]).toBe("#e5e9f0");
     expect(vars["--accent"]).toBe("#4a9eff");
+  });
+});
+
+describe("catppuccin-mocha builtin", () => {
+  it("is the default theme name", () => {
+    expect(DEFAULT_THEME_NAME).toBe("catppuccin-mocha");
+    expect(CATPPUCCIN_MOCHA.name).toBe("catppuccin-mocha");
+    expect(DEFAULT_DRAFT.terminalBackground).toBe(CATPPUCCIN_MOCHA.terminalBackground);
+    expect(DEFAULT_DRAFT.chromeAccent).toBe(CATPPUCCIN_MOCHA.chromeAccent);
+  });
+  it("maps the official Mocha palette onto Cove variables", () => {
+    const vars = cssVarsFromTheme(CATPPUCCIN_MOCHA);
+    expect(vars["--bg"]).toBe("#1e1e2e");
+    expect(vars["--panel"]).toBe("#181825");
+    expect(vars["--fg"]).toBe("#cdd6f4");
+    expect(vars["--accent"]).toBe("#cba6f7");
+  });
+  it("round-trips through draft conversion losslessly", () => {
+    expect(themeFromDraft(draftFromTheme(CATPPUCCIN_MOCHA))).toEqual(CATPPUCCIN_MOCHA);
+  });
+  it("text on surface passes AA contrast", () => {
+    expect(contrastRatio(CATPPUCCIN_MOCHA.chromeText, CATPPUCCIN_MOCHA.chromeSurface)).toBeGreaterThanOrEqual(4.5);
   });
 });
 

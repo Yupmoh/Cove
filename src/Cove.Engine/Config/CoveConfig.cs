@@ -32,8 +32,8 @@ internal static class ConfigValueCoercion
 
 public sealed class CoveConfig
 {
-    [Setting("Theme", "appearance", "select", "Active theme name", Options = new[] { "cove-harbor", "cove-daybreak", "cove-midnight", "cove-shoal", "cove-beacon", "cove-chalk" })]
-    public string Theme { get; set; } = "cove";
+    [Setting("Theme", "appearance", "select", "Active theme name", Options = new[] { "catppuccin-mocha", "cove-harbor", "cove-daybreak", "cove-midnight", "cove-shoal", "cove-beacon", "cove-chalk" })]
+    public string Theme { get; set; } = "catppuccin-mocha";
 
     [Setting("Appearance", "appearance", "section", "Appearance settings")]
     public AppearanceSection Appearance { get; set; } = new();
@@ -74,7 +74,7 @@ public sealed class CoveConfig
             {
                 case "theme":
                     if (prop.Value.ValueKind == JsonValueKind.String)
-                        cfg.Theme = prop.Value.GetString() ?? "cove";
+                        cfg.Theme = prop.Value.GetString() ?? "catppuccin-mocha";
                     break;
                 case "appearance":
                     cfg.Appearance = AppearanceSection.Read(prop.Value);
