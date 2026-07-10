@@ -277,6 +277,15 @@ public sealed class WorkspaceManager : IAsyncDisposable
         return result;
     }
 
+    public async Task<bool> RenameWorkspaceAsync(string id, string name)
+    {
+        if (Get(id) is not { } actor)
+            return false;
+        await actor.Mutate(m => m with { Name = name }).ConfigureAwait(false);
+        _emit?.Invoke(new WorkspaceChange(WorkspaceChangeKind.Updated, id));
+        return true;
+    }
+
     public async Task<bool> SetWorkspaceHiddenAsync(string id, bool hidden)
     {
         if (Get(id) is not { } actor)

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { workspaceInitial, buildWorkspaceBoxes, type WorkspaceBoxInput } from "./workspace-boxes";
+import { workspaceInitial, buildWorkspaceBoxes, nextWorkspaceName, type WorkspaceBoxInput } from "./workspace-boxes";
 
 describe("workspaceInitial", () => {
   it("uppercases the first non-space character", () => {
@@ -30,5 +30,15 @@ describe("buildWorkspaceBoxes", () => {
   it("marks nothing active when the active id is unknown", () => {
     const boxes = buildWorkspaceBoxes(items, null);
     expect(boxes.some((b) => b.active)).toBe(false);
+  });
+});
+
+describe("nextWorkspaceName", () => {
+  it("uses the trimmed input when non-empty", () => {
+    expect(nextWorkspaceName("  Harbor  ", "old")).toBe("Harbor");
+  });
+  it("falls back to the current name for blank input", () => {
+    expect(nextWorkspaceName("   ", "old")).toBe("old");
+    expect(nextWorkspaceName("", "old")).toBe("old");
   });
 });

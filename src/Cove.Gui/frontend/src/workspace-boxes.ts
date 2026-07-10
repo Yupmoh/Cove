@@ -16,6 +16,11 @@ export function workspaceInitial(name: string): string {
   return trimmed[0].toUpperCase();
 }
 
+export function nextWorkspaceName(input: string, current: string): string {
+  const trimmed = input.trim();
+  return trimmed.length > 0 ? trimmed : current;
+}
+
 export function buildWorkspaceBoxes(items: WorkspaceBoxInput[], activeId: string | null): WorkspaceBox[] {
   return items.map((w) => ({
     id: w.id,

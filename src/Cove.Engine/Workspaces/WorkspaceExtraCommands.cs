@@ -19,6 +19,23 @@ public static class WorkspaceExtraCommands
             : ctx.Fail("not_found", $"workspace {p.Id} not found");
     }
 
+    [CoveCommand("cove://commands/workspace.rename")]
+    public static async Task<ControlResponse> WorkspaceRename(EngineDispatchContext ctx)
+    {
+        if (ctx.Workspaces is not { } manager)
+            return ctx.Fail("not_ready", "workspace manager unavailable");
+        if (ctx.Request.Params is not JsonElement el
+            || el.Deserialize(WorkspaceExtraJsonContext.Default.WorkspaceRenameParams) is not { } p)
+            return ctx.Fail("invalid_params", "id and name are required");
+        if (string.IsNullOrEmpty(p.Id))
+            return ctx.Fail("invalid_params", "id is required");
+        if (string.IsNullOrWhiteSpace(p.Name))
+            return ctx.Fail("invalid_params", "name is required");
+        return await manager.RenameWorkspaceAsync(p.Id, p.Name.Trim()).ConfigureAwait(false)
+            ? ctx.Ok()
+            : ctx.Fail("not_found", $"workspace {p.Id} not found");
+    }
+
     [CoveCommand("cove://commands/workspace.reorder")]
     public static async Task<ControlResponse> WorkspaceReorder(EngineDispatchContext ctx)
     {
@@ -73,6 +90,7 @@ public static class WorkspaceExtraCommands
 }
 
 public sealed record WorkspaceHideParams(string Id, bool Hidden);
+public sealed record WorkspaceRenameParams(string Id, string Name);
 public sealed record WorkspaceReorderParams(IReadOnlyList<string> OrderedIds);
 public sealed record WorkspaceIconParams(string Id, string? Kind = null, string? Value = null);
 public sealed record WorkspaceAccentParams(string Id, string? Accent = null);
@@ -83,6 +101,7 @@ public sealed record WorkspaceMoveRoomParams(string FromWorkspaceId, string Room
     WriteIndented = true,
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
 [JsonSerializable(typeof(WorkspaceHideParams))]
+[JsonSerializable(typeof(WorkspaceRenameParams))]
 [JsonSerializable(typeof(WorkspaceReorderParams))]
 [JsonSerializable(typeof(WorkspaceIconParams))]
 [JsonSerializable(typeof(WorkspaceAccentParams))]
