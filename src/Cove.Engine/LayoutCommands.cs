@@ -61,6 +61,7 @@ internal static class LayoutCommands
                 "promoteSubtab" => MutateOk(() => layout.PromoteSubtab(p.RoomId!, p.PaneId!, p.Dir, p.NewPaneId!), p.RoomId, ctx),
                 "centerDrop" => MutateOk(() => layout.CenterDrop(p.RoomId!, p.TargetPaneId!, p.Dir, p.PaneId!), p.RoomId, ctx),
                 "movePane" => MutateOk(() => layout.MovePane(p.RoomId!, p.PaneId!, p.TargetPaneId!, Orient(p.Orientation), p.Dir), p.RoomId, ctx),
+                "movePaneToRoom" => MutateOk(() => layout.MovePaneToRoom(p.PaneId!, p.RoomId!), p.RoomId, ctx),
                 "focus" => MutateOk(() => layout.FocusPane(p.RoomId!, p.PaneId!), p.RoomId, ctx),
                 "cycleFocus" => MutateOk(() => layout.CycleFocus(p.RoomId!, p.Dir), p.RoomId, ctx),
                 "zoom" => MutateOk(() => layout.SetZoom(p.RoomId!, p.PaneId), p.RoomId, ctx),

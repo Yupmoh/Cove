@@ -257,6 +257,56 @@ public sealed class LayoutService
         OnChanged?.Invoke();
     }
 
+    public void MovePaneToRoom(string paneId, string targetRoomId)
+    {
+        lock (_sync)
+        {
+            var (_, targetRoom) = GetRoomOrThrow(targetRoomId);
+            RoomState? sourceRoom = null;
+            foreach (var bucket in _buckets.Values)
+            {
+                foreach (var rs in bucket.Rooms.Values)
+                {
+                    if (MosaicOps.Find(rs.Root, paneId) is not null)
+                    {
+                        sourceRoom = rs;
+                        break;
+                    }
+                }
+                if (sourceRoom is not null)
+                    break;
+            }
+            if (sourceRoom is null)
+                throw new KeyNotFoundException($"unknown pane {paneId}");
+            if (ReferenceEquals(sourceRoom, targetRoom))
+                throw new InvalidOperationException("pane is already in the target room");
+            var moved = MosaicOps.Find(sourceRoom.Root, paneId)!;
+            var without = MosaicOps.Close(sourceRoom.Root, paneId);
+            if (without is null)
+            {
+                sourceRoom.Root = MakeEmptyLeaf();
+                sourceRoom.ActivePaneId = ((PaneLeaf)sourceRoom.Root).PaneId;
+                sourceRoom.ZoomedPaneId = null;
+            }
+            else
+            {
+                sourceRoom.Root = without;
+                if (sourceRoom.ActivePaneId == paneId)
+                {
+                    var leaves = MosaicOps.Leaves(without);
+                    sourceRoom.ActivePaneId = leaves.Count > 0 ? leaves[0].PaneId : null;
+                }
+            }
+            if (IsEmptyRoom(targetRoom.Root))
+                targetRoom.Root = moved;
+            else
+                targetRoom.Root = new SplitNode { Orientation = SplitOrientation.Row, Ratio = 0.5, ChildA = targetRoom.Root, ChildB = moved };
+            targetRoom.ActivePaneId = paneId;
+            targetRoom.ZoomedPaneId = null;
+        }
+        OnChanged?.Invoke();
+    }
+
     public void ClosePane(string roomId, string paneId)
     {
         lock (_sync)
