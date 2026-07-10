@@ -2406,8 +2406,12 @@ function closeSettings(): void {
   settingsEl.classList.remove("open");
   if (focusedPaneId) panes.get(focusedPaneId)?.term.focus();
 }
+function isRealSetting(e: ConfigSchemaEntry): boolean {
+  return e.control !== "section" && e.type !== "object";
+}
+
 function renderSettings(): void {
-  const schemaTabs = [...new Set(configSchema.map((e) => e.tab))].sort();
+  const schemaTabs = [...new Set(configSchema.filter(isRealSetting).map((e) => e.tab))].sort();
   const tabs = schemaTabs.includes("theme") ? (schemaTabs.includes("keyboard") ? schemaTabs : ["theme", "keyboard", ...schemaTabs]) : (schemaTabs.includes("keyboard") ? ["theme", ...schemaTabs] : ["theme", "keyboard", ...schemaTabs]);
   if (tabs.length === 0) {
     setTabsEl.innerHTML = "";
@@ -2434,7 +2438,7 @@ function renderSettings(): void {
     renderKeyboardEditor(setBodyEl);
     return;
   }
-  const entries = configSchema.filter((e) => e.tab === activeSettingsTab);
+  const entries = configSchema.filter((e) => e.tab === activeSettingsTab && (e.control === "section" || isRealSetting(e)));
   for (const entry of entries) {
     if (entry.control === "section") {
       const header = document.createElement("div");
@@ -4153,6 +4157,15 @@ function renderTitleCluster(): void {
       find.addEventListener("click", (e) => { e.stopPropagation(); runAction(tool.action); });
       cluster.appendChild(find);
     } else {
+      if (tool.id === "zoom-in") {
+        const pct = document.createElement("div");
+        pct.id = "tb-zoom-label";
+        pct.title = "Current app zoom — click to reset";
+        pct.setAttribute("data-webview-ignore", "");
+        pct.textContent = `${Math.round(appZoom * 100)}%`;
+        pct.addEventListener("click", (e) => { e.stopPropagation(); appZoom = 1; applyAppZoom(); });
+        right.appendChild(pct);
+      }
       const btn = document.createElement("div");
       btn.className = "tbtn tb-cluster-btn" + (tool.id === "update" ? " tb-update" : "");
       btn.title = tool.title;
@@ -4174,6 +4187,8 @@ function applyAppZoom(): void {
   appZoom = Math.min(1.5, Math.max(0.7, Math.round(appZoom * 10) / 10));
   (document.body.style as CSSStyleDeclaration & { zoom: string }).zoom = String(appZoom);
   localStorage.setItem("cove.appZoom", String(appZoom));
+  const label = document.getElementById("tb-zoom-label");
+  if (label) label.textContent = `${Math.round(appZoom * 100)}%`;
   fitAll();
 }
 
