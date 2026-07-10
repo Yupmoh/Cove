@@ -1,6 +1,7 @@
 export interface WorkspaceBoxInput {
   id: string;
   name: string;
+  projectDir?: string;
 }
 
 export interface WorkspaceBox {

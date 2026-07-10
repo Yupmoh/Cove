@@ -33,7 +33,8 @@ import { initialSidebarModel, selectLeftMode, toggleSide, setCollapsed, setWidth
 import { nextWorkspaceName, type WorkspaceBoxInput } from "./workspace-boxes";
 import { clampMenuPosition, normalizeItems, firstSelectableIndex, moveSelection as ctxMoveSelection, activeItem, type ContextMenuItem, type ContextMenuModel } from "./context-menu";
 import { buildWorkspaceTree, workspaceTreeEmptyMessage, type TreeLeaf, type TreeRoomInput } from "./workspace-tree";
-import { buildAgentRows, agentStateCounts, AGENT_STATE_META, type AgentCard, type AgentRow } from "./agents-model";
+import { buildAgentRows, agentStateCounts, AGENT_STATE_META, type AgentCard, type AgentRow, type AgentState } from "./agents-model";
+import { splitWorkspaceCards, workspaceAccent, sortFsEntries, joinPath, dirBasename, type FsEntry, type WorkspaceCardEntry } from "./workspace-cards";
 import { parseQuery, filterAndSort, MruTracker, cycleCategory, categoryLabel, type PaletteItem } from "./omni-palette";
 import { buildEmptyState, EmptyStateMessages } from "./empty-states";
 import { brandLogoAt, nextBrandIndex, parseBrandIndex } from "./brand";
@@ -920,6 +921,7 @@ function renderNode(node: MosaicNode): HTMLElement {
     if (active.paneType === "video") return renderVideoPane(paneFilePaths.get(active.documentId) ?? active.title ?? active.documentId);
     if (isEmpty) return emptyPaneStrip(node.paneId);
     const activeEl = getPane(subs[activeIdx].documentId).el;
+    activeEl.style.flexGrow = "1";
     if (subs.length <= 1) return activeEl;
     const wrap = document.createElement("div");
     wrap.className = "leaf-wrap";
@@ -1014,7 +1016,9 @@ function renderRoom(): void {
     const treeIds = collectLeafIds(room.layoutTree);
     const zid = room.zoomedPaneId;
     if (zid && treeIds.includes(zid)) {
-      gridEl.appendChild(getPane(zid).el);
+      const zoomEl = getPane(zid).el;
+      zoomEl.style.flexGrow = "1";
+      gridEl.appendChild(zoomEl);
       focusedPaneId = zid;
       zoomed = true;
     } else {
@@ -1345,8 +1349,8 @@ let workspaceBoxItems: WorkspaceBoxInput[] = [];
 
 async function loadWorkspaceBoxes(): Promise<void> {
   try {
-    const res = await invoke<{ workspaces: { id: string; name: string }[] }>("cove://commands/workspace.list", {});
-    workspaceBoxItems = (res.workspaces ?? []).map((w) => ({ id: w.id, name: w.name }));
+    const res = await invoke<{ workspaces: { id: string; name: string; projectDir?: string }[] }>("cove://commands/workspace.list", {});
+    workspaceBoxItems = (res.workspaces ?? []).map((w) => ({ id: w.id, name: w.name, projectDir: w.projectDir }));
   } catch { workspaceBoxItems = []; }
   renderSidebarContent("left");
 }
@@ -1530,41 +1534,198 @@ function roomLeaves(room: RoomSnapshot): TreeLeaf[] {
   return collect(room.layoutTree);
 }
 
+const fsExpandedDirs = new Set<string>(JSON.parse(localStorage.getItem("cove.files.expanded") ?? "[]"));
+let fsFilesCollapsed = localStorage.getItem("cove.files.collapsed") === "true";
+const fsDirCache = new Map<string, { entries: FsEntry[]; truncated: boolean }>();
+const fsDirLoading = new Set<string>();
+
+function requestFsDir(path: string): void {
+  if (fsDirCache.has(path) || fsDirLoading.has(path)) return;
+  fsDirLoading.add(path);
+  void invoke<{ entries: FsEntry[]; truncated: boolean; error: string | null }>("app.fsList", { path })
+    .then((r) => {
+      if (r.error) console.warn("fs list failed", path, r.error);
+      fsDirCache.set(path, { entries: sortFsEntries(r.entries ?? []), truncated: !!r.truncated });
+    })
+    .catch((err) => {
+      console.warn("fs list failed", path, err);
+      fsDirCache.set(path, { entries: [], truncated: false });
+    })
+    .finally(() => {
+      fsDirLoading.delete(path);
+      renderSidebarContent("left");
+    });
+}
+
+function renderFsLevel(host: HTMLElement, dir: string, depth: number): void {
+  const cached = fsDirCache.get(dir);
+  if (!cached) {
+    requestFsDir(dir);
+    const loading = document.createElement("div");
+    loading.className = "fs-row fs-note";
+    loading.style.paddingLeft = `${10 + depth * 14}px`;
+    loading.textContent = "loading…";
+    host.appendChild(loading);
+    return;
+  }
+  for (const entry of cached.entries) {
+    const full = joinPath(dir, entry.name);
+    const row = document.createElement("div");
+    row.className = "fs-row" + (entry.isDir ? " fs-dir" : " fs-file");
+    row.style.paddingLeft = `${10 + depth * 14}px`;
+    const chev = document.createElement("span");
+    chev.className = "tw-chevron" + (entry.isDir ? "" : " tw-spacer");
+    if (entry.isDir) chev.textContent = fsExpandedDirs.has(full) ? "▾" : "▸";
+    row.appendChild(chev);
+    const ic = document.createElement("span");
+    ic.className = "fs-ic";
+    ic.innerHTML = iconSvg(entry.isDir ? "folder" : "file");
+    row.appendChild(ic);
+    const label = document.createElement("span");
+    label.className = "tw-label";
+    label.textContent = entry.name;
+    row.appendChild(label);
+    row.addEventListener("click", () => {
+      if (entry.isDir) {
+        if (fsExpandedDirs.has(full)) fsExpandedDirs.delete(full);
+        else fsExpandedDirs.add(full);
+        localStorage.setItem("cove.files.expanded", JSON.stringify([...fsExpandedDirs]));
+        renderSidebarContent("left");
+      } else {
+        void openFileInEditor(full);
+      }
+    });
+    host.appendChild(row);
+    if (entry.isDir && fsExpandedDirs.has(full) && depth < 12) renderFsLevel(host, full, depth + 1);
+  }
+  if (cached.truncated) {
+    const more = document.createElement("div");
+    more.className = "fs-row fs-note";
+    more.style.paddingLeft = `${10 + depth * 14}px`;
+    more.textContent = "… more entries not shown";
+    host.appendChild(more);
+  }
+}
+
+function agentStateByPane(): Map<string, AgentState> {
+  return new Map(buildAgentRows(agentCards, needsInputPanes).map((r) => [r.paneId, r.state]));
+}
+
 function renderWorkspacesContent(container: HTMLElement): void {
   container.appendChild(sidebarHead("Workspace", [{ icon: "+", title: "New workspace", run: () => void newWorkspace() }]));
-  const list = document.createElement("div");
-  list.className = "sb-list";
   const emptyMessage = workspaceTreeEmptyMessage(workspaceBoxItems.length);
   if (emptyMessage) {
+    const list = document.createElement("div");
+    list.className = "sb-list";
     list.appendChild(buildEmptyState({ message: emptyMessage }));
     container.appendChild(list);
     return;
   }
+  const cards = splitWorkspaceCards(
+    workspaceBoxItems.map((w) => ({ id: w.id, name: w.name, projectDir: w.projectDir ?? "" })),
+    layout?.id ?? null,
+  );
+  const scroll = document.createElement("div");
+  scroll.className = "sb-list ws-card-scroll";
+  if (cards.active) scroll.appendChild(renderActiveWorkspaceCard(cards.active));
+  container.appendChild(scroll);
+  if (cards.others.length > 0) container.appendChild(renderWorkspaceDock(cards.others));
+}
+
+function wireWorkspaceCardDrag(el: HTMLElement, wid: string): void {
+  el.draggable = true;
+  el.addEventListener("dragstart", (e) => {
+    draggingWorkspaceId = wid;
+    if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
+  });
+  el.addEventListener("dragend", () => { draggingWorkspaceId = null; });
+  el.addEventListener("dragover", (e) => {
+    if (!draggingWorkspaceId || draggingWorkspaceId === wid) return;
+    e.preventDefault();
+    el.classList.add("drag-over");
+  });
+  el.addEventListener("dragleave", () => el.classList.remove("drag-over"));
+  el.addEventListener("drop", (e) => {
+    e.preventDefault();
+    el.classList.remove("drag-over");
+    if (!draggingWorkspaceId || draggingWorkspaceId === wid) return;
+    void reorderWorkspaces(draggingWorkspaceId, wid);
+    draggingWorkspaceId = null;
+  });
+}
+
+function workspaceCardHead(ws: WorkspaceCardEntry, mini: boolean): HTMLElement {
+  const head = document.createElement("div");
+  head.className = "ws-card-head";
+  const swatch = document.createElement("span");
+  swatch.className = "ws-card-swatch";
+  head.appendChild(swatch);
+  const titles = document.createElement("div");
+  titles.className = "ws-card-titles";
+  const name = document.createElement("span");
+  name.className = "ws-card-name";
+  name.textContent = ws.name;
+  titles.appendChild(name);
+  const dir = document.createElement("span");
+  dir.className = "ws-card-dir";
+  dir.textContent = dirBasename(ws.projectDir) || "no directory";
+  dir.title = ws.projectDir;
+  titles.appendChild(dir);
+  head.appendChild(titles);
+  head.addEventListener("contextmenu", (e) => {
+    openContextMenuAt(e, [
+      { id: "new-room", label: "New room", disabled: mini },
+      { id: "rename", label: "Rename" },
+      { id: "sep", label: "", separator: true },
+      { id: "close-ws", label: "Close workspace", danger: true },
+    ], (id) => {
+      if (id === "new-room") void newRoom();
+      else if (id === "rename") startWorkspaceRename(ws.id, name, ws.name);
+      else if (id === "close-ws") void deleteWorkspace(ws.id);
+    });
+  });
+  return head;
+}
+
+function renderActiveWorkspaceCard(ws: WorkspaceCardEntry): HTMLElement {
+  const card = document.createElement("div");
+  card.className = "ws-card ws-card-active" + (treeWorkspaceCollapsed ? " collapsed" : "");
+  card.style.setProperty("--ws-accent", workspaceAccent(ws.id));
+  const head = workspaceCardHead(ws, false);
+  head.addEventListener("click", () => {
+    treeWorkspaceCollapsed = !treeWorkspaceCollapsed;
+    localStorage.setItem("cove.tree.workspaceCollapsed", String(treeWorkspaceCollapsed));
+    renderSidebarContent("left");
+  });
+  card.appendChild(head);
+  wireWorkspaceCardDrag(card, ws.id);
+  if (treeWorkspaceCollapsed) return card;
+
+  const body = document.createElement("div");
+  body.className = "ws-card-body";
   const rooms: TreeRoomInput[] = (layout?.rooms ?? []).map((r) => ({ id: r.id, name: roomTabName(r), leaves: roomLeaves(r) }));
   const rows = buildWorkspaceTree({
-    workspaceName: layout?.name || "Workspace",
+    workspaceName: ws.name,
     activeRoomId,
     focusedPaneId,
     rooms,
     collapsedRoomIds: collapsedTreeRooms,
-    workspaceCollapsed: treeWorkspaceCollapsed,
-    workspaces: workspaceBoxItems,
-    activeWorkspaceId: layout?.id ?? null,
-  });
+    workspaceCollapsed: false,
+    workspaces: [{ id: ws.id, name: ws.name }],
+    activeWorkspaceId: ws.id,
+  }).filter((r) => r.kind !== "workspace");
+  const paneStates = agentStateByPane();
   for (const row of rows) {
     const rowEl = document.createElement("div");
     rowEl.className = `tree-row kind-${row.kind}` + (row.active ? " active" : "") + (row.collapsed ? " collapsed" : "");
-    rowEl.style.paddingLeft = `${8 + row.depth * 14}px`;
+    rowEl.style.paddingLeft = `${6 + (row.depth - 1) * 14}px`;
     if (row.expandable) {
       const chev = document.createElement("span");
       chev.className = "tw-chevron";
       chev.textContent = "▾";
       chev.addEventListener("click", (e) => {
         e.stopPropagation();
-        if (row.kind === "workspace") {
-          treeWorkspaceCollapsed = !treeWorkspaceCollapsed;
-          localStorage.setItem("cove.tree.workspaceCollapsed", String(treeWorkspaceCollapsed));
-        } else if (row.roomId) {
+        if (row.roomId) {
           if (collapsedTreeRooms.has(row.roomId)) collapsedTreeRooms.delete(row.roomId);
           else collapsedTreeRooms.add(row.roomId);
           localStorage.setItem("cove.tree.collapsedRooms", JSON.stringify([...collapsedTreeRooms]));
@@ -1575,14 +1736,19 @@ function renderWorkspacesContent(container: HTMLElement): void {
     } else {
       const spacer = document.createElement("span");
       spacer.className = "tw-chevron tw-spacer";
-      spacer.textContent = row.kind === "pane" ? "" : "";
       rowEl.appendChild(spacer);
     }
-    if (row.kind === "pane" || row.kind === "room") {
-      const dot = document.createElement("span");
-      dot.className = "tw-dot";
-      rowEl.appendChild(dot);
+    const dot = document.createElement("span");
+    dot.className = "tw-dot";
+    if (row.kind === "pane" && row.paneId) {
+      const st = paneStates.get(row.paneId);
+      if (st) {
+        dot.style.background = AGENT_STATE_META[st].color;
+        dot.classList.add("tw-dot-agent");
+        rowEl.title = AGENT_STATE_META[st].label;
+      }
     }
+    rowEl.appendChild(dot);
     const label = document.createElement("span");
     label.className = "tw-label";
     label.textContent = row.label;
@@ -1593,35 +1759,7 @@ function renderWorkspacesContent(container: HTMLElement): void {
       count.textContent = String(row.count);
       rowEl.appendChild(count);
     }
-    rowEl.addEventListener("click", () => {
-      if (row.kind === "workspace" && row.workspaceId && layout?.id && row.workspaceId !== layout.id) {
-        void switchWorkspace(row.workspaceId);
-        return;
-      }
-      onTreeRowClick(row.kind, row.roomId, row.paneId, row.expandable);
-    });
-    if (row.kind === "workspace" && row.workspaceId) {
-      const wid = row.workspaceId;
-      rowEl.draggable = true;
-      rowEl.addEventListener("dragstart", (e) => {
-        draggingWorkspaceId = wid;
-        if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
-      });
-      rowEl.addEventListener("dragend", () => { draggingWorkspaceId = null; });
-      rowEl.addEventListener("dragover", (e) => {
-        if (!draggingWorkspaceId || draggingWorkspaceId === wid) return;
-        e.preventDefault();
-        rowEl.classList.add("drag-over");
-      });
-      rowEl.addEventListener("dragleave", () => rowEl.classList.remove("drag-over"));
-      rowEl.addEventListener("drop", (e) => {
-        e.preventDefault();
-        rowEl.classList.remove("drag-over");
-        if (!draggingWorkspaceId || draggingWorkspaceId === wid) return;
-        void reorderWorkspaces(draggingWorkspaceId, wid);
-        draggingWorkspaceId = null;
-      });
-    }
+    rowEl.addEventListener("click", () => onTreeRowClick(row.kind, row.roomId, row.paneId, row.expandable));
     if (row.kind === "room" && row.roomId) {
       const rid = row.roomId;
       rowEl.draggable = true;
@@ -1644,36 +1782,62 @@ function renderWorkspacesContent(container: HTMLElement): void {
         treeDragRoomId = null;
       });
     }
-    if (row.kind !== "workspace") {
-      rowEl.addEventListener("contextmenu", (e) => {
-        openContextMenuAt(e, [
-          { id: "focus", label: "Go to" },
-          { id: "close", label: "Close", danger: true },
-        ], (id) => {
-          if (id === "focus") focusTreeRow(row.kind, row.roomId, row.paneId);
-          else if (id === "close") closeTreeRow(row.kind, row.roomId, row.paneId);
-        });
+    rowEl.addEventListener("contextmenu", (e) => {
+      openContextMenuAt(e, [
+        { id: "focus", label: "Go to" },
+        { id: "close", label: "Close", danger: true },
+      ], (id) => {
+        if (id === "focus") focusTreeRow(row.kind, row.roomId, row.paneId);
+        else if (id === "close") closeTreeRow(row.kind, row.roomId, row.paneId);
       });
-    } else {
-      rowEl.addEventListener("contextmenu", (e) => {
-        const isActiveWs = row.workspaceId === (layout?.id ?? null) || workspaceBoxItems.length <= 1;
-        openContextMenuAt(e, [
-          { id: "new-room", label: "New room", disabled: !isActiveWs },
-          { id: "rename", label: "Rename" },
-          { id: "toggle", label: row.collapsed ? "Expand" : "Collapse", disabled: !isActiveWs },
-          { id: "sep", label: "", separator: true },
-          { id: "close-ws", label: "Close workspace", danger: true },
-        ], (id) => {
-          if (id === "new-room") void newRoom();
-          else if (id === "rename" && row.workspaceId) startWorkspaceRename(row.workspaceId, rowEl.querySelector(".tw-label") as HTMLElement, row.label);
-          else if (id === "toggle") onTreeRowClick("workspace", null, null, true);
-          else if (id === "close-ws" && row.workspaceId) void deleteWorkspace(row.workspaceId);
-        });
-      });
-    }
-    list.appendChild(rowEl);
+    });
+    body.appendChild(rowEl);
   }
-  container.appendChild(list);
+
+  const filesHead = document.createElement("div");
+  filesHead.className = "ws-files-head" + (fsFilesCollapsed ? " collapsed" : "");
+  const filesChev = document.createElement("span");
+  filesChev.className = "tw-chevron";
+  filesChev.textContent = fsFilesCollapsed ? "▸" : "▾";
+  filesHead.appendChild(filesChev);
+  const filesLabel = document.createElement("span");
+  filesLabel.textContent = "Files";
+  filesHead.appendChild(filesLabel);
+  filesHead.addEventListener("click", () => {
+    fsFilesCollapsed = !fsFilesCollapsed;
+    localStorage.setItem("cove.files.collapsed", String(fsFilesCollapsed));
+    renderSidebarContent("left");
+  });
+  body.appendChild(filesHead);
+  if (!fsFilesCollapsed) {
+    const filesHost = document.createElement("div");
+    filesHost.className = "ws-files";
+    if (ws.projectDir) renderFsLevel(filesHost, ws.projectDir, 0);
+    else {
+      const none = document.createElement("div");
+      none.className = "fs-row fs-note";
+      none.textContent = "no workspace directory";
+      filesHost.appendChild(none);
+    }
+    body.appendChild(filesHost);
+  }
+  card.appendChild(body);
+  return card;
+}
+
+function renderWorkspaceDock(others: WorkspaceCardEntry[]): HTMLElement {
+  const dock = document.createElement("div");
+  dock.className = "ws-dock";
+  for (const w of others) {
+    const mini = document.createElement("div");
+    mini.className = "ws-card ws-card-mini";
+    mini.style.setProperty("--ws-accent", workspaceAccent(w.id));
+    mini.appendChild(workspaceCardHead(w, true));
+    mini.addEventListener("click", () => void switchWorkspace(w.id));
+    wireWorkspaceCardDrag(mini, w.id);
+    dock.appendChild(mini);
+  }
+  return dock;
 }
 
 function onTreeRowClick(kind: string, roomId: string | null, paneId: string | null, expandable: boolean): void {

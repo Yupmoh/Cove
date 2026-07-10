@@ -119,6 +119,10 @@ public sealed class CoveGuiCommands
 
     private static string? N(string s) => string.IsNullOrEmpty(s) ? null : s;
 
+    [RynCommand("app.fsList")]
+    public ValueTask<string> FsList(string path)
+        => ValueTask.FromResult(FsListing.ListDirectory(path, 400));
+
     [RynCommand("app.adapterList")]
     public async ValueTask<string> AdapterList(CancellationToken ct)
         => await Call("cove://commands/adapter.list", null, ct);
