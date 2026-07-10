@@ -14,4 +14,15 @@ public static class EngineCommandCatalogue
             return list;
         }
     }
+
+    public static IReadOnlyList<string> RegisteredRoutes
+    {
+        get
+        {
+            var list = new System.Collections.Generic.List<string>(CoveCommandRegistry.Handlers.Count);
+            foreach (var key in CoveCommandRegistry.Handlers.Keys)
+                list.Add(key);
+            return list;
+        }
+    }
 }
