@@ -1,0 +1,35 @@
+{
+  "sdkVersion": 2,
+  "name": "omp",
+  "displayName": "omp",
+  "description": "oh-my-pi (pi-coding-agent) interactive coding CLI.",
+  "accent": "#cba6f7",
+  "binary": "omp",
+  "version": "1.0.0",
+  "author": "Cove",
+  "binaryDiscovery": {
+    "commands": ["omp"],
+    "wellKnownPaths": [
+      "~/.bun/bin",
+      "/opt/homebrew/bin",
+      "/usr/local/bin",
+      "~/.npm-global/bin"
+    ],
+    "versionFlag": "--version",
+    "versionRegex": "(\\d+\\.\\d+\\.\\d+)"
+  },
+  "hooks": {
+    "session-start": "cove://hooks/omp/session-start",
+    "session-end": "cove://hooks/omp/session-end",
+    "user-prompt-submit": "cove://hooks/omp/user-prompt-submit",
+    "pre-tool-use": "cove://hooks/omp/pre-tool-use",
+    "post-tool-use": "cove://hooks/omp/post-tool-use",
+    "stop": "cove://hooks/omp/stop"
+  },
+  "methods": {
+    "list_recent_sessions": { "script": "list_recent_sessions.sh" },
+    "build_launch_command": { "script": "build_launch_command.sh" },
+    "build_resume_command": { "script": "build_resume_command.sh" },
+    "launcher_options": { "static": "launcher_options.json" }
+  }
+}

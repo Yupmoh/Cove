@@ -1,0 +1,35 @@
+{
+  "sdkVersion": 2,
+  "name": "codex",
+  "displayName": "Codex",
+  "description": "OpenAI Codex agentic coding CLI.",
+  "accent": "#a6e3a1",
+  "binary": "codex",
+  "version": "1.0.0",
+  "author": "Cove",
+  "binaryDiscovery": {
+    "commands": ["codex"],
+    "wellKnownPaths": [
+      "/opt/homebrew/bin",
+      "/usr/local/bin",
+      "~/.bun/bin",
+      "~/.npm-global/bin"
+    ],
+    "versionFlag": "--version",
+    "versionRegex": "(\\d+\\.\\d+\\.\\d+)"
+  },
+  "hooks": {
+    "session-start": "cove://hooks/codex/session-start",
+    "session-end": "cove://hooks/codex/session-end",
+    "user-prompt-submit": "cove://hooks/codex/user-prompt-submit",
+    "pre-tool-use": "cove://hooks/codex/pre-tool-use",
+    "post-tool-use": "cove://hooks/codex/post-tool-use",
+    "stop": "cove://hooks/codex/stop"
+  },
+  "methods": {
+    "list_recent_sessions": { "script": "list_recent_sessions.sh" },
+    "build_launch_command": { "script": "build_launch_command.sh" },
+    "build_resume_command": { "script": "build_resume_command.sh" },
+    "launcher_options": { "static": "launcher_options.json" }
+  }
+}

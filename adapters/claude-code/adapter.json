@@ -1,0 +1,38 @@
+{
+  "sdkVersion": 2,
+  "name": "claude-code",
+  "displayName": "Claude Code",
+  "description": "Anthropic's Claude Code agentic coding CLI.",
+  "accent": "#fab387",
+  "binary": "claude",
+  "version": "1.0.0",
+  "author": "Cove",
+  "skillInstallPath": "~/.claude/skills/cove/SKILL.md",
+  "skillsDir": "~/.claude/skills",
+  "binaryDiscovery": {
+    "commands": ["claude"],
+    "wellKnownPaths": [
+      "/opt/homebrew/bin",
+      "/usr/local/bin",
+      "~/.claude/local",
+      "~/.bun/bin",
+      "~/.npm-global/bin"
+    ],
+    "versionFlag": "--version",
+    "versionRegex": "(\\d+\\.\\d+\\.\\d+)"
+  },
+  "hooks": {
+    "session-start": "cove://hooks/claude-code/session-start",
+    "session-end": "cove://hooks/claude-code/session-end",
+    "user-prompt-submit": "cove://hooks/claude-code/user-prompt-submit",
+    "pre-tool-use": "cove://hooks/claude-code/pre-tool-use",
+    "post-tool-use": "cove://hooks/claude-code/post-tool-use",
+    "stop": "cove://hooks/claude-code/stop"
+  },
+  "methods": {
+    "list_recent_sessions": { "script": "list_recent_sessions.sh" },
+    "build_launch_command": { "script": "build_launch_command.sh" },
+    "build_resume_command": { "script": "build_resume_command.sh" },
+    "launcher_options": { "static": "launcher_options.json" }
+  }
+}

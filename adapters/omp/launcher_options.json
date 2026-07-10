@@ -1,0 +1,11 @@
+{
+  "options": [
+    {
+      "key": "continue",
+      "label": "Continue previous session",
+      "type": "toggle",
+      "default": false,
+      "description": "Resume the most recent omp session on launch (--continue)."
+    }
+  ]
+}

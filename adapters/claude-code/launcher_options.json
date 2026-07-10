@@ -1,0 +1,17 @@
+{
+  "options": [
+    {
+      "key": "model",
+      "label": "Model",
+      "type": "select",
+      "default": "default",
+      "description": "Model passed to Claude Code via --model.",
+      "choices": [
+        {"value": "default", "label": "Default"},
+        {"value": "sonnet", "label": "Sonnet"},
+        {"value": "opus", "label": "Opus"},
+        {"value": "haiku", "label": "Haiku"}
+      ]
+    }
+  ]
+}

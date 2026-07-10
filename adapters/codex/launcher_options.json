@@ -1,0 +1,11 @@
+{
+  "options": [
+    {
+      "key": "model",
+      "label": "Model",
+      "type": "text",
+      "default": "",
+      "description": "Optional model passed to Codex via --model (blank uses the Codex default)."
+    }
+  ]
+}
