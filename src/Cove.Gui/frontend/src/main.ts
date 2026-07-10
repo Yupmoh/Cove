@@ -67,6 +67,22 @@ const THEME = {
   cursor: "#f5e0dc",
   cursorAccent: THEME_BG,
   selectionBackground: "#585b70",
+  black: "#45475a",
+  red: "#f38ba8",
+  green: "#a6e3a1",
+  yellow: "#f9e2af",
+  blue: "#89b4fa",
+  magenta: "#f5c2e7",
+  cyan: "#94e2d5",
+  white: "#bac2de",
+  brightBlack: "#585b70",
+  brightRed: "#f38ba8",
+  brightGreen: "#a6e3a1",
+  brightYellow: "#f9e2af",
+  brightBlue: "#89b4fa",
+  brightMagenta: "#f5c2e7",
+  brightCyan: "#94e2d5",
+  brightWhite: "#a6adc8",
 };
 function themeBackgroundWithOpacity(opacity: number): string {
   const n = opacity >= 0 && opacity <= 1 ? opacity : 1;
@@ -1079,6 +1095,18 @@ async function splitActive(dir: "row" | "col"): Promise<void> {
 
 let draggingPaneId: string | null = null;
 let dropOverlayEl: HTMLElement | null = null;
+let tabSpringTimer: number | null = null;
+let tabSpringRoomId: string | null = null;
+document.addEventListener("dragend", () => { draggingPaneId = null; clearDropOverlay(); });
+
+async function movePaneToRoom(paneId: string, targetRoomId: string): Promise<void> {
+  try {
+    await invoke("app.layoutMutate", { op: "movePaneToRoom", roomId: targetRoomId, paneId, targetPaneId: "", newPaneId: "", orientation: "", name: "", dir: 0 });
+    activeRoomId = targetRoomId;
+    await reload();
+    focusPane(paneId);
+  } catch (err) { console.warn("move pane to room failed", paneId, targetRoomId, err); }
+}
 
 function paintDropOverlay(host: HTMLElement, zone: ReturnType<typeof dropZoneFor>): void {
   if (!dropOverlayEl) {
@@ -1100,6 +1128,10 @@ function clearDropOverlay(): void {
 async function applyPaneMove(m: { op: string; paneId: string; targetPaneId: string; orientation: string; dir: number }, focusId: string): Promise<void> {
   if (!activeRoomId) { console.warn("pane move without active room"); return; }
   try {
+    const srcRoom = layout?.rooms.find((r) => collectLeafIds(r.layoutTree).includes(m.paneId));
+    if (srcRoom && srcRoom.id !== activeRoomId) {
+      await invoke("app.layoutMutate", { op: "movePaneToRoom", roomId: activeRoomId, paneId: m.paneId, targetPaneId: "", newPaneId: "", orientation: "", name: "", dir: 0 });
+    }
     if (m.op === "centerDrop") {
       const room = activeRoom();
       const srcLeaf = room ? findLeaf(room.layoutTree, m.paneId) : null;
@@ -1172,7 +1204,7 @@ function newPlaceholderId(): string {
 
 async function newRoom(): Promise<void> {
   const placeholder = newPlaceholderId();
-  const r = await invoke<{ roomId: string }>("app.layoutMutate", { op: "createRoom", newPaneId: placeholder, name: "Terminal " + (layout ? layout.rooms.length + 1 : 1), roomId: "", targetPaneId: "", orientation: "", paneId: "", dir: 0, paneType: "empty" });
+  const r = await invoke<{ roomId: string }>("app.layoutMutate", { op: "createRoom", newPaneId: placeholder, name: nextRoomName(), roomId: "", targetPaneId: "", orientation: "", paneId: "", dir: 0, paneType: "empty" });
   activeRoomId = r.roomId;
   focusedPaneId = null;
   await reload();
@@ -1185,7 +1217,7 @@ async function placePaneIntoRoom(roomId: string, placeholderId: string | null, p
       try { await invoke("app.layoutMutate", { op: "rename", roomId, name: roomName, targetPaneId: "", newPaneId: "", orientation: "", paneId: "", dir: 0 }); } catch (err) { console.warn("room rename after place failed", err); }
     }
   } else {
-    await invoke("app.layoutMutate", { op: "createRoom", newPaneId: paneId, name: roomName ?? (paneType === "browser" ? "Browser" : "Terminal " + (layout ? layout.rooms.length + 1 : 1)), roomId: "", targetPaneId: "", orientation: "", paneId: "", dir: 0, paneType });
+    await invoke("app.layoutMutate", { op: "createRoom", newPaneId: paneId, name: roomName === "Room" || !roomName ? nextRoomName() : roomName, roomId: "", targetPaneId: "", orientation: "", paneId: "", dir: 0, paneType });
   }
   activeRoomId = roomId;
   await reload();
@@ -1205,7 +1237,7 @@ async function launchTileInto(roomId: string | null, placeholderId: string | nul
   if (roomId) {
     await placePaneIntoRoom(roomId, placeholderId, paneId, placeable.paneType, placeable.roomName);
   } else {
-    const r = await invoke<{ roomId: string }>("app.layoutMutate", { op: "createRoom", newPaneId: paneId, name: placeable.roomName, roomId: "", targetPaneId: "", orientation: "", paneId: "", dir: 0, paneType: placeable.paneType });
+    const r = await invoke<{ roomId: string }>("app.layoutMutate", { op: "createRoom", newPaneId: paneId, name: placeable.roomName === "Room" ? nextRoomName() : placeable.roomName, roomId: "", targetPaneId: "", orientation: "", paneId: "", dir: 0, paneType: placeable.paneType });
     activeRoomId = r.roomId;
     await reload();
     focusPane(paneId);
@@ -1793,9 +1825,14 @@ async function switchWingActive(wingId: string): Promise<void> {
 }
 
 function roomTabName(room: RoomSnapshot): string {
+  if (room.name.trim().length > 0) return room.name;
   const leaves = collectLeafIds(room.layoutTree);
   const first = leaves[0] ? panes.get(leaves[0]) : undefined;
-  return (first && first.title) || room.name;
+  return (first && first.title) || "Room";
+}
+
+function nextRoomName(): string {
+  return "Room " + ((layout?.rooms.length ?? 0) + 1);
 }
 
 function renderRoomTabs(): void {
@@ -1881,11 +1918,48 @@ function renderRoomTabs(): void {
     });
     tab.addEventListener("dragstart", () => { dragSrcId = roomId; tab.classList.add("dragging"); });
     tab.addEventListener("dragend", () => { tab.classList.remove("dragging"); dragSrcId = null; });
-    tab.addEventListener("dragover", (e) => { e.preventDefault(); tab.classList.add("drag-over"); });
-    tab.addEventListener("dragleave", () => { tab.classList.remove("drag-over"); });
+    tab.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      if (draggingPaneId) {
+        tab.classList.add("pane-drop-target");
+        if (roomId !== activeRoomId && tabSpringRoomId !== roomId) {
+          if (tabSpringTimer !== null) window.clearTimeout(tabSpringTimer);
+          tabSpringRoomId = roomId;
+          tabSpringTimer = window.setTimeout(() => {
+            tabSpringTimer = null;
+            tabSpringRoomId = null;
+            if (!draggingPaneId) return;
+            activeRoomId = roomId;
+            renderRoom();
+            renderRoomTabs();
+            renderSidebar();
+          }, 550);
+        }
+        return;
+      }
+      tab.classList.add("drag-over");
+    });
+    tab.addEventListener("dragleave", () => {
+      tab.classList.remove("drag-over");
+      tab.classList.remove("pane-drop-target");
+      if (tabSpringRoomId === roomId && tabSpringTimer !== null) {
+        window.clearTimeout(tabSpringTimer);
+        tabSpringTimer = null;
+        tabSpringRoomId = null;
+      }
+    });
     tab.addEventListener("drop", (e) => {
       e.preventDefault();
       tab.classList.remove("drag-over");
+      tab.classList.remove("pane-drop-target");
+      if (tabSpringTimer !== null) { window.clearTimeout(tabSpringTimer); tabSpringTimer = null; tabSpringRoomId = null; }
+      const paneSrc = e.dataTransfer?.getData("text/cove-pane") || draggingPaneId;
+      if (paneSrc) {
+        draggingPaneId = null;
+        clearDropOverlay();
+        void movePaneToRoom(paneSrc, roomId);
+        return;
+      }
       if (dragSrcId && dragSrcId !== roomId) {
         void reorderRooms(dragSrcId, roomId);
       }

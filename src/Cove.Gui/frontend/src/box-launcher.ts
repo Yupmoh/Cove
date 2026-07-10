@@ -57,7 +57,7 @@ export interface PlaceablePane {
 export function placeablePaneForAction(action: string): PlaceablePane | null {
   switch (action) {
     case "room.new":
-      return { paneType: "terminal", kind: "terminal", roomName: "Terminal" };
+      return { paneType: "terminal", kind: "terminal", roomName: "Room" };
     case "tool.browser":
       return { paneType: "browser", kind: "browser", roomName: "Browser" };
     case "tool.search":

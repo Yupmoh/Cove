@@ -89,7 +89,7 @@ describe("launcherPlacement", () => {
 
 describe("placeablePaneForAction", () => {
   it("maps terminal and browser and tool tiles to pane types and room names", () => {
-    expect(placeablePaneForAction("room.new")).toEqual({ paneType: "terminal", kind: "terminal", roomName: "Terminal" });
+    expect(placeablePaneForAction("room.new")).toEqual({ paneType: "terminal", kind: "terminal", roomName: "Room" });
     expect(placeablePaneForAction("tool.browser")).toEqual({ paneType: "browser", kind: "browser", roomName: "Browser" });
     expect(placeablePaneForAction("tool.git")).toEqual({ paneType: "git", kind: "tool", roomName: "Source Control" });
     expect(placeablePaneForAction("tool.search")).toEqual({ paneType: "search", kind: "tool", roomName: "Search" });
