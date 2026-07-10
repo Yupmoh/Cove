@@ -1,6 +1,6 @@
 import type * as Monaco from "monaco-editor";
 import { invoke } from "./invoke";
-import { MonacoLoader } from "./monaco-loader";
+import { MonacoLoader, defineCoveMonacoTheme } from "./monaco-loader";
 
 interface Note {
   id: string;
@@ -20,37 +20,6 @@ let currentNoteId: string | null = null;
 let currentWorkspaceId: string | null = null;
 let noteEditor: Monaco.editor.IStandaloneCodeEditor | null = null;
 let viewport: { scrollX: number; scrollY: number; zoom: number } = { scrollX: 0, scrollY: 0, zoom: 1 };
-
-function cssColor(name: string, fallback: string): string {
-  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  return /^#[0-9a-fA-F]{6}$/.test(v) ? v : fallback;
-}
-
-function isLightHex(hex: string): boolean {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 > 0.55;
-}
-
-export function defineCoveMonacoTheme(monaco: typeof Monaco): string {
-  const bg = cssColor("--panel", "#181825");
-  const fg = cssColor("--fg", "#cdd6f4");
-  const accent = cssColor("--accent", "#cba6f7");
-  monaco.editor.defineTheme("cove", {
-    base: isLightHex(bg) ? "vs" : "vs-dark",
-    inherit: true,
-    rules: [],
-    colors: {
-      "editor.background": bg,
-      "editor.foreground": fg,
-      "editorCursor.foreground": accent,
-      "editorLineNumber.foreground": cssColor("--muted", "#7f849c"),
-      "editor.selectionBackground": accent + "55",
-    },
-  });
-  return "cove";
-}
 
 export async function renderNotepadPane(workspaceId: string): Promise<HTMLElement> {
   const el = document.createElement("div");

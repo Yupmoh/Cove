@@ -34,7 +34,7 @@ import { nextWorkspaceName, type WorkspaceBoxInput } from "./workspace-boxes";
 import { clampMenuPosition, normalizeItems, firstSelectableIndex, moveSelection as ctxMoveSelection, activeItem, type ContextMenuItem, type ContextMenuModel } from "./context-menu";
 import { buildWorkspaceTree, workspaceTreeEmptyMessage, PANE_TYPE_LABELS, type TreeLeaf, type TreeRoomInput, type TreeRow } from "./workspace-tree";
 import { buildAgentRows, AGENT_STATE_META, type AgentCard, type AgentState } from "./agents-model";
-import { splitWorkspaceCards, workspaceAccent, sortFsEntries, joinPath, dirBasename, type FsEntry, type WorkspaceCardEntry } from "./workspace-cards";
+import { splitWorkspaceCards, workspaceAccent, sortFsEntries, joinPath, dirBasename, scmChipText, type FsEntry, type WorkspaceCardEntry, type ScmSummary } from "./workspace-cards";
 import { parseQuery, filterAndSort, MruTracker, cycleCategory, categoryLabel, type PaletteItem } from "./omni-palette";
 import { buildEmptyState, EmptyStateMessages } from "./empty-states";
 import { brandLogoAt, nextBrandIndex, parseBrandIndex } from "./brand";
@@ -1518,6 +1518,29 @@ const fsExpandedDirs = new Set<string>(JSON.parse(localStorage.getItem("cove.fil
 let fsFilesCollapsed = localStorage.getItem("cove.files.collapsed") === "true";
 const fsDirCache = new Map<string, { entries: FsEntry[]; truncated: boolean }>();
 const fsDirLoading = new Set<string>();
+const scmSummaryCache = new Map<string, ScmSummary>();
+const scmSummaryFetchedAt = new Map<string, number>();
+const scmSummaryFetching = new Set<string>();
+const SCM_SUMMARY_TTL_MS = 10000;
+
+function requestScmSummary(dir: string): void {
+  if (!dir || scmSummaryFetching.has(dir)) return;
+  if (Date.now() - (scmSummaryFetchedAt.get(dir) ?? 0) < SCM_SUMMARY_TTL_MS) return;
+  scmSummaryFetching.add(dir);
+  void invoke<ScmSummary>("app.gitSummary", { path: dir })
+    .then((r) => {
+      const prev = scmSummaryCache.get(dir);
+      scmSummaryCache.set(dir, r);
+      scmSummaryFetchedAt.set(dir, Date.now());
+      scmSummaryFetching.delete(dir);
+      if (JSON.stringify(prev ?? null) !== JSON.stringify(r)) renderSidebarContent("left");
+    })
+    .catch((err) => {
+      console.warn("git summary failed", dir, err);
+      scmSummaryFetchedAt.set(dir, Date.now());
+      scmSummaryFetching.delete(dir);
+    });
+}
 
 function requestFsDir(path: string): void {
   if (fsDirCache.has(path) || fsDirLoading.has(path)) return;
@@ -1728,6 +1751,26 @@ function renderActiveWorkspaceCard(ws: WorkspaceCardEntry): HTMLElement {
   card.className = "ws-card ws-card-active" + (treeWorkspaceCollapsed ? " collapsed" : "");
   card.style.setProperty("--ws-accent", workspaceAccent(ws.id));
   const head = workspaceCardHead(ws, false);
+  if (ws.projectDir) {
+    requestScmSummary(ws.projectDir);
+    const summary = scmSummaryCache.get(ws.projectDir);
+    const chipText = summary ? scmChipText(summary) : "";
+    if (chipText) {
+      const chip = document.createElement("span");
+      chip.className = "ws-scm-chip";
+      for (const part of chipText.split(" ")) {
+        const seg = document.createElement("span");
+        seg.textContent = part;
+        if (part.startsWith("↑")) seg.className = "scm-ahead";
+        else if (part.startsWith("↓")) seg.className = "scm-behind";
+        else if (part.startsWith("●")) seg.className = "scm-dirty";
+        else seg.className = "scm-branch";
+        chip.appendChild(seg);
+      }
+      chip.title = `${ws.projectDir} — ahead/behind upstream · modified files`;
+      head.appendChild(chip);
+    }
+  }
   head.addEventListener("click", () => {
     treeWorkspaceCollapsed = !treeWorkspaceCollapsed;
     localStorage.setItem("cove.tree.workspaceCollapsed", String(treeWorkspaceCollapsed));

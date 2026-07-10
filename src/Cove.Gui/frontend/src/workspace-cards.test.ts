@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   WORKSPACE_ACCENTS,
+  scmChipText,
   workspaceAccent,
   splitWorkspaceCards,
   sortFsEntries,
@@ -69,5 +70,21 @@ describe("path helpers", () => {
     expect(dirBasename("/Users/moh/Desktop/Work/Cove")).toBe("Cove");
     expect(dirBasename("/Users/moh/Work/")).toBe("Work");
     expect(dirBasename("")).toBe("");
+  });
+});
+
+describe("scmChipText", () => {
+  it("shows branch with ahead and behind arrows and dirty count", () => {
+    expect(scmChipText({ ok: true, branch: "main", ahead: 2, behind: 1, dirty: 3 })).toBe("main ↑2 ↓1 ●3");
+  });
+
+  it("omits zero counts", () => {
+    expect(scmChipText({ ok: true, branch: "main", ahead: 0, behind: 0, dirty: 0 })).toBe("main");
+    expect(scmChipText({ ok: true, branch: "dev", ahead: 1, behind: 0, dirty: 0 })).toBe("dev ↑1");
+  });
+
+  it("returns empty for failed summaries", () => {
+    expect(scmChipText({ ok: false, error: "not_a_repo" })).toBe("");
+    expect(scmChipText({ ok: true })).toBe("");
   });
 });

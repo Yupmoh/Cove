@@ -123,6 +123,10 @@ public sealed class CoveGuiCommands
     public ValueTask<string> FsList(string path)
         => ValueTask.FromResult(FsListing.ListDirectory(path, 400));
 
+    [RynCommand("app.gitSummary")]
+    public ValueTask<string> GitSummaryFor(string path)
+        => ValueTask.FromResult(GitSummary.Run(path));
+
     [RynCommand("app.adapterList")]
     public async ValueTask<string> AdapterList(CancellationToken ct)
         => await Call("cove://commands/adapter.list", null, ct);

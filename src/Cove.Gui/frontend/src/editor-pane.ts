@@ -1,6 +1,6 @@
 import type * as Monaco from "monaco-editor";
 import { invoke } from "./invoke";
-import { MonacoLoader, detectLanguage } from "./monaco-loader";
+import { MonacoLoader, detectLanguage, defineCoveMonacoTheme } from "./monaco-loader";
 import {
   buildBreadcrumbs,
   toggleWordWrap,
@@ -93,10 +93,10 @@ const LARGE_FILE_THRESHOLD = 5 * 1024 * 1024;
 export async function renderEditorPane(paneId: string, filePath: string): Promise<HTMLElement> {
   const el = document.createElement("div");
   el.className = "editor-pane";
-  el.style.cssText = "display:flex;flex-direction:column;height:100%;background:#1e1e1e;color:#d4d4d4;font-family:ui-monospace,monospace;";
+  el.style.cssText = "display:flex;flex-direction:column;height:100%;background:var(--panel);color:var(--fg);";
 
   const header = document.createElement("div");
-  header.style.cssText = "padding:6px 12px;border-bottom:1px solid #303030;display:flex;gap:8px;align-items:center;flex-shrink:0;";
+  header.style.cssText = "padding:6px 12px;border-bottom:1px solid var(--border);display:flex;gap:8px;align-items:center;flex-shrink:0;";
 
   const breadcrumbs = document.createElement("div");
   breadcrumbs.className = "editor-breadcrumbs";
@@ -105,13 +105,13 @@ export async function renderEditorPane(paneId: string, filePath: string): Promis
   segments.forEach((seg, i) => {
     if (i > 0) {
       const sep = document.createElement("span");
-      sep.style.cssText = "color:#5a5a5a;";
+      sep.style.cssText = "color:var(--muted);";
       sep.textContent = "›";
       breadcrumbs.appendChild(sep);
     }
     const crumb = document.createElement("span");
     const isLast = i === segments.length - 1;
-    crumb.style.cssText = `color:${isLast ? "#d4d4d4" : "#858585"};font-weight:${isLast ? "600" : "400"};cursor:pointer;white-space:nowrap;`;
+    crumb.style.cssText = `color:${isLast ? "var(--fg)" : "var(--muted)"};font-weight:${isLast ? "600" : "400"};cursor:pointer;white-space:nowrap;`;
     crumb.textContent = seg.label;
     crumb.title = seg.path;
     crumb.addEventListener("click", () => {
@@ -123,17 +123,17 @@ export async function renderEditorPane(paneId: string, filePath: string): Promis
 
   const agentChip = document.createElement("span");
   agentChip.className = "editor-agent-chip";
-  agentChip.style.cssText = "display:none;font-size:10px;color:#a78bfa;background:#1a1a2e;border-radius:3px;padding:2px 6px;white-space:nowrap;";
+  agentChip.style.cssText = "display:none;font-size:10px;color:var(--accent);background:color-mix(in srgb, var(--accent) 14%, transparent);border-radius:4px;padding:2px 6px;white-space:nowrap;";
   header.appendChild(agentChip);
 
   const wrapBtn = document.createElement("button");
   wrapBtn.className = "editor-wordwrap-toggle";
-  wrapBtn.style.cssText = "background:#252526;border:1px solid #3a3a3a;color:#858585;border-radius:3px;padding:2px 6px;font-size:11px;cursor:pointer;flex-shrink:0;";
+  wrapBtn.style.cssText = "background:var(--panel-2);border:1px solid var(--border);color:var(--muted);border-radius:5px;padding:2px 6px;font-size:11px;cursor:pointer;flex-shrink:0;";
   header.appendChild(wrapBtn);
 
   const minimapBtn = document.createElement("button");
   minimapBtn.className = "editor-minimap-toggle";
-  minimapBtn.style.cssText = "background:#252526;border:1px solid #3a3a3a;color:#858585;border-radius:3px;padding:2px 6px;font-size:11px;cursor:pointer;flex-shrink:0;";
+  minimapBtn.style.cssText = "background:var(--panel-2);border:1px solid var(--border);color:var(--muted);border-radius:5px;padding:2px 6px;font-size:11px;cursor:pointer;flex-shrink:0;";
   header.appendChild(minimapBtn);
 
   el.appendChild(header);
@@ -153,7 +153,7 @@ export async function renderEditorPane(paneId: string, filePath: string): Promis
   el.appendChild(container);
 
   const statusBar = document.createElement("div");
-  statusBar.style.cssText = "padding:4px 12px;border-top:1px solid #303030;display:flex;gap:12px;font-size:11px;color:#858585;flex-shrink:0;";
+  statusBar.style.cssText = "padding:4px 12px;border-top:1px solid var(--border);display:flex;gap:12px;font-size:11px;color:var(--muted);flex-shrink:0;";
   const cursorPos = document.createElement("span");
   cursorPos.textContent = "Ln 1, Col 1";
   statusBar.appendChild(cursorPos);
@@ -188,7 +188,7 @@ export async function renderEditorPane(paneId: string, filePath: string): Promis
   let minimapOn = loadMinimap(paneId, !largeFile);
   const editor = monaco.editor.create(container, {
     model,
-    theme: "vs-dark",
+    theme: defineCoveMonacoTheme(monaco),
     fontSize: 13,
     lineHeight: 1.5 * 13,
     minimap: { enabled: minimapOn },
@@ -200,7 +200,7 @@ export async function renderEditorPane(paneId: string, filePath: string): Promis
 
   const renderWrapBtn = () => {
     wrapBtn.textContent = `Wrap: ${wordWrap === "on" ? "On" : "Off"}`;
-    wrapBtn.style.color = wordWrap === "on" ? "#4ec9b0" : "#858585";
+    wrapBtn.style.color = wordWrap === "on" ? "var(--accent)" : "var(--muted)";
   };
   renderWrapBtn();
   wrapBtn.addEventListener("click", () => {
@@ -212,7 +212,7 @@ export async function renderEditorPane(paneId: string, filePath: string): Promis
 
   const renderMinimapBtn = () => {
     minimapBtn.textContent = `Minimap: ${minimapOn ? "On" : "Off"}`;
-    minimapBtn.style.color = minimapOn ? "#4ec9b0" : "#858585";
+    minimapBtn.style.color = minimapOn ? "var(--accent)" : "var(--muted)";
   };
   renderMinimapBtn();
   minimapBtn.addEventListener("click", () => {
@@ -286,7 +286,7 @@ export async function renderEditorPane(paneId: string, filePath: string): Promis
   };
 
   const blameTip = document.createElement("div");
-  blameTip.style.cssText = "position:absolute;display:none;z-index:20;background:#252526;border:1px solid #3a3a3a;color:#d4d4d4;font-size:11px;padding:3px 8px;border-radius:3px;pointer-events:none;white-space:nowrap;";
+  blameTip.style.cssText = "position:absolute;display:none;z-index:20;background:var(--panel-2);border:1px solid var(--border);color:var(--fg);font-size:11px;padding:3px 8px;border-radius:5px;pointer-events:none;white-space:nowrap;";
   container.appendChild(blameTip);
 
   editor.onMouseMove((e: Monaco.editor.IEditorMouseEvent) => {
@@ -326,7 +326,7 @@ export async function renderEditorPane(paneId: string, filePath: string): Promis
       await invoke("cove://commands/editor.save", { filePath, paneId, content: model.getValue() });
       dirty = false;
       saveStatus.textContent = "Saved";
-      saveStatus.style.color = "#858585";
+      saveStatus.style.color = "var(--muted)";
       void refreshDecorations();
       void refreshBlame();
     } catch (e) {
