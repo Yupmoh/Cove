@@ -46,6 +46,8 @@ import { toolbarTiles } from "./toolbar-tiles";
 import { shouldShowLauncher, buildAdapterTiles, buildBuiltinTiles, isEmptyRoomTree, placeablePaneForAction, type LauncherAdapter, type LauncherBuiltin, type LauncherTile } from "./box-launcher";
 import { adapterAccent, toolAccent, assignHotkeys, detectedHarnessTiles, clampLauncherSelection, moveLauncherSelection, hotkeyTarget, resumableSessionsFor, mostRecentSession, shapeRecentSessions, tipAt, computeLauncherCols, type LauncherSelection, type LauncherGeometry, type LauncherSession, type LauncherArrowKey, type RecentSessionRow } from "./launcher-model";
 import { iconSvg, iconForPaneType, monogram } from "./icons";
+import { dropZoneFor, moveMutationFor, zoneOverlayRect } from "./pane-dnd";
+import { cssPath, buildFeedbackReport, feedbackSlug, harnessPrompt } from "./inspect-mode";
 import { clusterTools } from "./title-cluster";
 import { initialZenState, toggleZen, type ChromeVisibility, type ZenState } from "./zen-mode";
 import { eventToChord, buildChordMap, resolveDispatch, defaultBindings, type ResolvedBinding } from "./keymap-dispatch";
@@ -219,6 +221,9 @@ const leftContentEl = document.getElementById("left-content")!;
 const rightContentEl = document.getElementById("right-content")!;
 const leftResizeEl = document.getElementById("left-resize")!;
 const rightResizeEl = document.getElementById("right-resize")!;
+const rightReopenEl = document.getElementById("right-reopen")!;
+rightReopenEl.innerHTML = iconSvg("agents");
+rightReopenEl.addEventListener("click", () => toggleRightSidebar());
 const palInput = document.getElementById("pal-input") as HTMLInputElement;
 const palList = document.getElementById("pal-list")!;
 
@@ -278,7 +283,10 @@ function attachWs(pane: PaneView) {
       if (!m) return;
       if (m.t === "base") { pane.consumed = m.off; pane.lastAck = m.off; }
       else if (m.t === "resync") { pane.term.reset(); pane.consumed = m.base; pane.lastAck = m.base; }
-      else if (m.t === "end") { pane.term.write(`\r\n\x1b[38;5;244m[process exited: ${m.code}]\x1b[0m\r\n`); }
+      else if (m.t === "end") {
+        pane.term.write(`\r\n\x1b[38;5;244m[process exited: ${m.code}]\x1b[0m\r\n`);
+        window.setTimeout(() => { void closePaneById(pane.paneId); }, 400);
+      }
       return;
     }
     const raw = new Uint8Array(ev.data as ArrayBuffer);
@@ -378,6 +386,34 @@ function makePane(paneId: string, since: number): PaneView {
   });
   const setTitle = () => { titleSpan.textContent = pv.customTitle || pv.title || "shell"; };
   header.addEventListener("mousedown", (e) => { if (e.target !== moreBtn) focusPane(paneId); });
+  header.draggable = true;
+  header.addEventListener("dragstart", (e) => {
+    if (!e.dataTransfer) return;
+    e.dataTransfer.setData("text/cove-pane", paneId);
+    e.dataTransfer.effectAllowed = "move";
+    draggingPaneId = paneId;
+  });
+  header.addEventListener("dragend", () => { draggingPaneId = null; clearDropOverlay(); });
+  el.addEventListener("dragover", (e) => {
+    if (!draggingPaneId || draggingPaneId === paneId) return;
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+    const rect = el.getBoundingClientRect();
+    paintDropOverlay(el, dropZoneFor(e.clientX - rect.left, e.clientY - rect.top, rect.width, rect.height));
+  });
+  el.addEventListener("dragleave", (e) => { if (e.target === el) clearDropOverlay(); });
+  el.addEventListener("drop", (e) => {
+    e.preventDefault();
+    const src = e.dataTransfer?.getData("text/cove-pane") || draggingPaneId;
+    clearDropOverlay();
+    draggingPaneId = null;
+    if (!src || !activeRoomId) { console.warn("pane drop without source or active room"); return; }
+    const rect = el.getBoundingClientRect();
+    const zone = dropZoneFor(e.clientX - rect.left, e.clientY - rect.top, rect.width, rect.height);
+    const m = moveMutationFor(zone, src, paneId);
+    if (!m) return;
+    void applyPaneMove(m, src);
+  });
   const startRename = () => {
     const input = document.createElement("input");
     input.className = "prename";
@@ -984,6 +1020,7 @@ function focusPane(paneId: string): void {
   }
   panes.get(paneId)?.term.focus();
   refreshTitles();
+  if (sidebarModel.leftMode === "workspaces" && !collapsedOf(sidebarModel, "left")) renderSidebarContent("left");
   if (activeRoomId) {
     void invoke("app.layoutMutate", { op: "focus", roomId: activeRoomId, paneId, targetPaneId: "", newPaneId: "", orientation: "", name: "", dir: 0 });
   }
@@ -1038,6 +1075,55 @@ async function splitActive(dir: "row" | "col"): Promise<void> {
   await invoke("app.layoutMutate", { op: "split", roomId: activeRoomId, targetPaneId: src, newPaneId: sp, orientation: dir, name: "", paneId: "", dir: 0 });
   await reload();
   focusPane(sp);
+}
+
+let draggingPaneId: string | null = null;
+let dropOverlayEl: HTMLElement | null = null;
+
+function paintDropOverlay(host: HTMLElement, zone: ReturnType<typeof dropZoneFor>): void {
+  if (!dropOverlayEl) {
+    dropOverlayEl = document.createElement("div");
+    dropOverlayEl.className = "drop-overlay";
+  }
+  if (dropOverlayEl.parentElement !== host) host.appendChild(dropOverlayEl);
+  const r = zoneOverlayRect(zone);
+  dropOverlayEl.style.left = r.left;
+  dropOverlayEl.style.top = r.top;
+  dropOverlayEl.style.width = r.width;
+  dropOverlayEl.style.height = r.height;
+}
+
+function clearDropOverlay(): void {
+  dropOverlayEl?.remove();
+}
+
+async function applyPaneMove(m: { op: string; paneId: string; targetPaneId: string; orientation: string; dir: number }, focusId: string): Promise<void> {
+  if (!activeRoomId) { console.warn("pane move without active room"); return; }
+  try {
+    if (m.op === "centerDrop") {
+      const room = activeRoom();
+      const srcLeaf = room ? findLeaf(room.layoutTree, m.paneId) : null;
+      const idx = srcLeaf ? Math.max(0, srcLeaf.activeSubtab) : 0;
+      await invoke("app.layoutMutate", { op: "centerDrop", roomId: activeRoomId, targetPaneId: m.paneId, paneId: m.targetPaneId, dir: idx, newPaneId: "", orientation: "", name: "" });
+    } else {
+      await invoke("app.layoutMutate", { op: "movePane", roomId: activeRoomId, paneId: m.paneId, targetPaneId: m.targetPaneId, orientation: m.orientation, dir: m.dir, newPaneId: "", name: "" });
+    }
+    await reload();
+    focusPane(focusId);
+  } catch (err) { console.warn("pane move failed", m.op, err); }
+}
+
+function findLeaf(node: MosaicNode, paneId: string): { paneId: string; activeSubtab: number } | null {
+  if (node.kind === "leaf") return node.paneId === paneId ? { paneId: node.paneId, activeSubtab: node.activeSubtab } : null;
+  return findLeaf(node.childA, paneId) ?? findLeaf(node.childB, paneId);
+}
+
+async function closePaneById(paneId: string): Promise<void> {
+  const room = layout?.rooms.find((r) => collectLeafIds(r.layoutTree).includes(paneId));
+  if (!room) { console.warn("close requested for pane not in layout", paneId); return; }
+  try { await invoke("app.paneKill", { paneId }); } catch (err) { console.warn("pane kill on exit failed", paneId, err); }
+  try { await invoke("app.layoutMutate", { op: "close", roomId: room.id, paneId, targetPaneId: "", newPaneId: "", orientation: "", name: "", dir: 0 }); } catch (err) { console.warn("layout close on exit failed", paneId, err); }
+  await reload();
 }
 
 async function closeFocused(): Promise<void> {
@@ -1180,6 +1266,25 @@ function renderWorkspaceChips(container: HTMLElement): void {
     name.textContent = box.name || box.id;
     chipEl.appendChild(name);
     chipEl.addEventListener("click", () => { if (!box.active) void switchWorkspace(box.id); });
+    chipEl.draggable = true;
+    chipEl.addEventListener("dragstart", (e) => {
+      draggingWorkspaceId = box.id;
+      if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
+    });
+    chipEl.addEventListener("dragend", () => { draggingWorkspaceId = null; });
+    chipEl.addEventListener("dragover", (e) => {
+      if (!draggingWorkspaceId || draggingWorkspaceId === box.id) return;
+      e.preventDefault();
+      chipEl.classList.add("drag-over");
+    });
+    chipEl.addEventListener("dragleave", () => chipEl.classList.remove("drag-over"));
+    chipEl.addEventListener("drop", (e) => {
+      e.preventDefault();
+      chipEl.classList.remove("drag-over");
+      if (!draggingWorkspaceId || draggingWorkspaceId === box.id) return;
+      void reorderWorkspaces(draggingWorkspaceId, box.id);
+      draggingWorkspaceId = null;
+    });
     chipEl.addEventListener("contextmenu", (e) => {
       openContextMenuAt(e, [
         { id: "rename", label: "Rename" },
@@ -1193,6 +1298,20 @@ function renderWorkspaceChips(container: HTMLElement): void {
   }
   container.appendChild(row);
 }
+
+let draggingWorkspaceId: string | null = null;
+
+async function reorderWorkspaces(fromId: string, toId: string): Promise<void> {
+  const ids = workspaceBoxItems.map((w) => w.id);
+  const fromIdx = ids.indexOf(fromId);
+  const toIdx = ids.indexOf(toId);
+  if (fromIdx < 0 || toIdx < 0) { console.warn("workspace reorder with unknown ids", fromId, toId); return; }
+  ids.splice(toIdx, 0, ids.splice(fromIdx, 1)[0]);
+  try { await invoke("cove://commands/workspace.reorder", { orderedIds: ids }); } catch (err) { console.warn("workspace reorder failed", err); }
+  await loadWorkspaceBoxes();
+}
+
+let treeDragRoomId: string | null = null;
 
 function startWorkspaceRename(wsId: string, boxEl: HTMLElement, currentName: string): void {
   const input = document.createElement("input");
@@ -1382,10 +1501,23 @@ function renderWorkspacesContent(container: HTMLElement): void {
   for (const row of rows) {
     const rowEl = document.createElement("div");
     rowEl.className = `tree-row kind-${row.kind}` + (row.active ? " active" : "") + (row.collapsed ? " collapsed" : "");
+    rowEl.style.paddingLeft = `${8 + row.depth * 14}px`;
     if (row.expandable) {
       const chev = document.createElement("span");
       chev.className = "tw-chevron";
       chev.textContent = "▾";
+      chev.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (row.kind === "workspace") {
+          treeWorkspaceCollapsed = !treeWorkspaceCollapsed;
+          localStorage.setItem("cove.tree.workspaceCollapsed", String(treeWorkspaceCollapsed));
+        } else if (row.roomId) {
+          if (collapsedTreeRooms.has(row.roomId)) collapsedTreeRooms.delete(row.roomId);
+          else collapsedTreeRooms.add(row.roomId);
+          localStorage.setItem("cove.tree.collapsedRooms", JSON.stringify([...collapsedTreeRooms]));
+        }
+        renderSidebarContent("left");
+      });
       rowEl.appendChild(chev);
     } else {
       const spacer = document.createElement("span");
@@ -1401,7 +1533,6 @@ function renderWorkspacesContent(container: HTMLElement): void {
     const label = document.createElement("span");
     label.className = "tw-label";
     label.textContent = row.label;
-    label.style.paddingLeft = `${row.depth * 8}px`;
     rowEl.appendChild(label);
     if (row.count > 1 && row.kind !== "pane") {
       const count = document.createElement("span");
@@ -1410,14 +1541,46 @@ function renderWorkspacesContent(container: HTMLElement): void {
       rowEl.appendChild(count);
     }
     rowEl.addEventListener("click", () => onTreeRowClick(row.kind, row.roomId, row.paneId, row.expandable));
+    if (row.kind === "room" && row.roomId) {
+      const rid = row.roomId;
+      rowEl.draggable = true;
+      rowEl.addEventListener("dragstart", (e) => {
+        treeDragRoomId = rid;
+        if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
+      });
+      rowEl.addEventListener("dragend", () => { treeDragRoomId = null; });
+      rowEl.addEventListener("dragover", (e) => {
+        if (!treeDragRoomId || treeDragRoomId === rid) return;
+        e.preventDefault();
+        rowEl.classList.add("drag-over");
+      });
+      rowEl.addEventListener("dragleave", () => rowEl.classList.remove("drag-over"));
+      rowEl.addEventListener("drop", (e) => {
+        e.preventDefault();
+        rowEl.classList.remove("drag-over");
+        if (!treeDragRoomId || treeDragRoomId === rid) return;
+        void reorderRooms(treeDragRoomId, rid);
+        treeDragRoomId = null;
+      });
+    }
     if (row.kind !== "workspace") {
       rowEl.addEventListener("contextmenu", (e) => {
         openContextMenuAt(e, [
-          { id: "focus", label: "Focus" },
+          { id: "focus", label: "Go to" },
           { id: "close", label: "Close", danger: true },
         ], (id) => {
           if (id === "focus") focusTreeRow(row.kind, row.roomId, row.paneId);
           else if (id === "close") closeTreeRow(row.kind, row.roomId, row.paneId);
+        });
+      });
+    } else {
+      rowEl.addEventListener("contextmenu", (e) => {
+        openContextMenuAt(e, [
+          { id: "new-room", label: "New room" },
+          { id: "toggle", label: row.collapsed ? "Expand" : "Collapse" },
+        ], (id) => {
+          if (id === "new-room") void newRoom();
+          else if (id === "toggle") onTreeRowClick("workspace", null, null, true);
         });
       });
     }
@@ -1438,11 +1601,6 @@ function onTreeRowClick(kind: string, roomId: string | null, paneId: string | nu
   if (kind === "room" && roomId) {
     const room = layout?.rooms.find((r) => r.id === roomId);
     if (!room) { console.warn("tree click: unknown room", roomId); return; }
-    if (expandable && roomId === activeRoomId) {
-      if (collapsedTreeRooms.has(roomId)) collapsedTreeRooms.delete(roomId);
-      else collapsedTreeRooms.add(roomId);
-      localStorage.setItem("cove.tree.collapsedRooms", JSON.stringify([...collapsedTreeRooms]));
-    }
     activeRoomId = roomId;
     const f = firstLeafOf(room);
     if (f) focusedPaneId = f;
@@ -1474,7 +1632,10 @@ function closeTreeRow(kind: string, roomId: string | null, paneId: string | null
 }
 
 function renderAgentsContent(container: HTMLElement): void {
-  container.appendChild(sidebarHead("Agents", [{ icon: iconSvg("refresh"), title: "Refresh", run: () => void refreshAgents() }]));
+  container.appendChild(sidebarHead("Agents", [
+    { icon: iconSvg("refresh"), title: "Refresh", run: () => void refreshAgents() },
+    { icon: iconSvg("chevron-right"), title: "Collapse", run: () => toggleRightSidebar() },
+  ]));
   const list = document.createElement("div");
   list.className = "sb-list";
   const rows = buildAgentRows(agentCards, needsInputPanes);
@@ -1638,6 +1799,8 @@ function roomTabName(room: RoomSnapshot): string {
 }
 
 function renderRoomTabs(): void {
+  const activeRename = roomTabsEl.querySelector(".rtab-rename-input");
+  if (activeRename && activeRename === document.activeElement) return;
   roomTabsEl.innerHTML = "";
   const allRooms = layout?.rooms ?? [];
   const wingModel = buildWingModel(wings, roomWingSummaries, activeWingId);
@@ -1835,15 +1998,20 @@ function startRename(roomId: string, tab: HTMLElement, nameEl: HTMLElement): voi
     const newName = input.value.trim() || room.name;
     if (newName !== room.name) {
       room.name = newName;
-      try { await invoke("app.layoutMutate", { op: "rename", roomId, name: newName, paneId: "", targetPaneId: "", newPaneId: "", orientation: "", dir: 0 }); } catch { void 0; }
+      try {
+        await invoke("app.layoutMutate", { op: "rename", roomId, name: newName, paneId: "", targetPaneId: "", newPaneId: "", orientation: "", dir: 0 });
+        await reload();
+        return;
+      } catch (err) { console.warn("room rename failed", roomId, err); }
     }
     renderRoomTabs();
     renderSidebar();
   };
   input.addEventListener("blur", commit);
   input.addEventListener("keydown", (e) => {
+    e.stopPropagation();
     if (e.key === "Enter") input.blur();
-    if (e.key === "Escape") { renderRoomTabs(); }
+    if (e.key === "Escape") { input.value = room.name; input.blur(); }
   });
 }
 
@@ -1874,6 +2042,7 @@ function baseActions(): Action[] {
     { label: "Decrease font size", icon: "-", key: "Cmd -", run: () => { settings.fontSize = Math.max(9, settings.fontSize - 1); applySettings(); } },
     { label: "Reset font size", icon: "\u21ba", key: "Cmd 0", run: () => { settings.fontSize = 13; applySettings(); } },
     { label: "Settings", icon: "\u2699", key: "Cmd ,", run: openSettings },
+    { label: "Inspect UI (report a bug)", icon: "\u2316", run: startInspectMode },
   ];
 }
 
@@ -3364,6 +3533,187 @@ function renderCardExpansion(ctx: LauncherContext, tile: LauncherTile): HTMLElem
   return body;
 }
 
+let inspectActive = false;
+
+function startInspectMode(): void {
+  if (inspectActive) return;
+  inspectActive = true;
+  const overlay = document.createElement("div");
+  overlay.id = "inspect-overlay";
+  const hi = document.createElement("div");
+  hi.className = "inspect-highlight";
+  const tagEl = document.createElement("div");
+  tagEl.className = "inspect-tag";
+  tagEl.textContent = "inspect mode — click an element, drag a region, esc to exit";
+  overlay.appendChild(hi);
+  overlay.appendChild(tagEl);
+  document.body.appendChild(overlay);
+  tagEl.style.left = "50%";
+  tagEl.style.top = "10px";
+  tagEl.style.transform = "translateX(-50%)";
+
+  let dragStart: { x: number; y: number } | null = null;
+  let marquee = false;
+  let marqueeRect = { x: 0, y: 0, width: 0, height: 0 };
+
+  const pick = (x: number, y: number): Element | null => {
+    const els = document.elementsFromPoint(x, y);
+    return els.find((el) => el !== overlay && !overlay.contains(el)) ?? null;
+  };
+  const placeHighlight = (r: { left: number; top: number; width: number; height: number }) => {
+    hi.style.left = `${r.left}px`;
+    hi.style.top = `${r.top}px`;
+    hi.style.width = `${r.width}px`;
+    hi.style.height = `${r.height}px`;
+  };
+  const placeTag = (text: string, x: number, y: number) => {
+    tagEl.style.transform = "none";
+    tagEl.textContent = text;
+    tagEl.style.left = `${Math.max(4, x)}px`;
+    tagEl.style.top = `${Math.max(4, y - 22)}px`;
+  };
+  const onMove = (e: MouseEvent) => {
+    if (dragStart && (Math.abs(e.clientX - dragStart.x) > 8 || Math.abs(e.clientY - dragStart.y) > 8)) marquee = true;
+    if (marquee && dragStart) {
+      const left = Math.min(dragStart.x, e.clientX);
+      const top = Math.min(dragStart.y, e.clientY);
+      const width = Math.abs(e.clientX - dragStart.x);
+      const height = Math.abs(e.clientY - dragStart.y);
+      marqueeRect = { x: left, y: top, width, height };
+      placeHighlight({ left, top, width, height });
+      placeTag("region", left, top);
+      return;
+    }
+    const el = pick(e.clientX, e.clientY);
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    placeHighlight(r);
+    placeTag(cssPath(el as unknown as import("./inspect-mode").InspectElementLike, 3), r.left, r.top);
+  };
+  const teardown = () => {
+    inspectActive = false;
+    overlay.remove();
+    document.removeEventListener("keydown", onKey, true);
+  };
+  const onKey = (e: KeyboardEvent) => {
+    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); teardown(); }
+  };
+  overlay.addEventListener("mousemove", onMove);
+  overlay.addEventListener("mousedown", (e) => { dragStart = { x: e.clientX, y: e.clientY }; });
+  overlay.addEventListener("mouseup", (e) => {
+    const wasMarquee = marquee;
+    const start = dragStart;
+    dragStart = null;
+    marquee = false;
+    if (wasMarquee && start) {
+      teardown();
+      openInspectNote(null, { ...marqueeRect });
+      return;
+    }
+    const el = pick(e.clientX, e.clientY);
+    teardown();
+    openInspectNote(el, null);
+  });
+  document.addEventListener("keydown", onKey, true);
+}
+
+function inspectTargetOf(el: Element): import("./inspect-mode").InspectTarget {
+  const r = el.getBoundingClientRect();
+  return {
+    selector: cssPath(el as unknown as import("./inspect-mode").InspectElementLike),
+    tag: el.tagName.toLowerCase(),
+    classes: [...el.classList],
+    rect: { x: Math.round(r.left), y: Math.round(r.top), width: Math.round(r.width), height: Math.round(r.height) },
+    textExcerpt: (el.textContent ?? "").trim().slice(0, 120),
+  };
+}
+
+function openInspectNote(el: Element | null, regionRect: { x: number; y: number; width: number; height: number } | null): void {
+  const panel = document.createElement("div");
+  panel.className = "inspect-note";
+  const target = el ? inspectTargetOf(el) : null;
+  const summary = document.createElement("div");
+  summary.className = "inspect-note-summary";
+  summary.textContent = target ? target.selector : `region ${regionRect?.width}×${regionRect?.height}`;
+  panel.appendChild(summary);
+  const ta = document.createElement("textarea");
+  ta.className = "inspect-note-input";
+  ta.placeholder = "what's wrong here?";
+  panel.appendChild(ta);
+  const row = document.createElement("div");
+  row.className = "inspect-send-row";
+  const harnesses = detectedHarnessTiles(buildAdapterTiles(launcherAdapters));
+  for (const tile of harnesses) {
+    const accent = adapterAccent(tile.adapterName, tile.accent);
+    const btn = document.createElement("button");
+    btn.className = "inspect-btn inspect-send";
+    btn.style.setProperty("--card-accent", accent);
+    btn.textContent = `Send to ${tile.label}`;
+    btn.addEventListener("click", () => {
+      void submitInspectFeedback(ta.value, el, target, regionRect, tile);
+      panel.remove();
+    });
+    row.appendChild(btn);
+  }
+  const save = document.createElement("button");
+  save.className = "inspect-btn";
+  save.textContent = "Save report";
+  save.addEventListener("click", () => {
+    void submitInspectFeedback(ta.value, el, target, regionRect, null);
+    panel.remove();
+  });
+  row.appendChild(save);
+  const cancel = document.createElement("button");
+  cancel.className = "inspect-btn inspect-cancel";
+  cancel.textContent = "Cancel";
+  cancel.addEventListener("click", () => panel.remove());
+  row.appendChild(cancel);
+  panel.appendChild(row);
+  document.body.appendChild(panel);
+  const anchor = target?.rect ?? regionRect;
+  const px = Math.min(window.innerWidth - 360, Math.max(8, (anchor?.x ?? 100)));
+  const py = Math.min(window.innerHeight - 220, Math.max(8, (anchor?.y ?? 100) + (anchor?.height ?? 0) + 8));
+  panel.style.left = `${px}px`;
+  panel.style.top = `${py}px`;
+  ta.focus();
+}
+
+async function submitInspectFeedback(
+  note: string,
+  el: Element | null,
+  target: import("./inspect-mode").InspectTarget | null,
+  regionRect: { x: number; y: number; width: number; height: number } | null,
+  harness: LauncherTile | null,
+): Promise<void> {
+  const trimmed = note.trim() || "(no note)";
+  const report = buildFeedbackReport({
+    note: trimmed,
+    target,
+    regionRect,
+    workspace: layout?.name ?? "",
+    room: activeRoom()?.name ?? "",
+    appVersion: document.getElementById("wordmark-ver")?.textContent ?? "dev",
+    htmlExcerpt: el instanceof HTMLElement ? el.outerHTML : "",
+    nowIso: new Date().toISOString(),
+  });
+  try {
+    const res = await invoke<{ path: string }>("app.feedbackSave", { json: JSON.stringify(report, null, 2), slug: feedbackSlug(trimmed) });
+    if (harness) {
+      await spawnFeedbackAgent(harness, harnessPrompt(report, res.path), `Fix: ${feedbackSlug(trimmed)}`);
+    } else {
+      console.warn("feedback report saved", res.path);
+    }
+  } catch (err) { console.warn("feedback save failed", err); }
+}
+
+async function spawnFeedbackAgent(tile: LauncherTile, prompt: string, roomName: string): Promise<void> {
+  const sp = (await invoke<{ paneId: string }>("app.paneSpawn", { command: tile.binary, args: [prompt], cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: tile.adapterName, agentName: tile.label, workspace: "", room: "" })).paneId;
+  const r = await invoke<{ roomId: string }>("app.layoutMutate", { op: "createRoom", newPaneId: sp, name: roomName, roomId: "", targetPaneId: "", orientation: "", paneId: "", dir: 0, paneType: "terminal" });
+  activeRoomId = r.roomId;
+  await reload();
+  focusPane(sp);
+}
+
 async function resumeSessionInto(ctx: LauncherContext, tile: LauncherTile, session: LauncherSession): Promise<void> {
   try { await invoke("cove://commands/session.foreground", { paneId: session.paneId }); } catch (err) { console.warn("session.foreground failed, falling back to new session", err); launchHarnessTile(ctx, tile); return; }
   await reload();
@@ -3623,6 +3973,7 @@ function runAction(action: string): void {
     case "view.zoom-out": settings.fontSize = Math.max(9, settings.fontSize - 1); applySettings(); break;
     case "view.zoom-reset": settings.fontSize = 13; applySettings(); break;
     case "view.toggle-backdrop": void toggleBackdrop(); break;
+    case "tool.inspect": startInspectMode(); break;
     case "tool.git": void openToolRoom("git", "Source Control"); break;
     case "tool.search": void openToolRoom("search", "Search"); break;
     case "tool.tasks": void openToolRoom("tasks-list", "Tasks"); break;
@@ -3662,8 +4013,10 @@ function setupMenuBar(): void {
 let clusterUpdateStaged = false;
 function renderTitleCluster(): void {
   const cluster = document.getElementById("tb-cluster");
-  if (!cluster) { console.warn("title cluster container missing"); return; }
+  const right = document.getElementById("tb-right");
+  if (!cluster || !right) { console.warn("title cluster containers missing"); return; }
   cluster.innerHTML = "";
+  right.innerHTML = "";
   for (const tool of clusterTools({ updateStaged: clusterUpdateStaged })) {
     if (tool.id === "find-anything") {
       const find = document.createElement("div");
@@ -3671,7 +4024,8 @@ function renderTitleCluster(): void {
       find.title = tool.title;
       const ic = document.createElement("span");
       ic.className = "tb-find-ic";
-      ic.textContent = tool.icon;
+      ic.innerHTML = iconSvg("search");
+      ic.style.display = "inline-flex";
       const ph = document.createElement("span");
       ph.className = "tb-find-ph";
       ph.textContent = "find anything…";
@@ -3683,9 +4037,9 @@ function renderTitleCluster(): void {
       const btn = document.createElement("div");
       btn.className = "tbtn tb-cluster-btn" + (tool.id === "update" ? " tb-update" : "");
       btn.title = tool.title;
-      btn.textContent = tool.icon;
+      btn.innerHTML = tool.id === "settings" ? iconSvg("gear") : tool.id === "inspect" ? iconSvg("inspect") : iconSvg("refresh");
       btn.addEventListener("click", () => runAction(tool.action));
-      cluster.appendChild(btn);
+      right.appendChild(btn);
     }
   }
 }

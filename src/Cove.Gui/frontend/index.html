@@ -47,10 +47,13 @@
     #wordmark { display: flex; align-items: baseline; gap: 5px; flex-shrink: 0; font-weight: 650; font-size: 13px; letter-spacing: 0.3px; color: var(--fg); }
     #wordmark-ver { font-size: 10.5px; color: var(--muted); opacity: 0; transition: opacity 0.15s; }
     #wordmark:hover #wordmark-ver { opacity: 1; }
-    #tb-cluster { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
-    .tb-find-anything { display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: 8px; background: var(--panel-2); border: 1px solid var(--border); color: var(--muted); cursor: pointer; font-size: 12px; }
+    #tb-cluster { display: flex; align-items: center; justify-content: center; gap: 4px; flex: 1; min-width: 0; }
+    #tb-right { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+    .tb-find-anything { display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: 8px; background: var(--panel-2); border: 1px solid var(--border); color: var(--muted); cursor: pointer; font-size: 12px; width: min(520px, 70%); }
+    .tb-cluster-btn svg { width: 15px; height: 15px; display: block; }
     .tb-find-anything:hover { color: var(--fg); border-color: var(--accent-dim); }
-    .tb-find-ic { font-size: 13px; }
+    .tb-find-ic { font-size: 13px; line-height: 0; }
+    .tb-find-ic svg { width: 13px; height: 13px; display: block; }
     .tb-find-ph { white-space: nowrap; }
     .tb-cluster-btn { width: 28px; justify-content: center; font-size: 14px; }
     .tb-cluster-btn.tb-update { color: var(--accent); }
@@ -79,6 +82,13 @@
     .sb-mode.stub { opacity: 0.55; }
     .sb-content { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; order: 1; }
     .dual-sidebar.collapsed .sb-content, .dual-sidebar.collapsed .sb-resize { display: none; }
+    .sb-reopen { display: none; }
+    .dual-sidebar.side-right.collapsed .sb-reopen {
+      display: flex; align-items: flex-start; justify-content: center; padding-top: 12px;
+      width: 26px; cursor: pointer; color: var(--muted);
+    }
+    .sb-reopen:hover { color: var(--fg); background: var(--panel-2); }
+    .sb-reopen svg { width: 15px; height: 15px; }
     .sb-resize { width: 5px; flex-shrink: 0; cursor: col-resize; position: relative; }
     .side-left .sb-resize { order: 3; }
     .side-right .sb-resize { order: 0; }
@@ -122,11 +132,11 @@
     .agent-row .ag-name { color: var(--fg); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .agent-row .ag-meta { color: var(--muted); font-size: 10.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .sb-group-head { padding: 12px 10px 4px; color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; }
-    #tb-cluster { margin: 0 auto; }
     .sb-wschips { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 10px 6px; }
     .sb-wschip { display: flex; align-items: center; gap: 7px; max-width: 100%; padding: 3px 9px 3px 3px; border-radius: 9px; cursor: pointer; color: var(--muted); background: var(--panel-2); border: 1px solid transparent; overflow: hidden; }
     .sb-wschip:hover { color: var(--fg); }
     .sb-wschip.active { color: var(--fg); border-color: var(--accent); }
+    .sb-wschip.drag-over, .tree-row.drag-over { box-shadow: inset 0 0 0 2px var(--accent); }
     .sb-wschip-badge { width: 24px; height: 24px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border-radius: 7px; background: var(--panel); border: 1px solid var(--border); font-weight: 650; font-size: 12px; color: var(--fg); }
     .sb-wschip.active .sb-wschip-badge { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 7px var(--accent-dim); }
     .sb-wschip-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
@@ -195,6 +205,24 @@
       display: flex; flex-direction: column;
     }
     .pane.focused { border-color: var(--accent-dim); box-shadow: 0 0 0 1px var(--accent-dim); }
+    #inspect-overlay { position: fixed; inset: 0; z-index: 90; cursor: crosshair; }
+    .inspect-highlight { position: fixed; pointer-events: none; z-index: 91; border: 1.5px solid #f9e2af; background: rgba(249, 226, 175, 0.12); border-radius: 4px; }
+    .inspect-tag { position: fixed; pointer-events: none; z-index: 92; background: #f9e2af; color: #11111b; font-size: 10px; font-weight: 650; padding: 2px 7px; border-radius: 4px; white-space: nowrap; }
+    .inspect-note { position: fixed; z-index: 95; width: 340px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 13px; box-shadow: 0 18px 48px rgba(0,0,0,0.5); display: flex; flex-direction: column; gap: 9px; }
+    .inspect-note-summary { font-size: 11px; color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .inspect-note-input { min-height: 68px; resize: vertical; background: var(--panel-2); border: 1px solid var(--border); color: var(--fg); border-radius: 8px; padding: 7px 9px; font-size: 12px; font-family: inherit; outline: none; }
+    .inspect-note-input:focus { border-color: var(--accent-dim); }
+    .inspect-send-row { display: flex; gap: 6px; flex-wrap: wrap; }
+    .inspect-btn { padding: 6px 11px; border-radius: 7px; border: 1px solid var(--border); background: var(--panel-2); color: var(--fg); font-size: 11.5px; cursor: pointer; }
+    .inspect-btn:hover { border-color: var(--accent-dim); }
+    .inspect-btn.inspect-send { background: color-mix(in srgb, var(--card-accent, var(--accent)) 18%, transparent); border-color: color-mix(in srgb, var(--card-accent, var(--accent)) 40%, transparent); color: var(--card-accent, var(--accent)); font-weight: 600; }
+    .inspect-btn.inspect-cancel { color: var(--muted); }
+    .drop-overlay {
+      position: absolute; z-index: 15; pointer-events: none; border-radius: 8px;
+      background: color-mix(in srgb, var(--accent) 20%, transparent);
+      border: 1.5px solid var(--accent);
+      transition: left 0.08s, top 0.08s, width 0.08s, height 0.08s;
+    }
     .pane-header {
       position: relative; flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between;
       height: 24px; padding: 0 8px; background: var(--panel); border-bottom: 1px solid var(--border);
@@ -417,6 +445,7 @@
     <div id="tl-zone"></div>
     <div id="wordmark" data-webview-ignore>&#8779; cove<span id="wordmark-ver"></span></div>
     <div id="tb-cluster" data-webview-ignore></div>
+    <div id="tb-right" data-webview-ignore></div>
     <div id="win-controls" data-webview-ignore>
       <div class="wc" id="wc-min" data-webview-minimize title="Minimize">&#8211;</div>
       <div class="wc" id="wc-max" data-webview-maximize title="Maximize">&#9633;</div>
@@ -436,6 +465,7 @@
   <aside id="right-sidebar" class="dual-sidebar side-right" data-webview-ignore>
     <div class="sb-resize" id="right-resize" title="Resize"></div>
     <div class="sb-content" id="right-content"></div>
+    <div class="sb-reopen" id="right-reopen" title="Show agents"></div>
   </aside>
   </div>
   <div id="palette">

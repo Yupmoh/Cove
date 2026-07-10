@@ -25,6 +25,9 @@ export const ICONS: Record<string, string> = {
   image: svg('<rect x="3.5" y="4.5" width="17" height="15" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M20.5 15.5l-4.5-4.5-8.5 8.5"/>'),
   play: svg('<rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M10 9l5 3-5 3z"/>'),
   diff: svg('<line x1="6" y1="7.5" x2="12" y2="7.5"/><line x1="9" y1="4.5" x2="9" y2="10.5"/><line x1="6" y1="17" x2="12" y2="17"/><line x1="14.5" y1="4" x2="19.5" y2="20"/>'),
+  "chevron-right": svg('<polyline points="9.5 6 15.5 12 9.5 18"/>'),
+  "chevron-left": svg('<polyline points="14.5 6 8.5 12 14.5 18"/>'),
+  inspect: svg('<rect x="3.5" y="3.5" width="17" height="17" rx="2.5" stroke-dasharray="3.4 2.6"/><path d="M10.5 10.5l7.2 2.7-3 1.5-1.5 3z"/>'),
 };
 
 export function iconSvg(name: string): string {

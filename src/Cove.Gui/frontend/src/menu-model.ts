@@ -81,6 +81,7 @@ export function menuIA(): MenuSection[] {
         { id: "toggle-right-sidebar", label: "Toggle Right Sidebar", action: "view.toggle-notepad" },
         { id: "toggle-zen", label: "Toggle Zen Mode", action: "view.zen-mode" },
         { id: "toggle-backdrop", label: "Toggle Window Backdrop", action: "view.toggle-backdrop" },
+        { id: "inspect-ui", label: "Inspect UI (Report a Bug)", action: "tool.inspect" },
         { separator: true },
         { id: "zoom-in", label: "Zoom In", action: "view.zoom-in" },
         { id: "zoom-out", label: "Zoom Out", action: "view.zoom-out" },
