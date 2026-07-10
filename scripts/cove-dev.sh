@@ -5,6 +5,13 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENGINE="$ROOT/src/Cove.Cli/bin/Debug/net10.0/cove"
 GUI="$ROOT/src/Cove.Gui/bin/Debug/net10.0/Cove"
 
+if [ "${1:-}" = "restart" ]; then
+  echo "restarting daemon and gui (panes respawn, harness sessions need --resume)"
+  pkill -f "bin/Debug/net10.0/Cove$" 2>/dev/null || true
+  pkill -f "cove daemon run" 2>/dev/null || true
+  sleep 1.5
+fi
+
 if [ ! -x "$ENGINE" ] || [ ! -x "$GUI" ]; then
   echo "binaries missing — building solution first"
   dotnet build "$ROOT/Cove.slnx" -c Debug -v:q -clp:ErrorsOnly
