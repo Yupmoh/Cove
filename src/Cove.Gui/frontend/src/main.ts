@@ -30,7 +30,7 @@ import { renderVideoPane } from "./video-pane";
 import { partitionPinned, reorderRoom, glyphForPaneType, visibleRoomIds, buildWingModel, filterRoomsByWing } from "./room-tabs";
 import { groupByWorkspace, moveSelection, selectedNote, kindIcon, kindColor, type NoteListItem, type NavState } from "./notepad-sidebar";
 import { initialSidebarModel, selectLeftMode, toggleSide, setCollapsed, setWidth, collapsedOf, widthOf, SIDEBAR_MODES, SIDEBAR_MODE_META, type SidebarModel, type SidebarSide, type SidebarMode } from "./sidebar-model";
-import { buildWorkspaceBoxes, nextWorkspaceName, type WorkspaceBoxInput } from "./workspace-boxes";
+import { nextWorkspaceName, type WorkspaceBoxInput } from "./workspace-boxes";
 import { clampMenuPosition, normalizeItems, firstSelectableIndex, moveSelection as ctxMoveSelection, activeItem, type ContextMenuItem, type ContextMenuModel } from "./context-menu";
 import { buildWorkspaceTree, workspaceTreeEmptyMessage, type TreeLeaf, type TreeRoomInput } from "./workspace-tree";
 import { buildAgentRows, agentStateCounts, AGENT_STATE_META, type AgentCard, type AgentRow } from "./agents-model";
@@ -1320,57 +1320,6 @@ async function loadWorkspaceBoxes(): Promise<void> {
   renderSidebarContent("left");
 }
 
-function renderWorkspaceChips(container: HTMLElement): void {
-  const boxes = buildWorkspaceBoxes(workspaceBoxItems, layout?.id ?? null);
-  if (boxes.length === 0) return;
-  const row = document.createElement("div");
-  row.className = "sb-wschips";
-  for (const box of boxes) {
-    const chipEl = document.createElement("div");
-    chipEl.className = "sb-wschip" + (box.active ? " active" : "");
-    chipEl.title = box.name || box.id;
-    const badge = document.createElement("span");
-    badge.className = "sb-wschip-badge";
-    badge.textContent = box.initial;
-    chipEl.appendChild(badge);
-    const name = document.createElement("span");
-    name.className = "sb-wschip-name";
-    name.textContent = box.name || box.id;
-    chipEl.appendChild(name);
-    chipEl.addEventListener("click", () => { if (!box.active) void switchWorkspace(box.id); });
-    chipEl.draggable = true;
-    chipEl.addEventListener("dragstart", (e) => {
-      draggingWorkspaceId = box.id;
-      if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
-    });
-    chipEl.addEventListener("dragend", () => { draggingWorkspaceId = null; });
-    chipEl.addEventListener("dragover", (e) => {
-      if (!draggingWorkspaceId || draggingWorkspaceId === box.id) return;
-      e.preventDefault();
-      chipEl.classList.add("drag-over");
-    });
-    chipEl.addEventListener("dragleave", () => chipEl.classList.remove("drag-over"));
-    chipEl.addEventListener("drop", (e) => {
-      e.preventDefault();
-      chipEl.classList.remove("drag-over");
-      if (!draggingWorkspaceId || draggingWorkspaceId === box.id) return;
-      void reorderWorkspaces(draggingWorkspaceId, box.id);
-      draggingWorkspaceId = null;
-    });
-    chipEl.addEventListener("contextmenu", (e) => {
-      openContextMenuAt(e, [
-        { id: "rename", label: "Rename" },
-        { id: "close", label: "Close", danger: true },
-      ], (id) => {
-        if (id === "rename") startWorkspaceRename(box.id, chipEl, box.name || box.id);
-        if (id === "close") void deleteWorkspace(box.id);
-      });
-    });
-    row.appendChild(chipEl);
-  }
-  container.appendChild(row);
-}
-
 let draggingWorkspaceId: string | null = null;
 
 async function reorderWorkspaces(fromId: string, toId: string): Promise<void> {
@@ -1501,7 +1450,6 @@ function renderSidebarContent(side: SidebarSide): void {
   if (collapsedOf(sidebarModel, side)) { content.innerHTML = ""; return; }
   content.innerHTML = "";
   if (side === "right") { renderAgentsContent(content); return; }
-  renderWorkspaceChips(content);
   const mode = sidebarModel.leftMode;
   if (mode === "workspaces") renderWorkspacesContent(content);
   else if (mode === "notepad") renderNotepadContent(content);
@@ -1569,6 +1517,8 @@ function renderWorkspacesContent(container: HTMLElement): void {
     rooms,
     collapsedRoomIds: collapsedTreeRooms,
     workspaceCollapsed: treeWorkspaceCollapsed,
+    workspaces: workspaceBoxItems,
+    activeWorkspaceId: layout?.id ?? null,
   });
   for (const row of rows) {
     const rowEl = document.createElement("div");
@@ -1612,7 +1562,35 @@ function renderWorkspacesContent(container: HTMLElement): void {
       count.textContent = String(row.count);
       rowEl.appendChild(count);
     }
-    rowEl.addEventListener("click", () => onTreeRowClick(row.kind, row.roomId, row.paneId, row.expandable));
+    rowEl.addEventListener("click", () => {
+      if (row.kind === "workspace" && row.workspaceId && layout?.id && row.workspaceId !== layout.id) {
+        void switchWorkspace(row.workspaceId);
+        return;
+      }
+      onTreeRowClick(row.kind, row.roomId, row.paneId, row.expandable);
+    });
+    if (row.kind === "workspace" && row.workspaceId) {
+      const wid = row.workspaceId;
+      rowEl.draggable = true;
+      rowEl.addEventListener("dragstart", (e) => {
+        draggingWorkspaceId = wid;
+        if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
+      });
+      rowEl.addEventListener("dragend", () => { draggingWorkspaceId = null; });
+      rowEl.addEventListener("dragover", (e) => {
+        if (!draggingWorkspaceId || draggingWorkspaceId === wid) return;
+        e.preventDefault();
+        rowEl.classList.add("drag-over");
+      });
+      rowEl.addEventListener("dragleave", () => rowEl.classList.remove("drag-over"));
+      rowEl.addEventListener("drop", (e) => {
+        e.preventDefault();
+        rowEl.classList.remove("drag-over");
+        if (!draggingWorkspaceId || draggingWorkspaceId === wid) return;
+        void reorderWorkspaces(draggingWorkspaceId, wid);
+        draggingWorkspaceId = null;
+      });
+    }
     if (row.kind === "room" && row.roomId) {
       const rid = row.roomId;
       rowEl.draggable = true;
@@ -1647,12 +1625,18 @@ function renderWorkspacesContent(container: HTMLElement): void {
       });
     } else {
       rowEl.addEventListener("contextmenu", (e) => {
+        const isActiveWs = row.workspaceId === (layout?.id ?? null) || workspaceBoxItems.length <= 1;
         openContextMenuAt(e, [
-          { id: "new-room", label: "New room" },
-          { id: "toggle", label: row.collapsed ? "Expand" : "Collapse" },
+          { id: "new-room", label: "New room", disabled: !isActiveWs },
+          { id: "rename", label: "Rename" },
+          { id: "toggle", label: row.collapsed ? "Expand" : "Collapse", disabled: !isActiveWs },
+          { id: "sep", label: "", separator: true },
+          { id: "close-ws", label: "Close workspace", danger: true },
         ], (id) => {
           if (id === "new-room") void newRoom();
+          else if (id === "rename" && row.workspaceId) startWorkspaceRename(row.workspaceId, rowEl.querySelector(".tw-label") as HTMLElement, row.label);
           else if (id === "toggle") onTreeRowClick("workspace", null, null, true);
+          else if (id === "close-ws" && row.workspaceId) void deleteWorkspace(row.workspaceId);
         });
       });
     }

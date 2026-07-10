@@ -79,6 +79,26 @@ describe("buildWorkspaceTree", () => {
     expect(rows[0].count).toBe(0);
     expect(rows[0].expandable).toBe(false);
   });
+
+  it("lists every workspace, expanding only the active one", () => {
+    const rows = buildWorkspaceTree(baseInput({
+      workspaces: [{ id: "w1", name: "Cove" }, { id: "w2", name: "Raptor" }],
+      activeWorkspaceId: "w1",
+    }));
+    const wsRows = rows.filter((r) => r.kind === "workspace");
+    expect(wsRows.map((r) => r.label)).toEqual(["Cove", "Raptor"]);
+    expect(wsRows[0].active).toBe(true);
+    expect(wsRows[1].active).toBe(false);
+    expect(wsRows[1].collapsed).toBe(true);
+    const roomRows = rows.filter((r) => r.kind === "room");
+    expect(roomRows.every((r) => r.workspaceId === "w1")).toBe(true);
+  });
+
+  it("keeps a single unlisted workspace expanded regardless of active id", () => {
+    const rows = buildWorkspaceTree(baseInput());
+    expect(rows.filter((r) => r.kind === "workspace")).toHaveLength(1);
+    expect(rows.some((r) => r.kind === "room")).toBe(true);
+  });
 });
 
 describe("workspaceTreeEmptyMessage", () => {

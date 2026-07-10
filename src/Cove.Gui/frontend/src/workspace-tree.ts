@@ -12,6 +12,11 @@ export interface TreeRoomInput {
   leaves: TreeLeaf[];
 }
 
+export interface WorkspaceEntry {
+  id: string;
+  name: string;
+}
+
 export interface WorkspaceTreeInput {
   workspaceName: string;
   activeRoomId: string | null;
@@ -19,6 +24,8 @@ export interface WorkspaceTreeInput {
   rooms: TreeRoomInput[];
   collapsedRoomIds: Set<string>;
   workspaceCollapsed: boolean;
+  workspaces?: WorkspaceEntry[];
+  activeWorkspaceId?: string | null;
 }
 
 export interface TreeRow {
@@ -29,6 +36,7 @@ export interface TreeRow {
   roomId: string | null;
   paneId: string | null;
   paneType: string | null;
+  workspaceId: string | null;
   active: boolean;
   expandable: boolean;
   collapsed: boolean;
@@ -72,52 +80,63 @@ export function paneLabel(leaf: TreeLeaf): string {
 
 export function buildWorkspaceTree(input: WorkspaceTreeInput): TreeRow[] {
   const rows: TreeRow[] = [];
-  rows.push({
-    kind: "workspace",
-    key: `ws:${input.workspaceName}`,
-    label: input.workspaceName,
-    depth: 0,
-    roomId: null,
-    paneId: null,
-    paneType: null,
-    active: false,
-    expandable: input.rooms.length > 0,
-    collapsed: input.workspaceCollapsed,
-    count: input.rooms.length,
-  });
-  if (input.workspaceCollapsed) return rows;
+  const activeId = input.activeWorkspaceId ?? null;
+  const workspaces: WorkspaceEntry[] = input.workspaces && input.workspaces.length > 0
+    ? input.workspaces
+    : [{ id: activeId ?? "active", name: input.workspaceName }];
 
-  for (const room of input.rooms) {
-    const roomCollapsed = input.collapsedRoomIds.has(room.id);
-    const realLeaves = room.leaves.filter((l) => l.paneType !== "empty");
+  for (const ws of workspaces) {
+    const isActive = workspaces.length === 1 || ws.id === activeId;
     rows.push({
-      kind: "room",
-      key: `room:${room.id}`,
-      label: room.name,
-      depth: 1,
-      roomId: room.id,
+      kind: "workspace",
+      key: `ws:${ws.id}`,
+      label: ws.name,
+      depth: 0,
+      roomId: null,
       paneId: null,
       paneType: null,
-      active: room.id === input.activeRoomId,
-      expandable: realLeaves.length > 0,
-      collapsed: roomCollapsed,
-      count: realLeaves.length,
+      workspaceId: ws.id,
+      active: isActive,
+      expandable: isActive && input.rooms.length > 0,
+      collapsed: isActive ? input.workspaceCollapsed : true,
+      count: isActive ? input.rooms.length : 0,
     });
-    if (roomCollapsed || realLeaves.length === 0) continue;
-    for (const leaf of realLeaves) {
+    if (!isActive || input.workspaceCollapsed) continue;
+
+    for (const room of input.rooms) {
+      const roomCollapsed = input.collapsedRoomIds.has(room.id);
+      const realLeaves = room.leaves.filter((l) => l.paneType !== "empty");
       rows.push({
-        kind: "pane",
-        key: `pane:${room.id}:${leaf.paneId}`,
-        label: paneLabel(leaf),
-        depth: 2,
+        kind: "room",
+        key: `room:${room.id}`,
+        label: room.name,
+        depth: 1,
         roomId: room.id,
-        paneId: leaf.paneId,
-        paneType: leaf.paneType,
-        active: room.id === input.activeRoomId && leaf.paneId === input.focusedPaneId,
-        expandable: false,
-        collapsed: false,
-        count: 0,
+        paneId: null,
+        paneType: null,
+        workspaceId: ws.id,
+        active: room.id === input.activeRoomId,
+        expandable: realLeaves.length > 0,
+        collapsed: roomCollapsed,
+        count: realLeaves.length,
       });
+      if (roomCollapsed || realLeaves.length === 0) continue;
+      for (const leaf of realLeaves) {
+        rows.push({
+          kind: "pane",
+          key: `pane:${room.id}:${leaf.paneId}`,
+          label: paneLabel(leaf),
+          depth: 2,
+          roomId: room.id,
+          paneId: leaf.paneId,
+          paneType: leaf.paneType,
+          workspaceId: ws.id,
+          active: room.id === input.activeRoomId && leaf.paneId === input.focusedPaneId,
+          expandable: false,
+          collapsed: false,
+          count: 0,
+        });
+      }
     }
   }
   return rows;
