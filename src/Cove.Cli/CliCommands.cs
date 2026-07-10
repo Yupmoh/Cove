@@ -468,6 +468,10 @@ internal static class CliCommands
         return ctx.RouteCoreAsync($"cove://commands/protocol.resolve?uri={uri}");
     }
 
+    [CoveCommand("session recent")]
+    public static Task<int> SessionRecent(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/session.recent");
+
     [CoveCommand("task list")]
     public static Task<int> TaskList(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/task.list");

@@ -136,6 +136,53 @@ export function mostRecentSession(sessions: LauncherSession[]): LauncherSession 
   return sessions.length > 0 ? sessions[0] : null;
 }
 
+export interface RecentSessionRow {
+  adapter: string;
+  sessionId: string;
+  workspaceId: string;
+  cwd: string;
+  startedAt: string;
+}
+
+export interface RecentSessionView {
+  adapter: string;
+  sessionId: string;
+  cwd: string;
+  cwdBase: string;
+  relative: string;
+}
+
+export function cwdBasename(cwd: string): string {
+  const trimmed = cwd.replace(/[/\\]+$/, "");
+  if (trimmed.length === 0) return "~";
+  const parts = trimmed.split(/[/\\]/);
+  const last = parts[parts.length - 1];
+  return last.length > 0 ? last : "~";
+}
+
+export function relativeTime(startedAt: string, nowMs: number): string {
+  const then = Date.parse(startedAt);
+  if (Number.isNaN(then)) return "";
+  const deltaSec = Math.max(0, Math.round((nowMs - then) / 1000));
+  if (deltaSec < 45) return "just now";
+  const min = Math.round(deltaSec / 60);
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.round(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  const day = Math.round(hr / 24);
+  return `${day}d ago`;
+}
+
+export function shapeRecentSessions(rows: RecentSessionRow[], nowMs: number, limit: number): RecentSessionView[] {
+  return rows.slice(0, Math.max(0, limit)).map((r) => ({
+    adapter: r.adapter,
+    sessionId: r.sessionId,
+    cwd: r.cwd,
+    cwdBase: cwdBasename(r.cwd),
+    relative: relativeTime(r.startedAt, nowMs),
+  }));
+}
+
 export const LAUNCHER_TIPS = [
   "press a letter to launch — hold shift to reveal them",
   "⌘↵ starts a new session in the selected harness",

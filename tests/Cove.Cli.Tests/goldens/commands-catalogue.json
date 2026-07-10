@@ -881,6 +881,10 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/session.recent",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/session.state",
     "source": "core"
   },
@@ -1256,6 +1260,10 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/workspace.rename",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/workspace.reorder",
     "source": "core"
   },
@@ -1589,6 +1597,10 @@
   },
   {
     "command": "search set-state",
+    "source": "cli"
+  },
+  {
+    "command": "session recent",
     "source": "cli"
   },
   {

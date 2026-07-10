@@ -30,7 +30,7 @@ import { renderVideoPane } from "./video-pane";
 import { partitionPinned, reorderRoom, glyphForPaneType, visibleRoomIds, buildWingModel, filterRoomsByWing } from "./room-tabs";
 import { groupByWorkspace, moveSelection, selectedNote, kindIcon, kindColor, type NoteListItem, type NavState } from "./notepad-sidebar";
 import { initialSidebarModel, selectLeftMode, toggleSide, setCollapsed, setWidth, collapsedOf, widthOf, SIDEBAR_MODES, SIDEBAR_MODE_META, type SidebarModel, type SidebarSide, type SidebarMode } from "./sidebar-model";
-import { buildWorkspaceBoxes, type WorkspaceBoxInput } from "./workspace-boxes";
+import { buildWorkspaceBoxes, nextWorkspaceName, type WorkspaceBoxInput } from "./workspace-boxes";
 import { clampMenuPosition, normalizeItems, firstSelectableIndex, moveSelection as ctxMoveSelection, activeItem, type ContextMenuItem, type ContextMenuModel } from "./context-menu";
 import { buildWorkspaceTree, workspaceTreeEmptyMessage, type TreeLeaf, type TreeRoomInput } from "./workspace-tree";
 import { buildAgentRows, agentStateCounts, AGENT_STATE_META, type AgentCard, type AgentRow } from "./agents-model";
@@ -44,7 +44,7 @@ import { NotificationBridge, type NotificationBridgeDeps, type NotificationDeliv
 import { buildMenu, menuChordSet } from "./menu-model";
 import { toolbarTiles } from "./toolbar-tiles";
 import { shouldShowLauncher, buildAdapterTiles, buildBuiltinTiles, isEmptyRoomTree, placeablePaneForAction, type LauncherAdapter, type LauncherBuiltin, type LauncherTile } from "./box-launcher";
-import { adapterAccent, toolAccent, assignHotkeys, detectedHarnessTiles, clampLauncherSelection, moveLauncherSelection, hotkeyTarget, resumableSessionsFor, mostRecentSession, tipAt, type LauncherSelection, type LauncherGeometry, type LauncherSession, type LauncherArrowKey } from "./launcher-model";
+import { adapterAccent, toolAccent, assignHotkeys, detectedHarnessTiles, clampLauncherSelection, moveLauncherSelection, hotkeyTarget, resumableSessionsFor, mostRecentSession, shapeRecentSessions, tipAt, type LauncherSelection, type LauncherGeometry, type LauncherSession, type LauncherArrowKey, type RecentSessionRow } from "./launcher-model";
 import { clusterTools } from "./title-cluster";
 import { initialZenState, toggleZen, type ChromeVisibility, type ZenState } from "./zen-mode";
 import { eventToChord, buildChordMap, resolveDispatch, defaultBindings, type ResolvedBinding } from "./keymap-dispatch";
@@ -1191,14 +1191,45 @@ function renderWorkspaceStrip(): void {
     boxEl.addEventListener("click", () => { if (!box.active) void switchWorkspace(box.id); });
     boxEl.addEventListener("contextmenu", (e) => {
       openContextMenuAt(e, [
-        { id: "rename", label: "Rename", disabled: true },
+        { id: "rename", label: "Rename" },
         { id: "close", label: "Close", danger: true },
       ], (id) => {
+        if (id === "rename") startWorkspaceRename(box.id, boxEl, box.name || box.id);
         if (id === "close") void deleteWorkspace(box.id);
       });
     });
     leftWsbarEl.appendChild(boxEl);
   }
+}
+
+function startWorkspaceRename(wsId: string, boxEl: HTMLElement, currentName: string): void {
+  const input = document.createElement("input");
+  input.className = "prename";
+  input.value = currentName;
+  input.spellcheck = false;
+  boxEl.textContent = "";
+  boxEl.appendChild(input);
+  input.focus();
+  input.select();
+  let done = false;
+  const commit = async (save: boolean) => {
+    if (done) return;
+    done = true;
+    const newName = nextWorkspaceName(input.value, currentName);
+    if (save && newName !== currentName) {
+      try { await invoke("cove://commands/workspace.rename", { id: wsId, name: newName }); }
+      catch (e) { console.warn("workspace.rename failed", wsId, e); }
+      await loadWorkspaceBoxes();
+      return;
+    }
+    renderWorkspaceStrip();
+  };
+  input.addEventListener("blur", () => void commit(true));
+  input.addEventListener("keydown", (e) => {
+    e.stopPropagation();
+    if (e.key === "Enter") { e.preventDefault(); void commit(true); }
+    else if (e.key === "Escape") { e.preventDefault(); void commit(false); }
+  });
 }
 
 async function deleteWorkspace(wsId: string): Promise<void> {
@@ -3008,7 +3039,9 @@ async function spawnAgentInto(roomId: string | null, placeholderId: string | nul
 
 let launcherAdapters: LauncherAdapter[] = [];
 let launcherSessions: LauncherSession[] = [];
+let launcherRecents: RecentSessionRow[] = [];
 interface SessionListResult { sessions: LauncherSession[]; }
+interface SessionRecentResult { sessions: RecentSessionRow[]; }
 async function loadLauncherAdapters(): Promise<void> {
   try {
     const result = await invoke<AdapterListResult>("app.adapterList", {});
@@ -3018,6 +3051,10 @@ async function loadLauncherAdapters(): Promise<void> {
     const res = await invoke<SessionListResult>("cove://commands/session.list", {});
     launcherSessions = res.sessions ?? [];
   } catch { launcherSessions = []; }
+  try {
+    const res = await invoke<SessionRecentResult>("cove://commands/session.recent", { limit: 30 });
+    launcherRecents = res.sessions ?? [];
+  } catch { launcherRecents = []; }
   if ((layout?.rooms ?? []).length === 0) renderRoom();
 }
 
@@ -3265,6 +3302,36 @@ function renderCardExpansion(ctx: LauncherContext, tile: LauncherTile): HTMLElem
     picker.appendChild(edit);
     picker.addEventListener("click", (e) => { e.stopPropagation(); void resumeSessionInto(ctx, tile, recent); });
     body.appendChild(picker);
+  }
+
+  const recentRows = launcherRecents.filter((r) => r.adapter === tile.adapterName);
+  const shaped = shapeRecentSessions(recentRows, Date.now(), 3);
+  if (shaped.length > 0) {
+    const list = document.createElement("div");
+    list.className = "cl-recent-list";
+    const heading = document.createElement("div");
+    heading.className = "cl-recent-heading";
+    heading.textContent = "recent";
+    list.appendChild(heading);
+    for (const s of shaped) {
+      const row = document.createElement("div");
+      row.className = "cl-recent-row";
+      const base = document.createElement("span");
+      base.className = "cl-recent-cwd";
+      base.textContent = s.cwdBase;
+      base.title = s.cwd;
+      const when = document.createElement("span");
+      when.className = "cl-recent-when";
+      when.textContent = s.relative;
+      row.appendChild(base);
+      row.appendChild(when);
+      list.appendChild(row);
+    }
+    const note = document.createElement("div");
+    note.className = "cl-recent-note";
+    note.textContent = "resume coming";
+    list.appendChild(note);
+    body.appendChild(list);
   }
   return body;
 }

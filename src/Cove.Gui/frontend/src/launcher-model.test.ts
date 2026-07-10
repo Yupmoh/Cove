@@ -14,8 +14,12 @@ import {
   mostRecentSession,
   tipAt,
   LAUNCHER_TIPS,
+  cwdBasename,
+  relativeTime,
+  shapeRecentSessions,
   type LauncherGeometry,
   type LauncherSession,
+  type RecentSessionRow,
 } from "./launcher-model";
 
 describe("detectedHarnessTiles", () => {
@@ -139,5 +143,38 @@ describe("tip rotation", () => {
     expect(tipAt(0)).toBe(LAUNCHER_TIPS[0]);
     expect(tipAt(LAUNCHER_TIPS.length)).toBe(LAUNCHER_TIPS[0]);
     expect(tipAt(-1)).toBe(LAUNCHER_TIPS[LAUNCHER_TIPS.length - 1]);
+  });
+});
+
+describe("recent session shaping", () => {
+  it("extracts the trailing path segment as the basename", () => {
+    expect(cwdBasename("/home/moh/proj")).toBe("proj");
+    expect(cwdBasename("/home/moh/proj/")).toBe("proj");
+    expect(cwdBasename("C:\\work\\cove")).toBe("cove");
+    expect(cwdBasename("")).toBe("~");
+    expect(cwdBasename("/")).toBe("~");
+  });
+
+  it("renders coarse relative times", () => {
+    const now = Date.parse("2026-07-10T12:00:00Z");
+    expect(relativeTime("2026-07-10T11:59:40Z", now)).toBe("just now");
+    expect(relativeTime("2026-07-10T11:55:00Z", now)).toBe("5m ago");
+    expect(relativeTime("2026-07-10T10:00:00Z", now)).toBe("2h ago");
+    expect(relativeTime("2026-07-07T12:00:00Z", now)).toBe("3d ago");
+    expect(relativeTime("not-a-date", now)).toBe("");
+  });
+
+  it("shapes and caps recent rows preserving order", () => {
+    const now = Date.parse("2026-07-10T12:00:00Z");
+    const rows: RecentSessionRow[] = [
+      { adapter: "claude", sessionId: "s1", workspaceId: "w", cwd: "/home/moh/alpha", startedAt: "2026-07-10T11:55:00Z" },
+      { adapter: "claude", sessionId: "s2", workspaceId: "w", cwd: "/home/moh/beta", startedAt: "2026-07-10T11:00:00Z" },
+      { adapter: "claude", sessionId: "s3", workspaceId: "w", cwd: "/home/moh/gamma", startedAt: "2026-07-09T12:00:00Z" },
+      { adapter: "claude", sessionId: "s4", workspaceId: "w", cwd: "/home/moh/delta", startedAt: "2026-07-08T12:00:00Z" },
+    ];
+    const shaped = shapeRecentSessions(rows, now, 3);
+    expect(shaped.map((s) => s.sessionId)).toEqual(["s1", "s2", "s3"]);
+    expect(shaped[0].cwdBase).toBe("alpha");
+    expect(shaped[0].relative).toBe("5m ago");
   });
 });

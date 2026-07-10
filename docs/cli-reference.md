@@ -220,6 +220,7 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/session.dismiss` | core |  |
 | `cove://commands/session.foreground` | core |  |
 | `cove://commands/session.list` | core |  |
+| `cove://commands/session.recent` | core |  |
 | `cove://commands/session.state` | core |  |
 | `cove://commands/session.stop` | core |  |
 | `cove://commands/skills.index` | core |  |
@@ -313,6 +314,7 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/workspace.hide` | core |  |
 | `cove://commands/workspace.list` | core |  |
 | `cove://commands/workspace.move-room` | core |  |
+| `cove://commands/workspace.rename` | core |  |
 | `cove://commands/workspace.reorder` | core |  |
 | `cove://commands/workspace.set-accent` | core |  |
 | `cove://commands/workspace.set-icon` | core |  |
@@ -397,6 +399,7 @@ Generated from the command registry. Do not edit by hand.
 | `search get-state` | cli |  |
 | `search query` | cli |  |
 | `search set-state` | cli |  |
+| `session recent` | cli |  |
 | `skills list` | cli |  |
 | `skills resolve-prompt-sigils` | cli |  |
 | `task binding get` | cli |  |
@@ -450,4 +453,4 @@ Generated from the command registry. Do not edit by hand.
 | `viewer get-state` | cli |  |
 | `viewer open` | cli |  |
 
-Total: 445 commands
+Total: 448 commands

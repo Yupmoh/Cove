@@ -352,6 +352,12 @@
     .cl-session-more { color: var(--muted); font-size: 10px; }
     .cl-session-edit { color: var(--muted); font-size: 11px; }
     .cl-session-edit:hover { color: var(--fg); }
+    .cl-recent-list { display: flex; flex-direction: column; gap: 4px; margin-top: 2px; }
+    .cl-recent-heading { font-size: 9px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); }
+    .cl-recent-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-size: 11px; color: var(--fg); }
+    .cl-recent-cwd { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .cl-recent-when { color: var(--muted); font-size: 10px; flex-shrink: 0; }
+    .cl-recent-note { font-size: 9px; color: var(--muted); font-style: italic; }
     .cl-tool-row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
     .cl-tool { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; width: 84px; height: 84px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; cursor: pointer; color: var(--fg); transition: border-color 0.15s, transform 0.12s; }
     .cl-tool:hover { border-color: var(--tool-accent, var(--accent-dim)); transform: translateY(-1px); }

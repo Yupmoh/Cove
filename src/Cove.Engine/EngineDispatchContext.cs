@@ -73,7 +73,8 @@ public sealed class EngineDispatchContext
         Cove.Engine.Keybindings.KeybindingEngine? keybindings = null,
         Cove.Engine.Browser.BrowserAutomationBridge? browserAutomation = null,
         Cove.Engine.Diagnostics.DiagnosticsHub? diagnostics = null,
-        Cove.Engine.Diagnostics.PerformanceBundleService? perfBundles = null)
+        Cove.Engine.Diagnostics.PerformanceBundleService? perfBundles = null,
+        RecentSessionStore? recentSessions = null)
     {
         Request = request;
         Panes = panes;
@@ -127,6 +128,7 @@ public sealed class EngineDispatchContext
         BrowserAutomation = browserAutomation;
         Diagnostics = diagnostics;
         PerfBundles = perfBundles;
+        RecentSessions = recentSessions;
     }
 
     public ControlRequest Request { get; }
@@ -181,6 +183,7 @@ public sealed class EngineDispatchContext
     public Cove.Engine.Browser.BrowserAutomationBridge? BrowserAutomation { get; }
     public Cove.Engine.Diagnostics.DiagnosticsHub? Diagnostics { get; }
     public Cove.Engine.Diagnostics.PerformanceBundleService? PerfBundles { get; }
+    public RecentSessionStore? RecentSessions { get; }
     public System.Func<ControlRequest, System.Threading.Tasks.Task<ControlResponse?>>? Redrive { get; set; }
 
     public ControlResponse Ok<T>(T data, JsonTypeInfo<T> typeInfo)
