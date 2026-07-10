@@ -1027,6 +1027,7 @@ function renderRoom(): void {
     pv.el.classList.toggle("focused", id === focusedPaneId);
   }
   fitAll();
+  requestAnimationFrame(() => fitAll());
 }
 
 function focusPane(paneId: string): void {
@@ -1156,6 +1157,45 @@ async function closePaneById(paneId: string): Promise<void> {
   try { await invoke("app.paneKill", { paneId }); } catch (err) { console.warn("pane kill on exit failed", paneId, err); }
   try { await invoke("app.layoutMutate", { op: "close", roomId: room.id, paneId, targetPaneId: "", newPaneId: "", orientation: "", name: "", dir: 0 }); } catch (err) { console.warn("layout close on exit failed", paneId, err); }
   await reload();
+}
+
+function openSplitChooser(e: MouseEvent, dir: "row" | "col"): void {
+  const harnesses = detectedHarnessTiles(buildAdapterTiles(launcherAdapters));
+  const items: ContextMenuItem[] = [
+    { id: "terminal", label: "Terminal" },
+    ...harnesses.map((h) => ({ id: `adapter:${h.adapterName}`, label: h.label })),
+    { id: "sep1", label: "", separator: true },
+    { id: "browser", label: "Browser" },
+    { id: "search", label: "Search" },
+    { id: "git", label: "Source Control" },
+    { id: "tasks-list", label: "Tasks" },
+  ];
+  openContextMenuAt(e, items, (id) => { void splitActiveWith(dir, id); });
+}
+
+async function splitActiveWith(dir: "row" | "col", kind: string): Promise<void> {
+  if (!activeRoomId) { console.warn("split requested with no active room"); return; }
+  const target = focusedPaneId ?? activeLeafIds()[0];
+  if (!target) { console.warn("split requested with no target pane"); return; }
+  let paneId: string;
+  let paneType = "terminal";
+  if (kind === "terminal") {
+    paneId = (await invoke<{ paneId: string }>("app.paneSpawn", { command: "", cwd: "", inheritCwdFrom: target, cols: 80, rows: 24, adapter: "", agentName: "", workspace: "", room: "" })).paneId;
+  } else if (kind.startsWith("adapter:")) {
+    const name = kind.slice("adapter:".length);
+    const tile = detectedHarnessTiles(buildAdapterTiles(launcherAdapters)).find((t) => t.adapterName === name);
+    if (!tile) { console.warn("split chooser: unknown adapter", name); return; }
+    paneId = (await invoke<{ paneId: string }>("app.paneSpawn", { command: tile.binary, cwd: "", inheritCwdFrom: target, cols: 80, rows: 24, adapter: tile.adapterName, agentName: tile.label, workspace: "", room: "" })).paneId;
+  } else if (kind === "browser") {
+    paneId = (await invoke<{ paneId: string; currentUrl: string }>("cove://commands/browser.create", { url: "https://duckduckgo.com" })).paneId;
+    paneType = "browser";
+  } else {
+    paneId = (await invoke<{ paneId: string }>("app.paneSpawn", { command: "", cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: "", agentName: "", workspace: "", room: "" })).paneId;
+    paneType = kind;
+  }
+  await invoke("app.layoutMutate", { op: "split", roomId: activeRoomId, targetPaneId: target, newPaneId: paneId, orientation: dir, name: "", paneId: "", dir: 0, paneType });
+  await reload();
+  focusPane(paneId);
 }
 
 async function closeFocused(): Promise<void> {
@@ -2027,7 +2067,7 @@ function renderRoomTabs(): void {
     b.className = "rbox-ctl";
     b.textContent = ctl.icon;
     b.title = ctl.title;
-    b.addEventListener("click", () => runAction(ctl.action));
+    b.addEventListener("click", (e) => openSplitChooser(e, ctl.action === "pane.split-right" ? "row" : "col"));
     roomTabsEl.appendChild(b);
   }
 

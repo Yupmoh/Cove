@@ -72,4 +72,17 @@ public sealed class MovePaneTests
         var roomId = layout.CreateRoom("room", Leaf("a"));
         Assert.Throws<InvalidOperationException>(() => layout.MovePane(roomId, "a", "a", SplitOrientation.Row, 1));
     }
+
+    [Fact]
+    public void ClosePane_AfterMove_CollapsesSplitsWithoutGhostLeaves()
+    {
+        var (layout, roomId) = RoomWithThree();
+        layout.MovePane(roomId, "a", "c", SplitOrientation.Column, 1);
+        layout.ClosePane(roomId, "c");
+        layout.ClosePane(roomId, "a");
+
+        var room = layout.ToSnapshot("w", "w", "/tmp").Rooms.Single(r => r.Id == roomId);
+        var leaf = Assert.IsType<PaneLeaf>(room.LayoutTree);
+        Assert.Equal("b", leaf.PaneId);
+    }
 }

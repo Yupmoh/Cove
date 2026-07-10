@@ -89,6 +89,7 @@ export function buildWorkspaceTree(input: WorkspaceTreeInput): TreeRow[] {
 
   for (const room of input.rooms) {
     const roomCollapsed = input.collapsedRoomIds.has(room.id);
+    const realLeaves = room.leaves.filter((l) => l.paneType !== "empty");
     rows.push({
       kind: "room",
       key: `room:${room.id}`,
@@ -98,12 +99,12 @@ export function buildWorkspaceTree(input: WorkspaceTreeInput): TreeRow[] {
       paneId: null,
       paneType: null,
       active: room.id === input.activeRoomId,
-      expandable: room.leaves.length > 1,
+      expandable: realLeaves.length > 0,
       collapsed: roomCollapsed,
-      count: room.leaves.length,
+      count: realLeaves.length,
     });
-    if (roomCollapsed || room.leaves.length <= 1) continue;
-    for (const leaf of room.leaves) {
+    if (roomCollapsed || realLeaves.length === 0) continue;
+    for (const leaf of realLeaves) {
       rows.push({
         kind: "pane",
         key: `pane:${room.id}:${leaf.paneId}`,

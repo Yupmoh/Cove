@@ -36,26 +36,32 @@ describe("paneLabel", () => {
 });
 
 describe("buildWorkspaceTree", () => {
-  it("emits a workspace root then rooms, expanding multi-pane rooms only", () => {
+  it("emits a workspace root then rooms with pane children including single-pane rooms", () => {
     const rows = buildWorkspaceTree(baseInput());
-    expect(rows.map((r) => r.kind)).toEqual(["workspace", "room", "room", "pane", "pane"]);
+    expect(rows.map((r) => r.kind)).toEqual(["workspace", "room", "pane", "room", "pane", "pane"]);
     const single = rows.find((r) => r.roomId === "r1" && r.kind === "room")!;
-    expect(single.expandable).toBe(false);
+    expect(single.expandable).toBe(true);
     const multi = rows.find((r) => r.roomId === "r2" && r.kind === "room")!;
     expect(multi.expandable).toBe(true);
     expect(multi.count).toBe(2);
   });
 
+  it("skips placeholder empty panes but keeps the room row", () => {
+    const rows = buildWorkspaceTree(baseInput({ rooms: [{ id: "r9", name: "empty room", leaves: [{ paneId: "e1", paneType: "empty", title: "" }] }] }));
+    expect(rows.map((r) => r.kind)).toEqual(["workspace", "room"]);
+    expect(rows[1].expandable).toBe(false);
+  });
+
   it("marks the active room and focused pane", () => {
     const rows = buildWorkspaceTree(baseInput());
     expect(rows.find((r) => r.roomId === "r1" && r.kind === "room")!.active).toBe(true);
-    const focused = rows.filter((r) => r.kind === "pane");
-    expect(focused.every((r) => r.active === false)).toBe(true);
+    expect(rows.find((r) => r.paneId === "p1")!.active).toBe(true);
+    expect(rows.filter((r) => r.kind === "pane" && r.paneId !== "p1").every((r) => r.active === false)).toBe(true);
   });
 
   it("hides room children when the room is collapsed", () => {
     const rows = buildWorkspaceTree(baseInput({ collapsedRoomIds: new Set(["r2"]) }));
-    expect(rows.some((r) => r.kind === "pane")).toBe(false);
+    expect(rows.filter((r) => r.kind === "pane").map((r) => r.paneId)).toEqual(["p1"]);
     expect(rows.find((r) => r.roomId === "r2" && r.kind === "room")!.collapsed).toBe(true);
   });
 
