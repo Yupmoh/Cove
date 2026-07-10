@@ -48,18 +48,24 @@ export function launcherPlacement(activeRoomEmpty: boolean): LauncherPlacement {
   return activeRoomEmpty ? "replace" : "create";
 }
 
-export function placeablePaneForAction(action: string): { paneType: string; kind: "terminal" | "browser" | "tool" } | null {
+export interface PlaceablePane {
+  paneType: string;
+  kind: "terminal" | "browser" | "tool";
+  roomName: string;
+}
+
+export function placeablePaneForAction(action: string): PlaceablePane | null {
   switch (action) {
     case "room.new":
-      return { paneType: "terminal", kind: "terminal" };
+      return { paneType: "terminal", kind: "terminal", roomName: "Terminal" };
     case "tool.browser":
-      return { paneType: "browser", kind: "browser" };
+      return { paneType: "browser", kind: "browser", roomName: "Browser" };
     case "tool.search":
-      return { paneType: "search", kind: "tool" };
+      return { paneType: "search", kind: "tool", roomName: "Search" };
     case "tool.git":
-      return { paneType: "git", kind: "tool" };
+      return { paneType: "git", kind: "tool", roomName: "Source Control" };
     case "tool.tasks":
-      return { paneType: "tasks-list", kind: "tool" };
+      return { paneType: "tasks-list", kind: "tool", roomName: "Tasks" };
     default:
       return null;
   }

@@ -17,6 +17,7 @@ import {
   cwdBasename,
   relativeTime,
   shapeRecentSessions,
+  computeLauncherCols,
   type LauncherGeometry,
   type LauncherSession,
   type RecentSessionRow,
@@ -106,6 +107,23 @@ describe("launcher selection geometry", () => {
   it("clamps a stale selection when the geometry shrinks", () => {
     expect(clampLauncherSelection({ section: "harness", index: 9 }, geo)).toEqual({ section: "harness", index: 4 });
     expect(clampLauncherSelection({ section: "harness", index: 0 }, { harnessCount: 0, harnessCols: 3, toolCount: 6 })).toEqual({ section: "tool", index: 0 });
+  });
+});
+
+describe("computeLauncherCols", () => {
+  it("fits three cards in a wide container", () => {
+    expect(computeLauncherCols(680, 3, 3)).toBe(3);
+  });
+
+  it("drops to fewer columns as the container narrows", () => {
+    expect(computeLauncherCols(460, 3, 3)).toBe(2);
+    expect(computeLauncherCols(300, 3, 3)).toBe(1);
+  });
+
+  it("never exceeds the card count and never returns zero", () => {
+    expect(computeLauncherCols(9999, 2, 3)).toBe(2);
+    expect(computeLauncherCols(0, 3, 3)).toBe(1);
+    expect(computeLauncherCols(680, 0, 3)).toBe(1);
   });
 });
 

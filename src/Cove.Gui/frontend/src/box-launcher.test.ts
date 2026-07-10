@@ -88,10 +88,12 @@ describe("launcherPlacement", () => {
 });
 
 describe("placeablePaneForAction", () => {
-  it("maps terminal and browser and tool tiles to pane types", () => {
-    expect(placeablePaneForAction("room.new")).toEqual({ paneType: "terminal", kind: "terminal" });
-    expect(placeablePaneForAction("tool.browser")).toEqual({ paneType: "browser", kind: "browser" });
-    expect(placeablePaneForAction("tool.git")).toEqual({ paneType: "git", kind: "tool" });
+  it("maps terminal and browser and tool tiles to pane types and room names", () => {
+    expect(placeablePaneForAction("room.new")).toEqual({ paneType: "terminal", kind: "terminal", roomName: "Terminal" });
+    expect(placeablePaneForAction("tool.browser")).toEqual({ paneType: "browser", kind: "browser", roomName: "Browser" });
+    expect(placeablePaneForAction("tool.git")).toEqual({ paneType: "git", kind: "tool", roomName: "Source Control" });
+    expect(placeablePaneForAction("tool.search")).toEqual({ paneType: "search", kind: "tool", roomName: "Search" });
+    expect(placeablePaneForAction("tool.tasks")).toEqual({ paneType: "tasks-list", kind: "tool", roomName: "Tasks" });
     expect(placeablePaneForAction("tool.notepad")).toBeNull();
   });
 });

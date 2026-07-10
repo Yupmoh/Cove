@@ -59,6 +59,14 @@ export interface LauncherGeometry {
 
 export type LauncherArrowKey = "ArrowLeft" | "ArrowRight" | "ArrowUp" | "ArrowDown";
 
+export const LAUNCHER_CARD_STRIDE = 176;
+
+export function computeLauncherCols(containerWidth: number, cardCount: number, maxCols: number): number {
+  const usable = Math.max(LAUNCHER_CARD_STRIDE, containerWidth - 64);
+  const fit = Math.floor(usable / LAUNCHER_CARD_STRIDE);
+  return Math.max(1, Math.min(maxCols, Math.max(1, cardCount), fit));
+}
+
 export function initialLauncherSelection(geo: LauncherGeometry): LauncherSelection {
   if (geo.harnessCount > 0) return { section: "harness", index: 0 };
   return { section: "tool", index: 0 };

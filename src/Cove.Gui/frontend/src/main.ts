@@ -44,7 +44,8 @@ import { NotificationBridge, type NotificationBridgeDeps, type NotificationDeliv
 import { buildMenu, menuChordSet } from "./menu-model";
 import { toolbarTiles } from "./toolbar-tiles";
 import { shouldShowLauncher, buildAdapterTiles, buildBuiltinTiles, isEmptyRoomTree, placeablePaneForAction, type LauncherAdapter, type LauncherBuiltin, type LauncherTile } from "./box-launcher";
-import { adapterAccent, toolAccent, assignHotkeys, detectedHarnessTiles, clampLauncherSelection, moveLauncherSelection, hotkeyTarget, resumableSessionsFor, mostRecentSession, shapeRecentSessions, tipAt, type LauncherSelection, type LauncherGeometry, type LauncherSession, type LauncherArrowKey, type RecentSessionRow } from "./launcher-model";
+import { adapterAccent, toolAccent, assignHotkeys, detectedHarnessTiles, clampLauncherSelection, moveLauncherSelection, hotkeyTarget, resumableSessionsFor, mostRecentSession, shapeRecentSessions, tipAt, computeLauncherCols, type LauncherSelection, type LauncherGeometry, type LauncherSession, type LauncherArrowKey, type RecentSessionRow } from "./launcher-model";
+import { iconSvg, iconForPaneType, monogram } from "./icons";
 import { clusterTools } from "./title-cluster";
 import { initialZenState, toggleZen, type ChromeVisibility, type ZenState } from "./zen-mode";
 import { eventToChord, buildChordMap, resolveDispatch, defaultBindings, type ResolvedBinding } from "./keymap-dispatch";
@@ -831,7 +832,7 @@ function renderNode(node: MosaicNode): HTMLElement {
     if (active.paneType === "diff-review") return renderDiffReviewPaneWrapper(active.documentId);
     if (active.paneType === "editor") return renderEditorPaneWrapper(active.documentId);
     if (active.paneType === "image") return renderImagePane(active.documentId);
-    if (active.paneType === "git") return renderGitPaneWrapper(active.documentId);
+    if (active.paneType === "git" || active.paneType === "sourceControl") return renderGitPaneWrapper(active.documentId);
     if (active.paneType === "search") return renderSearchPaneWrapper(active.documentId);
     if (active.paneType === "browser") return renderBrowserPaneWrapper(active.documentId, active.title ?? "about:blank");
     if (active.paneType === "diff") return renderDiffViewerPaneWrapper(active.documentId, active.title ?? "");
@@ -1091,11 +1092,14 @@ async function newRoom(): Promise<void> {
   await reload();
 }
 
-async function placePaneIntoRoom(roomId: string, placeholderId: string | null, paneId: string, paneType: string): Promise<void> {
+async function placePaneIntoRoom(roomId: string, placeholderId: string | null, paneId: string, paneType: string, roomName?: string): Promise<void> {
   if (placeholderId) {
     await invoke("app.layoutMutate", { op: "replace", roomId, targetPaneId: placeholderId, newPaneId: paneId, orientation: "", name: "", paneId: "", dir: 0, paneType });
+    if (roomName) {
+      try { await invoke("app.layoutMutate", { op: "rename", roomId, name: roomName, targetPaneId: "", newPaneId: "", orientation: "", paneId: "", dir: 0 }); } catch (err) { console.warn("room rename after place failed", err); }
+    }
   } else {
-    await invoke("app.layoutMutate", { op: "createRoom", newPaneId: paneId, name: paneType === "browser" ? "Browser" : "Terminal " + (layout ? layout.rooms.length + 1 : 1), roomId: "", targetPaneId: "", orientation: "", paneId: "", dir: 0, paneType });
+    await invoke("app.layoutMutate", { op: "createRoom", newPaneId: paneId, name: roomName ?? (paneType === "browser" ? "Browser" : "Terminal " + (layout ? layout.rooms.length + 1 : 1)), roomId: "", targetPaneId: "", orientation: "", paneId: "", dir: 0, paneType });
   }
   activeRoomId = roomId;
   await reload();
@@ -1113,9 +1117,9 @@ async function launchTileInto(roomId: string | null, placeholderId: string | nul
     paneId = (await invoke<{ paneId: string }>("app.paneSpawn", { command: "", cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: "", agentName: "", workspace: "", room: "" })).paneId;
   }
   if (roomId) {
-    await placePaneIntoRoom(roomId, placeholderId, paneId, placeable.paneType);
+    await placePaneIntoRoom(roomId, placeholderId, paneId, placeable.paneType, placeable.roomName);
   } else {
-    const r = await invoke<{ roomId: string }>("app.layoutMutate", { op: "createRoom", newPaneId: paneId, name: placeable.kind === "browser" ? "Browser" : "Terminal " + (layout ? layout.rooms.length + 1 : 1), roomId: "", targetPaneId: "", orientation: "", paneId: "", dir: 0, paneType: placeable.paneType });
+    const r = await invoke<{ roomId: string }>("app.layoutMutate", { op: "createRoom", newPaneId: paneId, name: placeable.roomName, roomId: "", targetPaneId: "", orientation: "", paneId: "", dir: 0, paneType: placeable.paneType });
     activeRoomId = r.roomId;
     await reload();
     focusPane(paneId);
@@ -1256,7 +1260,7 @@ function renderLeftRail(): void {
   for (const meta of SIDEBAR_MODES) {
     const btn = document.createElement("div");
     btn.className = "sb-mode" + (meta.mode === activeMode ? " active" : "") + (meta.functional ? "" : " stub");
-    btn.textContent = meta.icon;
+    btn.innerHTML = iconSvg(meta.mode);
     btn.title = meta.label;
     btn.setAttribute("role", "button");
     btn.setAttribute("aria-label", meta.label);
@@ -1325,7 +1329,8 @@ function sidebarHead(title: string, actions: { icon: string; title: string; run:
     for (const a of actions) {
       const act = document.createElement("span");
       act.className = "sb-act";
-      act.textContent = a.icon;
+      if (a.icon.startsWith("<svg")) act.innerHTML = a.icon;
+      else act.textContent = a.icon;
       act.title = a.title;
       act.addEventListener("click", (e) => { e.stopPropagation(); a.run(); });
       wrap.appendChild(act);
@@ -1469,7 +1474,7 @@ function closeTreeRow(kind: string, roomId: string | null, paneId: string | null
 }
 
 function renderAgentsContent(container: HTMLElement): void {
-  container.appendChild(sidebarHead("Agents", [{ icon: "↻", title: "Refresh", run: () => void refreshAgents() }]));
+  container.appendChild(sidebarHead("Agents", [{ icon: iconSvg("refresh"), title: "Refresh", run: () => void refreshAgents() }]));
   const list = document.createElement("div");
   list.className = "sb-list";
   const rows = buildAgentRows(agentCards, needsInputPanes);
@@ -1657,7 +1662,7 @@ function renderRoomTabs(): void {
 
     const glyph = document.createElement("span");
     glyph.className = "rtab-glyph";
-    glyph.textContent = glyphForPaneType(roomLeaves(room)[0]?.paneType ?? "terminal");
+    glyph.innerHTML = iconForPaneType(roomLeaves(room)[0]?.paneType ?? "terminal");
     tab.appendChild(glyph);
 
     const nameEl = document.createElement("span");
@@ -3056,9 +3061,10 @@ const LAUNCHER_HARNESS_COLS = 3;
 let launcherSelection: LauncherSelection = { section: "harness", index: 0 };
 let launcherTipIndex = 0;
 let launcherTipTimer: number | null = null;
+let launcherCols = LAUNCHER_HARNESS_COLS;
 
 function launcherGeometry(harnessCount: number, toolCount: number): LauncherGeometry {
-  return { harnessCount, harnessCols: Math.min(LAUNCHER_HARNESS_COLS, Math.max(1, harnessCount)), toolCount };
+  return { harnessCount, harnessCols: Math.min(launcherCols, Math.max(1, harnessCount)), toolCount };
 }
 
 function launchHarnessTile(ctx: LauncherContext, tile: LauncherTile): void {
@@ -3088,6 +3094,13 @@ function renderBoxLauncher(targetRoomId: string | null, targetPlaceholderId: str
   if (targetRoomId) wrap.dataset.roomId = targetRoomId;
   if (targetPlaceholderId) wrap.dataset.placeholderId = targetPlaceholderId;
   paintBoxLauncher(wrap, ctx);
+  const ro = new ResizeObserver(() => {
+    if (!document.body.contains(wrap)) { ro.disconnect(); return; }
+    const count = Math.max(1, launcherTileSets().harness.length);
+    const cols = computeLauncherCols(wrap.clientWidth || 680, count, LAUNCHER_HARNESS_COLS);
+    if (cols !== launcherCols) paintBoxLauncher(wrap, ctx);
+  });
+  ro.observe(wrap);
   wrap.addEventListener("keydown", (e) => handleLauncherKey(e, wrap, ctx));
   if (launcherTipTimer !== null) window.clearInterval(launcherTipTimer);
   launcherTipTimer = window.setInterval(() => {
@@ -3144,6 +3157,7 @@ function firstSensibleSelection(harness: LauncherTile[], tools: LauncherTile[]):
 
 function paintBoxLauncher(wrap: HTMLElement, ctx: LauncherContext): void {
   const { harness, tools, harnessKeys, toolKeys } = launcherTileSets();
+  launcherCols = computeLauncherCols(wrap.clientWidth || 680, Math.max(1, harness.length), LAUNCHER_HARNESS_COLS);
   const geo = launcherGeometry(harness.length, tools.length);
   launcherSelection = clampLauncherSelection(launcherSelection, geo);
   if (launcherSelection.section === "harness" && harness[launcherSelection.index]?.disabled) {
@@ -3174,6 +3188,10 @@ function paintBoxLauncher(wrap: HTMLElement, ctx: LauncherContext): void {
     const selected = launcherSelection.section === "harness" && launcherSelection.index === i;
     cards.appendChild(renderHarnessCard(ctx, tile, harnessKeys[i], selected));
   });
+  if (harness.length === 0) {
+    cards.style.gridTemplateColumns = "minmax(0, 280px)";
+    cards.appendChild(renderConfigureAdapterCard());
+  }
   wrap.appendChild(cards);
 
   const toolRow = document.createElement("div");
@@ -3183,6 +3201,32 @@ function paintBoxLauncher(wrap: HTMLElement, ctx: LauncherContext): void {
     toolRow.appendChild(renderToolTile(ctx, tile, toolKeys[i], selected));
   });
   wrap.appendChild(toolRow);
+}
+
+function renderConfigureAdapterCard(): HTMLElement {
+  const el = document.createElement("div");
+  el.className = "cl-card cl-configure";
+  el.style.setProperty("--card-accent", "#cba6f7");
+  const badge = document.createElement("span");
+  badge.className = "cl-card-badge";
+  badge.innerHTML = iconSvg("gear");
+  el.appendChild(badge);
+  const name = document.createElement("div");
+  name.className = "cl-card-name";
+  name.textContent = "Configure an adapter";
+  el.appendChild(name);
+  const note = document.createElement("div");
+  note.className = "cl-card-note";
+  note.textContent = "no coding agents set up yet — connect one to launch sessions";
+  el.appendChild(note);
+  el.addEventListener("click", () => openAdapterSetup());
+  return el;
+}
+
+function openAdapterSetup(): void {
+  onboardingState = { ...INITIAL_ONBOARDING_STATE, currentStep: 1 };
+  onboardingEl.classList.add("open");
+  renderOnboarding();
 }
 
 function renderHarnessCard(ctx: LauncherContext, tile: LauncherTile, letter: string, selected: boolean): HTMLElement {
@@ -3204,11 +3248,10 @@ function renderHarnessCard(ctx: LauncherContext, tile: LauncherTile, letter: str
   top.appendChild(cta);
   el.appendChild(top);
 
-  const icon = document.createElement("span");
-  icon.className = "cl-card-icon";
-  icon.textContent = "◆";
-  icon.style.color = accent;
-  el.appendChild(icon);
+  const badge = document.createElement("span");
+  badge.className = "cl-card-badge";
+  badge.textContent = monogram(tile.label);
+  el.appendChild(badge);
 
   const name = document.createElement("div");
   name.className = "cl-card-name";
@@ -3335,7 +3378,7 @@ function renderToolTile(ctx: LauncherContext, tile: LauncherTile, letter: string
   el.style.setProperty("--tool-accent", accent);
   const ic = document.createElement("span");
   ic.className = "cl-tool-ic";
-  ic.textContent = tile.icon;
+  ic.innerHTML = iconSvg(id);
   ic.style.color = accent;
   const lbl = document.createElement("span");
   lbl.className = "cl-tool-lbl";
