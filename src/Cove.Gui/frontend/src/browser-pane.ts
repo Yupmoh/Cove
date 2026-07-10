@@ -189,7 +189,7 @@ export async function renderBrowserPane(paneId: string, initialUrl: string, user
     const storagePath = `/tmp/cove-webview-${paneId}`;
     const openArgs: Record<string, unknown> = { url, x: 0, y: 0, width: 800, height: 600, storagePath, devTools: false, zoom: zoomLevel };
     if (userAgent && userAgent.length > 0) openArgs.userAgent = userAgent;
-    const result = await invoke<WebViewPaneOpenResult>("webviewPane.open", openArgs);
+    const result = await invoke<WebViewPaneOpenResult>("webviewPane.open", { options: openArgs });
     webviewId = result.id;
     browserWebviewRegistry.set(paneId, result.id);
     syncBounds();
@@ -234,12 +234,12 @@ export async function renderBrowserPane(paneId: string, initialUrl: string, user
   const setZoom = async (level: number) => {
     zoomLevel = Math.max(0.25, Math.min(5.0, level));
     updateChrome();
-    if (webviewId) await invoke("webviewPane.setZoom", { id: webviewId, zoom: zoomLevel }).catch(() => void 0);
+    if (webviewId) await invoke("webviewPane.setZoom", { id: webviewId, factor: zoomLevel }).catch((err) => console.warn("webview setZoom failed", err));
   };
 
   const toggleDevTools = async () => {
     devToolsOpen = !devToolsOpen;
-    if (webviewId) await invoke("webviewPane.setDevTools", { id: webviewId, devTools: devToolsOpen }).catch(() => void 0);
+    if (webviewId) await invoke("webviewPane.setDevTools", { id: webviewId, enabled: devToolsOpen }).catch((err) => console.warn("webview setDevTools failed", err));
     devToolsBtn.style.background = devToolsOpen ? "#34c2b0" : "";
   };
 
