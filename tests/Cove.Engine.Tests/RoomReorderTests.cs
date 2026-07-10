@@ -91,7 +91,7 @@ public sealed class RoomReorderTests
     }
 
     [Fact]
-    public void ClosePane_PreservesRemainingOrder()
+    public void ClosePane_LastPane_KeepsRoomAsEmpty_PreservingOrder()
     {
         var svc = new LayoutService();
         var r1 = svc.CreateRoom("A", Leaf("a"));
@@ -100,6 +100,25 @@ public sealed class RoomReorderTests
         svc.ReorderRooms(new[] { r3, r1, r2 });
 
         svc.ClosePane(r1, "a");
+
+        var snap = svc.ToSnapshot("ws", "demo", "/proj");
+        Assert.Equal(3, snap.Rooms.Count);
+        Assert.Equal(r3, snap.Rooms[0].Id);
+        Assert.Equal(r1, snap.Rooms[1].Id);
+        Assert.Equal(r2, snap.Rooms[2].Id);
+        Assert.True(LayoutService.IsEmptyRoom(snap.Rooms[1].LayoutTree));
+    }
+
+    [Fact]
+    public void CloseRoom_RemovesRoom_PreservingOrder()
+    {
+        var svc = new LayoutService();
+        var r1 = svc.CreateRoom("A", Leaf("a"));
+        var r2 = svc.CreateRoom("B", Leaf("b"));
+        var r3 = svc.CreateRoom("C", Leaf("c"));
+        svc.ReorderRooms(new[] { r3, r1, r2 });
+
+        svc.CloseRoom(r1);
 
         var snap = svc.ToSnapshot("ws", "demo", "/proj");
         Assert.Equal(2, snap.Rooms.Count);

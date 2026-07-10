@@ -17,6 +17,7 @@ public static class WorkspaceCommands
         var outcome = await manager.CreateValidatedWorkspaceAsync(p.Name, p.ProjectDir, p.CollectionId).ConfigureAwait(false);
         if (outcome.Workspace is not { } workspace)
             return ctx.Fail(outcome.ErrorCode ?? "bad_params", outcome.ErrorMessage ?? "invalid params");
+        ctx.Layout?.SetActiveWorkspace(workspace.Id);
         return ctx.Ok(new WorkspaceIdResult(workspace.Id), WorkspacesJsonContext.Default.WorkspaceIdResult);
     }
 
@@ -29,9 +30,10 @@ public static class WorkspaceCommands
             || el.Deserialize(WorkspacesJsonContext.Default.WorkspaceIdParams) is not { } p)
             return ctx.Fail("bad_params", "id is required");
 
-        return await manager.SwitchWorkspaceAsync(p.Id).ConfigureAwait(false)
-            ? ctx.Ok()
-            : ctx.Fail("not_found", $"workspace {p.Id} not found");
+        if (!await manager.SwitchWorkspaceAsync(p.Id).ConfigureAwait(false))
+            return ctx.Fail("not_found", $"workspace {p.Id} not found");
+        ctx.Layout?.SetActiveWorkspace(p.Id);
+        return ctx.Ok();
     }
 
     [CoveCommand("cove://commands/workspace.list")]
@@ -51,8 +53,17 @@ public static class WorkspaceCommands
             || el.Deserialize(WorkspacesJsonContext.Default.WorkspaceIdParams) is not { } p)
             return ctx.Fail("bad_params", "id is required");
 
-        return await manager.DeleteWorkspaceAsync(p.Id).ConfigureAwait(false)
-            ? ctx.Ok()
-            : ctx.Fail("not_found", $"workspace {p.Id} not found");
+        if (ctx.Layout is { } layout)
+        {
+            var paneIds = layout.RemoveWorkspace(p.Id);
+            if (ctx.Panes is { } panes)
+                foreach (var paneId in paneIds)
+                    panes.Kill(paneId);
+        }
+        if (!await manager.DeleteWorkspaceAsync(p.Id).ConfigureAwait(false))
+            return ctx.Fail("not_found", $"workspace {p.Id} not found");
+        if (ctx.Layout is { } layout2 && manager.Registry.FocusedWorkspaceId is { } focused)
+            layout2.SetActiveWorkspace(focused);
+        return ctx.Ok();
     }
 }

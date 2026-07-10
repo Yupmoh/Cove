@@ -29,7 +29,7 @@ public sealed class RoomWingCommandsTests
 
         var listed = await Route(mgr, "cove://commands/room.list",
             El(new WorkspaceRef(wsId), RoomWingJsonContext.Default.WorkspaceRef));
-        Assert.Equal(2, listed!.Data!.Value.GetProperty("rooms").GetArrayLength());
+        Assert.Equal(1, listed!.Data!.Value.GetProperty("rooms").GetArrayLength());
 
         await Route(mgr, "cove://commands/room.rename",
             El(new RoomRenameParams(wsId, roomId, "renamed"), RoomWingJsonContext.Default.RoomRenameParams));

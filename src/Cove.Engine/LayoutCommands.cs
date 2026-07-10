@@ -15,8 +15,7 @@ internal static class LayoutCommands
     {
         if (ctx.Layout is not { } layout)
             return Task.FromResult(ctx.Fail("not_ready", "layout service unavailable"));
-        var snap = layout.ToSnapshot("default", "default", Environment.CurrentDirectory);
-        return Task.FromResult(ctx.Ok(snap, Cove.Persistence.CoveJsonContext.Default.WorkspaceSnapshot));
+        return Task.FromResult(ctx.Ok(ActiveSnapshot(ctx, layout), Cove.Persistence.CoveJsonContext.Default.WorkspaceSnapshot));
     }
 
     [CoveCommand("cove://commands/layout.snapshot")]
@@ -24,8 +23,20 @@ internal static class LayoutCommands
     {
         if (ctx.Layout is not { } layout)
             return Task.FromResult(ctx.Fail("not_ready", "layout service unavailable"));
-        var snap = layout.ToSnapshot("default", "default", Environment.CurrentDirectory);
-        return Task.FromResult(ctx.Ok(snap, Cove.Persistence.CoveJsonContext.Default.WorkspaceSnapshot));
+        return Task.FromResult(ctx.Ok(ActiveSnapshot(ctx, layout), Cove.Persistence.CoveJsonContext.Default.WorkspaceSnapshot));
+    }
+
+    private static Cove.Persistence.WorkspaceSnapshot ActiveSnapshot(EngineDispatchContext ctx, Cove.Engine.Layout.LayoutService layout)
+    {
+        var wsId = layout.ActiveWorkspaceId;
+        var name = wsId;
+        var projectDir = Environment.CurrentDirectory;
+        if (ctx.Workspaces?.Get(wsId) is { } actor)
+        {
+            name = actor.State.Name;
+            projectDir = actor.State.ProjectDir;
+        }
+        return layout.ToSnapshot(wsId, name, projectDir);
     }
 
     [CoveCommand("cove://commands/layout.mutate")]
@@ -42,7 +53,9 @@ internal static class LayoutCommands
             {
                 "createRoom" => ctx.Ok(new LayoutMutateResult(layout.CreateRoom(p.Name ?? "main", NewLeaf(p.NewPaneId!, p.PaneType))), Cove.Protocol.CoveJsonContext.Default.LayoutMutateResult),
                 "split" => MutateOk(() => layout.SplitPane(p.RoomId!, p.TargetPaneId!, Orient(p.Orientation), NewLeaf(p.NewPaneId!, p.PaneType)), p.RoomId, ctx),
+                "replace" => MutateOk(() => layout.ReplacePane(p.RoomId!, p.TargetPaneId!, NewLeaf(p.NewPaneId!, p.PaneType)), p.RoomId, ctx),
                 "close" => MutateOk(() => layout.ClosePane(p.RoomId!, p.PaneId!), p.RoomId, ctx),
+                "closeRoom" => CloseRoomOk(() => layout.CloseRoom(p.RoomId!), p.RoomId, ctx),
                 "addSubtab" => MutateOk(() => layout.AddSubtab(p.RoomId!, p.PaneId!, p.NewPaneId!), p.RoomId, ctx),
                 "activateSubtab" => MutateOk(() => layout.ActivateSubtab(p.RoomId!, p.PaneId!, p.Dir), p.RoomId, ctx),
                 "promoteSubtab" => MutateOk(() => layout.PromoteSubtab(p.RoomId!, p.PaneId!, p.Dir, p.NewPaneId!), p.RoomId, ctx),
@@ -78,6 +91,12 @@ internal static class LayoutCommands
     }
 
     private static ControlResponse MutateOk(Action work, string? roomId, EngineDispatchContext ctx)
+    {
+        work();
+        return ctx.Ok(new LayoutMutateResult(roomId), Cove.Protocol.CoveJsonContext.Default.LayoutMutateResult);
+    }
+
+    private static ControlResponse CloseRoomOk(Action work, string? roomId, EngineDispatchContext ctx)
     {
         work();
         return ctx.Ok(new LayoutMutateResult(roomId), Cove.Protocol.CoveJsonContext.Default.LayoutMutateResult);

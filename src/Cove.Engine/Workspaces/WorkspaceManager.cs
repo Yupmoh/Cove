@@ -105,8 +105,6 @@ public sealed class WorkspaceManager : IAsyncDisposable
     public async Task<WorkspaceModel> CreateWorkspaceAsync(string name, string projectDir, string? collectionId = null)
     {
         var id = _newId();
-        var paneId = _newId();
-        var roomId = _newId();
         var model = new WorkspaceModel
         {
             Id = id,
@@ -114,10 +112,10 @@ public sealed class WorkspaceManager : IAsyncDisposable
             ProjectDir = projectDir,
             CollectionId = collectionId ?? WorkspaceModel.DefaultCollectionId,
             Wings = [new Wing { Id = WorkspaceModel.MainWingId, Name = "main" }],
-            Rooms = [new Room { Id = roomId, Name = "shell", WingId = WorkspaceModel.MainWingId, ActivePaneId = paneId, LayoutTree = new PaneLeaf { PaneId = paneId } }],
-            Panes = new Dictionary<string, PaneRecord> { [paneId] = new PaneRecord { PaneId = paneId } },
-            ActiveRoomId = roomId,
-            FocusedPaneId = paneId,
+            Rooms = [],
+            Panes = new Dictionary<string, PaneRecord>(),
+            ActiveRoomId = null,
+            FocusedPaneId = null,
         };
 
         lock (_mapGate)
@@ -129,6 +127,31 @@ public sealed class WorkspaceManager : IAsyncDisposable
             FocusedWorkspaceId = r.FocusedWorkspaceId ?? id,
         }).ConfigureAwait(false);
 
+        _emit?.Invoke(new WorkspaceChange(WorkspaceChangeKind.Created, id));
+        return model;
+    }
+
+    public async Task<WorkspaceModel> AdoptExistingAsync(string id, string name, string projectDir, string? collectionId = null)
+    {
+        var model = new WorkspaceModel
+        {
+            Id = id,
+            Name = name,
+            ProjectDir = projectDir,
+            CollectionId = collectionId ?? WorkspaceModel.DefaultCollectionId,
+            Wings = [new Wing { Id = WorkspaceModel.MainWingId, Name = "main" }],
+            Rooms = [],
+            Panes = new Dictionary<string, PaneRecord>(),
+            ActiveRoomId = null,
+            FocusedPaneId = null,
+        };
+        lock (_mapGate)
+            _workspaces[id] = new Actor<WorkspaceModel>(model);
+        await _registry.Mutate(r => r with
+        {
+            OpenWorkspaces = Append(r.OpenWorkspaces, id),
+            FocusedWorkspaceId = r.FocusedWorkspaceId ?? id,
+        }).ConfigureAwait(false);
         _emit?.Invoke(new WorkspaceChange(WorkspaceChangeKind.Created, id));
         return model;
     }
@@ -408,8 +431,6 @@ public sealed class WorkspaceManager : IAsyncDisposable
             return null;
 
         var id = _newId();
-        var paneId = _newId();
-        var roomId = _newId();
         var model = new WorkspaceModel
         {
             Id = id,
@@ -420,10 +441,10 @@ public sealed class WorkspaceManager : IAsyncDisposable
             ParentWorkspaceId = parentId,
             WorktreeBranch = branch,
             Wings = [new Wing { Id = WorkspaceModel.MainWingId, Name = "main" }],
-            Rooms = [new Room { Id = roomId, Name = "shell", WingId = WorkspaceModel.MainWingId, ActivePaneId = paneId, LayoutTree = new PaneLeaf { PaneId = paneId } }],
-            Panes = new Dictionary<string, PaneRecord> { [paneId] = new PaneRecord { PaneId = paneId } },
-            ActiveRoomId = roomId,
-            FocusedPaneId = paneId,
+            Rooms = [],
+            Panes = new Dictionary<string, PaneRecord>(),
+            ActiveRoomId = null,
+            FocusedPaneId = null,
         };
         lock (_mapGate)
             _workspaces[id] = new Actor<WorkspaceModel>(model);
@@ -456,8 +477,6 @@ public sealed class WorkspaceManager : IAsyncDisposable
             return null;
 
         var id = _newId();
-        var paneId = _newId();
-        var roomId = _newId();
         var model = new WorkspaceModel
         {
             Id = id,
@@ -468,10 +487,10 @@ public sealed class WorkspaceManager : IAsyncDisposable
             ParentWorkspaceId = parentId,
             WorktreeBranch = branch,
             Wings = [new Wing { Id = WorkspaceModel.MainWingId, Name = "main" }],
-            Rooms = [new Room { Id = roomId, Name = "shell", WingId = WorkspaceModel.MainWingId, ActivePaneId = paneId, LayoutTree = new PaneLeaf { PaneId = paneId } }],
-            Panes = new Dictionary<string, PaneRecord> { [paneId] = new PaneRecord { PaneId = paneId } },
-            ActiveRoomId = roomId,
-            FocusedPaneId = paneId,
+            Rooms = [],
+            Panes = new Dictionary<string, PaneRecord>(),
+            ActiveRoomId = null,
+            FocusedPaneId = null,
         };
         lock (_mapGate)
             _workspaces[id] = new Actor<WorkspaceModel>(model);

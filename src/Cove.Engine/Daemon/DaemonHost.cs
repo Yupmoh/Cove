@@ -214,35 +214,50 @@ public sealed class DaemonHost
         _hookServer.Aggregator = aggregator;
         await _hookServer.StartAsync();
 
-        var wsDir = System.IO.Path.Combine(dataDir, "workspaces", "default");
+        var workspacesRoot = System.IO.Path.Combine(dataDir, "workspaces");
         var wasClean = _restoration.WasCleanShutdown();
         _restoration.MarkLaunching();
         _restoration.EmitProgress("default", "load_workspace", Cove.Engine.Restart.RestorePhase.Started, wasClean ? "clean" : "unclean");
-        var (savedLayout, sessions) = Cove.Engine.Layout.WorkspacePersistence.Load(wsDir, logger);
-        if (savedLayout is { } sl)
+        _layout!.OnChanged = () => PersistActiveWorkspace(workspacesRoot, logger);
+        var loadedWorkspaces = Cove.Engine.Layout.WorkspaceStartup.Enumerate(workspacesRoot, logger);
+        var fallbackProjectDir = System.Environment.CurrentDirectory;
+        foreach (var entry in loadedWorkspaces)
         {
-            if (!string.IsNullOrEmpty(sl.ProjectDir)) _panes!.ProjectDir = sl.ProjectDir;
-            _restoration.EmitProgress("default", "load_workspace", Cove.Engine.Restart.RestorePhase.WorkspaceLoaded);
+            var sl = entry.Snapshot;
             foreach (var room in sl.Rooms)
                 foreach (var leaf in Cove.Engine.Layout.MosaicOps.Leaves(room.LayoutTree))
-                    if (sessions.TryGetValue(leaf.PaneId, out var d))
+                    if (entry.Sessions.TryGetValue(leaf.PaneId, out var d))
                     {
-                        try { _panes!.RespawnAs(d.PaneId, d.Command, d.Args, d.Cwd, 80, 24, Cove.Engine.Layout.WorkspacePersistence.LoadScrollback(d.PaneId, wsDir)); if (!string.IsNullOrEmpty(d.Title)) _panes!.Rename(d.PaneId, d.Title!); }
+                        try { _panes!.RespawnAs(d.PaneId, d.Command, d.Args, d.Cwd, 80, 24, Cove.Engine.Layout.WorkspacePersistence.LoadScrollback(d.PaneId, entry.WorkspaceDir)); if (!string.IsNullOrEmpty(d.Title)) _panes!.Rename(d.PaneId, d.Title!); }
                         catch (System.Exception ex) { logger.LogWarning(ex, "respawn on restore failed for {PaneId}", d.PaneId); }
                     }
-            _restoration.EmitProgress("default", "materialize_panes", Cove.Engine.Restart.RestorePhase.PanesMaterialized);
             _layout!.LoadSnapshot(sl);
+            var displayName = Cove.Engine.Layout.WorkspaceStartup.DisplayName(sl, fallbackProjectDir);
+            var projectDir = string.IsNullOrWhiteSpace(sl.ProjectDir) ? fallbackProjectDir : sl.ProjectDir;
+            await _workspaces!.AdoptExistingAsync(sl.Id, displayName, projectDir).ConfigureAwait(false);
+            logger.LogWarning("workspace startup: adopted {Id} '{Name}' rooms={Rooms} dir={Dir}", sl.Id, displayName, sl.Rooms.Count, projectDir);
         }
+        if (loadedWorkspaces.Count == 0)
+        {
+            var seedDir = _panes!.ProjectDir ?? fallbackProjectDir;
+            var seedName = System.IO.Path.GetFileName(seedDir.TrimEnd('/', '\\'));
+            if (string.IsNullOrWhiteSpace(seedName)) seedName = "Workspace";
+            var seeded = await _workspaces!.CreateWorkspaceAsync(seedName, seedDir).ConfigureAwait(false);
+            _layout!.SetActiveWorkspace(seeded.Id);
+            logger.LogWarning("workspace startup: no persisted workspaces, seeded default {Id} '{Name}' dir={Dir}", seeded.Id, seedName, seedDir);
+        }
+        else if (_workspaces!.Registry.FocusedWorkspaceId is { } focused)
+        {
+            _layout!.SetActiveWorkspace(focused);
+            if (_workspaces.Get(focused) is { } focusedActor && !string.IsNullOrEmpty(focusedActor.State.ProjectDir))
+                _panes!.ProjectDir = focusedActor.State.ProjectDir;
+        }
+        _restoration.EmitProgress("default", "materialize_panes", Cove.Engine.Restart.RestorePhase.PanesMaterialized);
         try { if (_runCommands is not null) await _runCommands.RelaunchPreviouslyRunningAsync().ConfigureAwait(false); }
         catch (System.Exception ex) { logger.LogWarning(ex, "run-command relaunch on restore failed"); }
         _restoration.EmitProgress("default", "restore_complete", Cove.Engine.Restart.RestorePhase.Completed);
         PopulateAmbientAggregator(aggregator, dataDir, logger);
-        _layout!.OnChanged = () =>
-        {
-            try { Cove.Engine.Layout.WorkspacePersistence.Save(_layout.ToSnapshot("default", "default", _panes!.ProjectDir ?? System.Environment.CurrentDirectory), _panes!.Descriptors(), wsDir); }
-            catch (System.Exception ex) { logger.LogWarning(ex, "workspace persist failed"); }
-        };
-        _scrollbackTimer = new System.Threading.Timer(_ => { try { if (_panes is { } reg) foreach (var info in reg.List()) { var bytes = reg.SnapshotRing(info.PaneId); if (bytes.Length > 0) Cove.Engine.Layout.WorkspacePersistence.SaveScrollback(info.PaneId, bytes, wsDir); } } catch (System.Exception ex) { logger.LogWarning(ex, "scrollback snapshot failed"); } }, null, System.TimeSpan.FromSeconds(15), System.TimeSpan.FromSeconds(15));
+        _scrollbackTimer = new System.Threading.Timer(_ => PersistAllScrollback(workspacesRoot, logger), null, System.TimeSpan.FromSeconds(15), System.TimeSpan.FromSeconds(15));
         SingleInstanceGuard? guard = SingleInstanceGuard.TryAcquire(_paths.PidFilePath);
         if (guard is null)
         {
@@ -292,7 +307,7 @@ public sealed class DaemonHost
 
         await listener.DisposeAsync().ConfigureAwait(false);
         try { _restoration?.MarkCleanShutdown(); } catch (System.Exception ex) { logger.LogWarning(ex, "clean-shutdown marker failed"); }
-        try { if (_panes is { } reg) foreach (var info in reg.List()) { var bytes = reg.SnapshotRing(info.PaneId); if (bytes.Length > 0) Cove.Engine.Layout.WorkspacePersistence.SaveScrollback(info.PaneId, bytes, wsDir); } } catch (System.Exception ex) { logger.LogWarning(ex, "shutdown scrollback snapshot failed"); }
+        try { PersistAllScrollback(System.IO.Path.Combine(_paths.DataDir.Root, "workspaces"), logger); } catch (System.Exception ex) { logger.LogWarning(ex, "shutdown scrollback snapshot failed"); }
         _scrollbackTimer?.Dispose();
         if (_runCommands is not null)
             await _runCommands.DisposeAsync().ConfigureAwait(false);
@@ -648,13 +663,46 @@ public sealed class DaemonHost
 
     private string? GetFocusedPane()
     {
-        if (_workspaces is null || _layout is null)
-            return null;
-        var focusedWs = _workspaces.Registry.FocusedWorkspaceId;
-        if (focusedWs is null || _workspaces.Get(focusedWs) is not { } actor)
-            return null;
-        var roomId = actor.State.ActiveRoomId;
-        return roomId is null ? null : _layout.GetActive(roomId);
+        return _layout?.FocusedPaneId();
+    }
+
+    private void PersistActiveWorkspace(string workspacesRoot, ILogger logger)
+    {
+        if (_layout is not { } layout || _panes is not { } panes)
+            return;
+        try
+        {
+            var wsId = layout.ActiveWorkspaceId;
+            var actor = _workspaces?.Get(wsId);
+            var name = actor?.State.Name ?? wsId;
+            var dir = actor?.State.ProjectDir ?? panes.ProjectDir ?? System.Environment.CurrentDirectory;
+            var wsDir = System.IO.Path.Combine(workspacesRoot, wsId);
+            var snap = layout.ToSnapshot(wsId, name, dir);
+            var leafIds = new System.Collections.Generic.HashSet<string>(layout.LeafPaneIds(wsId), System.StringComparer.Ordinal);
+            var descs = panes.Descriptors().Where(d => leafIds.Contains(d.PaneId)).ToArray();
+            Cove.Engine.Layout.WorkspacePersistence.Save(snap, descs, wsDir);
+        }
+        catch (System.Exception ex) { logger.LogWarning(ex, "workspace persist failed"); }
+    }
+
+    private void PersistAllScrollback(string workspacesRoot, ILogger logger)
+    {
+        if (_layout is not { } layout || _panes is not { } reg)
+            return;
+        try
+        {
+            foreach (var wsId in layout.WorkspaceIds)
+            {
+                var wsDir = System.IO.Path.Combine(workspacesRoot, wsId);
+                foreach (var paneId in layout.LeafPaneIds(wsId))
+                {
+                    var bytes = reg.SnapshotRing(paneId);
+                    if (bytes.Length > 0)
+                        Cove.Engine.Layout.WorkspacePersistence.SaveScrollback(paneId, bytes, wsDir);
+                }
+            }
+        }
+        catch (System.Exception ex) { logger.LogWarning(ex, "scrollback snapshot failed"); }
     }
     private void BroadcastEvent<T>(string channel, T payload, System.Text.Json.Serialization.Metadata.JsonTypeInfo<T> typeInfo)
     {
