@@ -36,6 +36,11 @@ public sealed class SessionServiceTests
             var svc = new SessionService(runner);
             var sessions = await svc.ListRecentSessionsAsync(dir, "/repo");
 
+            if (sessions.Count != 3)
+            {
+                var raw = await runner.RunAsync(dir, "list_recent_sessions.sh", ["/repo"], TimeSpan.FromSeconds(10));
+                Assert.Fail($"expected 3 sessions, got {sessions.Count}; direct rerun exit={raw.ExitCode} stdout='{raw.Stdout}' stderr='{raw.Stderr}'");
+            }
             Assert.Equal(3, sessions.Count);
             Assert.Equal("s2", sessions[0].Id);
             Assert.Equal("s3", sessions[1].Id);
