@@ -74,7 +74,6 @@ export function defaultBindings(): ResolvedBinding[] {
     app("cmd+9", "workspace.switch-9"),
     app("cmd+b", "view.toggle-sidebar"),
     app("cmd+shift+a", "view.toggle-notepad"),
-    app("cmd+shift+y", "view.toggle-toolbar"),
     app("cmd+shift+`", "view.zen-mode"),
     app("cmd+=", "view.zoom-in"),
     app("cmd+-", "view.zoom-out"),

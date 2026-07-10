@@ -12,7 +12,7 @@ import {
 const bindings: KeybindDto[] = [
   { chord: "cmd+t", actionType: "app-command", action: "room.new", description: "New room" },
   { chord: "cmd+w", actionType: "app-command", action: "pane.close", description: "Close pane" },
-  { chord: "cmd+shift+b", actionType: "app-command", action: "view.toggle-toolbar", description: "Toggle toolbar" },
+  { chord: "cmd+shift+b", actionType: "app-command", action: "view.toggle-sidebar", description: "Toggle sidebar" },
   { chord: "cmd+c", actionType: "app-command", action: "terminal.copy-or-sigint", description: "Copy" },
   { chord: "cmd+shift+b", actionType: "app-command", action: "tool.browser", description: "Browser" },
 ];

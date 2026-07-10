@@ -1,7 +1,6 @@
 export interface ChromeVisibility {
   leftSidebarHidden: boolean;
   rightSidebarHidden: boolean;
-  toolbarHidden: boolean;
 }
 
 export interface ZenState {
@@ -14,8 +13,8 @@ export interface ZenTransition {
   visibility: ChromeVisibility;
 }
 
-const ALL_SHOWN: ChromeVisibility = { leftSidebarHidden: false, rightSidebarHidden: false, toolbarHidden: false };
-const ALL_HIDDEN: ChromeVisibility = { leftSidebarHidden: true, rightSidebarHidden: true, toolbarHidden: true };
+const ALL_SHOWN: ChromeVisibility = { leftSidebarHidden: false, rightSidebarHidden: false };
+const ALL_HIDDEN: ChromeVisibility = { leftSidebarHidden: true, rightSidebarHidden: true };
 
 export function initialZenState(): ZenState {
   return { active: false, saved: null };

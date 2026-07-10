@@ -209,13 +209,11 @@ function normalizeChord(e: KeyboardEvent): string {
 }
 
 const gridEl = document.getElementById("grid")!;
-const titleEl = document.getElementById("tb-title")!;
 const paletteEl = document.getElementById("palette")!;
 const roomTabsEl = document.getElementById("room-tabs")!;
 const leftSidebarEl = document.getElementById("left-sidebar")!;
 const rightSidebarEl = document.getElementById("right-sidebar")!;
 const leftRailEl = document.getElementById("left-rail")!;
-const leftWsbarEl = document.getElementById("left-wsbar")!;
 const leftContentEl = document.getElementById("left-content")!;
 const rightContentEl = document.getElementById("right-content")!;
 const leftResizeEl = document.getElementById("left-resize")!;
@@ -991,14 +989,6 @@ function focusPane(paneId: string): void {
 }
 
 function refreshTitles(): void {
-  const room = activeRoom();
-  if (room) {
-    const leaves = collectLeafIds(room.layoutTree);
-    const count = leaves.length;
-    const focused = focusedPaneId ? panes.get(focusedPaneId) : undefined;
-    const label = (focused && focused.title) || room.name;
-    titleEl.innerHTML = `${label}` + (count > 1 ? ` <span class="sub">${count} panes</span>` : "");
-  }
   const tabEls = roomTabsEl.querySelectorAll<HTMLElement>(".rtab");
   (layout?.rooms ?? []).forEach((r) => {
     const tab = Array.from(tabEls).find((el) => el.title === roomTabName(r) || el.querySelector(".rtab-name")?.textContent === roomTabName(r));
@@ -1029,7 +1019,6 @@ async function reload(): Promise<WorkspaceSnapshot> {
   renderRoom();
   renderRoomTabs();
   renderSidebar();
-  renderWorkspaceStrip();
   if (focusedPaneId) {
     panes.get(focusedPaneId)?.term.focus();
   }
@@ -1166,40 +1155,39 @@ async function loadWorkspaceBoxes(): Promise<void> {
     const res = await invoke<{ workspaces: { id: string; name: string }[] }>("cove://commands/workspace.list", {});
     workspaceBoxItems = (res.workspaces ?? []).map((w) => ({ id: w.id, name: w.name }));
   } catch { workspaceBoxItems = []; }
-  renderWorkspaceStrip();
+  renderSidebarContent("left");
 }
 
-function renderWorkspaceStrip(): void {
-  leftWsbarEl.innerHTML = "";
-  const expanded = !collapsedOf(sidebarModel, "left");
-  leftWsbarEl.classList.toggle("expanded", expanded);
+function renderWorkspaceChips(container: HTMLElement): void {
   const boxes = buildWorkspaceBoxes(workspaceBoxItems, layout?.id ?? null);
+  if (boxes.length === 0) return;
+  const row = document.createElement("div");
+  row.className = "sb-wschips";
   for (const box of boxes) {
-    const boxEl = document.createElement("div");
-    boxEl.className = "sb-wsbox" + (box.active ? " active" : "");
-    boxEl.title = box.name || box.id;
+    const chipEl = document.createElement("div");
+    chipEl.className = "sb-wschip" + (box.active ? " active" : "");
+    chipEl.title = box.name || box.id;
     const badge = document.createElement("span");
-    badge.className = "sb-wsbox-badge";
+    badge.className = "sb-wschip-badge";
     badge.textContent = box.initial;
-    boxEl.appendChild(badge);
-    if (expanded) {
-      const name = document.createElement("span");
-      name.className = "sb-wsbox-name";
-      name.textContent = box.name || box.id;
-      boxEl.appendChild(name);
-    }
-    boxEl.addEventListener("click", () => { if (!box.active) void switchWorkspace(box.id); });
-    boxEl.addEventListener("contextmenu", (e) => {
+    chipEl.appendChild(badge);
+    const name = document.createElement("span");
+    name.className = "sb-wschip-name";
+    name.textContent = box.name || box.id;
+    chipEl.appendChild(name);
+    chipEl.addEventListener("click", () => { if (!box.active) void switchWorkspace(box.id); });
+    chipEl.addEventListener("contextmenu", (e) => {
       openContextMenuAt(e, [
         { id: "rename", label: "Rename" },
         { id: "close", label: "Close", danger: true },
       ], (id) => {
-        if (id === "rename") startWorkspaceRename(box.id, boxEl, box.name || box.id);
+        if (id === "rename") startWorkspaceRename(box.id, chipEl, box.name || box.id);
         if (id === "close") void deleteWorkspace(box.id);
       });
     });
-    leftWsbarEl.appendChild(boxEl);
+    row.appendChild(chipEl);
   }
+  container.appendChild(row);
 }
 
 function startWorkspaceRename(wsId: string, boxEl: HTMLElement, currentName: string): void {
@@ -1222,7 +1210,7 @@ function startWorkspaceRename(wsId: string, boxEl: HTMLElement, currentName: str
       await loadWorkspaceBoxes();
       return;
     }
-    renderWorkspaceStrip();
+    renderSidebarContent("left");
   };
   input.addEventListener("blur", () => void commit(true));
   input.addEventListener("keydown", (e) => {
@@ -1259,7 +1247,6 @@ function applySidebarModel(): void {
     renderSidebarContent(side);
   }
   renderLeftRail();
-  renderWorkspaceStrip();
   fitAll();
 }
 
@@ -1319,6 +1306,7 @@ function renderSidebarContent(side: SidebarSide): void {
   if (collapsedOf(sidebarModel, side)) { content.innerHTML = ""; return; }
   content.innerHTML = "";
   if (side === "right") { renderAgentsContent(content); return; }
+  renderWorkspaceChips(content);
   const mode = sidebarModel.leftMode;
   if (mode === "workspaces") renderWorkspacesContent(content);
   else if (mode === "notepad") renderNotepadContent(content);
@@ -2072,11 +2060,8 @@ async function openFileInEditor(filePath: string): Promise<void> {
 }
 
 
-function toggleSidebar() { toggleLeftSidebar(); }
-
 wireSidebarResize(leftResizeEl, "left");
 wireSidebarResize(rightResizeEl, "right");
-document.getElementById("tb-sidebar")!.addEventListener("click", toggleSidebar);
 document.body.classList.add(navigator.platform.toUpperCase().includes("MAC") ? "platform-mac" : "platform-other");
 window.__ryn.on("window.focused", () => document.body.classList.remove("window-inactive"));
 window.__ryn.on("window.blurred", () => document.body.classList.add("window-inactive"));
@@ -3402,8 +3387,6 @@ window.addEventListener("keydown", (e) => {
 
 window.addEventListener("resize", () => fitAll());
 
-function toggleToolbar(): void { document.body.classList.toggle("toolbar-hidden"); fitAll(); }
-
 async function openToolRoom(paneType: string, name: string): Promise<void> {
   try {
     const sp = (await invoke<{ paneId: string }>("app.paneSpawn", { command: "", cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: "", agentName: "", workspace: "", room: "" })).paneId;
@@ -3504,13 +3487,11 @@ function currentChrome(): ChromeVisibility {
   return {
     leftSidebarHidden: collapsedOf(sidebarModel, "left"),
     rightSidebarHidden: collapsedOf(sidebarModel, "right"),
-    toolbarHidden: document.body.classList.contains("toolbar-hidden"),
   };
 }
 function applyChrome(v: ChromeVisibility): void {
   sidebarModel = setCollapsed(sidebarModel, "left", v.leftSidebarHidden);
   sidebarModel = setCollapsed(sidebarModel, "right", v.rightSidebarHidden);
-  document.body.classList.toggle("toolbar-hidden", v.toolbarHidden);
   persistSidebarModel();
   applySidebarModel();
 }
@@ -3594,7 +3575,6 @@ function runAction(action: string): void {
     case "workspace.create": void newWorkspace(); break;
     case "view.toggle-sidebar": toggleLeftSidebar(); break;
     case "view.toggle-notepad": toggleRightSidebar(); break;
-    case "view.toggle-toolbar": toggleToolbar(); break;
     case "view.zen-mode": doToggleZen(); break;
     case "view.zoom-in": settings.fontSize = Math.min(24, settings.fontSize + 1); applySettings(); break;
     case "view.zoom-out": settings.fontSize = Math.max(9, settings.fontSize - 1); applySettings(); break;
@@ -3634,33 +3614,6 @@ function setupMenuBar(): void {
     runAction(action);
   });
   refreshMenu();
-}
-
-function setupToolbar(): void {
-  const tilesEl = document.getElementById("tb-tiles");
-  if (!tilesEl) { console.warn("toolbar tiles container missing"); return; }
-  tilesEl.innerHTML = "";
-  for (const tile of toolbarTiles()) {
-    const el = document.createElement("div");
-    el.className = "tbtn tb-tile";
-    el.setAttribute("data-webview-ignore", "");
-    el.title = `${tile.label} (${tile.letter})`;
-    const ic = document.createElement("span");
-    ic.className = "tb-tile-ic";
-    ic.textContent = tile.icon;
-    const lbl = document.createElement("span");
-    lbl.className = "tb-tile-lbl";
-    lbl.textContent = tile.label;
-    el.appendChild(ic);
-    el.appendChild(lbl);
-    el.addEventListener("click", () => runAction(tile.action));
-    tilesEl.appendChild(el);
-  }
-  const search = document.getElementById("tb-search") as HTMLInputElement | null;
-  if (search) {
-    search.addEventListener("focus", () => { search.blur(); openPalette(); });
-    search.addEventListener("keydown", (e) => { e.preventDefault(); search.blur(); openPalette(); });
-  }
 }
 
 let clusterUpdateStaged = false;
@@ -3960,7 +3913,6 @@ async function createNote(): Promise<void> {
   applySidebarModel();
   setupMenuBar();
   void reloadKeymap();
-  setupToolbar();
   setupTitleCluster();
   setupBadge();
   setupNotifications();

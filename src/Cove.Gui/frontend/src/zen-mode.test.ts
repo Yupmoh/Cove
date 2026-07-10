@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { initialZenState, enterZen, exitZen, toggleZen, type ChromeVisibility } from "./zen-mode";
 
-const shown: ChromeVisibility = { leftSidebarHidden: false, rightSidebarHidden: false, toolbarHidden: false };
-const hidden: ChromeVisibility = { leftSidebarHidden: true, rightSidebarHidden: true, toolbarHidden: true };
+const shown: ChromeVisibility = { leftSidebarHidden: false, rightSidebarHidden: false };
+const hidden: ChromeVisibility = { leftSidebarHidden: true, rightSidebarHidden: true };
 
 describe("initialZenState", () => {
   it("starts inactive with no saved snapshot", () => {
@@ -18,7 +18,7 @@ describe("enterZen", () => {
     expect(r.visibility).toEqual(hidden);
   });
   it("preserves partially-hidden chrome in the snapshot", () => {
-    const partial: ChromeVisibility = { leftSidebarHidden: true, rightSidebarHidden: false, toolbarHidden: false };
+    const partial: ChromeVisibility = { leftSidebarHidden: true, rightSidebarHidden: false };
     const r = enterZen(initialZenState(), partial);
     expect(r.state.saved).toEqual(partial);
   });
@@ -31,7 +31,7 @@ describe("enterZen", () => {
 
 describe("exitZen", () => {
   it("restores exactly the pre-zen visibility", () => {
-    const partial: ChromeVisibility = { leftSidebarHidden: true, rightSidebarHidden: false, toolbarHidden: false };
+    const partial: ChromeVisibility = { leftSidebarHidden: true, rightSidebarHidden: false };
     const entered = enterZen(initialZenState(), partial);
     const exited = exitZen(entered.state);
     expect(exited.state).toEqual({ active: false, saved: null });
@@ -45,7 +45,7 @@ describe("exitZen", () => {
 
 describe("toggleZen", () => {
   it("enters from inactive then restores on the second toggle", () => {
-    const partial: ChromeVisibility = { leftSidebarHidden: false, rightSidebarHidden: true, toolbarHidden: true };
+    const partial: ChromeVisibility = { leftSidebarHidden: false, rightSidebarHidden: true };
     const on = toggleZen(initialZenState(), partial);
     expect(on.state.active).toBe(true);
     expect(on.visibility).toEqual(hidden);

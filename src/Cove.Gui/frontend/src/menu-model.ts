@@ -79,7 +79,6 @@ export function menuIA(): MenuSection[] {
       items: [
         { id: "toggle-sidebar", label: "Toggle Left Sidebar", action: "view.toggle-sidebar" },
         { id: "toggle-right-sidebar", label: "Toggle Right Sidebar", action: "view.toggle-notepad" },
-        { id: "toggle-toolbar", label: "Toggle Toolbar", action: "view.toggle-toolbar" },
         { id: "toggle-zen", label: "Toggle Zen Mode", action: "view.zen-mode" },
         { id: "toggle-backdrop", label: "Toggle Window Backdrop", action: "view.toggle-backdrop" },
         { separator: true },
