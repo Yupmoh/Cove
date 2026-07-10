@@ -347,6 +347,18 @@ function makePane(paneId: string, since: number): PaneView {
   moreBtn.className = "pmore";
   moreBtn.textContent = "\u22ef";
   header.appendChild(titleSpan);
+  const splitCtls: { icon: string; title: string; dir: "row" | "col" }[] = [
+    { icon: "split-right", title: "Split right (Cmd D)", dir: "row" },
+    { icon: "split-down", title: "Split down (Cmd Shift D)", dir: "col" },
+  ];
+  for (const ctl of splitCtls) {
+    const b = document.createElement("button");
+    b.className = "pmore psplit";
+    b.innerHTML = iconSvg(ctl.icon);
+    b.title = ctl.title;
+    b.addEventListener("click", (e) => { e.stopPropagation(); focusPane(paneId); openSplitChooser(e, ctl.dir); });
+    header.appendChild(b);
+  }
   header.appendChild(moreBtn);
   el.appendChild(header);
   const host = document.createElement("div");
@@ -2052,19 +2064,6 @@ function renderRoomTabs(): void {
   addBtn.title = "New room (Cmd T)";
   addBtn.addEventListener("click", () => void newRoom());
   roomTabsEl.appendChild(addBtn);
-
-  const boxCtls: { icon: string; title: string; action: string }[] = [
-    { icon: "split-right", title: "Split right (Cmd D)", action: "pane.split-right" },
-    { icon: "split-down", title: "Split down (Cmd Shift D)", action: "pane.split-down" },
-  ];
-  for (const ctl of boxCtls) {
-    const b = document.createElement("div");
-    b.className = "rbox-ctl";
-    b.innerHTML = iconSvg(ctl.icon);
-    b.title = ctl.title;
-    b.addEventListener("click", (e) => openSplitChooser(e, ctl.action === "pane.split-right" ? "row" : "col"));
-    roomTabsEl.appendChild(b);
-  }
 
   updateEdgeFade();
 }
