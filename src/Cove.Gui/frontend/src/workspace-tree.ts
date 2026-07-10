@@ -58,6 +58,12 @@ export const PANE_TYPE_LABELS: Record<string, string> = {
   empty: "empty",
 };
 
+export const NO_WORKSPACES_MESSAGE = "No workspaces yet, create or open a workspace";
+
+export function workspaceTreeEmptyMessage(workspaceCount: number): string | null {
+  return workspaceCount <= 0 ? NO_WORKSPACES_MESSAGE : null;
+}
+
 export function paneLabel(leaf: TreeLeaf): string {
   const title = leaf.title.trim();
   if (title.length > 0) return title;

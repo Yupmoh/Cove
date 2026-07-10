@@ -250,6 +250,20 @@
     .pal-item .key { margin-left: auto; color: var(--muted); font-size: 11px; }
     #settings { position: fixed; inset: 0; display: none; background: rgba(17, 17, 27, 0.55); align-items: flex-start; justify-content: center; z-index: 50; }
     #settings.open { display: flex; }
+    #ws-create { position: fixed; inset: 0; display: none; background: rgba(17, 17, 27, 0.55); align-items: flex-start; justify-content: center; z-index: 55; }
+    #ws-create.open { display: flex; }
+    .wsc-field { display: flex; flex-direction: column; gap: 6px; padding: 10px 0; }
+    .wsc-field label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .wsc-field input[type=text] { background: var(--panel-2); border: 1px solid var(--border); color: var(--fg); border-radius: 6px; padding: 8px 10px; width: 100%; outline: none; font-size: 13px; box-sizing: border-box; }
+    .wsc-field input[type=text]:focus { border-color: var(--accent); }
+    .wsc-path-row { display: flex; gap: 8px; align-items: center; }
+    .wsc-path-row input { flex: 1; min-width: 0; }
+    .wsc-path-row button, .wsc-actions button { background: var(--panel-2); border: 1px solid var(--border); color: var(--fg); border-radius: 6px; padding: 8px 12px; font-size: 12px; cursor: pointer; white-space: nowrap; }
+    .wsc-path-row button:hover, .wsc-actions button:hover { border-color: var(--accent); }
+    .wsc-hint { color: var(--muted); font-size: 10px; }
+    .wsc-error { color: var(--danger, #f38ba8); font-size: 11px; min-height: 14px; padding: 2px 0; }
+    .wsc-actions { display: flex; justify-content: flex-end; padding-top: 6px; }
+    .wsc-actions button { background: var(--accent); border-color: var(--accent); color: var(--base, #11111b); font-weight: 600; }
     .set-box { margin-top: 12vh; width: 420px; max-width: 90vw; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; box-shadow: 0 24px 60px rgba(0,0,0,0.5); }
     .set-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--border); color: var(--fg); font-size: 15px; }
     .set-head .x { cursor: pointer; color: var(--muted); }
@@ -429,6 +443,32 @@
       </div>
       <div class="set-tabs" id="set-tabs"></div>
       <div class="set-body" id="set-body"></div>
+    </div>
+  </div>
+  <div id="ws-create">
+    <div class="set-box">
+      <div class="set-head">
+        <span>New workspace</span>
+        <span class="x" id="wsc-close">&times;</span>
+      </div>
+      <div class="set-body">
+        <div class="wsc-field">
+          <label for="wsc-name">Name</label>
+          <input id="wsc-name" type="text" placeholder="My project" autocomplete="off" spellcheck="false" />
+        </div>
+        <div class="wsc-field">
+          <label for="wsc-path">Directory</label>
+          <div class="wsc-path-row">
+            <input id="wsc-path" type="text" placeholder="~/code/my-project" autocomplete="off" spellcheck="false" />
+            <button id="wsc-browse" type="button">Browse…</button>
+          </div>
+          <div class="wsc-hint">Use ~ for your home directory. Created if it does not exist.</div>
+        </div>
+        <div class="wsc-error" id="wsc-error"></div>
+        <div class="wsc-actions">
+          <button id="wsc-create" type="button">Create</button>
+        </div>
+      </div>
     </div>
   </div>
   <div id="findbar">

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildWorkspaceTree, paneLabel, type WorkspaceTreeInput } from "./workspace-tree";
+import { buildWorkspaceTree, paneLabel, workspaceTreeEmptyMessage, NO_WORKSPACES_MESSAGE, type WorkspaceTreeInput } from "./workspace-tree";
 
 function baseInput(overrides: Partial<WorkspaceTreeInput> = {}): WorkspaceTreeInput {
   return {
@@ -64,5 +64,23 @@ describe("buildWorkspaceTree", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].kind).toBe("workspace");
     expect(rows[0].collapsed).toBe(true);
+  });
+
+  it("renders a lone workspace row with a zero count when it has no rooms", () => {
+    const rows = buildWorkspaceTree(baseInput({ rooms: [] }));
+    expect(rows).toHaveLength(1);
+    expect(rows[0].kind).toBe("workspace");
+    expect(rows[0].count).toBe(0);
+    expect(rows[0].expandable).toBe(false);
+  });
+});
+
+describe("workspaceTreeEmptyMessage", () => {
+  it("returns the calm empty message when there are no workspaces", () => {
+    expect(workspaceTreeEmptyMessage(0)).toBe(NO_WORKSPACES_MESSAGE);
+  });
+  it("returns null once at least one workspace exists", () => {
+    expect(workspaceTreeEmptyMessage(1)).toBeNull();
+    expect(workspaceTreeEmptyMessage(5)).toBeNull();
   });
 });

@@ -31,7 +31,7 @@ import { groupByWorkspace, moveSelection, selectedNote, kindIcon, kindColor, typ
 import { initialSidebarModel, selectLeftMode, toggleSide, setCollapsed, setWidth, collapsedOf, widthOf, SIDEBAR_MODES, SIDEBAR_MODE_META, type SidebarModel, type SidebarSide, type SidebarMode } from "./sidebar-model";
 import { buildWorkspaceBoxes, type WorkspaceBoxInput } from "./workspace-boxes";
 import { clampMenuPosition, normalizeItems, firstSelectableIndex, moveSelection as ctxMoveSelection, activeItem, type ContextMenuItem, type ContextMenuModel } from "./context-menu";
-import { buildWorkspaceTree, type TreeLeaf, type TreeRoomInput } from "./workspace-tree";
+import { buildWorkspaceTree, workspaceTreeEmptyMessage, type TreeLeaf, type TreeRoomInput } from "./workspace-tree";
 import { buildAgentRows, agentStateCounts, AGENT_STATE_META, type AgentCard, type AgentRow } from "./agents-model";
 import { parseQuery, filterAndSort, MruTracker, cycleCategory, categoryLabel, type PaletteItem } from "./omni-palette";
 import { buildEmptyState, EmptyStateMessages } from "./empty-states";
@@ -1286,9 +1286,15 @@ function roomLeaves(room: RoomSnapshot): TreeLeaf[] {
 }
 
 function renderWorkspacesContent(container: HTMLElement): void {
-  container.appendChild(sidebarHead("Workspace", [{ icon: "+", title: "New terminal (Cmd T)", run: () => void newRoom() }]));
+  container.appendChild(sidebarHead("Workspace", [{ icon: "+", title: "New workspace", run: () => void newWorkspace() }]));
   const list = document.createElement("div");
   list.className = "sb-list";
+  const emptyMessage = workspaceTreeEmptyMessage(workspaceBoxItems.length);
+  if (emptyMessage) {
+    list.appendChild(buildEmptyState({ message: emptyMessage }));
+    container.appendChild(list);
+    return;
+  }
   const rooms: TreeRoomInput[] = (layout?.rooms ?? []).map((r) => ({ id: r.id, name: roomTabName(r), leaves: roomLeaves(r) }));
   const rows = buildWorkspaceTree({
     workspaceName: layout?.name || "Workspace",
@@ -1298,13 +1304,6 @@ function renderWorkspacesContent(container: HTMLElement): void {
     collapsedRoomIds: collapsedTreeRooms,
     workspaceCollapsed: treeWorkspaceCollapsed,
   });
-  if (rooms.length === 0) {
-    list.appendChild(buildEmptyState({ message: EmptyStateMessages.noRooms, actionLabel: "New terminal", actionIcon: "+" }));
-    const action = list.querySelector(".cove-empty-action");
-    if (action) action.addEventListener("click", () => void newRoom());
-    container.appendChild(list);
-    return;
-  }
   for (const row of rows) {
     const rowEl = document.createElement("div");
     rowEl.className = `tree-row kind-${row.kind}` + (row.active ? " active" : "") + (row.collapsed ? " collapsed" : "");
@@ -3065,14 +3064,55 @@ function pinActiveRoom(): void {
   renderRoomTabs();
 }
 
-async function newWorkspace(): Promise<void> {
-  const name = typeof prompt === "function" ? prompt("New workspace name") : null;
-  if (!name || !name.trim()) { console.warn("workspace create cancelled or empty name"); return; }
-  try {
-    await invoke("cove://commands/workspace.create", { name: name.trim(), projectDir: "", collectionId: "" });
-    await reload();
-  } catch (e) { console.warn("workspace.create failed", e); }
+const wsCreateEl = document.getElementById("ws-create")!;
+const wscNameEl = document.getElementById("wsc-name") as HTMLInputElement;
+const wscPathEl = document.getElementById("wsc-path") as HTMLInputElement;
+const wscErrorEl = document.getElementById("wsc-error")!;
+
+function closeWorkspaceDialog(): void {
+  wsCreateEl.classList.remove("open");
 }
+
+function newWorkspace(): void {
+  wscNameEl.value = "";
+  wscPathEl.value = "";
+  wscErrorEl.textContent = "";
+  wsCreateEl.classList.add("open");
+  wscNameEl.focus();
+}
+
+async function browseWorkspaceDir(): Promise<void> {
+  try {
+    const initial = wscPathEl.value.trim() || "~";
+    const picked = await invoke<string>("dialog.openFolder", { initialPath: initial });
+    if (picked && picked.trim()) wscPathEl.value = picked.trim();
+  } catch (e) { console.warn("folder picker failed", e); }
+}
+
+async function submitWorkspaceDialog(): Promise<void> {
+  const name = wscNameEl.value.trim();
+  const path = wscPathEl.value.trim();
+  if (!name) { wscErrorEl.textContent = "Name is required."; wscNameEl.focus(); return; }
+  if (!path) { wscErrorEl.textContent = "Directory is required."; wscPathEl.focus(); return; }
+  try {
+    await invoke("cove://commands/workspace.create", { name, projectDir: path, collectionId: "" });
+    closeWorkspaceDialog();
+    await loadWorkspaceBoxes();
+    await reload();
+  } catch (e) {
+    console.warn("workspace.create failed", e);
+    wscErrorEl.textContent = "Could not create workspace at that directory.";
+  }
+}
+
+document.getElementById("wsc-close")!.addEventListener("click", closeWorkspaceDialog);
+document.getElementById("wsc-browse")!.addEventListener("click", () => void browseWorkspaceDir());
+document.getElementById("wsc-create")!.addEventListener("click", () => void submitWorkspaceDialog());
+wsCreateEl.addEventListener("mousedown", (e) => { if (e.target === wsCreateEl) closeWorkspaceDialog(); });
+wsCreateEl.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") { e.stopPropagation(); closeWorkspaceDialog(); }
+  else if (e.key === "Enter") { e.stopPropagation(); void submitWorkspaceDialog(); }
+});
 
 async function switchWorkspaceByIndex(n: number): Promise<void> {
   try {
