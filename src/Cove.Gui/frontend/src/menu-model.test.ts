@@ -66,13 +66,13 @@ describe("buildMenu", () => {
   });
 });
 
-describe("buildMenu enabled workaround", () => {
-  it("marks every actionable leaf as enabled", () => {
+describe("buildMenu enabled stamp removed", () => {
+  it("does not stamp actionable leaves with enabled", () => {
     const menu = buildMenu([]);
     const view = menu.find((s) => s.label === "View")!;
     for (const item of view.items!) {
       if (item.separator) continue;
-      expect(item.enabled).toBe(true);
+      expect(item.enabled).toBeUndefined();
     }
   });
   it("does not mark separators as enabled", () => {

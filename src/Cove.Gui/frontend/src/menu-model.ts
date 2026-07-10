@@ -142,8 +142,7 @@ export function buildMenu(bindings: ActionChord[], omitCustomAccelerators = fals
       items: section.items.map((item) => {
         if (!item.action) return item;
         const a = accel[item.action];
-        const withAccel = a && !omitCustomAccelerators ? { ...item, accelerator: a } : { ...item };
-        return { ...withAccel, enabled: true };
+        return a && !omitCustomAccelerators ? { ...item, accelerator: a } : { ...item };
       }),
     };
   });
