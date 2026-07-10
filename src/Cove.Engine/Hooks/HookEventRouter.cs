@@ -58,6 +58,12 @@ public sealed class HookEventRouter
             return;
         }
 
+        if (ev.Event != "session-start" && !_paneStates.ContainsKey(ev.PaneId))
+        {
+            _logger?.HookEventUntrackedPane(ev.Adapter, ev.Event, ev.PaneId);
+            return;
+        }
+
         switch (ev.Event)
         {
             case "session-start":
@@ -120,10 +126,11 @@ public sealed class HookEventRouter
 
     private void UpdateState(string paneId, System.Func<PaneAgentState, PaneAgentState> update)
     {
-        _paneStates.AddOrUpdate(
-            paneId,
-            _ => new PaneAgentState(paneId, "unknown", "active", 0, System.DateTimeOffset.UtcNow),
-            (_, existing) => update(existing));
+        while (_paneStates.TryGetValue(paneId, out var existing))
+        {
+            if (_paneStates.TryUpdate(paneId, update(existing), existing))
+                return;
+        }
     }
 
     public PaneAgentState? GetPaneState(string paneId) => _paneStates.TryGetValue(paneId, out var s) ? s : null;

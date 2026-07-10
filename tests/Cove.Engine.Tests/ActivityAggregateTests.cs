@@ -37,6 +37,7 @@ public sealed class ActivityAggregateTests
     public void ResolveStatus_ActiveHookState_MapsToWorking()
     {
         var agg = WithAgent(out var hooks, out _, "p1", "claude-code");
+        hooks.Route(new HookEvent { Adapter = "claude-code", Event = "session-start", PaneId = "p1" });
         hooks.Route(new HookEvent { Adapter = "claude-code", Event = "pre-tool-use", PaneId = "p1" });
         Assert.Equal(AgentStatus.Working, agg.ResolveStatus("p1"));
     }
@@ -91,6 +92,7 @@ public sealed class ActivityAggregateTests
     public void NeedsInput_Working_ReturnsFalse()
     {
         var agg = WithAgent(out var hooks, out _, "p1", "claude-code");
+        hooks.Route(new HookEvent { Adapter = "claude-code", Event = "session-start", PaneId = "p1" });
         hooks.Route(new HookEvent { Adapter = "claude-code", Event = "pre-tool-use", PaneId = "p1" });
         Assert.False(agg.NeedsInput("p1"));
     }
@@ -107,6 +109,7 @@ public sealed class ActivityAggregateTests
         hookRouter.Route(new HookEvent { Adapter = "claude-code", Event = "stop", PaneId = "p1" });
         hookRouter.Route(new HookEvent { Adapter = "codex", Event = "session-start", PaneId = "p2" });
         hookRouter.Route(new HookEvent { Adapter = "codex", Event = "stop", PaneId = "p2" });
+        hookRouter.Route(new HookEvent { Adapter = "gemini", Event = "session-start", PaneId = "p3" });
         hookRouter.Route(new HookEvent { Adapter = "gemini", Event = "pre-tool-use", PaneId = "p3" });
 
         var agg = new ActivityAggregate(hookRouter, agentRouter);

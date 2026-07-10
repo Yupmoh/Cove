@@ -115,6 +115,38 @@ public sealed class HookEventRouterTests
     }
 
     [Fact]
+    public void Route_EventWithoutSessionStart_CreatesNoPaneState()
+    {
+        var router = new HookEventRouter();
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "pre-tool-use", PaneId = "p1" });
+        Assert.Empty(router.GetAllPaneStates());
+    }
+
+    [Fact]
+    public void Route_StopWithoutSessionStart_DoesNotSignalNeedsInput()
+    {
+        var router = new HookEventRouter();
+        var fired = false;
+        router.NeedsInputTransition += (_, _) => fired = true;
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "stop", PaneId = "p1" });
+        Assert.False(fired);
+        Assert.Empty(router.GetAllPaneStates());
+    }
+
+    [Fact]
+    public void Route_EventAfterSessionEnd_UpdatesExistingPaneState()
+    {
+        var router = new HookEventRouter();
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "session-start", PaneId = "p1" });
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "session-end", PaneId = "p1" });
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "pre-tool-use", PaneId = "p1" });
+
+        var state = router.GetPaneState("p1");
+        Assert.Equal("tool-running", state!.Status);
+        Assert.Equal("claude-code", state.Adapter);
+    }
+
+    [Fact]
     public void Route_WithoutPaneId_NoStateChange()
     {
         var router = new HookEventRouter();

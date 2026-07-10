@@ -26,6 +26,9 @@ internal static partial class HookLog
     [ZLoggerMessage(LogLevel.Warning, "hook event unknown adapter={adapter} event={eventName}")]
     public static partial void HookEventUnknown(this ILogger logger, string adapter, string eventName);
 
+    [ZLoggerMessage(LogLevel.Warning, "hook event dropped untracked pane adapter={adapter} event={eventName} pane={paneId}")]
+    public static partial void HookEventUntrackedPane(this ILogger logger, string adapter, string eventName, string paneId);
+
     [ZLoggerMessage(LogLevel.Warning, "hook resolve missing params adapter={adapter} event={eventName}")]
     public static partial void HookResolveMissingParams(this ILogger logger, string adapter, string eventName);
 
