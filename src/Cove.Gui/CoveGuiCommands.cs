@@ -14,12 +14,32 @@ public sealed class CoveGuiCommands
         => await Call("cove://commands/pane.list", null, ct);
 
     [RynCommand("app.paneSpawn")]
-    public async ValueTask<string> PaneSpawn(string command, string cwd, string inheritCwdFrom, int cols, int rows, string adapter, string agentName, string workspace, string room, CancellationToken ct)
+    public async ValueTask<string> PaneSpawn(string command, string cwd, string inheritCwdFrom, int cols, int rows, string adapter, string agentName, string workspace, string room, string[]? args = null, CancellationToken ct = default)
     {
         var shell = string.IsNullOrEmpty(command) ? DefaultShell() : command;
-        var p = JsonSerializer.SerializeToElement(new SpawnParams(shell, Array.Empty<string>(), N(cwd), null, cols, rows, N(inheritCwdFrom), N(adapter), N(agentName), N(workspace), N(room)), CoveJsonContext.Default.SpawnParams);
+        var p = JsonSerializer.SerializeToElement(new SpawnParams(shell, args ?? Array.Empty<string>(), N(cwd), null, cols, rows, N(inheritCwdFrom), N(adapter), N(agentName), N(workspace), N(room)), CoveJsonContext.Default.SpawnParams);
         return await Call("cove://commands/pane.spawn", p, ct);
     }
+
+    [RynCommand("app.feedbackSave")]
+    public ValueTask<string> FeedbackSave(string json, string slug)
+    {
+        var dd = Cove.Platform.CoveDataDir.Resolve(ParseChannel(_link.Channel));
+        var dir = System.IO.Path.Combine(dd.Root, "feedback");
+        System.IO.Directory.CreateDirectory(dir);
+        var stamp = System.DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmss");
+        var safeSlug = string.IsNullOrWhiteSpace(slug) ? "ui-feedback" : slug;
+        var path = System.IO.Path.Combine(dir, $"{stamp}-{safeSlug}.json");
+        System.IO.File.WriteAllText(path, json);
+        return ValueTask.FromResult($"{{\"path\":\"{System.Text.Json.JsonEncodedText.Encode(path)}\"}}");
+    }
+
+    private static Cove.Platform.CoveChannel ParseChannel(string channel) => channel switch
+    {
+        "beta" => Cove.Platform.CoveChannel.Beta,
+        "dev" => Cove.Platform.CoveChannel.Dev,
+        _ => Cove.Platform.CoveChannel.Stable,
+    };
 
     [RynCommand("app.paneWrite")]
     public async ValueTask<string> PaneWrite(string paneId, string dataBase64, CancellationToken ct)
@@ -55,9 +75,9 @@ public sealed class CoveGuiCommands
         => await Call("cove://commands/layout.get", null, ct);
 
     [RynCommand("app.layoutMutate")]
-    public async ValueTask<string> LayoutMutate(string op, string roomId, string targetPaneId, string newPaneId, string orientation, string name, string paneId, int dir, string paneType = "", CancellationToken ct = default)
+    public async ValueTask<string> LayoutMutate(string op, string roomId, string targetPaneId, string newPaneId, string orientation, string name, string paneId, int dir, string paneType = "", string[]? roomIds = null, CancellationToken ct = default)
     {
-        var mp = new LayoutMutateParams(op, N(roomId), N(targetPaneId), N(newPaneId), N(orientation), N(name), N(paneId), dir, N(paneType));
+        var mp = new LayoutMutateParams(op, N(roomId), N(targetPaneId), N(newPaneId), N(orientation), N(name), N(paneId), dir, N(paneType), roomIds);
         var p = JsonSerializer.SerializeToElement(mp, CoveJsonContext.Default.LayoutMutateParams);
         return await Call("cove://commands/layout.mutate", p, ct);
     }

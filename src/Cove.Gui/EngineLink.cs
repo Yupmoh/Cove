@@ -20,6 +20,8 @@ public sealed class EngineLink : IAsyncDisposable
     public EngineLink(Func<CancellationToken, Task<Stream>> dial, string clientVersion, string channel)
     { _dial = dial; _clientVersion = clientVersion; _channel = channel; }
 
+    public string Channel => _channel;
+
     public void SetEngineEventHandler(System.Action<string, JsonElement> handler) { _onEngineEvent = handler; }
 
     public async Task<ControlResponse> RequestAsync(string uri, JsonElement? paramsEl, CancellationToken ct)
