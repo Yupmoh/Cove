@@ -111,6 +111,14 @@ public sealed class DaemonHost
         using var loggerFactory = Cove.Platform.CoveLog.CreateEngineLoggerFactory(_paths.DataDir.LogsDir, _paths.Channel);
         var logger = loggerFactory.CreateLogger<DaemonHost>();
 
+        SingleInstanceGuard? guard = SingleInstanceGuard.TryAcquire(_paths.PidFilePath);
+        if (guard is null)
+        {
+            DaemonLog.Write(_paths, "daemon already running on channel " + _paths.Channel);
+            logger.LogWarning("daemon already running on channel {Channel}, exiting before touching shared state", _paths.Channel);
+            return 0;
+        }
+
         _ptyHost = PtyHostFactory.Create(logger);
         var probedPath = Cove.Platform.LoginShellPath.Probe(logger);
         var dataDir = _paths.DataDir.Root;
@@ -283,13 +291,6 @@ public sealed class DaemonHost
         _restoration.EmitProgress("default", "restore_complete", Cove.Engine.Restart.RestorePhase.Completed);
         PopulateAmbientAggregator(aggregator, dataDir, logger);
         _scrollbackTimer = new System.Threading.Timer(_ => PersistAllScrollback(workspacesRoot, logger), null, System.TimeSpan.FromSeconds(15), System.TimeSpan.FromSeconds(15));
-        SingleInstanceGuard? guard = SingleInstanceGuard.TryAcquire(_paths.PidFilePath);
-        if (guard is null)
-        {
-            DaemonLog.Write(_paths, "daemon already running on channel " + _paths.Channel);
-            return 0;
-        }
-
         if (!OperatingSystem.IsWindows() && File.Exists(_paths.SocketPath))
         {
             if (_endpoint.TryProbe(250))
