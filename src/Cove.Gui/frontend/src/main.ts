@@ -2009,7 +2009,7 @@ function renderRoomTabs(): void {
 
   const homeBtn = document.createElement("div");
   homeBtn.className = "rbox-ctl rbox-home";
-  homeBtn.textContent = "⌂";
+  homeBtn.innerHTML = iconSvg("home");
   homeBtn.title = "Workspace overview";
   homeBtn.addEventListener("click", () => revealSidebarMode("workspaces"));
   roomTabsEl.appendChild(homeBtn);
@@ -2053,19 +2053,19 @@ function renderRoomTabs(): void {
   const addBtn = document.createElement("div");
   addBtn.className = "rbox-ctl rbox-add";
   addBtn.style.cssText = "margin-left:auto;";
-  addBtn.textContent = "+";
+  addBtn.innerHTML = iconSvg("plus");
   addBtn.title = "New room (Cmd T)";
   addBtn.addEventListener("click", () => void newRoom());
   roomTabsEl.appendChild(addBtn);
 
   const boxCtls: { icon: string; title: string; action: string }[] = [
-    { icon: "◧", title: "Split right (Cmd D)", action: "pane.split-right" },
-    { icon: "⊟", title: "Split down (Cmd Shift D)", action: "pane.split-down" },
+    { icon: "split-right", title: "Split right (Cmd D)", action: "pane.split-right" },
+    { icon: "split-down", title: "Split down (Cmd Shift D)", action: "pane.split-down" },
   ];
   for (const ctl of boxCtls) {
     const b = document.createElement("div");
     b.className = "rbox-ctl";
-    b.textContent = ctl.icon;
+    b.innerHTML = iconSvg(ctl.icon);
     b.title = ctl.title;
     b.addEventListener("click", (e) => openSplitChooser(e, ctl.action === "pane.split-right" ? "row" : "col"));
     roomTabsEl.appendChild(b);
@@ -4445,6 +4445,7 @@ async function createNote(): Promise<void> {
   void reloadKeymap();
   setupTitleCluster();
   applyAppZoom();
+  try { await window.__ryn.invoke("window.center", {}); } catch (err) { console.warn("window center failed", err); }
   setupBadge();
   setupNotifications();
   void setupBackdrop();

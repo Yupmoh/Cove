@@ -31,8 +31,8 @@ internal static class Program
             {
                 o.Url = new Uri($"http://localhost:{LoopbackServer.DefaultPort}{startPath}");
                 o.Title = "Cove";
-                o.Width = 1100;
-                o.Height = 720;
+                o.Width = 1440;
+                o.Height = 880;
                 o.TitleBarStyle = TitleBarStyle.Overlay;
                 o.Backdrop = BackdropMaterial.Blur;
                 o.DevTools = Environment.GetEnvironmentVariable("COVE_DEVTOOLS") == "1";
