@@ -36,6 +36,7 @@ import { buildWorkspaceTree, workspaceTreeEmptyMessage, type TreeLeaf, type Tree
 import { buildAgentRows, agentStateCounts, AGENT_STATE_META, type AgentCard, type AgentRow } from "./agents-model";
 import { parseQuery, filterAndSort, MruTracker, cycleCategory, categoryLabel, type PaletteItem } from "./omni-palette";
 import { buildEmptyState, EmptyStateMessages } from "./empty-states";
+import { brandLogoAt, nextBrandIndex, parseBrandIndex } from "./brand";
 import { DEFAULT_DRAFT, draftFromTheme, themeFromDraft, cssVarsFromTheme, isCustom, isBuiltin, canSaveDraft, canDelete, isValidHex, contrastRatio, contrastTier, THEME_COLOR_FIELDS, type ThemeDto, type ThemeDraft } from "./theme-editor";
 import { categorizeBindings, isReservedChord, isValidChord, chordDisplay, canRecordChord, normalizeChord as normalizeChordStr, type KeybindDto } from "./keyboard-editor";
 import { ONBOARDING_STEPS, INITIAL_ONBOARDING_STATE, nextStep, prevStep, dismiss as dismissOnboarding, currentStepData, isLastStep, isFirstStep, progressPercent, selectAdapter, setTelemetryOptIn, shouldShowOnboarding, onboardingSeenFromConfig, ONBOARDING_COMPLETED_KEY, type OnboardingState } from "./onboarding";
@@ -57,6 +58,15 @@ const RYN_MENUBAR_EVENTS_BROKEN = false;
 import { initHud, toggleHud, recordFrame, hudMetrics, readJsHeapBytes, hudLines, type HudState, type JsHeapProbe } from "./perf-hud";
 import { parseSnapshotExport, snapshotRows, summarizeSnapshots, formatBytes as formatSnapshotBytes, type DiagnosticsSnapshot } from "./diagnostics-snapshot";
 import { initialPerfBundlesState, applyBundleList, beginCreate, finishCreate, surfaceError, requestDelete, cancelDelete, bundleRows, PERF_BUNDLES_EMPTY_TEXT, type PerfBundlesState, type PerfBundleListResult, type PerfBundleDto } from "./perf-bundles";
+
+let brandIndex = parseBrandIndex(localStorage.getItem("cove.brandLogo"));
+localStorage.setItem("cove.brandLogo", String(nextBrandIndex(brandIndex)));
+function applyBrandLogo(): void {
+  const src = brandLogoAt(brandIndex);
+  const wm = document.getElementById("wordmark-img") as HTMLImageElement | null;
+  if (wm) wm.src = src;
+  for (const img of document.querySelectorAll<HTMLImageElement>(".cl-brand-img")) img.src = src;
+}
 
 const CREDIT_THRESHOLD = 131072;
 
@@ -2344,6 +2354,14 @@ void invoke<{ version?: string }>("cove://sys/daemon.status", {}).then((s) => {
   if (s?.version) document.getElementById("wordmark-ver")!.textContent = "v" + s.version;
 }).catch(() => void 0);
 
+const wordmarkImg = document.getElementById("wordmark-img") as HTMLImageElement;
+applyBrandLogo();
+wordmarkImg.addEventListener("click", () => {
+  brandIndex = nextBrandIndex(brandIndex);
+  localStorage.setItem("cove.brandLogo", String(nextBrandIndex(brandIndex)));
+  applyBrandLogo();
+});
+
 palInput.addEventListener("input", () => { palSel = 0; renderPalette(); });
 palInput.addEventListener("keydown", (e) => {
   if (e.key === "Escape") { e.preventDefault(); closePalette(); }
@@ -3462,9 +3480,10 @@ function paintBoxLauncher(wrap: HTMLElement, ctx: LauncherContext): void {
 
   const header = document.createElement("div");
   header.className = "cl-header";
-  const brand = document.createElement("span");
-  brand.className = "cl-brand";
-  brand.textContent = "≋ cove";
+  const brand = document.createElement("img");
+  brand.className = "cl-brand cl-brand-img";
+  brand.alt = "cove";
+  brand.src = brandLogoAt(brandIndex);
   const tip = document.createElement("span");
   tip.className = "cl-tip";
   tip.textContent = tipAt(launcherTipIndex);

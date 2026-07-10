@@ -37,6 +37,8 @@ internal static class Program
                 o.TrafficLightPosition = new TrafficLightPosition(20, 17);
                 o.Backdrop = BackdropMaterial.Blur;
                 o.DevTools = Environment.GetEnvironmentVariable("COVE_DEVTOOLS") == "1";
+                var iconPath = Path.Combine(AppContext.BaseDirectory, "assets", "app-icon.png");
+                if (File.Exists(iconPath)) o.IconPath = iconPath;
             })
             .ConfigureServices(s =>
             {

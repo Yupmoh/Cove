@@ -11,6 +11,7 @@
 
   <ItemGroup>
     <Content Include="wwwroot/**" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="assets/app-icon.png" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="ryn.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

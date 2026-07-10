@@ -64,7 +64,8 @@
     #tl-zone { width: var(--ryn-titlebar-inset-left, 70px); flex-shrink: 0; display: none; }
     body.platform-mac #tl-zone { display: block; }
     body.platform-mac #win-controls { display: none; }
-    #wordmark { display: flex; align-items: baseline; gap: 5px; flex-shrink: 0; font-weight: 650; font-size: 13px; letter-spacing: 0.3px; color: var(--fg); }
+    #wordmark { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+    #wordmark-img { height: 17px; width: auto; display: block; cursor: pointer; -webkit-user-drag: none; user-select: none; }
     #wordmark-ver { font-size: 10.5px; color: var(--muted); opacity: 0; transition: opacity 0.15s; }
     #wordmark:hover #wordmark-ver { opacity: 1; }
     #tb-cluster { display: flex; align-items: center; justify-content: center; gap: 4px; flex: 1; min-width: 0; }
@@ -360,6 +361,7 @@
     .box-launcher > :last-child { margin-bottom: auto; }
     .cl-header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 0 4px; }
     .cl-brand { font-size: 15px; font-weight: 600; letter-spacing: 0.02em; color: var(--fg); }
+    img.cl-brand-img { height: 20px; width: auto; display: block; -webkit-user-drag: none; user-select: none; }
     .cl-tip { flex: 1; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: opacity 0.2s; }
     .cl-hint { font-size: 10px; color: var(--muted); background: var(--panel-2); border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; white-space: nowrap; }
     .cl-harness-row { display: grid; gap: 12px; justify-content: center; }
@@ -497,7 +499,7 @@
 <body>
   <div id="titlebar" data-webview-drag>
     <div id="tl-zone"></div>
-    <div id="wordmark">&#8779; cove<span id="wordmark-ver"></span></div>
+    <div id="wordmark"><img id="wordmark-img" alt="cove" data-webview-ignore /><span id="wordmark-ver"></span></div>
     <div id="tb-cluster" data-webview-ignore></div>
     <div id="tb-right" data-webview-ignore></div>
     <div id="win-controls" data-webview-ignore>
