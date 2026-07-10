@@ -40,6 +40,9 @@ import { toolbarTiles } from "./toolbar-tiles";
 import { clusterTools } from "./title-cluster";
 import { initialZenState, toggleZen, type ChromeVisibility, type ZenState } from "./zen-mode";
 import { eventToChord, buildChordMap, resolveDispatch, defaultBindings, type ResolvedBinding } from "./keymap-dispatch";
+import { enqueuePaneWrite } from "./write-queue";
+
+const RYN_MENUBAR_EVENTS_BROKEN = true;
 import { initHud, toggleHud, recordFrame, hudMetrics, readJsHeapBytes, hudLines, type HudState, type JsHeapProbe } from "./perf-hud";
 import { parseSnapshotExport, snapshotRows, summarizeSnapshots, formatBytes as formatSnapshotBytes, type DiagnosticsSnapshot } from "./diagnostics-snapshot";
 import { initialPerfBundlesState, applyBundleList, beginCreate, finishCreate, surfaceError, requestDelete, cancelDelete, bundleRows, PERF_BUNDLES_EMPTY_TEXT, type PerfBundlesState, type PerfBundleListResult, type PerfBundleDto } from "./perf-bundles";
@@ -271,7 +274,7 @@ function attachWs(pane: PaneView) {
     });
   };
   setInterval(sendAck, 100);
-  pane.term.onData((d) => { void invoke("app.paneWrite", { paneId: pane.paneId, dataBase64: toBase64Utf8(d) }); });
+  pane.term.onData((d) => { void enqueuePaneWrite(pane.paneId, toBase64Utf8(d), (paneId, dataBase64) => invoke("app.paneWrite", { paneId, dataBase64 })); });
   pane.term.onResize(({ cols, rows }) => { void invoke("app.paneResize", { paneId: pane.paneId, cols, rows }); });
 }
 
@@ -2508,7 +2511,8 @@ window.addEventListener("keydown", (e) => {
   const chord = eventToChord({ metaKey: e.metaKey, ctrlKey: e.ctrlKey, altKey: e.altKey, shiftKey: e.shiftKey, key: e.key });
   if (!chord) return;
   const decision = resolveDispatch(chord, chordMap, menuChords);
-  if (decision.kind !== "dispatch") return;
+  const dispatchable = decision.kind === "dispatch" || (RYN_MENUBAR_EVENTS_BROKEN && decision.kind === "menu-owned");
+  if (!dispatchable) return;
   if (paletteEl.classList.contains("open") && decision.action !== "tool.palette") return;
   e.preventDefault();
   runAction(decision.action);
@@ -2687,7 +2691,7 @@ function runAction(action: string): void {
 }
 
 function refreshMenu(): void {
-  const menu = buildMenu(bindingsAsActionChords());
+  const menu = buildMenu(bindingsAsActionChords(), RYN_MENUBAR_EVENTS_BROKEN);
   menuIdToAction.clear();
   for (const section of menu) {
     for (const item of section.items ?? []) {
