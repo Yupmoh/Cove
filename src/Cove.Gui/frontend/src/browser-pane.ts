@@ -56,6 +56,26 @@ export class BrowserNavState {
   reloadUrl(): string { return this.current; }
 }
 
+export interface CssRect { x: number; y: number; width: number; height: number; }
+
+export function nativeWebviewBounds(rect: CssRect, windowInnerHeight: number): { x: number; y: number; width: number; height: number } {
+  const width = Math.max(1, Math.round(rect.width));
+  const height = Math.max(1, Math.round(rect.height));
+  const y = Math.max(0, Math.round(windowInnerHeight - rect.y - rect.height));
+  return { x: Math.round(rect.x), y, width, height };
+}
+
+async function whenLaidOut(el: HTMLElement): Promise<void> {
+  for (let i = 0; i < 120; i++) {
+    if (el.isConnected) {
+      const r = el.getBoundingClientRect();
+      if (r.width >= 1 && r.height >= 1) return;
+    }
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+  }
+  console.warn("browser pane content area never got a size, opening webview anyway");
+}
+
 export function extractWebviewId(openResult: unknown): number | null {
   if (typeof openResult === "number" && Number.isInteger(openResult)) return openResult;
   if (openResult && typeof openResult === "object") {
@@ -193,19 +213,21 @@ export async function renderBrowserPane(paneId: string, initialUrl: string, user
   };
 
   const syncBounds = () => {
-    if (!webviewId || crashState.isCrashed) return;
+    if (webviewId === null || crashState.isCrashed) return;
     const rect = contentArea.getBoundingClientRect();
     if (rect.width < 1 || rect.height < 1) return;
-    void invoke("webviewPane.setBounds", { id: webviewId, x: Math.round(rect.x), y: Math.round(rect.y), width: Math.round(rect.width), height: Math.round(rect.height) }).catch(() => void 0);
+    const bounds = nativeWebviewBounds(rect, window.innerHeight);
+    void invoke("webviewPane.setBounds", { id: webviewId, x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height }).catch(() => void 0);
   };
 
   const openWebView = async (url: string) => {
     const storagePath = `/tmp/cove-webview-${paneId}`;
-    const rect = contentArea.getBoundingClientRect();
+    await whenLaidOut(contentArea);
+    const bounds = nativeWebviewBounds(contentArea.getBoundingClientRect(), window.innerHeight);
     const openArgs: Record<string, unknown> = {
       url,
-      x: Math.round(rect.x), y: Math.round(rect.y),
-      width: Math.max(1, Math.round(rect.width)), height: Math.max(1, Math.round(rect.height)),
+      x: bounds.x, y: bounds.y,
+      width: bounds.width, height: bounds.height,
       storagePath, devTools: false, zoom: zoomLevel,
     };
     if (userAgent && userAgent.length > 0) openArgs.userAgent = userAgent;
@@ -220,12 +242,13 @@ export async function renderBrowserPane(paneId: string, initialUrl: string, user
     syncBounds();
     const ro = new ResizeObserver(() => syncBounds());
     ro.observe(contentArea);
+    window.addEventListener("resize", syncBounds);
   };
 
   const doNavigate = async (url: string) => {
     nav.navigate(url);
     updateChrome();
-    if (webviewId) {
+    if (webviewId !== null) {
       setLoading(true);
       await invoke("webviewPane.navigate", { id: webviewId, url: nav.currentUrl }).catch((err) => { console.warn("webview navigate failed", nav.currentUrl, err); setLoading(false); });
     } else {
@@ -239,7 +262,7 @@ export async function renderBrowserPane(paneId: string, initialUrl: string, user
     if (!nav.canGoBack) return;
     nav.back();
     updateChrome();
-    if (webviewId) await invoke("webviewPane.navigate", { id: webviewId, url: nav.currentUrl }).catch(() => void 0);
+    if (webviewId !== null) await invoke("webviewPane.navigate", { id: webviewId, url: nav.currentUrl }).catch(() => void 0);
     void invoke("cove://commands/browser.back", { paneId }).catch(() => void 0);
   };
 
@@ -247,24 +270,24 @@ export async function renderBrowserPane(paneId: string, initialUrl: string, user
     if (!nav.canGoForward) return;
     nav.forward();
     updateChrome();
-    if (webviewId) await invoke("webviewPane.navigate", { id: webviewId, url: nav.currentUrl }).catch(() => void 0);
+    if (webviewId !== null) await invoke("webviewPane.navigate", { id: webviewId, url: nav.currentUrl }).catch(() => void 0);
     void invoke("cove://commands/browser.forward", { paneId }).catch(() => void 0);
   };
 
   const doReload = async () => {
-    if (webviewId) await invoke("webviewPane.reload", { id: webviewId }).catch(() => void 0);
+    if (webviewId !== null) await invoke("webviewPane.reload", { id: webviewId }).catch(() => void 0);
     void invoke("cove://commands/browser.reload", { paneId }).catch(() => void 0);
   };
 
   const setZoom = async (level: number) => {
     zoomLevel = Math.max(0.25, Math.min(5.0, level));
     updateChrome();
-    if (webviewId) await invoke("webviewPane.setZoom", { id: webviewId, factor: zoomLevel }).catch((err) => console.warn("webview setZoom failed", err));
+    if (webviewId !== null) await invoke("webviewPane.setZoom", { id: webviewId, factor: zoomLevel }).catch((err) => console.warn("webview setZoom failed", err));
   };
 
   const toggleDevTools = async () => {
     devToolsOpen = !devToolsOpen;
-    if (webviewId) await invoke("webviewPane.setDevTools", { id: webviewId, enabled: devToolsOpen }).catch((err) => console.warn("webview setDevTools failed", err));
+    if (webviewId !== null) await invoke("webviewPane.setDevTools", { id: webviewId, enabled: devToolsOpen }).catch((err) => console.warn("webview setDevTools failed", err));
     devToolsBtn.style.background = devToolsOpen ? "#34c2b0" : "";
   };
 
@@ -275,7 +298,7 @@ export async function renderBrowserPane(paneId: string, initialUrl: string, user
   };
 
   const runFind = async (forward: boolean) => {
-    if (!webviewId) return;
+    if (webviewId === null) return;
     if (!findState.canSearch) {
       await invoke("webviewPane.findStop", { id: webviewId, clearHighlights: true }).catch(() => void 0);
       findState.applyResult({ matches: 0, activeIndex: 0 });
@@ -288,7 +311,7 @@ export async function renderBrowserPane(paneId: string, initialUrl: string, user
   };
 
   const runFindNext = async (forward: boolean) => {
-    if (!webviewId || !findState.canSearch) return;
+    if (webviewId === null || !findState.canSearch) return;
     const result = await invoke<FindResult>("webviewPane.findNext", { id: webviewId, forward }).catch(() => null);
     if (result) findState.applyResult(result);
     renderFind();
@@ -305,7 +328,7 @@ export async function renderBrowserPane(paneId: string, initialUrl: string, user
   const closeFind = () => {
     findState.closeBar();
     renderFind();
-    if (webviewId) void invoke("webviewPane.findStop", { id: webviewId, clearHighlights: true }).catch(() => void 0);
+    if (webviewId !== null) void invoke("webviewPane.findStop", { id: webviewId, clearHighlights: true }).catch(() => void 0);
     el.focus();
   };
 
@@ -451,12 +474,12 @@ export async function renderBrowserPane(paneId: string, initialUrl: string, user
     crashOverlay.style.display = "none";
     titleBar.textContent = "Loading…";
     setLoading(true);
-    if (webviewId) await invoke("webviewPane.reloadFromCrash", { id: webviewId }).catch(() => void 0);
+    if (webviewId !== null) await invoke("webviewPane.reloadFromCrash", { id: webviewId }).catch(() => void 0);
     syncBounds();
   };
 
   const setSuspended = async (value: boolean) => {
-    if (suspended === value || !webviewId) return;
+    if (suspended === value || webviewId === null) return;
     suspended = value;
     await invoke("webviewPane.setSuspended", { id: webviewId, suspended: value }).catch(() => void 0);
   };

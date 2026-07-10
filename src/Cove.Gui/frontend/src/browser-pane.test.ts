@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { BrowserNavState, normalizeUrl } from "./browser-pane";
+import { BrowserNavState, normalizeUrl, nativeWebviewBounds } from "./browser-pane";
 
 describe("normalizeUrl", () => {
   it("prepends https:// for bare domains", () => {
@@ -94,5 +94,25 @@ describe("BrowserNavState", () => {
     const s = new BrowserNavState("https://a.com");
     s.navigate("https://b.com");
     expect(s.reloadUrl()).toBe("https://b.com");
+  });
+});
+
+describe("nativeWebviewBounds", () => {
+  it("flips css top-left coordinates into bottom-left native bounds", () => {
+    const b = nativeWebviewBounds({ x: 298, y: 90, width: 944, height: 790 }, 950);
+    expect(b).toEqual({ x: 298, y: 70, width: 944, height: 790 });
+  });
+
+  it("rounds fractional rects and enforces a minimum size", () => {
+    const b = nativeWebviewBounds({ x: 10.4, y: 20.6, width: 0.2, height: 0.4 }, 500);
+    expect(b.x).toBe(10);
+    expect(b.width).toBe(1);
+    expect(b.height).toBe(1);
+    expect(b.y).toBe(479);
+  });
+
+  it("clamps the native y at zero when the rect overflows the window", () => {
+    const b = nativeWebviewBounds({ x: 0, y: 100, width: 200, height: 600 }, 500);
+    expect(b.y).toBe(0);
   });
 });
