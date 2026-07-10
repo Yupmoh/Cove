@@ -114,7 +114,7 @@ public sealed class DaemonHost
         _ptyHost = PtyHostFactory.Create(logger);
         var probedPath = Cove.Platform.LoginShellPath.Probe(logger);
         var dataDir = _paths.DataDir.Root;
-        var cliPath = System.IO.Path.Combine(dataDir, "bin", "cove");
+        var cliPath = CliBinLink.Ensure(dataDir, System.Environment.ProcessPath, logger);
         var spawnEnv = new SpawnEnvironment(probedPath, dataDir, cliPath, "default");
         var shellDir = ShellIntegration.Install(dataDir);
         _panes = new PaneRegistry(_ptyHost, logger, spawnEnv, shellDir);
