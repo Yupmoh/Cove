@@ -18,6 +18,10 @@ public static class LaunchCommands
             return ctx.Fail("invalid_params", "launch build params required");
 
         var profile = profiles.Load(p.Adapter, p.ProfileSlug);
+        if (profile is null && p.ProfileSlug == "default")
+            profile = new Cove.Adapters.LaunchProfile("Default", "default", p.Adapter, true, null, null,
+                System.Array.Empty<string>(), new System.Collections.Generic.Dictionary<string, string>(),
+                new System.Collections.Generic.Dictionary<string, bool>(), System.Array.Empty<string>(), null, 1);
         if (profile is null)
             return ctx.Fail("not_found", $"profile '{p.Adapter}/{p.ProfileSlug}' not found");
 

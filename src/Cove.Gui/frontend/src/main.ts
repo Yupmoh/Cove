@@ -379,6 +379,7 @@ function makePane(paneId: string, since: number): PaneView {
   const overrides = loadKeybindings();
   term.attachCustomKeyEventHandler((e) => {
     if (e.type !== "keydown") return true;
+    if (e.key === "Tab") { e.preventDefault(); return true; }
     const chord = normalizeChord(e);
     const action = overrides[chord];
     if (action && action.startsWith("send-text:")) { void invoke("app.paneWrite", { paneId, dataBase64: toBase64Utf8(action.slice("send-text:".length)) }); return false; }
@@ -3285,8 +3286,29 @@ async function spawnAgent(a: AdapterInfo): Promise<void> {
   await spawnAgentInto(null, null, a);
 }
 
+function launcherYoloKey(adapter: string): string {
+  return "cove.launcher.yolo." + adapter;
+}
+
+function launcherYolo(adapter: string): boolean {
+  const stored = localStorage.getItem(launcherYoloKey(adapter));
+  if (stored !== null) return stored === "true";
+  return adapter === "claude-code";
+}
+
+async function buildAdapterLaunch(a: AdapterInfo): Promise<{ command: string; args: string[] }> {
+  try {
+    const built = await invoke<{ command: string; args: string[] }>("cove://commands/launch.build", {
+      adapter: a.name, profileSlug: "default", yolo: launcherYolo(a.name), workingDir: null, extraFlags: [], env: {},
+    });
+    if (built.command) return { command: built.command, args: built.args ?? [] };
+  } catch (err) { console.warn("launch.build failed, spawning raw binary", a.name, err); }
+  return { command: a.binary, args: [] };
+}
+
 async function spawnAgentInto(roomId: string | null, placeholderId: string | null, a: AdapterInfo): Promise<void> {
-  const sp = (await invoke<{ paneId: string }>("app.paneSpawn", { command: a.binary, args: [] as string[], cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: a.name, agentName: a.displayName, workspace: "", room: "" })).paneId;
+  const launch = await buildAdapterLaunch(a);
+  const sp = (await invoke<{ paneId: string }>("app.paneSpawn", { command: launch.command, args: launch.args, cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: a.name, agentName: a.displayName, workspace: "", room: "" })).paneId;
   if (roomId) {
     if (placeholderId) {
       await invoke("app.layoutMutate", { op: "replace", roomId, targetPaneId: placeholderId, newPaneId: sp, orientation: "", name: "", paneId: "", dir: 0, paneType: "terminal" });
@@ -3578,6 +3600,19 @@ function renderCardExpansion(ctx: LauncherContext, tile: LauncherTile): HTMLElem
   newSession.textContent = "New session";
   newSession.addEventListener("click", (e) => { e.stopPropagation(); launchHarnessTile(ctx, tile); });
   body.appendChild(newSession);
+
+  const yoloRow = document.createElement("label");
+  yoloRow.className = "cl-yolo-row";
+  yoloRow.addEventListener("click", (e) => e.stopPropagation());
+  const yoloBox = document.createElement("input");
+  yoloBox.type = "checkbox";
+  yoloBox.checked = launcherYolo(tile.adapterName);
+  yoloBox.addEventListener("change", () => localStorage.setItem(launcherYoloKey(tile.adapterName), String(yoloBox.checked)));
+  const yoloLabel = document.createElement("span");
+  yoloLabel.textContent = "skip permissions";
+  yoloRow.appendChild(yoloBox);
+  yoloRow.appendChild(yoloLabel);
+  body.appendChild(yoloRow);
 
   const resumable = resumableSessionsFor(tile.adapterName, launcherSessions);
   const recent = mostRecentSession(resumable);
