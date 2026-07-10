@@ -68,6 +68,7 @@ public sealed class SettingSchemaGenerator : IIncrementalGenerator
         var sectionKey = sectionName switch
         {
             "CoveConfig" => null,
+            "AppearanceSection" => "appearance",
             "TerminalSection" => "terminal",
             "MarkdownEditorSection" => "markdown_editor",
             "UpdatesSection" => "updates",

@@ -123,7 +123,21 @@ public sealed class ConfigService : System.IDisposable
             "telemetry.enabled" => (true, _config.Telemetry.Enabled),
             "telemetry.analyticsOptIn" => (true, _config.Telemetry.AnalyticsOptIn),
             "pushToTalk.enabled" => (true, _config.PushToTalk.Enabled),
+            "pushToTalk.isModifier" => (true, _config.PushToTalk.IsModifier),
+            "pushToTalk.keyCode" => (true, _config.PushToTalk.KeyCode),
+            "pushToTalk.requiredFlags" => (true, _config.PushToTalk.RequiredFlags),
+            "pushToTalk.label" => (true, _config.PushToTalk.Label),
             "speech.gain" => (true, _config.Speech.Gain),
+            "speech.inputDevice" => (true, _config.Speech.InputDevice ?? ""),
+            "speech.onDeviceRecognition" => (true, _config.Speech.OnDeviceRecognition),
+            "diagnostics.captureLongTasks" => (true, _config.Diagnostics.CaptureLongTasks),
+            "diagnostics.captureRenderStats" => (true, _config.Diagnostics.CaptureRenderStats),
+            "diagnostics.captureIpcTimings" => (true, _config.Diagnostics.CaptureIpcTimings),
+            "diagnostics.captureTerminalStats" => (true, _config.Diagnostics.CaptureTerminalStats),
+            "diagnostics.captureMemoryStats" => (true, _config.Diagnostics.CaptureMemoryStats),
+            "diagnostics.flushIntervalMs" => (true, _config.Diagnostics.FlushIntervalMs),
+            "worktree.defaultLocationPattern" => (true, _config.Worktree.DefaultLocationPattern),
+            "telemetry.coreTelemetryDisclosed" => (true, _config.Telemetry.CoreTelemetryDisclosed),
             _ => _config.Extra.TryGetValue(key, out var extra) ? (true, (object?)extra) : (false, null),
         };
     }
@@ -173,7 +187,21 @@ public sealed class ConfigService : System.IDisposable
                 case "telemetry.enabled": _config.Telemetry.Enabled = AutoDetectBool(value); break;
                 case "telemetry.analyticsOptIn": _config.Telemetry.AnalyticsOptIn = AutoDetectBool(value); break;
                 case "pushToTalk.enabled": _config.PushToTalk.Enabled = AutoDetectBool(value); break;
+                case "pushToTalk.isModifier": _config.PushToTalk.IsModifier = AutoDetectBool(value); break;
+                case "pushToTalk.keyCode": _config.PushToTalk.KeyCode = AutoDetectInt(value); break;
+                case "pushToTalk.requiredFlags": _config.PushToTalk.RequiredFlags = AutoDetectInt(value); break;
+                case "pushToTalk.label": _config.PushToTalk.Label = value; break;
                 case "speech.gain": _config.Speech.Gain = AutoDetectDouble(value); break;
+                case "speech.inputDevice": _config.Speech.InputDevice = string.IsNullOrEmpty(value) ? null : value; break;
+                case "speech.onDeviceRecognition": _config.Speech.OnDeviceRecognition = AutoDetectBool(value); break;
+                case "diagnostics.captureLongTasks": _config.Diagnostics.CaptureLongTasks = AutoDetectBool(value); break;
+                case "diagnostics.captureRenderStats": _config.Diagnostics.CaptureRenderStats = AutoDetectBool(value); break;
+                case "diagnostics.captureIpcTimings": _config.Diagnostics.CaptureIpcTimings = AutoDetectBool(value); break;
+                case "diagnostics.captureTerminalStats": _config.Diagnostics.CaptureTerminalStats = AutoDetectBool(value); break;
+                case "diagnostics.captureMemoryStats": _config.Diagnostics.CaptureMemoryStats = AutoDetectBool(value); break;
+                case "diagnostics.flushIntervalMs": _config.Diagnostics.FlushIntervalMs = AutoDetectInt(value); break;
+                case "worktree.defaultLocationPattern": _config.Worktree.DefaultLocationPattern = value; break;
+                case "telemetry.coreTelemetryDisclosed": _config.Telemetry.CoreTelemetryDisclosed = AutoDetectBool(value); break;
                 default:
                     _config.Extra[key] = AutoDetectJson(value);
                     break;
