@@ -42,7 +42,7 @@ import { initBackdrop, setBackdropMaterial, nextToggleMaterial, coerceMaterial, 
 import { NotificationBridge, type NotificationBridgeDeps, type NotificationDeliverPayload } from "./notifications";
 import { buildMenu, menuChordSet } from "./menu-model";
 import { toolbarTiles } from "./toolbar-tiles";
-import { shouldShowLauncher, buildLauncherTiles, type LauncherAdapter, type LauncherBuiltin } from "./box-launcher";
+import { shouldShowLauncher, buildLauncherTiles, isEmptyRoomTree, placeablePaneForAction, type LauncherAdapter, type LauncherBuiltin } from "./box-launcher";
 import { clusterTools } from "./title-cluster";
 import { initialZenState, toggleZen, type ChromeVisibility, type ZenState } from "./zen-mode";
 import { eventToChord, buildChordMap, resolveDispatch, defaultBindings, type ResolvedBinding } from "./keymap-dispatch";
@@ -925,8 +925,9 @@ function firstLeafOf(room: RoomSnapshot): string | undefined {
 function renderRoom(): void {
   const room = activeRoom();
   gridEl.innerHTML = "";
+  const roomEmpty = room ? isEmptyRoomTree(room.layoutTree) : false;
   let zoomed = false;
-  if (room && room.layoutTree) {
+  if (room && room.layoutTree && !roomEmpty) {
     const treeIds = collectLeafIds(room.layoutTree);
     const zid = room.zoomedPaneId;
     if (zid && treeIds.includes(zid)) {
@@ -946,10 +947,20 @@ function renderRoom(): void {
         }
       }
     }
+  } else {
+    for (const [id, pv] of panes) {
+      try { pv.ws.close(); } catch { void 0; }
+      pv.term.dispose();
+      panes.delete(id);
+    }
   }
-  if (!room || !room.layoutTree) {
+  if (room && roomEmpty) {
+    const placeholder = collectLeafIds(room.layoutTree)[0] ?? null;
+    focusedPaneId = null;
+    gridEl.appendChild(renderBoxLauncher(room.id, placeholder));
+  } else if (!room || !room.layoutTree) {
     if (shouldShowLauncher((layout?.rooms ?? []).length)) {
-      gridEl.appendChild(renderBoxLauncher());
+      gridEl.appendChild(renderBoxLauncher(null, null));
     } else {
       const empty = buildEmptyState({ message: EmptyStateMessages.noRooms, actionLabel: "New terminal", actionIcon: "+" });
       const action = empty.querySelector(".cove-empty-action");
@@ -1074,12 +1085,48 @@ function cycleFocus(d: number): void {
   focusPane(next);
 }
 
+function newPlaceholderId(): string {
+  const rnd = (globalThis.crypto && "randomUUID" in globalThis.crypto) ? globalThis.crypto.randomUUID() : Math.random().toString(36).slice(2);
+  return "empty-" + rnd;
+}
+
 async function newRoom(): Promise<void> {
-  const sp = (await invoke<{ paneId: string }>("app.paneSpawn", { command: "", cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: "", agentName: "", workspace: "", room: "" })).paneId;
-  const r = await invoke<{ roomId: string }>("app.layoutMutate", { op: "createRoom", newPaneId: sp, name: "Terminal " + (layout ? layout.rooms.length + 1 : 1), roomId: "", targetPaneId: "", orientation: "", paneId: "", dir: 0 });
+  const placeholder = newPlaceholderId();
+  const r = await invoke<{ roomId: string }>("app.layoutMutate", { op: "createRoom", newPaneId: placeholder, name: "Terminal " + (layout ? layout.rooms.length + 1 : 1), roomId: "", targetPaneId: "", orientation: "", paneId: "", dir: 0, paneType: "empty" });
   activeRoomId = r.roomId;
+  focusedPaneId = null;
   await reload();
-  focusPane(sp);
+}
+
+async function placePaneIntoRoom(roomId: string, placeholderId: string | null, paneId: string, paneType: string): Promise<void> {
+  if (placeholderId) {
+    await invoke("app.layoutMutate", { op: "replace", roomId, targetPaneId: placeholderId, newPaneId: paneId, orientation: "", name: "", paneId: "", dir: 0, paneType });
+  } else {
+    await invoke("app.layoutMutate", { op: "createRoom", newPaneId: paneId, name: paneType === "browser" ? "Browser" : "Terminal " + (layout ? layout.rooms.length + 1 : 1), roomId: "", targetPaneId: "", orientation: "", paneId: "", dir: 0, paneType });
+  }
+  activeRoomId = roomId;
+  await reload();
+  focusPane(paneId);
+}
+
+async function launchTileInto(roomId: string | null, placeholderId: string | null, action: string): Promise<void> {
+  const placeable = placeablePaneForAction(action);
+  if (!placeable) { runAction(action); return; }
+  let paneId: string;
+  if (placeable.kind === "browser") {
+    const bp = await invoke<{ paneId: string; currentUrl: string }>("cove://commands/browser.create", { url: "https://duckduckgo.com" });
+    paneId = bp.paneId;
+  } else {
+    paneId = (await invoke<{ paneId: string }>("app.paneSpawn", { command: "", cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: "", agentName: "", workspace: "", room: "" })).paneId;
+  }
+  if (roomId) {
+    await placePaneIntoRoom(roomId, placeholderId, paneId, placeable.paneType);
+  } else {
+    const r = await invoke<{ roomId: string }>("app.layoutMutate", { op: "createRoom", newPaneId: paneId, name: placeable.kind === "browser" ? "Browser" : "Terminal " + (layout ? layout.rooms.length + 1 : 1), roomId: "", targetPaneId: "", orientation: "", paneId: "", dir: 0, paneType: placeable.paneType });
+    activeRoomId = r.roomId;
+    await reload();
+    focusPane(paneId);
+  }
 }
 
 async function newBrowserRoom(url: string): Promise<void> {
@@ -1096,8 +1143,8 @@ async function closeRoom(roomId: string): Promise<void> {
   const leaves = collectLeafIds(room.layoutTree);
   for (const id of leaves) {
     try { await invoke("app.paneKill", { paneId: id }); } catch { void 0; }
-    try { await invoke("app.layoutMutate", { op: "close", roomId, paneId: id, targetPaneId: "", newPaneId: "", orientation: "", name: "", dir: 0 }); } catch { void 0; }
   }
+  try { await invoke("app.layoutMutate", { op: "closeRoom", roomId, paneId: "", targetPaneId: "", newPaneId: "", orientation: "", name: "", dir: 0 }); } catch { void 0; }
   if (activeRoomId === roomId) activeRoomId = null;
   await reload();
 }
@@ -1538,12 +1585,13 @@ let activeWingId: string | null = "main";
 let wingSwitcherExpanded = false;
 let roomWingSummaries: { id: string; wingId: string; pinned: boolean }[] = [];
 async function loadWings(): Promise<void> {
+  const wsId = layout?.id ?? "default";
   try {
-    const res = await invoke<{ wings: { id: string; name: string }[] }>("cove://commands/wing.list", { workspaceId: "default" });
+    const res = await invoke<{ wings: { id: string; name: string }[] }>("cove://commands/wing.list", { workspaceId: wsId });
     wings = res.wings ?? [{ id: "main", name: "main" }];
   } catch { wings = [{ id: "main", name: "main" }]; }
   try {
-    const list = await invoke<{ rooms: { id: string; wingId: string; pinned: boolean }[] }>("cove://commands/room.list", { workspaceId: "default" });
+    const list = await invoke<{ rooms: { id: string; wingId: string; pinned: boolean }[] }>("cove://commands/room.list", { workspaceId: wsId });
     roomWingSummaries = list.rooms ?? [];
   } catch { roomWingSummaries = []; }
 }
@@ -1956,7 +2004,14 @@ async function searchFiles(query: string): Promise<void> {
 }
 
 async function switchWorkspace(wsId: string): Promise<void> {
-  try { await invoke("cove://commands/workspace.switch", { workspaceId: wsId }); await reload(); } catch { void 0; }
+  try {
+    await invoke("cove://commands/workspace.switch", { id: wsId });
+    activeRoomId = null;
+    focusedPaneId = null;
+    await reload();
+    await loadWings();
+    renderRoomTabs();
+  } catch { void 0; }
 }
 
 async function openTaskInPane(taskId: string): Promise<void> {
@@ -2929,9 +2984,20 @@ async function loadLauncherAgents(): Promise<void> {
   } catch { void 0; }
 }
 async function spawnAgent(a: AdapterInfo): Promise<void> {
+  await spawnAgentInto(null, null, a);
+}
+
+async function spawnAgentInto(roomId: string | null, placeholderId: string | null, a: AdapterInfo): Promise<void> {
   const sp = (await invoke<{ paneId: string }>("app.paneSpawn", { command: a.binary, args: [] as string[], cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: a.name, agentName: a.displayName, workspace: "", room: "" })).paneId;
-  const r = await invoke<{ roomId: string }>("app.layoutMutate", { op: "createRoom", newPaneId: sp, name: a.displayName || a.name, roomId: "", targetPaneId: "", orientation: "", paneId: "", dir: 0 });
-  activeRoomId = r.roomId;
+  if (roomId) {
+    if (placeholderId) {
+      await invoke("app.layoutMutate", { op: "replace", roomId, targetPaneId: placeholderId, newPaneId: sp, orientation: "", name: "", paneId: "", dir: 0, paneType: "terminal" });
+    }
+    activeRoomId = roomId;
+  } else {
+    const r = await invoke<{ roomId: string }>("app.layoutMutate", { op: "createRoom", newPaneId: sp, name: a.displayName || a.name, roomId: "", targetPaneId: "", orientation: "", paneId: "", dir: 0 });
+    activeRoomId = r.roomId;
+  }
   await reload();
   focusPane(sp);
 }
@@ -2949,7 +3015,7 @@ function builtinLauncherDefs(): LauncherBuiltin[] {
   return toolbarTiles().map((t) => ({ id: t.id, label: t.label, icon: t.icon, action: t.action }));
 }
 
-function renderBoxLauncher(): HTMLElement {
+function renderBoxLauncher(targetRoomId: string | null, targetPlaceholderId: string | null): HTMLElement {
   const wrap = document.createElement("div");
   wrap.className = "box-launcher";
   const title = document.createElement("div");
@@ -2979,8 +3045,8 @@ function renderBoxLauncher(): HTMLElement {
     }
     if (!tile.disabled) {
       el.addEventListener("click", () => {
-        if (tile.kind === "adapter") void spawnAgent({ name: tile.adapterName, displayName: tile.label, accent: tile.accent, binary: tile.binary });
-        else runAction(tile.action);
+        if (tile.kind === "adapter") void spawnAgentInto(targetRoomId, targetPlaceholderId, { name: tile.adapterName, displayName: tile.label, accent: tile.accent, binary: tile.binary });
+        else void launchTileInto(targetRoomId, targetPlaceholderId, tile.action);
       });
     }
     grid.appendChild(el);

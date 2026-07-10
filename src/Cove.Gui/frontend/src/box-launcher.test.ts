@@ -4,6 +4,9 @@ import {
   buildAdapterTiles,
   buildBuiltinTiles,
   buildLauncherTiles,
+  isEmptyRoomTree,
+  launcherPlacement,
+  placeablePaneForAction,
   type LauncherAdapter,
   type LauncherBuiltin,
 } from "./box-launcher";
@@ -60,5 +63,35 @@ describe("buildLauncherTiles", () => {
     const builtins: LauncherBuiltin[] = [{ id: "terminal", label: "Terminal", icon: "▌", action: "room.new" }];
     const tiles = buildLauncherTiles(adapters, builtins);
     expect(tiles.map((t) => t.id)).toEqual(["adapter:claude", "builtin:terminal"]);
+  });
+});
+
+describe("isEmptyRoomTree", () => {
+  it("treats a lone empty-typed leaf as empty", () => {
+    expect(isEmptyRoomTree({ kind: "leaf", subtabs: [{ paneType: "empty" }] })).toBe(true);
+    expect(isEmptyRoomTree({ kind: "leaf", subtabs: [] })).toBe(true);
+  });
+  it("treats a leaf with a real pane as non-empty", () => {
+    expect(isEmptyRoomTree({ kind: "leaf", subtabs: [{ paneType: "terminal" }] })).toBe(false);
+  });
+  it("treats a split as non-empty", () => {
+    expect(isEmptyRoomTree({ kind: "split" })).toBe(false);
+    expect(isEmptyRoomTree(null)).toBe(false);
+  });
+});
+
+describe("launcherPlacement", () => {
+  it("replaces into an empty room, otherwise creates a room", () => {
+    expect(launcherPlacement(true)).toBe("replace");
+    expect(launcherPlacement(false)).toBe("create");
+  });
+});
+
+describe("placeablePaneForAction", () => {
+  it("maps terminal and browser and tool tiles to pane types", () => {
+    expect(placeablePaneForAction("room.new")).toEqual({ paneType: "terminal", kind: "terminal" });
+    expect(placeablePaneForAction("tool.browser")).toEqual({ paneType: "browser", kind: "browser" });
+    expect(placeablePaneForAction("tool.git")).toEqual({ paneType: "git", kind: "tool" });
+    expect(placeablePaneForAction("tool.notepad")).toBeNull();
   });
 });
