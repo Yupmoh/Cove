@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { initialZenState, enterZen, exitZen, toggleZen, type ChromeVisibility } from "./zen-mode";
 
-const shown: ChromeVisibility = { leftSidebarHidden: false, toolbarHidden: false, notepadOpen: false };
-const hidden: ChromeVisibility = { leftSidebarHidden: true, toolbarHidden: true, notepadOpen: false };
+const shown: ChromeVisibility = { leftSidebarHidden: false, rightSidebarHidden: false, toolbarHidden: false };
+const hidden: ChromeVisibility = { leftSidebarHidden: true, rightSidebarHidden: true, toolbarHidden: true };
 
 describe("initialZenState", () => {
   it("starts inactive with no saved snapshot", () => {
@@ -15,10 +15,10 @@ describe("enterZen", () => {
     const r = enterZen(initialZenState(), shown);
     expect(r.state.active).toBe(true);
     expect(r.state.saved).toEqual(shown);
-    expect(r.visibility).toEqual({ leftSidebarHidden: true, toolbarHidden: true, notepadOpen: false });
+    expect(r.visibility).toEqual(hidden);
   });
-  it("preserves an already-hidden sidebar in the snapshot", () => {
-    const partial: ChromeVisibility = { leftSidebarHidden: true, toolbarHidden: false, notepadOpen: true };
+  it("preserves partially-hidden chrome in the snapshot", () => {
+    const partial: ChromeVisibility = { leftSidebarHidden: true, rightSidebarHidden: false, toolbarHidden: false };
     const r = enterZen(initialZenState(), partial);
     expect(r.state.saved).toEqual(partial);
   });
@@ -31,7 +31,7 @@ describe("enterZen", () => {
 
 describe("exitZen", () => {
   it("restores exactly the pre-zen visibility", () => {
-    const partial: ChromeVisibility = { leftSidebarHidden: true, toolbarHidden: false, notepadOpen: true };
+    const partial: ChromeVisibility = { leftSidebarHidden: true, rightSidebarHidden: false, toolbarHidden: false };
     const entered = enterZen(initialZenState(), partial);
     const exited = exitZen(entered.state);
     expect(exited.state).toEqual({ active: false, saved: null });
@@ -45,10 +45,10 @@ describe("exitZen", () => {
 
 describe("toggleZen", () => {
   it("enters from inactive then restores on the second toggle", () => {
-    const partial: ChromeVisibility = { leftSidebarHidden: false, toolbarHidden: true, notepadOpen: true };
+    const partial: ChromeVisibility = { leftSidebarHidden: false, rightSidebarHidden: true, toolbarHidden: true };
     const on = toggleZen(initialZenState(), partial);
     expect(on.state.active).toBe(true);
-    expect(on.visibility.leftSidebarHidden).toBe(true);
+    expect(on.visibility).toEqual(hidden);
     const off = toggleZen(on.state, on.visibility);
     expect(off.state.active).toBe(false);
     expect(off.visibility).toEqual(partial);
