@@ -6,6 +6,7 @@
     "badge": true,
     "webviewPane": true,
     "window": true,
-    "notification": true
+    "notification": true,
+    "dialog": true
   }
 }

@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Ryn.Core;
 using Ryn.Ipc;
 using Ryn.Plugins.Badge;
+using Ryn.Plugins.Dialog;
 using Ryn.Plugins.GlobalShortcut;
 using Ryn.Plugins.MenuBar;
 using Ryn.Plugins.Notification;
@@ -49,6 +50,7 @@ internal static class Program
                 s.AddRynGlobalShortcut();
                 s.AddRynWebViewPane();
                 s.AddRynNotification();
+                s.AddRynDialog();
                 s.AddPerfResultsCommand();
             })
             .Build()
