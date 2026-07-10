@@ -25,6 +25,34 @@ export function accentForPaneType(paneType: string): string {
   return PaneTypeAccent[paneType] ?? "#6b7280";
 }
 
+export const PaneTypeGlyph: Record<string, string> = {
+  terminal: "▌",
+  browser: "◑",
+  search: "⌕",
+  git: "⎇",
+  "source-control": "⎇",
+  editor: "✐",
+  markdown: "❡",
+  notepad: "✎",
+  tasks: "▤",
+  "tasks-list": "▤",
+  "tasks-kanban": "▤",
+  "tasks-detail": "▤",
+  diff: "±",
+  "diff-review": "±",
+  image: "▦",
+  pdf: "▤",
+  video: "▶",
+  library: "▤",
+  "session-picker": "≣",
+  "snapshot-inspector": "◱",
+  empty: "▌",
+};
+
+export function glyphForPaneType(paneType: string): string {
+  return PaneTypeGlyph[paneType] ?? "▌";
+}
+
 export interface PinnedState {
   pinned: string[];
   unpinned: string[];

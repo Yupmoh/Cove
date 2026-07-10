@@ -1,61 +1,52 @@
 import { describe, it, expect } from "vitest";
 import {
   initialSidebarModel,
-  selectMode,
+  selectLeftMode,
   toggleSide,
   setCollapsed,
   setWidth,
   clampWidth,
-  oppositeSide,
-  modeOf,
   collapsedOf,
+  widthOf,
   SIDEBAR_MIN_WIDTH,
   SIDEBAR_MAX_WIDTH,
   SIDEBAR_MODES,
 } from "./sidebar-model";
 
 describe("initialSidebarModel", () => {
-  it("defaults workspaces on the left and agents on the right, both expanded", () => {
+  it("defaults workspaces on the left, both sides expanded", () => {
     const m = initialSidebarModel();
     expect(m.leftMode).toBe("workspaces");
-    expect(m.rightMode).toBe("agents");
     expect(m.leftCollapsed).toBe(false);
     expect(m.rightCollapsed).toBe(false);
   });
 });
 
 describe("SIDEBAR_MODES", () => {
-  it("lists all seven spec modes with workspaces, agents and notepad functional", () => {
+  it("lists the six left-rail modes with workspaces and notepad functional and no agents mode", () => {
     const names = SIDEBAR_MODES.map((m) => m.mode);
-    expect(names).toEqual(["workspaces", "overview", "skills", "agents", "activity", "timeline", "notepad"]);
+    expect(names).toEqual(["workspaces", "overview", "skills", "activity", "timeline", "notepad"]);
+    expect(names).not.toContain("agents");
     const functional = SIDEBAR_MODES.filter((m) => m.functional).map((m) => m.mode);
-    expect(functional).toEqual(["workspaces", "agents", "notepad"]);
+    expect(functional).toEqual(["workspaces", "notepad"]);
   });
 });
 
-describe("selectMode", () => {
-  it("assigns a free mode to the requested side", () => {
-    const m = selectMode(initialSidebarModel(), "left", "timeline");
+describe("selectLeftMode", () => {
+  it("assigns the requested mode to the left rail", () => {
+    const m = selectLeftMode(initialSidebarModel(), "timeline");
     expect(m.leftMode).toBe("timeline");
-    expect(m.rightMode).toBe("agents");
   });
-  it("atomically swaps when the mode is mounted on the opposite side", () => {
-    const m = selectMode(initialSidebarModel(), "left", "agents");
-    expect(m.leftMode).toBe("agents");
-    expect(m.rightMode).toBe("workspaces");
-  });
-  it("expands the side when selecting its already-active mode", () => {
+  it("expands the left side when selecting a mode", () => {
     const collapsed = setCollapsed(initialSidebarModel(), "left", true);
-    const m = selectMode(collapsed, "left", "workspaces");
-    expect(m.leftMode).toBe("workspaces");
+    const m = selectLeftMode(collapsed, "notepad");
+    expect(m.leftMode).toBe("notepad");
     expect(m.leftCollapsed).toBe(false);
   });
-  it("expands the target side after a swap", () => {
-    const collapsed = setCollapsed(initialSidebarModel(), "right", true);
-    const m = selectMode(collapsed, "right", "workspaces");
-    expect(m.rightMode).toBe("workspaces");
-    expect(m.leftMode).toBe("agents");
-    expect(m.rightCollapsed).toBe(false);
+  it("never touches the right side", () => {
+    const rightCollapsed = setCollapsed(initialSidebarModel(), "right", true);
+    const m = selectLeftMode(rightCollapsed, "skills");
+    expect(m.rightCollapsed).toBe(true);
   });
 });
 
@@ -65,6 +56,11 @@ describe("toggleSide", () => {
     expect(m.leftCollapsed).toBe(true);
     expect(m.rightCollapsed).toBe(false);
     expect(toggleSide(m, "left").leftCollapsed).toBe(false);
+  });
+  it("toggles the right side independently", () => {
+    const m = toggleSide(initialSidebarModel(), "right");
+    expect(m.rightCollapsed).toBe(true);
+    expect(m.leftCollapsed).toBe(false);
   });
 });
 
@@ -81,13 +77,10 @@ describe("clampWidth / setWidth", () => {
 });
 
 describe("helpers", () => {
-  it("oppositeSide flips sides", () => {
-    expect(oppositeSide("left")).toBe("right");
-    expect(oppositeSide("right")).toBe("left");
-  });
-  it("modeOf and collapsedOf read the correct side", () => {
-    const m = setCollapsed(initialSidebarModel(), "right", true);
-    expect(modeOf(m, "right")).toBe("agents");
+  it("collapsedOf and widthOf read the correct side", () => {
+    const m = setCollapsed(setWidth(initialSidebarModel(), "right", 300), "right", true);
     expect(collapsedOf(m, "right")).toBe(true);
+    expect(collapsedOf(m, "left")).toBe(false);
+    expect(widthOf(m, "right")).toBe(300);
   });
 });

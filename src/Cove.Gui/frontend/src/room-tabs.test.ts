@@ -6,6 +6,7 @@ import {
   closeAllPreservePinned,
   buildMiniDiagram,
   accentForPaneType,
+  glyphForPaneType,
   visibleRoomIds,
   switchWing,
   WingSwitcherState,
@@ -16,6 +17,17 @@ import {
   type MiniDiagramNode,
   type WingModel,
 } from "./room-tabs";
+
+describe("glyphForPaneType", () => {
+  it("maps known pane types to glyphs and shares one across same-type rooms", () => {
+    expect(glyphForPaneType("terminal")).toBe("▌");
+    expect(glyphForPaneType("browser")).toBe("◑");
+    expect(glyphForPaneType("git")).toBe(glyphForPaneType("source-control"));
+  });
+  it("falls back to the terminal glyph for unknown types", () => {
+    expect(glyphForPaneType("mystery")).toBe("▌");
+  });
+});
 
 const mkRoom = (id: string, pinned = false): TabRoom => ({ id, name: id, pinned });
 
