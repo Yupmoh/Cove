@@ -32,8 +32,11 @@ internal static class EngineCommands
             return Task.FromResult(ctx.Fail("not_ready", "pane registry unavailable"));
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.PaneWriteParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "write params required"));
+        var resolved = reg.ResolveId(p.PaneId);
+        if (!resolved.Found)
+            return Task.FromResult(ctx.Fail(resolved.ErrorCode ?? "not_found", $"unknown pane {p.PaneId}"));
         byte[] data = Convert.FromBase64String(p.DataBase64);
-        return Task.FromResult(reg.Write(p.PaneId, data)
+        return Task.FromResult(reg.Write(resolved.Id!, data)
             ? ctx.Ok()
             : ctx.Fail("not_found", $"unknown pane {p.PaneId}"));
     }
@@ -45,7 +48,10 @@ internal static class EngineCommands
             return Task.FromResult(ctx.Fail("not_ready", "pane registry unavailable"));
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.ResizeParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "resize params required"));
-        return Task.FromResult(reg.Resize(p.PaneId, p.Cols, p.Rows)
+        var resolved = reg.ResolveId(p.PaneId);
+        if (!resolved.Found)
+            return Task.FromResult(ctx.Fail(resolved.ErrorCode ?? "not_found", $"unknown pane {p.PaneId}"));
+        return Task.FromResult(reg.Resize(resolved.Id!, p.Cols, p.Rows)
             ? ctx.Ok()
             : ctx.Fail("not_found", $"unknown pane {p.PaneId}"));
     }
@@ -57,8 +63,11 @@ internal static class EngineCommands
             return Task.FromResult(ctx.Fail("not_ready", "pane registry unavailable"));
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.PaneRefParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "pane ref required"));
-        ctx.AgentRouter?.Unregister(p.PaneId);
-        return Task.FromResult(reg.Kill(p.PaneId)
+        var resolved = reg.ResolveId(p.PaneId);
+        if (!resolved.Found)
+            return Task.FromResult(ctx.Fail(resolved.ErrorCode ?? "not_found", $"unknown pane {p.PaneId}"));
+        ctx.AgentRouter?.Unregister(resolved.Id!);
+        return Task.FromResult(reg.Kill(resolved.Id!)
                 ? ctx.Ok()
                 : ctx.Fail("not_found", $"unknown pane {p.PaneId}"));
     }
@@ -70,7 +79,9 @@ internal static class EngineCommands
             return Task.FromResult(ctx.Fail("not_ready", "pane registry unavailable"));
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.SearchParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "search params required"));
-        var matches = reg.Search(p.PaneId, p.Query, p.CaseSensitive);
+        var resolved = reg.ResolveId(p.PaneId);
+        var searchPaneId = resolved.Found ? resolved.Id! : p.PaneId;
+        var matches = reg.Search(searchPaneId, p.Query, p.CaseSensitive);
         return Task.FromResult(ctx.Ok(new SearchResult(matches), CoveJsonContext.Default.SearchResult));
     }
 
@@ -81,7 +92,10 @@ internal static class EngineCommands
             return Task.FromResult(ctx.Fail("not_ready", "pane registry unavailable"));
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.PaneRenameParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "rename params required"));
-        return Task.FromResult(reg.Rename(p.PaneId, p.Title)
+        var resolved = reg.ResolveId(p.PaneId);
+        if (!resolved.Found)
+            return Task.FromResult(ctx.Fail(resolved.ErrorCode ?? "not_found", $"unknown pane {p.PaneId}"));
+        return Task.FromResult(reg.Rename(resolved.Id!, p.Title)
             ? ctx.Ok()
             : ctx.Fail("not_found", $"unknown pane {p.PaneId}"));
     }
@@ -93,9 +107,11 @@ internal static class EngineCommands
             return Task.FromResult(ctx.Fail("not_ready", "pane registry unavailable"));
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.PaneReadParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "read params required"));
-        byte[] bytes = reg.Read(p.PaneId, p.Offset, p.MaxBytes);
+        var resolved = reg.ResolveId(p.PaneId);
+        var readPaneId = resolved.Found ? resolved.Id! : p.PaneId;
+        byte[] bytes = reg.Read(readPaneId, p.Offset, p.MaxBytes);
         long head = 0;
-        if (reg.TryGet(p.PaneId, out var pane))
+        if (reg.TryGet(readPaneId, out var pane))
             head = pane.Ring.Head;
         long nextOffset = p.Offset + bytes.Length;
         return Task.FromResult(ctx.Ok(new PaneReadResult(System.Convert.ToBase64String(bytes), nextOffset, head), CoveJsonContext.Default.PaneReadResult));

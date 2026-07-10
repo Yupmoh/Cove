@@ -118,6 +118,15 @@ public sealed class PaneRegistry : IDisposable, Cove.Engine.Agents.IPaneWriter
             return _panes.TryGetValue(paneId, out pane!);
     }
 
+    public Cove.Engine.Protocol.PrefixResolveResult ResolveId(string idOrPrefix)
+    {
+        var resolver = new Cove.Engine.Protocol.PrefixResolver();
+        lock (_sync)
+            foreach (var id in _panes.Keys)
+                resolver.Index("pane", id);
+        return resolver.Resolve("pane", idOrPrefix);
+    }
+
     public PaneInfo[] List()
     {
         lock (_sync)
