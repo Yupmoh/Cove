@@ -4177,8 +4177,9 @@ async function browseWorkspaceDir(): Promise<void> {
   try {
     const typed = wscPathEl.value.trim();
     const initial = typed.startsWith("/") ? typed : (activeProjectDir() || "/");
-    const picked = await invoke<string>("dialog.openFolder", { initialPath: initial });
-    if (picked && picked.trim()) wscPathEl.value = picked.trim();
+    const picked = await window.__ryn.invoke("dialog.openFolder", { initialPath: initial });
+    const path = typeof picked === "string" ? picked.trim() : "";
+    if (path) wscPathEl.value = path;
     else console.warn("folder picker returned nothing (cancelled or dialog error)", initial);
   } catch (e) { console.warn("folder picker failed", e); }
 }
