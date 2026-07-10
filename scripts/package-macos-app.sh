@@ -25,7 +25,7 @@ find "$MACOS" -maxdepth 1 -name '*.pdb' -delete
 find "$MACOS" -maxdepth 1 -name '*.dbg' -delete
 rm -f "$MACOS/covptygen"
 rm -rf "$MACOS/cove.dSYM"
-chmod +x "$MACOS/Cove.Gui" "$MACOS/cove"
+chmod +x "$MACOS/Cove" "$MACOS/cove"
 
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -43,7 +43,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleShortVersionString</key>
   <string>${VERSION}</string>
   <key>CFBundleExecutable</key>
-  <string>Cove.Gui</string>
+  <string>Cove</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>LSMinimumSystemVersion</key>

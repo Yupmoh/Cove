@@ -6,6 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <RootNamespace>Cove.Gui</RootNamespace>
+    <AssemblyName>Cove</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>

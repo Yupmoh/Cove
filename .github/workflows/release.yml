@@ -81,7 +81,7 @@ jobs:
             name="${d%/}"
             rm -f "$d"*.pdb "$d"*.dbg "$d"covptygen
             rm -rf "$d"cove.dSYM
-            find "$d" -type f \( -name cove -o -name Cove.Gui \) -exec chmod +x {} + 2>/dev/null || true
+            find "$d" -type f \( -name cove -o -name Cove.Gui -o -name Cove \) -exec chmod +x {} + 2>/dev/null || true
             (cd "$d" && zip -r "../${name}.zip" .)
           done
           ls -la
