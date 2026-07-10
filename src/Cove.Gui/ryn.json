@@ -4,6 +4,8 @@
     "menubar": true,
     "globalShortcut": true,
     "badge": true,
-    "webviewPane": true
+    "webviewPane": true,
+    "window": true,
+    "notification": true
   }
 }
