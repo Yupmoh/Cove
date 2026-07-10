@@ -6,6 +6,45 @@ export interface ThemeDto {
   chromeSurface: string;
   chromeText: string;
   chromeAccent: string;
+  ansi?: string[] | null;
+}
+
+export const FALLBACK_DARK_ANSI = [
+  "#45475a", "#f38ba8", "#a6e3a1", "#f9e2af", "#89b4fa", "#f5c2e7", "#94e2d5", "#bac2de",
+  "#585b70", "#f38ba8", "#a6e3a1", "#f9e2af", "#89b4fa", "#f5c2e7", "#94e2d5", "#a6adc8",
+];
+
+export const FALLBACK_LIGHT_ANSI = [
+  "#24292f", "#cf222e", "#116329", "#4d2d00", "#0969da", "#8250df", "#1b7c83", "#6e7781",
+  "#57606a", "#a40e26", "#1a7f37", "#633c01", "#218bff", "#a475f9", "#3192aa", "#8c959f",
+];
+
+const ANSI_SLOT_NAMES = [
+  "black", "red", "green", "yellow", "blue", "magenta", "cyan", "white",
+  "brightBlack", "brightRed", "brightGreen", "brightYellow", "brightBlue", "brightMagenta", "brightCyan", "brightWhite",
+] as const;
+
+export function backgroundWithOpacity(hex: string, opacity: number): string {
+  const n = opacity >= 0 && opacity <= 1 ? opacity : 1;
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${n})`;
+}
+
+export function xtermThemeFromDto(theme: ThemeDto, opacity: number): Record<string, string> {
+  const ansi = theme.ansi && theme.ansi.length === 16
+    ? theme.ansi
+    : theme.type === "light" ? FALLBACK_LIGHT_ANSI : FALLBACK_DARK_ANSI;
+  const out: Record<string, string> = {
+    background: backgroundWithOpacity(theme.terminalBackground, opacity),
+    foreground: theme.terminalForeground,
+    cursor: theme.chromeAccent,
+    cursorAccent: theme.terminalBackground,
+    selectionBackground: theme.chromeAccent + "55",
+  };
+  ANSI_SLOT_NAMES.forEach((slot, i) => { out[slot] = ansi[i]; });
+  return out;
 }
 
 export interface ThemeEditorState {

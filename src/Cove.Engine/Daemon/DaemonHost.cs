@@ -202,6 +202,12 @@ public sealed class DaemonHost
             catch (System.Exception ex) { logger.ConfigParseFailed("keybindings", ex.Message); }
         }
         _themes = new Cove.Engine.Theming.ThemeService(dataDir);
+        var configuredTheme = _config!.GetTheme();
+        var activatedTheme = _themes.SetActiveIfKnown(configuredTheme);
+        if (activatedTheme is null)
+            logger.LogWarning("configured theme {Theme} could not be activated, no themes available", configuredTheme);
+        else if (!string.Equals(activatedTheme.Name, configuredTheme, StringComparison.Ordinal))
+            logger.LogWarning("configured theme {Theme} unknown, falling back to {Fallback}", configuredTheme, activatedTheme.Name);
         _browserAutomation = new Cove.Engine.Browser.BrowserAutomationBridge(e => BroadcastEvent("browser.automation.exec", e, Cove.Protocol.CoveJsonContext.Default.BrowserAutomationExecEvent), logger);
         _config!.SettingsChanged += key => BroadcastEvent("config.changed", new ConfigChangedEvent(key), Cove.Protocol.CoveJsonContext.Default.ConfigChangedEvent);
         _hookServer.OnEvent += _hookRouter.Route;

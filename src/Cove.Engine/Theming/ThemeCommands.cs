@@ -10,7 +10,7 @@ public static class ThemeCommands
     {
         if (ctx.Themes is not { } themes)
             return Task.FromResult(ctx.Fail("not_ready", "theme service unavailable"));
-        var dtos = themes.ListAll().Select(t => new ThemeDto(t.Name, t.Type, t.TerminalBackground, t.TerminalForeground, t.ChromeSurface, t.ChromeText, t.ChromeAccent)).ToList();
+        var dtos = themes.ListAll().Select(t => new ThemeDto(t.Name, t.Type, t.TerminalBackground, t.TerminalForeground, t.ChromeSurface, t.ChromeText, t.ChromeAccent, t.Ansi)).ToList();
         return Task.FromResult(ctx.Ok(new ThemeListResult(dtos), CoveJsonContext.Default.ThemeListResult));
     }
 
@@ -22,7 +22,7 @@ public static class ThemeCommands
         var active = themes.GetActive();
         if (active is null)
             return Task.FromResult(ctx.Ok(new ThemeActiveResult(null), CoveJsonContext.Default.ThemeActiveResult));
-        var dto = new ThemeDto(active.Name, active.Type, active.TerminalBackground, active.TerminalForeground, active.ChromeSurface, active.ChromeText, active.ChromeAccent);
+        var dto = new ThemeDto(active.Name, active.Type, active.TerminalBackground, active.TerminalForeground, active.ChromeSurface, active.ChromeText, active.ChromeAccent, active.Ansi);
         return Task.FromResult(ctx.Ok(new ThemeActiveResult(dto), CoveJsonContext.Default.ThemeActiveResult));
     }
 
@@ -33,8 +33,11 @@ public static class ThemeCommands
             return Task.FromResult(ctx.Fail("not_ready", "theme service unavailable"));
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.ThemeRefParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "theme name required"));
+        if (themes.Get(p.Name) is null)
+            return Task.FromResult(ctx.Fail("not_found", $"theme '{p.Name}' not found"));
         var theme = themes.SetActive(p.Name);
-        var dto = new ThemeDto(theme.Name, theme.Type, theme.TerminalBackground, theme.TerminalForeground, theme.ChromeSurface, theme.ChromeText, theme.ChromeAccent);
+        ctx.Config?.SetTheme(theme.Name);
+        var dto = new ThemeDto(theme.Name, theme.Type, theme.TerminalBackground, theme.TerminalForeground, theme.ChromeSurface, theme.ChromeText, theme.ChromeAccent, theme.Ansi);
         return Task.FromResult(ctx.Ok(new ThemeActiveResult(dto), CoveJsonContext.Default.ThemeActiveResult));
     }
 
@@ -45,7 +48,7 @@ public static class ThemeCommands
             return Task.FromResult(ctx.Fail("not_ready", "theme service unavailable"));
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.ThemeSaveParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "theme save params required"));
-        var theme = new Theme(p.Name, p.Type, p.TerminalBackground, p.TerminalForeground, p.ChromeSurface, p.ChromeText, p.ChromeAccent);
+        var theme = new Theme(p.Name, p.Type, p.TerminalBackground, p.TerminalForeground, p.ChromeSurface, p.ChromeText, p.ChromeAccent, p.Ansi);
         themes.SaveCustom(theme);
         return Task.FromResult(ctx.Ok());
     }

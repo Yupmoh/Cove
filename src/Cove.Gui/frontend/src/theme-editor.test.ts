@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
   DEFAULT_DRAFT,
+  FALLBACK_DARK_ANSI,
+  FALLBACK_LIGHT_ANSI,
+  xtermThemeFromDto,
   DEFAULT_THEME_NAME,
   CATPPUCCIN_MOCHA,
   draftFromTheme,
@@ -134,5 +137,43 @@ describe("contrastTier", () => {
     expect(contrastTier(4.5)).toBe("AA");
     expect(contrastTier(4.4)).toBe("fail");
     expect(contrastTier(1)).toBe("fail");
+  });
+});
+
+describe("xtermThemeFromDto", () => {
+  const base = {
+    name: "t", type: "dark",
+    terminalBackground: "#101020", terminalForeground: "#e0e0f0",
+    chromeSurface: "#0a0a14", chromeText: "#e0e0f0", chromeAccent: "#ff8800",
+  };
+
+  it("uses the theme's own 16-slot ansi palette when present", () => {
+    const ansi = Array.from({ length: 16 }, (_, i) => `#00${i.toString(16).padStart(2, "0")}00`);
+    const t = xtermThemeFromDto({ ...base, ansi }, 1);
+    expect(t.black).toBe(ansi[0]);
+    expect(t.brightWhite).toBe(ansi[15]);
+    expect(t.foreground).toBe("#e0e0f0");
+  });
+
+  it("falls back to a coherent dark palette when ansi is missing", () => {
+    const t = xtermThemeFromDto(base, 1);
+    expect(t.red).toBe(FALLBACK_DARK_ANSI[1]);
+    expect(t.brightBlack).toBe(FALLBACK_DARK_ANSI[8]);
+  });
+
+  it("falls back to a light palette for light themes", () => {
+    const t = xtermThemeFromDto({ ...base, type: "light" }, 1);
+    expect(t.blue).toBe(FALLBACK_LIGHT_ANSI[4]);
+  });
+
+  it("applies opacity to the background only", () => {
+    const t = xtermThemeFromDto(base, 0.8);
+    expect(t.background).toBe("rgba(16, 16, 32, 0.8)");
+    expect(t.foreground).toBe("#e0e0f0");
+  });
+
+  it("rejects malformed ansi arrays by falling back", () => {
+    const t = xtermThemeFromDto({ ...base, ansi: ["#000000"] }, 1);
+    expect(t.green).toBe(FALLBACK_DARK_ANSI[2]);
   });
 });

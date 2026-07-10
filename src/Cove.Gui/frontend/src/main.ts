@@ -37,7 +37,7 @@ import { buildAgentRows, agentStateCounts, AGENT_STATE_META, type AgentCard, typ
 import { parseQuery, filterAndSort, MruTracker, cycleCategory, categoryLabel, type PaletteItem } from "./omni-palette";
 import { buildEmptyState, EmptyStateMessages } from "./empty-states";
 import { brandLogoAt, nextBrandIndex, parseBrandIndex } from "./brand";
-import { DEFAULT_DRAFT, draftFromTheme, themeFromDraft, cssVarsFromTheme, isCustom, isBuiltin, canSaveDraft, canDelete, isValidHex, contrastRatio, contrastTier, THEME_COLOR_FIELDS, type ThemeDto, type ThemeDraft } from "./theme-editor";
+import { DEFAULT_DRAFT, draftFromTheme, themeFromDraft, cssVarsFromTheme, xtermThemeFromDto, isCustom, isBuiltin, canSaveDraft, canDelete, isValidHex, contrastRatio, contrastTier, THEME_COLOR_FIELDS, type ThemeDto, type ThemeDraft } from "./theme-editor";
 import { categorizeBindings, isReservedChord, isValidChord, chordDisplay, canRecordChord, normalizeChord as normalizeChordStr, type KeybindDto } from "./keyboard-editor";
 import { ONBOARDING_STEPS, INITIAL_ONBOARDING_STATE, nextStep, prevStep, dismiss as dismissOnboarding, currentStepData, isLastStep, isFirstStep, progressPercent, selectAdapter, setTelemetryOptIn, shouldShowOnboarding, onboardingSeenFromConfig, ONBOARDING_COMPLETED_KEY, type OnboardingState } from "./onboarding";
 import { initBackdrop, setBackdropMaterial, nextToggleMaterial, coerceMaterial, BACKDROP_PREF_KEY, type BackdropDeps, type BackdropMaterial } from "./backdrop";
@@ -100,6 +100,11 @@ function themeBackgroundWithOpacity(opacity: number): string {
   const g = parseInt(THEME_BG.slice(3, 5), 16);
   const b = parseInt(THEME_BG.slice(5, 7), 16);
   return `rgba(${r}, ${g}, ${b}, ${n})`;
+}
+let activeThemeDto: ThemeDto | null = null;
+function currentTermTheme(): Record<string, string> {
+  if (activeThemeDto) return xtermThemeFromDto(activeThemeDto, settings.backgroundOpacity);
+  return { ...THEME, background: themeBackgroundWithOpacity(settings.backgroundOpacity) };
 }
 
 async function invoke<T>(cmd: string, args: unknown): Promise<T> {
@@ -208,7 +213,7 @@ async function loadSettings(): Promise<TermSettings> {
   const lineHeight = clampFloat(lhRaw, 1, 2, defaultSettings.lineHeight);
   const scrollback = clampInt(await get("terminal.scrollbackLines"), 100, 100000, defaultSettings.scrollback);
   const padding = clampInt(await get("terminal.padding"), 0, 40, defaultSettings.padding);
-  const backgroundOpacity = clampFloat(await get("terminal.backgroundOpacity"), 0, 1, defaultSettings.backgroundOpacity);
+  const backgroundOpacity = clampFloat(await get("terminal.backgroundOpacity"), 0.2, 1, defaultSettings.backgroundOpacity);
   const cs = await get("terminal.cursorStyle");
   const cursorStyle: TermSettings["cursorStyle"] = cs === "bar" || cs === "underline" ? cs : "block";
   const cursorBlink = (await get("terminal.cursorBlink")) === "true";
@@ -272,7 +277,7 @@ function applySettings() {
     pv.term.options.cursorStyle = settings.cursorStyle;
     pv.term.options.cursorBlink = settings.cursorBlink;
     pv.term.options.scrollback = settings.scrollback;
-    pv.term.options.theme = { ...THEME, background: themeBackgroundWithOpacity(settings.backgroundOpacity) };
+    pv.term.options.theme = currentTermTheme();
   }
   gridEl.style.padding = `${settings.padding}px`;
   document.documentElement.style.setProperty("--cove-bg-opacity", String(settings.backgroundOpacity));
@@ -328,7 +333,7 @@ function attachWs(pane: PaneView) {
 }
 
 function makePane(paneId: string, since: number): PaneView {
-  const term = new Terminal({ allowTransparency: true, scrollback: settings.scrollback, convertEol: false, fontFamily: settings.fontFamily || "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: settings.fontSize, lineHeight: settings.lineHeight, cursorStyle: settings.cursorStyle, cursorBlink: settings.cursorBlink, theme: { ...THEME, background: themeBackgroundWithOpacity(settings.backgroundOpacity) } });
+  const term = new Terminal({ allowTransparency: true, scrollback: settings.scrollback, convertEol: false, fontFamily: settings.fontFamily || "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: settings.fontSize, lineHeight: settings.lineHeight, cursorStyle: settings.cursorStyle, cursorBlink: settings.cursorBlink, theme: currentTermTheme() });
   const fitAddon = new FitAddon();
   term.loadAddon(fitAddon);
   try { term.loadAddon(new WebglAddon()); } catch { void 0; }
@@ -2356,6 +2361,10 @@ void invoke<{ version?: string }>("cove://sys/daemon.status", {}).then((s) => {
   if (s?.version) document.getElementById("wordmark-ver")!.textContent = "v" + s.version;
 }).catch(() => void 0);
 
+void invoke<{ theme: ThemeDto | null }>("cove://commands/theme.get-active", {}).then((r) => {
+  if (r.theme) { themeActiveName = r.theme.name; themeDraft = draftFromTheme(r.theme); applyThemeVars(r.theme); }
+}).catch((err) => console.warn("active theme load failed, using built-in defaults", err));
+
 const wordmarkImg = document.getElementById("wordmark-img") as HTMLImageElement;
 applyBrandLogo();
 wordmarkImg.addEventListener("click", () => {
@@ -2833,12 +2842,9 @@ function applyThemeVars(theme: ThemeDto): void {
   const root = document.documentElement;
   for (const [k, v] of Object.entries(vars)) { root.style.setProperty(k, v); }
   themeAppliedVars = vars;
-  const opacity = settings.backgroundOpacity;
-  const bgR = parseInt(theme.terminalBackground.slice(1, 3), 16);
-  const bgG = parseInt(theme.terminalBackground.slice(3, 5), 16);
-  const bgB = parseInt(theme.terminalBackground.slice(5, 7), 16);
-  const termTheme = { ...THEME, background: `rgba(${bgR}, ${bgG}, ${bgB}, ${opacity >= 0 && opacity <= 1 ? opacity : 1})`, foreground: theme.terminalForeground, cursor: theme.chromeAccent, cursorAccent: theme.terminalBackground, selectionBackground: theme.chromeAccent };
-  themeAppliedTermTheme = termTheme;
+  activeThemeDto = theme;
+  const termTheme = xtermThemeFromDto(theme, settings.backgroundOpacity);
+  themeAppliedTermTheme = termTheme as typeof THEME;
   for (const pv of panes.values()) { pv.term.options.theme = termTheme; }
 }
 
@@ -2847,6 +2853,7 @@ function revertThemeVars(): void {
   const root = document.documentElement;
   for (const k of Object.keys(themeAppliedVars)) { root.style.removeProperty(k); }
   themeAppliedVars = null;
+  activeThemeDto = null;
   if (themeAppliedTermTheme) {
     const restored = { ...THEME, background: themeBackgroundWithOpacity(settings.backgroundOpacity) };
     for (const pv of panes.values()) { pv.term.options.theme = restored; }
@@ -2956,7 +2963,6 @@ function renderThemeEditorBody(container: HTMLElement): void {
   contrastInfo.id = "theme-contrast";
   contrastInfo.style.cssText = "padding:8px 0;font-size:11px;color:var(--muted);";
   container.appendChild(contrastInfo);
-  updateThemePreview();
 
   const actions = document.createElement("div");
   actions.style.cssText = "padding:12px 0;display:flex;gap:10px;";
