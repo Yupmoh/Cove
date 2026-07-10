@@ -43,7 +43,8 @@ import { initBackdrop, setBackdropMaterial, nextToggleMaterial, coerceMaterial, 
 import { NotificationBridge, type NotificationBridgeDeps, type NotificationDeliverPayload } from "./notifications";
 import { buildMenu, menuChordSet } from "./menu-model";
 import { toolbarTiles } from "./toolbar-tiles";
-import { shouldShowLauncher, buildLauncherTiles, isEmptyRoomTree, placeablePaneForAction, type LauncherAdapter, type LauncherBuiltin } from "./box-launcher";
+import { shouldShowLauncher, buildAdapterTiles, buildBuiltinTiles, isEmptyRoomTree, placeablePaneForAction, type LauncherAdapter, type LauncherBuiltin, type LauncherTile } from "./box-launcher";
+import { adapterAccent, toolAccent, assignHotkeys, detectedHarnessTiles, clampLauncherSelection, moveLauncherSelection, hotkeyTarget, resumableSessionsFor, mostRecentSession, tipAt, type LauncherSelection, type LauncherGeometry, type LauncherSession, type LauncherArrowKey } from "./launcher-model";
 import { clusterTools } from "./title-cluster";
 import { initialZenState, toggleZen, type ChromeVisibility, type ZenState } from "./zen-mode";
 import { eventToChord, buildChordMap, resolveDispatch, defaultBindings, type ResolvedBinding } from "./keymap-dispatch";
@@ -3006,11 +3007,17 @@ async function spawnAgentInto(roomId: string | null, placeholderId: string | nul
 }
 
 let launcherAdapters: LauncherAdapter[] = [];
+let launcherSessions: LauncherSession[] = [];
+interface SessionListResult { sessions: LauncherSession[]; }
 async function loadLauncherAdapters(): Promise<void> {
   try {
     const result = await invoke<AdapterListResult>("app.adapterList", {});
     launcherAdapters = (result.adapters ?? []).map((a) => ({ name: a.name, displayName: a.displayName, accent: a.accent, binary: a.binary }));
   } catch { launcherAdapters = []; }
+  try {
+    const res = await invoke<SessionListResult>("cove://commands/session.list", {});
+    launcherSessions = res.sessions ?? [];
+  } catch { launcherSessions = []; }
   if ((layout?.rooms ?? []).length === 0) renderRoom();
 }
 
@@ -3018,44 +3025,277 @@ function builtinLauncherDefs(): LauncherBuiltin[] {
   return toolbarTiles().map((t) => ({ id: t.id, label: t.label, icon: t.icon, action: t.action }));
 }
 
+interface LauncherContext {
+  targetRoomId: string | null;
+  targetPlaceholderId: string | null;
+}
+
+const LAUNCHER_HARNESS_COLS = 3;
+let launcherSelection: LauncherSelection = { section: "harness", index: 0 };
+let launcherTipIndex = 0;
+let launcherTipTimer: number | null = null;
+
+function launcherGeometry(harnessCount: number, toolCount: number): LauncherGeometry {
+  return { harnessCount, harnessCols: Math.min(LAUNCHER_HARNESS_COLS, Math.max(1, harnessCount)), toolCount };
+}
+
+function launchHarnessTile(ctx: LauncherContext, tile: LauncherTile): void {
+  void spawnAgentInto(ctx.targetRoomId, ctx.targetPlaceholderId, { name: tile.adapterName, displayName: tile.label, accent: tile.accent, binary: tile.binary });
+}
+
+function launchToolTile(ctx: LauncherContext, tile: LauncherTile): void {
+  void launchTileInto(ctx.targetRoomId, ctx.targetPlaceholderId, tile.action);
+}
+
+function activateLauncherSelection(ctx: LauncherContext, harness: LauncherTile[], tools: LauncherTile[]): void {
+  const sel = clampLauncherSelection(launcherSelection, launcherGeometry(harness.length, tools.length));
+  if (sel.section === "harness") {
+    const tile = harness[sel.index];
+    if (tile && !tile.disabled) launchHarnessTile(ctx, tile);
+  } else {
+    const tile = tools[sel.index];
+    if (tile) launchToolTile(ctx, tile);
+  }
+}
+
 function renderBoxLauncher(targetRoomId: string | null, targetPlaceholderId: string | null): HTMLElement {
+  const ctx: LauncherContext = { targetRoomId, targetPlaceholderId };
   const wrap = document.createElement("div");
   wrap.className = "box-launcher";
-  const title = document.createElement("div");
-  title.className = "box-launcher-title";
-  title.textContent = "Open something in this workspace";
-  wrap.appendChild(title);
-  const grid = document.createElement("div");
-  grid.className = "box-launcher-grid";
-  for (const tile of buildLauncherTiles(launcherAdapters, builtinLauncherDefs())) {
-    const el = document.createElement("div");
-    el.className = "box-launch-tile" + (tile.disabled ? " disabled" : "");
-    el.title = tile.note ? `${tile.label} — ${tile.note}` : tile.label;
-    const ic = document.createElement("span");
-    ic.className = "box-launch-ic";
-    ic.textContent = tile.icon;
-    if (tile.accent) ic.style.color = tile.accent;
-    const lbl = document.createElement("span");
-    lbl.className = "box-launch-lbl";
-    lbl.textContent = tile.label;
-    el.appendChild(ic);
-    el.appendChild(lbl);
-    if (tile.note) {
-      const note = document.createElement("span");
-      note.className = "box-launch-note";
-      note.textContent = tile.note;
-      el.appendChild(note);
-    }
-    if (!tile.disabled) {
-      el.addEventListener("click", () => {
-        if (tile.kind === "adapter") void spawnAgentInto(targetRoomId, targetPlaceholderId, { name: tile.adapterName, displayName: tile.label, accent: tile.accent, binary: tile.binary });
-        else void launchTileInto(targetRoomId, targetPlaceholderId, tile.action);
-      });
-    }
-    grid.appendChild(el);
-  }
-  wrap.appendChild(grid);
+  wrap.tabIndex = 0;
+  if (targetRoomId) wrap.dataset.roomId = targetRoomId;
+  if (targetPlaceholderId) wrap.dataset.placeholderId = targetPlaceholderId;
+  paintBoxLauncher(wrap, ctx);
+  wrap.addEventListener("keydown", (e) => handleLauncherKey(e, wrap, ctx));
+  if (launcherTipTimer !== null) window.clearInterval(launcherTipTimer);
+  launcherTipTimer = window.setInterval(() => {
+    launcherTipIndex += 1;
+    const tipEl = wrap.querySelector(".cl-tip");
+    if (tipEl) tipEl.textContent = tipAt(launcherTipIndex);
+    else if (launcherTipTimer !== null) { window.clearInterval(launcherTipTimer); launcherTipTimer = null; }
+  }, 9000);
+  queueMicrotask(() => { if (document.body.contains(wrap)) wrap.focus(); });
   return wrap;
+}
+
+function launcherTileSets(): { harness: LauncherTile[]; tools: LauncherTile[]; harnessKeys: string[]; toolKeys: string[] } {
+  const harness = detectedHarnessTiles(buildAdapterTiles(launcherAdapters));
+  const tools = buildBuiltinTiles(builtinLauncherDefs());
+  const toolKeys = toolbarTiles().map((t) => t.letter);
+  const harnessKeys = assignHotkeys(harness.map((t) => t.label), toolKeys);
+  return { harness, tools, harnessKeys, toolKeys };
+}
+
+function handleLauncherKey(e: KeyboardEvent, wrap: HTMLElement, ctx: LauncherContext): void {
+  const active = document.activeElement as HTMLElement | null;
+  if (active && active !== wrap && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.isContentEditable)) return;
+  const { harness, tools, harnessKeys, toolKeys } = launcherTileSets();
+  const geo = launcherGeometry(harness.length, tools.length);
+  if (e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "ArrowUp" || e.key === "ArrowDown") {
+    e.preventDefault();
+    launcherSelection = moveLauncherSelection(launcherSelection, e.key as LauncherArrowKey, geo);
+    paintBoxLauncher(wrap, ctx);
+    return;
+  }
+  if (e.key === "Enter") {
+    e.preventDefault();
+    if (e.metaKey || e.ctrlKey) launcherSelection = clampLauncherSelection({ section: "harness", index: launcherSelection.section === "harness" ? launcherSelection.index : 0 }, geo);
+    activateLauncherSelection(ctx, harness, tools);
+    return;
+  }
+  if (/^[a-zA-Z]$/.test(e.key) && !e.metaKey && !e.ctrlKey && !e.altKey) {
+    const target = hotkeyTarget(e.key, harnessKeys, toolKeys);
+    if (target) {
+      e.preventDefault();
+      launcherSelection = target;
+      activateLauncherSelection(ctx, harness, tools);
+    }
+  }
+}
+
+function firstSensibleSelection(harness: LauncherTile[], tools: LauncherTile[]): LauncherSelection {
+  const firstEnabled = harness.findIndex((t) => !t.disabled);
+  if (firstEnabled >= 0) return { section: "harness", index: firstEnabled };
+  if (tools.length > 0) return { section: "tool", index: 0 };
+  return { section: "harness", index: 0 };
+}
+
+function paintBoxLauncher(wrap: HTMLElement, ctx: LauncherContext): void {
+  const { harness, tools, harnessKeys, toolKeys } = launcherTileSets();
+  const geo = launcherGeometry(harness.length, tools.length);
+  launcherSelection = clampLauncherSelection(launcherSelection, geo);
+  if (launcherSelection.section === "harness" && harness[launcherSelection.index]?.disabled) {
+    launcherSelection = firstSensibleSelection(harness, tools);
+  }
+  wrap.innerHTML = "";
+
+  const header = document.createElement("div");
+  header.className = "cl-header";
+  const brand = document.createElement("span");
+  brand.className = "cl-brand";
+  brand.textContent = "≋ cove";
+  const tip = document.createElement("span");
+  tip.className = "cl-tip";
+  tip.textContent = tipAt(launcherTipIndex);
+  const hint = document.createElement("span");
+  hint.className = "cl-hint";
+  hint.textContent = "hold ⇧ for shortcuts";
+  header.appendChild(brand);
+  header.appendChild(tip);
+  header.appendChild(hint);
+  wrap.appendChild(header);
+
+  const cards = document.createElement("div");
+  cards.className = "cl-harness-row";
+  cards.style.gridTemplateColumns = `repeat(${geo.harnessCols}, minmax(0, 200px))`;
+  harness.forEach((tile, i) => {
+    const selected = launcherSelection.section === "harness" && launcherSelection.index === i;
+    cards.appendChild(renderHarnessCard(ctx, tile, harnessKeys[i], selected));
+  });
+  wrap.appendChild(cards);
+
+  const toolRow = document.createElement("div");
+  toolRow.className = "cl-tool-row";
+  tools.forEach((tile, i) => {
+    const selected = launcherSelection.section === "tool" && launcherSelection.index === i;
+    toolRow.appendChild(renderToolTile(ctx, tile, toolKeys[i], selected));
+  });
+  wrap.appendChild(toolRow);
+}
+
+function renderHarnessCard(ctx: LauncherContext, tile: LauncherTile, letter: string, selected: boolean): HTMLElement {
+  const accent = adapterAccent(tile.adapterName, tile.accent);
+  const el = document.createElement("div");
+  el.className = "cl-card" + (tile.disabled ? " disabled" : "") + (selected ? " selected" : "");
+  if (selected && !tile.disabled) { el.classList.add("expanded"); el.style.setProperty("--card-accent", accent); }
+  el.style.setProperty("--card-accent", accent);
+
+  const top = document.createElement("div");
+  top.className = "cl-card-top";
+  const key = document.createElement("span");
+  key.className = "cl-card-key";
+  key.textContent = letter;
+  const cta = document.createElement("span");
+  cta.className = "cl-card-cta";
+  cta.textContent = "⌘↵";
+  top.appendChild(key);
+  top.appendChild(cta);
+  el.appendChild(top);
+
+  const icon = document.createElement("span");
+  icon.className = "cl-card-icon";
+  icon.textContent = "◆";
+  icon.style.color = accent;
+  el.appendChild(icon);
+
+  const name = document.createElement("div");
+  name.className = "cl-card-name";
+  name.textContent = tile.label;
+  el.appendChild(name);
+
+  if (tile.disabled) {
+    const note = document.createElement("div");
+    note.className = "cl-card-note";
+    note.textContent = tile.note || "not detected";
+    el.appendChild(note);
+    return el;
+  }
+
+  el.addEventListener("click", () => {
+    if (selected) launchHarnessTile(ctx, tile);
+    else { launcherSelection = { section: "harness", index: harnessIndexOf(tile) }; repaintActiveLauncher(); }
+  });
+
+  if (selected) el.appendChild(renderCardExpansion(ctx, tile));
+  return el;
+}
+
+function harnessIndexOf(tile: LauncherTile): number {
+  return detectedHarnessTiles(buildAdapterTiles(launcherAdapters)).findIndex((t) => t.id === tile.id);
+}
+
+function repaintActiveLauncher(): void {
+  const wrap = document.querySelector(".box-launcher") as HTMLElement | null;
+  if (!wrap) return;
+  const targetRoomId = wrap.dataset.roomId || null;
+  const targetPlaceholderId = wrap.dataset.placeholderId || null;
+  paintBoxLauncher(wrap, { targetRoomId, targetPlaceholderId });
+  wrap.focus();
+}
+
+function renderCardExpansion(ctx: LauncherContext, tile: LauncherTile): HTMLElement {
+  const body = document.createElement("div");
+  body.className = "cl-card-expand";
+
+  const chipRow = document.createElement("div");
+  chipRow.className = "cl-key-chip-row";
+  const chip = document.createElement("span");
+  chip.className = "cl-key-chip";
+  chip.textContent = "⌘↵ new session";
+  chipRow.appendChild(chip);
+  body.appendChild(chipRow);
+
+  const newSession = document.createElement("button");
+  newSession.className = "cl-new-session";
+  newSession.textContent = "New session";
+  newSession.addEventListener("click", (e) => { e.stopPropagation(); launchHarnessTile(ctx, tile); });
+  body.appendChild(newSession);
+
+  const resumable = resumableSessionsFor(tile.adapterName, launcherSessions);
+  const recent = mostRecentSession(resumable);
+  if (recent) {
+    const picker = document.createElement("div");
+    picker.className = "cl-session-picker";
+    const dot = document.createElement("span");
+    dot.className = "cl-session-dot";
+    dot.style.background = adapterAccent(tile.adapterName, tile.accent);
+    const label = document.createElement("span");
+    label.className = "cl-session-label";
+    label.textContent = "resume " + (recent.sessionId ?? "").slice(0, 8);
+    const edit = document.createElement("span");
+    edit.className = "cl-session-edit";
+    edit.textContent = "✎";
+    edit.title = "edit session";
+    const more = document.createElement("span");
+    more.className = "cl-session-more";
+    more.textContent = resumable.length > 1 ? `▾ ${resumable.length}` : "▾";
+    picker.appendChild(dot);
+    picker.appendChild(label);
+    picker.appendChild(more);
+    picker.appendChild(edit);
+    picker.addEventListener("click", (e) => { e.stopPropagation(); void resumeSessionInto(ctx, tile, recent); });
+    body.appendChild(picker);
+  }
+  return body;
+}
+
+async function resumeSessionInto(ctx: LauncherContext, tile: LauncherTile, session: LauncherSession): Promise<void> {
+  try { await invoke("cove://commands/session.foreground", { paneId: session.paneId }); } catch (err) { console.warn("session.foreground failed, falling back to new session", err); launchHarnessTile(ctx, tile); return; }
+  await reload();
+  focusPane(session.paneId);
+}
+
+function renderToolTile(ctx: LauncherContext, tile: LauncherTile, letter: string, selected: boolean): HTMLElement {
+  const id = tile.id.replace("builtin:", "");
+  const accent = toolAccent(id);
+  const el = document.createElement("div");
+  el.className = "cl-tool" + (selected ? " selected" : "");
+  el.style.setProperty("--tool-accent", accent);
+  const ic = document.createElement("span");
+  ic.className = "cl-tool-ic";
+  ic.textContent = tile.icon;
+  ic.style.color = accent;
+  const lbl = document.createElement("span");
+  lbl.className = "cl-tool-lbl";
+  lbl.textContent = tile.label;
+  const key = document.createElement("span");
+  key.className = "cl-tool-key";
+  key.textContent = letter;
+  el.appendChild(key);
+  el.appendChild(ic);
+  el.appendChild(lbl);
+  el.addEventListener("click", () => launchToolTile(ctx, tile));
+  return el;
 }
 
 let resolvedBindings: ResolvedBinding[] = defaultBindings();
