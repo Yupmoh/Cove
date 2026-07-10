@@ -73,3 +73,9 @@ export function progressPercent(state: OnboardingState): number {
 export function shouldShowOnboarding(hasSeenOnboarding: boolean): boolean {
   return !hasSeenOnboarding;
 }
+
+export const ONBOARDING_COMPLETED_KEY = "onboarding.completed";
+
+export function onboardingSeenFromConfig(value: string | null | undefined): boolean {
+  return (value ?? "").trim().toLowerCase() === "true";
+}

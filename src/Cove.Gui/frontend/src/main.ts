@@ -4,6 +4,7 @@ import { WebglAddon } from "@xterm/addon-webgl";
 import { SearchAddon } from "@xterm/addon-search";
 import "@xterm/xterm/css/xterm.css";
 import { toBase64Utf8, parseRelayText } from "./wsproto";
+import { scrubTerminalReports } from "./terminal-scrub";
 import { renderKanbanBoard } from "./tasks-kanban";
 import { renderTaskList } from "./tasks-list";
 import { renderTimelineFeed } from "./timeline-feed";
@@ -37,7 +38,7 @@ import { parseQuery, filterAndSort, MruTracker, cycleCategory, categoryLabel, ty
 import { buildEmptyState, EmptyStateMessages } from "./empty-states";
 import { DEFAULT_DRAFT, draftFromTheme, themeFromDraft, cssVarsFromTheme, isCustom, isBuiltin, canSaveDraft, canDelete, isValidHex, contrastRatio, contrastTier, THEME_COLOR_FIELDS, type ThemeDto, type ThemeDraft } from "./theme-editor";
 import { categorizeBindings, isReservedChord, isValidChord, chordDisplay, canRecordChord, normalizeChord as normalizeChordStr, type KeybindDto } from "./keyboard-editor";
-import { ONBOARDING_STEPS, INITIAL_ONBOARDING_STATE, nextStep, prevStep, dismiss as dismissOnboarding, currentStepData, isLastStep, isFirstStep, progressPercent, selectAdapter, setTelemetryOptIn, shouldShowOnboarding, type OnboardingState } from "./onboarding";
+import { ONBOARDING_STEPS, INITIAL_ONBOARDING_STATE, nextStep, prevStep, dismiss as dismissOnboarding, currentStepData, isLastStep, isFirstStep, progressPercent, selectAdapter, setTelemetryOptIn, shouldShowOnboarding, onboardingSeenFromConfig, ONBOARDING_COMPLETED_KEY, type OnboardingState } from "./onboarding";
 import { initBackdrop, setBackdropMaterial, nextToggleMaterial, coerceMaterial, BACKDROP_PREF_KEY, type BackdropDeps, type BackdropMaterial } from "./backdrop";
 import { NotificationBridge, type NotificationBridgeDeps, type NotificationDeliverPayload } from "./notifications";
 import { buildMenu, menuChordSet } from "./menu-model";
@@ -132,6 +133,7 @@ interface PaneView {
   customTitle: string;
   headerTitleEl: HTMLElement;
   search: SearchAddon;
+  replaying: boolean;
 }
 
 const panes = new Map<string, PaneView>();
@@ -279,14 +281,15 @@ function attachWs(pane: PaneView) {
       else if (m.t === "end") { pane.term.write(`\r\n\x1b[38;5;244m[process exited: ${m.code}]\x1b[0m\r\n`); }
       return;
     }
-    const bytes = new Uint8Array(ev.data as ArrayBuffer);
+    const raw = new Uint8Array(ev.data as ArrayBuffer);
+    const bytes = scrubTerminalReports(raw, { includeOscColorReports: pane.replaying });
     pane.term.write(bytes, () => {
-      pane.consumed += bytes.length;
+      pane.consumed += raw.length;
       if (pane.consumed - pane.lastAck >= CREDIT_THRESHOLD) sendAck();
     });
   };
   setInterval(sendAck, 100);
-  pane.term.onData((d) => { void enqueuePaneWrite(pane.paneId, toBase64Utf8(d), (paneId, dataBase64) => invoke("app.paneWrite", { paneId, dataBase64 })); });
+  pane.term.onData((d) => { pane.replaying = false; void enqueuePaneWrite(pane.paneId, toBase64Utf8(d), (paneId, dataBase64) => invoke("app.paneWrite", { paneId, dataBase64 })); });
   pane.term.onResize(({ cols, rows }) => { void invoke("app.paneResize", { paneId: pane.paneId, cols, rows }); });
 }
 
@@ -345,7 +348,7 @@ function makePane(paneId: string, since: number): PaneView {
   });
 
   const ws = new WebSocket(`ws://${location.host}/pty?pane=${encodeURIComponent(paneId)}&since=${since}`);
-  const pv: PaneView = { paneId, term, fit: fitAddon, ws, el, consumed: 0, lastAck: 0, title: "", customTitle: "", headerTitleEl: titleSpan, search: searchAddon };
+  const pv: PaneView = { paneId, term, fit: fitAddon, ws, el, consumed: 0, lastAck: 0, title: "", customTitle: "", headerTitleEl: titleSpan, search: searchAddon, replaying: true };
 
   el.addEventListener("mousedown", () => focusPane(paneId));
   attachWs(pv);
@@ -2831,8 +2834,8 @@ let onboardingState: OnboardingState = { ...INITIAL_ONBOARDING_STATE };
 
 async function maybeShowOnboarding(): Promise<void> {
   try {
-    const seen = await invoke<{ ok: boolean; value?: string }>("app.configGet", { key: "onboarding.completed" });
-    const hasSeen = seen.ok && seen.value?.toLowerCase() === "true";
+    const seen = await invoke<{ value?: string }>("app.configGet", { key: ONBOARDING_COMPLETED_KEY });
+    const hasSeen = onboardingSeenFromConfig(seen.value);
     if (!shouldShowOnboarding(hasSeen)) return;
     onboardingEl.classList.add("open");
     renderOnboarding();
@@ -2920,10 +2923,10 @@ async function onOnboardingSkip(): Promise<void> {
 async function completeOnboarding(): Promise<void> {
   onboardingEl.classList.remove("open");
   try {
-    await invoke("cove://commands/config.set", { key: "onboarding.completed", value: "true" });
-    if (onboardingState.telemetryOptIn) { await invoke("cove://commands/config.set", { key: "telemetry.enabled", value: "true" }); }
-    if (onboardingState.selectedAdapter) { await invoke("cove://commands/config.set", { key: "adapterCommands.default", value: onboardingState.selectedAdapter }); }
-  } catch { void 0; }
+    await invoke("app.configSet", { key: ONBOARDING_COMPLETED_KEY, value: "true" });
+    if (onboardingState.telemetryOptIn) { await invoke("app.configSet", { key: "telemetry.enabled", value: "true" }); }
+    if (onboardingState.selectedAdapter) { await invoke("app.configSet", { key: "adapterCommands.default", value: onboardingState.selectedAdapter }); }
+  } catch (e) { console.warn("onboarding persist failed", e); }
 }
 
 (onboardingEl.querySelector(".ob-next") as HTMLButtonElement).addEventListener("click", () => void onOnboardingNext());

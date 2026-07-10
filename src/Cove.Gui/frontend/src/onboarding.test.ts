@@ -13,6 +13,8 @@ import {
   isFirstStep,
   progressPercent,
   shouldShowOnboarding,
+  onboardingSeenFromConfig,
+  ONBOARDING_COMPLETED_KEY,
 } from "./onboarding";
 
 describe("ONBOARDING_STEPS", () => {
@@ -120,5 +122,33 @@ describe("shouldShowOnboarding", () => {
   });
   it("hides when already seen", () => {
     expect(shouldShowOnboarding(true)).toBe(false);
+  });
+});
+
+describe("onboardingSeenFromConfig", () => {
+  it("treats a stored 'true' as seen", () => {
+    expect(onboardingSeenFromConfig("true")).toBe(true);
+  });
+  it("is case and whitespace insensitive", () => {
+    expect(onboardingSeenFromConfig(" TRUE ")).toBe(true);
+  });
+  it("treats a missing value as not seen", () => {
+    expect(onboardingSeenFromConfig(null)).toBe(false);
+    expect(onboardingSeenFromConfig(undefined)).toBe(false);
+    expect(onboardingSeenFromConfig("")).toBe(false);
+  });
+  it("treats any non-true value as not seen", () => {
+    expect(onboardingSeenFromConfig("false")).toBe(false);
+    expect(onboardingSeenFromConfig("1")).toBe(false);
+  });
+  it("drives shouldShowOnboarding from the persisted flag", () => {
+    expect(shouldShowOnboarding(onboardingSeenFromConfig("true"))).toBe(false);
+    expect(shouldShowOnboarding(onboardingSeenFromConfig(null))).toBe(true);
+  });
+});
+
+describe("ONBOARDING_COMPLETED_KEY", () => {
+  it("is the config key onboarding state persists under", () => {
+    expect(ONBOARDING_COMPLETED_KEY).toBe("onboarding.completed");
   });
 });
