@@ -2052,10 +2052,12 @@ async function reorderRooms(fromId: string, toId: string): Promise<void> {
   const reordered = reorderRoom(layout.rooms, fromIdx, toIdx);
   layout.rooms = reordered;
   renderRoomTabs();
+  renderSidebarContent("left");
   try {
     const newOrder = reordered.map((r) => r.id);
     await invoke("app.layoutMutate", { op: "reorder", roomIds: newOrder, roomId: "", targetPaneId: "", newPaneId: "", orientation: "", name: "", paneId: "", dir: 0 });
-  } catch { void 0; }
+  } catch (err) { console.warn("room reorder failed", err); }
+  await reload();
 }
 
 function startRename(roomId: string, tab: HTMLElement, nameEl: HTMLElement): void {
@@ -3263,7 +3265,7 @@ async function spawnAgentInto(roomId: string | null, placeholderId: string | nul
     }
     activeRoomId = roomId;
   } else {
-    const r = await invoke<{ roomId: string }>("app.layoutMutate", { op: "createRoom", newPaneId: sp, name: a.displayName || a.name, roomId: "", targetPaneId: "", orientation: "", paneId: "", dir: 0 });
+    const r = await invoke<{ roomId: string }>("app.layoutMutate", { op: "createRoom", newPaneId: sp, name: nextRoomName(), roomId: "", targetPaneId: "", orientation: "", paneId: "", dir: 0 });
     activeRoomId = r.roomId;
   }
   await reload();
@@ -4057,6 +4059,8 @@ function runAction(action: string): void {
     case "tool.palette": paletteEl.classList.contains("open") ? closePalette() : openPalette(); break;
     case "tool.launcher": launcherEl.classList.contains("open") ? closeLauncher() : openLauncher(); break;
     case "app.settings": openSettings(); break;
+    case "app.zoom-in": appZoom += 0.1; applyAppZoom(); break;
+    case "app.zoom-out": appZoom -= 0.1; applyAppZoom(); break;
     case "app.update": openSettings(); break;
     default: console.warn("unhandled keymap action", action); break;
   }
@@ -4103,19 +4107,34 @@ function renderTitleCluster(): void {
       const ph = document.createElement("span");
       ph.className = "tb-find-ph";
       ph.textContent = "find anything…";
+      find.setAttribute("data-webview-ignore", "");
       find.appendChild(ic);
       find.appendChild(ph);
-      find.addEventListener("click", () => runAction(tool.action));
+      find.addEventListener("click", (e) => { e.stopPropagation(); runAction(tool.action); });
       cluster.appendChild(find);
     } else {
       const btn = document.createElement("div");
       btn.className = "tbtn tb-cluster-btn" + (tool.id === "update" ? " tb-update" : "");
       btn.title = tool.title;
-      btn.innerHTML = tool.id === "settings" ? iconSvg("gear") : tool.id === "inspect" ? iconSvg("inspect") : iconSvg("refresh");
-      btn.addEventListener("click", () => runAction(tool.action));
+      btn.setAttribute("data-webview-ignore", "");
+      const btnIcon: Record<string, string> = { settings: "gear", inspect: "inspect", "zoom-in": "plus", "zoom-out": "minus", update: "refresh" };
+      btn.innerHTML = iconSvg(btnIcon[tool.id] ?? "gear");
+      btn.addEventListener("click", (e) => { e.stopPropagation(); runAction(tool.action); });
       right.appendChild(btn);
     }
   }
+}
+
+let appZoom = (() => {
+  const stored = parseFloat(localStorage.getItem("cove.appZoom") ?? "1");
+  return Number.isFinite(stored) && stored > 0 ? stored : 1;
+})();
+
+function applyAppZoom(): void {
+  appZoom = Math.min(1.5, Math.max(0.7, Math.round(appZoom * 10) / 10));
+  (document.body.style as CSSStyleDeclaration & { zoom: string }).zoom = String(appZoom);
+  localStorage.setItem("cove.appZoom", String(appZoom));
+  fitAll();
 }
 
 function setupTitleCluster(): void {
@@ -4385,6 +4404,7 @@ async function createNote(): Promise<void> {
   setupMenuBar();
   void reloadKeymap();
   setupTitleCluster();
+  applyAppZoom();
   setupBadge();
   setupNotifications();
   void setupBackdrop();

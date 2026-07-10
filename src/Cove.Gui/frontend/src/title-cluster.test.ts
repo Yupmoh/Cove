@@ -11,6 +11,14 @@ describe("clusterTools", () => {
     const find = clusterTools({ updateStaged: false }).find((t) => t.id === "find-anything")!;
     expect(find.action).toBe("tool.palette");
   });
+  it("places app zoom controls between inspect and settings", () => {
+    const ids = clusterTools({ updateStaged: false }).map((t: ClusterTool) => t.id);
+    expect(ids.indexOf("inspect")).toBeLessThan(ids.indexOf("zoom-out"));
+    expect(ids.indexOf("zoom-out")).toBeLessThan(ids.indexOf("zoom-in"));
+    expect(ids.indexOf("zoom-in")).toBeLessThan(ids.indexOf("settings"));
+    const zo = clusterTools({ updateStaged: false }).find((t) => t.id === "zoom-out")!;
+    expect(zo.action).toBe("app.zoom-out");
+  });
   it("hides the update affordance until an update is staged", () => {
     expect(clusterTools({ updateStaged: false }).some((t) => t.id === "update")).toBe(false);
     expect(clusterTools({ updateStaged: true }).some((t) => t.id === "update")).toBe(true);
