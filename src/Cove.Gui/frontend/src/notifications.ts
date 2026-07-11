@@ -12,6 +12,7 @@ export interface NotificationBridgeDeps {
   requestPermission: () => Promise<boolean>;
   send: (payload: NotificationDeliverPayload) => Promise<void>;
   reveal: (paneId: string) => void;
+  toast: (payload: NotificationDeliverPayload) => void;
   warn: (message: string) => void;
 }
 
@@ -66,6 +67,8 @@ export class NotificationBridge {
         this.degradedWarned = true;
         this.deps.warn("notification permission denied; degrading to in-app signals only");
       }
+      this.active.set(payload.id, payload.paneId);
+      this.deps.toast(payload);
       return false;
     }
 

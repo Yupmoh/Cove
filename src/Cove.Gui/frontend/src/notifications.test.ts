@@ -11,6 +11,7 @@ function makeDeps(over: Partial<NotificationBridgeDeps> = {}): NotificationBridg
     requestPermission: vi.fn(async () => true),
     send: vi.fn(async () => void 0),
     reveal: vi.fn(),
+    toast: vi.fn(),
     warn: vi.fn(),
     ...over,
   };
@@ -67,6 +68,27 @@ describe("NotificationBridge delivery gate", () => {
     expect(deps.send).not.toHaveBeenCalled();
     expect(deps.warn).toHaveBeenCalledTimes(1);
     expect(b.permissionState).toBe("denied");
+  });
+
+  it("fires an in-app toast on every denied delivery while warning once", async () => {
+    const toast = vi.fn();
+    const deps = makeDeps({ isPermissionGranted: vi.fn(async () => false), requestPermission: vi.fn(async () => false), toast });
+    const b = new NotificationBridge(deps);
+    expect(await b.deliver(payload("n1", "pane-1"))).toBe(false);
+    expect(await b.deliver(payload("n2", "pane-2"))).toBe(false);
+    expect(toast).toHaveBeenCalledTimes(2);
+    expect(toast).toHaveBeenLastCalledWith(payload("n2", "pane-2"));
+    expect(deps.send).not.toHaveBeenCalled();
+    expect(deps.warn).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not toast when the OS notification is delivered", async () => {
+    const toast = vi.fn();
+    const deps = makeDeps({ isPermissionGranted: vi.fn(async () => true), toast });
+    const b = new NotificationBridge(deps);
+    expect(await b.deliver(payload("n1", "pane-1"))).toBe(true);
+    expect(deps.send).toHaveBeenCalledTimes(1);
+    expect(toast).not.toHaveBeenCalled();
   });
 
   it("drops a payload with no id", async () => {

@@ -4471,12 +4471,51 @@ function revealPane(paneId: string): void {
   focusPane(leaf);
 }
 
+function toastHost(): HTMLElement {
+  let host = document.getElementById("toast-host");
+  if (!host) {
+    host = document.createElement("div");
+    host.id = "toast-host";
+    document.body.appendChild(host);
+  }
+  return host;
+}
+
+function showInAppToast(title: string, body: string, onClick: () => void): void {
+  const host = toastHost();
+  const toast = document.createElement("div");
+  toast.className = "toast";
+  toast.setAttribute("role", "status");
+  const t = document.createElement("div");
+  t.className = "toast-title";
+  t.textContent = title;
+  toast.appendChild(t);
+  if (body) {
+    const b = document.createElement("div");
+    b.className = "toast-body";
+    b.textContent = body;
+    toast.appendChild(b);
+  }
+  let dismissed = false;
+  const dismiss = () => {
+    if (dismissed) return;
+    dismissed = true;
+    toast.classList.add("leaving");
+    setTimeout(() => toast.remove(), 200);
+  };
+  toast.addEventListener("click", () => { onClick(); dismiss(); });
+  host.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add("in"));
+  setTimeout(dismiss, 6000);
+}
+
 function setupNotifications(): void {
   const deps: NotificationBridgeDeps = {
     isPermissionGranted: () => invoke<boolean>("notification.isPermissionGranted", {}).catch(() => false),
     requestPermission: () => invoke<boolean>("notification.requestPermission", {}).catch(() => false),
     send: async (payload) => { await window.__ryn.invoke("notification.sendWithId", { id: payload.id, title: payload.title, body: payload.body }); },
     reveal: (paneId) => revealPane(paneId),
+    toast: (payload) => showInAppToast(payload.title, payload.body, () => revealPane(payload.paneId)),
     warn: (message) => console.warn(message),
   };
   const bridge = new NotificationBridge(deps);
