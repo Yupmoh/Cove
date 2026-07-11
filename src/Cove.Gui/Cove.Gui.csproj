@@ -24,6 +24,7 @@
       <PackageReference Include="Ryn.Plugins.WebViewPane" />
     <PackageReference Include="Ryn.Plugins.Notification" />
     <PackageReference Include="Ryn.Plugins.Dialog" />
+    <PackageReference Include="Ryn.Plugins.Updater" />
     </ItemGroup>
 
   <ItemGroup>

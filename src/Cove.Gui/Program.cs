@@ -7,6 +7,7 @@ using Ryn.Plugins.Dialog;
 using Ryn.Plugins.GlobalShortcut;
 using Ryn.Plugins.MenuBar;
 using Ryn.Plugins.Notification;
+using Ryn.Plugins.Updater;
 using Ryn.Plugins.WebViewPane;
 
 internal static class Program
@@ -54,6 +55,12 @@ internal static class Program
                 s.AddRynWebViewPane();
                 s.AddRynNotification();
                 s.AddRynDialog();
+                s.AddRynUpdater(o =>
+                {
+                    o.GitHubOwner = "Yupmoh";
+                    o.GitHubRepo = "Cove";
+                    o.CurrentVersion = version;
+                });
                 s.AddPerfResultsCommand();
             })
             .Build()

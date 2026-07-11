@@ -52,6 +52,7 @@ import { iconSvg, iconForPaneType, monogram } from "./icons";
 import { dropZoneFor, moveMutationFor, zoneOverlayRect } from "./pane-dnd";
 import { cssPath, buildFeedbackReport, feedbackSlug, harnessPrompt } from "./inspect-mode";
 import { clusterTools } from "./title-cluster";
+import { nextUpdateState, updateButtonLabel, updateAffordanceVisible, type UpdateState, type UpdateEvent } from "./update-flow";
 import { initialZenState, toggleZen, type ChromeVisibility, type ZenState } from "./zen-mode";
 import { eventToChord, buildChordMap, resolveDispatch, defaultBindings, type ResolvedBinding } from "./keymap-dispatch";
 import { enqueuePaneWrite } from "./write-queue";
@@ -2735,6 +2736,7 @@ function renderSettings(): void {
     setBodyEl.appendChild(row);
   }
   if (activeSettingsTab === "diagnostics") renderDiagnosticsExtras(setBodyEl);
+  if (activeSettingsTab === "updates") renderUpdatesExtras(setBodyEl);
 }
 
 async function renderToolsTab(container: HTMLElement): Promise<void> {
@@ -4483,7 +4485,7 @@ function runAction(action: string): void {
     case "app.settings": openSettings(); break;
     case "app.zoom-in": appZoom += 0.1; applyAppZoom(); break;
     case "app.zoom-out": appZoom -= 0.1; applyAppZoom(); break;
-    case "app.update": openSettings(); break;
+    case "app.update": activeSettingsTab = "updates"; openSettings(); break;
     default: console.warn("unhandled keymap action", action); break;
   }
 }
@@ -4572,6 +4574,133 @@ function applyAppZoom(): void {
 
 function setupTitleCluster(): void {
   renderTitleCluster();
+}
+
+interface UpdateInfoDto { version: string; releaseUrl?: string; assetUrl?: string; signatureUrl?: string; releaseNotes?: string; }
+
+let updateState: UpdateState = { kind: "idle" };
+
+function dispatchUpdate(event: UpdateEvent): UpdateState {
+  updateState = nextUpdateState(updateState, event);
+  clusterUpdateStaged = updateAffordanceVisible(updateState);
+  renderTitleCluster();
+  if (settingsEl.classList.contains("open") && activeSettingsTab === "updates") renderUpdatesButton();
+  return updateState;
+}
+
+async function runUpdateCheck(): Promise<void> {
+  dispatchUpdate({ type: "check" });
+  try {
+    const raw = (await window.__ryn.invoke("updater.check", {})) as string;
+    const info = raw && raw !== "null" ? (JSON.parse(raw) as UpdateInfoDto) : null;
+    if (!info || !info.version) { dispatchUpdate({ type: "checkedUpToDate" }); return; }
+    updateLatest = info;
+    dispatchUpdate({ type: "checkedAvailable", version: info.version, notes: info.releaseUrl ?? null });
+  } catch (err) {
+    console.warn("updater.check failed", err);
+    dispatchUpdate({ type: "error", message: String(err) });
+  }
+}
+
+async function runUpdateDownload(): Promise<void> {
+  dispatchUpdate({ type: "download" });
+  try {
+    const handle = (await window.__ryn.invoke("updater.download", {})) as string;
+    if (!handle) { console.warn("updater.download returned no handle"); dispatchUpdate({ type: "error", message: "no download handle" }); return; }
+    const version = updateLatest?.version ?? "";
+    dispatchUpdate({ type: "downloaded", handle, version });
+  } catch (err) {
+    console.warn("updater.download failed", err);
+    dispatchUpdate({ type: "error", message: String(err) });
+  }
+}
+
+async function runUpdateApply(handle: string): Promise<void> {
+  dispatchUpdate({ type: "apply" });
+  try {
+    void window.__ryn.invoke("updater.apply", { downloadHandle: handle });
+  } catch (err) {
+    console.warn("updater.apply failed", err);
+    dispatchUpdate({ type: "error", message: String(err) });
+  }
+}
+
+let updateLatest: UpdateInfoDto | null = null;
+
+function onUpdateButton(): void {
+  const s = updateState;
+  if (s.kind === "idle" || s.kind === "upToDate") { void runUpdateCheck(); return; }
+  if (s.kind === "failed") { dispatchUpdate({ type: "retry" }); void runUpdateCheck(); return; }
+  if (s.kind === "available") { void runUpdateDownload(); return; }
+  if (s.kind === "readyToApply") { void runUpdateApply(s.handle); return; }
+}
+
+function currentAppVersion(): string {
+  const raw = document.getElementById("wordmark-ver")?.textContent ?? "";
+  return raw.replace(/^v/, "").trim() || "dev";
+}
+
+function updateStatusText(): string {
+  const cur = `Current version ${currentAppVersion()}`;
+  const s = updateState;
+  if (s.kind === "checking") return `${cur} · checking…`;
+  if (s.kind === "upToDate") return `${cur} · you are on the latest release`;
+  if (s.kind === "available") return `${cur} · ${s.version} available`;
+  if (s.kind === "downloading") return `${cur} · downloading ${updateLatest?.version ?? "update"}…`;
+  if (s.kind === "readyToApply") return `${cur} · ${s.version} downloaded — restart to apply`;
+  if (s.kind === "applying") return `${cur} · applying update — the app will restart`;
+  if (s.kind === "failed") return `${cur} · update failed: ${s.message}`;
+  return cur;
+}
+
+function updateButtonBusy(state: UpdateState): boolean {
+  return state.kind === "checking" || state.kind === "downloading" || state.kind === "applying";
+}
+
+function renderUpdatesButton(): void {
+  const btn = document.getElementById("cove-update-btn") as HTMLButtonElement | null;
+  const status = document.getElementById("cove-update-status");
+  const notes = document.getElementById("cove-update-notes") as HTMLAnchorElement | null;
+  if (btn) { btn.textContent = updateButtonLabel(updateState); btn.disabled = updateButtonBusy(updateState); }
+  if (status) status.textContent = updateStatusText();
+  if (notes) {
+    const href = updateLatest?.releaseUrl ?? "";
+    const show = (updateState.kind === "available" || updateState.kind === "readyToApply") && href.length > 0;
+    notes.style.display = show ? "inline" : "none";
+    if (show) notes.href = href;
+  }
+}
+
+function renderUpdatesExtras(container: HTMLElement): void {
+  container.appendChild(diagnosticsSectionHeader("Software updates"));
+  const row = document.createElement("div");
+  row.className = "set-row";
+  row.style.cssText = "display:flex;flex-direction:column;align-items:flex-start;gap:8px;";
+
+  const btn = document.createElement("button");
+  btn.id = "cove-update-btn";
+  btn.className = "set-btn";
+  btn.style.cssText = "padding:6px 14px;border:1px solid var(--border);border-radius:6px;background:var(--accent);color:#fff;cursor:pointer;font-size:12px;";
+  btn.addEventListener("click", (e) => { e.stopPropagation(); onUpdateButton(); });
+  row.appendChild(btn);
+
+  const status = document.createElement("span");
+  status.id = "cove-update-status";
+  status.className = "set-desc";
+  status.style.cssText = "color:var(--muted);font-size:11px;";
+  row.appendChild(status);
+
+  const notes = document.createElement("a");
+  notes.id = "cove-update-notes";
+  notes.className = "set-desc";
+  notes.textContent = "View release notes";
+  notes.target = "_blank";
+  notes.rel = "noreferrer";
+  notes.style.cssText = "color:var(--accent);font-size:11px;text-decoration:underline;display:none;";
+  row.appendChild(notes);
+
+  container.appendChild(row);
+  renderUpdatesButton();
 }
 
 const engineEventHandlers = new Map<string, (payload: unknown) => void>();

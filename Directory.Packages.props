@@ -19,6 +19,7 @@
     <PackageVersion Include="Ryn.Plugins.WebViewPane" Version="0.25.0" />
     <PackageVersion Include="Ryn.Plugins.Notification" Version="0.25.0" />
     <PackageVersion Include="Ryn.Plugins.Dialog" Version="0.25.0" />
+    <PackageVersion Include="Ryn.Plugins.Updater" Version="0.25.0" />
     <PackageVersion Include="ZLogger" Version="2.5.10" />
   </ItemGroup>
 
