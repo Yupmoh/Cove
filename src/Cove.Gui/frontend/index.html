@@ -370,16 +370,19 @@
     .wsc-actions { display: flex; justify-content: flex-end; padding-top: 6px; }
     .wsc-actions button { background: var(--accent); border-color: var(--accent); color: var(--base, #11111b); font-weight: 600; }
     .set-box { margin-top: 9vh; width: 560px; max-width: 92vw; max-height: 78vh; display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; box-shadow: 0 24px 60px rgba(0,0,0,0.5); }
+    .set-box--nav { width: 740px; }
     .set-head { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--border); color: var(--fg); font-size: 15px; font-weight: 650; }
     .set-head .x { cursor: pointer; color: var(--muted); padding: 2px 6px; border-radius: 6px; }
     .set-head .x:hover { color: var(--fg); background: var(--panel-2); }
+    .set-main { display: flex; flex: 1; min-height: 0; }
     .set-body { padding: 12px 18px 16px; overflow-y: auto; flex: 1; min-height: 0; }
-    .set-tabs { flex-shrink: 0; display: flex; gap: 2px; padding: 0 12px; border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: none; }
-    .set-tabs::-webkit-scrollbar { display: none; }
-    .set-tab { white-space: nowrap; flex-shrink: 0; }
-    .set-tab { padding: 8px 12px; cursor: pointer; color: var(--muted); font-size: 12px; border-bottom: 2px solid transparent; }
-    .set-tab:hover { color: var(--fg); }
-    .set-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .set-nav { flex-shrink: 0; width: 180px; display: flex; flex-direction: column; gap: 2px; padding: 12px 10px; border-right: 1px solid var(--border); overflow-y: auto; scrollbar-width: thin; }
+    .set-nav-item { display: flex; align-items: center; gap: 9px; padding: 7px 10px; border-radius: 8px; cursor: pointer; color: var(--muted); font-size: 12.5px; white-space: nowrap; transition: background 0.12s, color 0.12s; }
+    .set-nav-item:hover { color: var(--fg); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+    .set-nav-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: 0.35; flex-shrink: 0; transition: opacity 0.12s, box-shadow 0.12s; }
+    .set-nav-item:hover .set-nav-dot { opacity: 0.7; }
+    .set-nav-item.active { color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); font-weight: 600; }
+    .set-nav-item.active .set-nav-dot { opacity: 1; box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 60%, transparent); }
     .set-row input[type=text] { background: var(--panel-2); border: 1px solid var(--border); color: var(--fg); border-radius: 6px; padding: 4px 8px; width: 180px; outline: none; }
     .set-row label { display: flex; flex-direction: column; gap: 2px; }
     .set-row .set-desc { font-size: 10px; color: var(--muted); font-weight: 400; }
@@ -654,13 +657,15 @@
     </div>
   </div>
   <div id="settings">
-    <div class="set-box">
+    <div class="set-box set-box--nav">
       <div class="set-head">
         <span>Settings</span>
         <span class="x" id="set-close">&times;</span>
       </div>
-      <div class="set-tabs" id="set-tabs"></div>
-      <div class="set-body" id="set-body"></div>
+      <div class="set-main">
+        <nav class="set-nav" id="set-tabs"></nav>
+        <div class="set-body" id="set-body"></div>
+      </div>
     </div>
   </div>
   <div id="ws-create">
