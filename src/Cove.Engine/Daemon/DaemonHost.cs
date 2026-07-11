@@ -264,7 +264,7 @@ public sealed class DaemonHost
                 foreach (var leaf in Cove.Engine.Layout.MosaicOps.Leaves(shore.LayoutTree))
                     if (entry.Sessions.TryGetValue(leaf.NookId, out var d))
                         restorables.Add(new Cove.Engine.Restart.RestorableNook(d.NookId, d.Command, d.Args, d.Cwd, d.Title, d.Adapter, d.AgentName, d.SessionId, d.Yolo));
-            var spawner = new RestoreSpawner(_nooks!, entry.BayDir, sl.Id, _agentRouter, _sessions, logger);
+            var spawner = new RestoreSpawner(_nooks!, entry.BayDir, sl.Id, _agentRouter, _sessions, _hookRouter, logger);
             var restorer = new Cove.Engine.Restart.SessionRestorer(spawner, BuildResume, logger);
             var summary = restorer.Restore(restorables, restoreEnabled);
             restoreTotals = new Cove.Engine.Restart.RestoreSummary(
@@ -948,15 +948,17 @@ public sealed class DaemonHost
         private readonly string _bayId;
         private readonly Cove.Engine.Agents.AgentMessageRouter? _agentRouter;
         private readonly Cove.Engine.Sessions.SessionResumeOrchestrator? _sessions;
+        private readonly Cove.Engine.Hooks.HookEventRouter? _hookRouter;
         private readonly ILogger _logger;
 
-        public RestoreSpawner(NookRegistry nooks, string bayDir, string bayId, Cove.Engine.Agents.AgentMessageRouter? agentRouter, Cove.Engine.Sessions.SessionResumeOrchestrator? sessions, ILogger logger)
+        public RestoreSpawner(NookRegistry nooks, string bayDir, string bayId, Cove.Engine.Agents.AgentMessageRouter? agentRouter, Cove.Engine.Sessions.SessionResumeOrchestrator? sessions, Cove.Engine.Hooks.HookEventRouter? hookRouter, ILogger logger)
         {
             _nooks = nooks;
             _bayDir = bayDir;
             _bayId = bayId;
             _agentRouter = agentRouter;
             _sessions = sessions;
+            _hookRouter = hookRouter;
             _logger = logger;
         }
 
@@ -972,6 +974,7 @@ public sealed class DaemonHost
                 {
                     _agentRouter?.Register(nook.NookId, nook.Adapter!, nook.AgentName, _bayId);
                     _sessions?.Register(nook.NookId, nook.Adapter!, nook.SessionId);
+                    _hookRouter?.Seed(nook.NookId, nook.Adapter!, nook.SessionId);
                 }
             }
             catch (System.Exception ex) { _logger.LogWarning(ex, "respawn on restore failed for {NookId}", nook.NookId); }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { chimePlan, detectChimes, type ChimeKind } from "./chime";
+import { mapAgentState } from "./agents-model";
 
 describe("chimePlan", () => {
   it("gives done a rising two-note plan", () => {
@@ -47,5 +48,19 @@ describe("detectChimes", () => {
     const prev = new Map([["n1", "running"]]);
     const next = new Map([["n1", "running"], ["n2", "needs-input"]]);
     expect(detectChimes(prev, next)).toEqual(["needs-input"]);
+  });
+
+  it("fires when RAW engine wire statuses are mapped before diffing", () => {
+    const rawPrev = [{ nookId: "n1", status: "Working" }, { nookId: "n2", status: "Working" }];
+    const rawNext = [{ nookId: "n1", status: "WaitingForInput" }, { nookId: "n2", status: "Stopped" }];
+    const prev = new Map(rawPrev.map((c) => [c.nookId, mapAgentState(c.status)]));
+    const next = new Map(rawNext.map((c) => [c.nookId, mapAgentState(c.status)]));
+    expect(detectChimes(prev, next).sort()).toEqual(["done", "needs-input"]);
+  });
+
+  it("stays silent when raw statuses are diffed without mapping (the original bug)", () => {
+    const rawPrev = new Map([["n1", "Working"]]);
+    const rawNext = new Map([["n1", "WaitingForInput"]]);
+    expect(detectChimes(rawPrev, rawNext)).toEqual([]);
   });
 });

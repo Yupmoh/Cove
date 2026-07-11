@@ -47,6 +47,16 @@ public sealed class HookEventRouter
 
     public event Action<string, string, string>? SessionStarted;
 
+    public void Seed(string nookId, string adapter, string? sessionId = null)
+    {
+        if (string.IsNullOrEmpty(nookId))
+        {
+            _logger?.HookEventNoNookId(adapter, "seed");
+            return;
+        }
+        _nookStates.GetOrAdd(nookId, _ => new NookAgentState(nookId, adapter, "idle", 0, System.DateTimeOffset.UtcNow, SessionId: sessionId));
+    }
+
     public void Route(HookEvent ev)
     {
         if (ev.NookId is null)

@@ -178,6 +178,46 @@ public sealed class HookEventRouterTests
     }
 
     [Fact]
+    public void Seed_TracksNookAsIdle_SoLaterEventsAreNotDropped()
+    {
+        var router = new HookEventRouter();
+        router.Seed("p-restored", "claude-code", "sess-1");
+
+        var seeded = router.GetNookState("p-restored");
+        Assert.NotNull(seeded);
+        Assert.Equal("idle", seeded!.Status);
+        Assert.Equal("sess-1", seeded.SessionId);
+
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "pre-tool-use", NookId = "p-restored" });
+        Assert.Equal("tool-running", router.GetNookState("p-restored")!.Status);
+    }
+
+    [Fact]
+    public void Seed_DoesNotOverwriteExistingLiveState()
+    {
+        var router = new HookEventRouter();
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "session-start", NookId = "p1" });
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "pre-tool-use", NookId = "p1" });
+
+        router.Seed("p1", "claude-code", "sess-x");
+
+        Assert.Equal("tool-running", router.GetNookState("p1")!.Status);
+    }
+
+    [Fact]
+    public void SessionEndForSeededRestoredNook_TransitionsInsteadOfDropping()
+    {
+        var router = new HookEventRouter();
+        router.Seed("p-restored", "claude-code");
+
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "session-end", NookId = "p-restored" });
+
+        var state = router.GetNookState("p-restored");
+        Assert.NotNull(state);
+        Assert.Equal("idle", state!.Status);
+    }
+
+    [Fact]
     public void Route_Notification_DoesNotChangeStatus()
     {
         var router = new HookEventRouter();

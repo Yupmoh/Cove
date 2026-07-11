@@ -58,14 +58,22 @@ public sealed class SessionRestorer
 
             if (!string.IsNullOrEmpty(nook.Adapter))
             {
-                if (!string.IsNullOrEmpty(nook.SessionId) && TryResume(nook, out var command, out var args, out var cwd))
+                if (string.IsNullOrEmpty(nook.SessionId))
+                {
+                    _logger.LogWarning("agent nook {NookId} adapter {Adapter} has no persisted sessionId, starting fresh", nook.NookId, nook.Adapter);
+                    _spawner.Respawn(nook, nook.Command, nook.Args, nook.Cwd);
+                    fresh++;
+                    continue;
+                }
+
+                if (TryResume(nook, out var command, out var args, out var cwd))
                 {
                     _spawner.Respawn(nook, command, args, cwd);
                     restored++;
                     continue;
                 }
 
-                _logger.LogWarning("agent nook {NookId} adapter {Adapter} could not resume, starting fresh", nook.NookId, nook.Adapter);
+                _logger.LogWarning("agent nook {NookId} adapter {Adapter} sessionId {SessionId} present but resume command build failed, starting fresh", nook.NookId, nook.Adapter, nook.SessionId);
                 _spawner.Respawn(nook, nook.Command, nook.Args, nook.Cwd);
                 fresh++;
                 continue;

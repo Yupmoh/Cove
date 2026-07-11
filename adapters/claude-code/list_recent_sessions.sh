@@ -18,7 +18,17 @@ iso_from_epoch() { date -u -r "$1" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d
 extract_title() { { grep -m1 "\"$2\"" "$1" 2>/dev/null || true; } | sed -n "s/.*\"$2\":\"\\([^\"]*\\)\".*/\\1/p" | head -1; }
 
 tmp="$(mktemp)"
-trap 'rm -f "$tmp"' EXIT
+names_map="$(mktemp)"
+trap 'rm -f "$tmp" "$names_map"' EXIT
+
+sessions_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/sessions"
+printf '%s' '{}' > "$names_map"
+if [ -d "$sessions_dir" ]; then
+  for sf in "$sessions_dir"/*.json; do
+    [ -e "$sf" ] || continue
+    jq -c 'select((.sessionId // "") != "" and (.name // "") != "") | {(.sessionId): .name}' "$sf" 2>/dev/null || true
+  done | jq -s 'add // {}' > "$names_map" 2>/dev/null || printf '%s' '{}' > "$names_map"
+fi
 
 for f in "$dir"/*.jsonl; do
   [ -e "$f" ] || continue
@@ -27,6 +37,8 @@ for f in "$dir"/*.jsonl; do
   iso="$(iso_from_epoch "$epoch")"
   name="$(extract_title "$f" aiTitle)"
   [ -n "$name" ] || name="$(extract_title "$f" customTitle)"
+  override="$(jq -r --arg id "$id" '.[$id] // ""' "$names_map" 2>/dev/null || printf '')"
+  [ -n "$override" ] && name="$override"
   jq -cn --arg id "$id" --arg name "$name" --arg cwd "$CWD" --arg la "$iso" \
     '{id:$id,name:$name,cwd:$cwd,lastActive:$la}' >> "$tmp"
 done

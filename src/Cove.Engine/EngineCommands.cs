@@ -29,7 +29,8 @@ internal static class EngineCommands
         if (p.Adapter is { } adapter)
         {
             ctx.AgentRouter?.Register(info.NookId, adapter, p.AgentName, p.Bay, p.Shore, mcpAccessScope: p.McpAccessScope, mcpVisible: p.McpVisible);
-            ctx.Sessions?.Register(info.NookId, adapter, null);
+            ctx.Sessions?.Register(info.NookId, adapter, p.SessionId);
+            ctx.HookRouter?.Seed(info.NookId, adapter);
             ctx.RecentSessions?.RecordStart(adapter, info.NookId, p.Bay ?? "", p.Cwd ?? bayDir ?? "", System.DateTimeOffset.UtcNow);
         }
         return Task.FromResult(ctx.Ok(info, CoveJsonContext.Default.NookInfo));

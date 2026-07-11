@@ -3,6 +3,7 @@ set -euo pipefail
 
 SESSION_ID="${1:?Usage: build_resume_command.sh <session_id> [flags_json]}"
 FLAGS_JSON="${2:-}"
+ADAPTER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 flag_true() {
   printf '%s' "$FLAGS_JSON" | grep -q "\"$1\"[[:space:]]*:[[:space:]]*true"
@@ -24,6 +25,9 @@ resolve_binary() {
 bin="$(resolve_binary claude "$HOME/.claude/local/claude" /opt/homebrew/bin/claude /usr/local/bin/claude)"
 
 args=("$bin" "--resume" "$SESSION_ID")
+if [ -f "$ADAPTER_DIR/hooks-settings.json" ]; then
+  args+=("--settings" "$ADAPTER_DIR/hooks-settings.json")
+fi
 if flag_true "dangerouslySkipPermissions"; then
   args+=("--dangerously-skip-permissions")
 fi

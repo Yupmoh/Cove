@@ -41,6 +41,36 @@ describe("resumeSpawnPlan", () => {
     expect(action.toast).toBeNull();
   });
 
+  it("carries the resumed sessionId so the engine can persist it", () => {
+    const result: VaultResumeResult = {
+      ok: true,
+      adapter: "claude-code",
+      command: ["claude", "--resume", "abc"],
+      cwd: "/some/other/dir",
+      fallback: "none",
+      error: null,
+    };
+    const action = resumeSpawnPlan(result, projectDir, "Claude Code", "abc");
+    expect(action.kind).toBe("spawn");
+    if (action.kind !== "spawn") return;
+    expect(action.sessionId).toBe("abc");
+  });
+
+  it("drops the sessionId when it fell back to a fresh launch", () => {
+    const result: VaultResumeResult = {
+      ok: true,
+      adapter: "claude-code",
+      command: ["claude"],
+      cwd: "",
+      fallback: "fresh",
+      error: "session reaped",
+    };
+    const action = resumeSpawnPlan(result, projectDir, "Claude Code", "abc");
+    expect(action.kind).toBe("spawn");
+    if (action.kind !== "spawn") return;
+    expect(action.sessionId).toBeNull();
+  });
+
   it("maps a fresh fallback to a spawn with a toast", () => {
     const result: VaultResumeResult = {
       ok: true,

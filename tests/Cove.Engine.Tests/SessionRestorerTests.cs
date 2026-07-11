@@ -1,4 +1,5 @@
 using Cove.Engine.Restart;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -6,6 +7,16 @@ namespace Cove.Engine.Tests;
 
 public sealed class SessionRestorerTests
 {
+    private sealed class CapturingLogger : ILogger
+    {
+        public List<string> Messages { get; } = new();
+        public IDisposable BeginScope<TState>(TState state) where TState : notnull => new Noop();
+        public bool IsEnabled(LogLevel logLevel) => true;
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, System.Exception? exception, System.Func<TState, System.Exception?, string> formatter)
+            => Messages.Add(formatter(state, exception));
+        private sealed class Noop : IDisposable { public void Dispose() { } }
+    }
+
     private sealed record SpawnCall(RestorableNook Nook, string Command, string[] Args, string Cwd);
 
     private sealed class FakeSpawner : IRestoreSpawner
@@ -77,6 +88,32 @@ public sealed class SessionRestorerTests
         Assert.Equal(1, summary.Fresh);
         var call = Assert.Single(spawner.Calls);
         Assert.Equal("agent-launch", call.Command);
+    }
+
+    [Fact]
+    public void AgentWithoutSessionId_LogsEmptySessionIdReason()
+    {
+        var spawner = new FakeSpawner();
+        var logger = new CapturingLogger();
+        var restorer = new SessionRestorer(spawner, FakeResume, logger);
+
+        restorer.Restore(new RestorableNook?[] { Agent("nook-empty", "claude-code", null, yolo: false) }, enabled: true);
+
+        Assert.Contains(logger.Messages, m => m.Contains("no persisted sessionId"));
+        Assert.DoesNotContain(logger.Messages, m => m.Contains("resume command build failed"));
+    }
+
+    [Fact]
+    public void AgentWithSessionId_ButBuildFails_LogsBuildFailureReason()
+    {
+        var spawner = new FakeSpawner();
+        var logger = new CapturingLogger();
+        var restorer = new SessionRestorer(spawner, ThrowResume, logger);
+
+        restorer.Restore(new RestorableNook?[] { Agent("nook-build", "claude-code", "sess-xyz", yolo: false) }, enabled: true);
+
+        Assert.Contains(logger.Messages, m => m.Contains("resume command build failed"));
+        Assert.DoesNotContain(logger.Messages, m => m.Contains("no persisted sessionId"));
     }
 
     [Fact]

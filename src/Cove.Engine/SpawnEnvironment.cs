@@ -36,6 +36,7 @@ public sealed class SpawnEnvironment
         env["COVE_DATA_DIR"] = _dataDir;
         env["COVE_NOOK_ID"] = nookId;
         env["COVE_BAY_ID"] = _bayId;
+        env["COVE_SHORE_ID"] = "";
         env["COVE_TASK_ID"] = "";
         env["COVE_TASK_RUN_ID"] = "";
         env["COVE_HOOK_PORT"] = "";

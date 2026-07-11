@@ -35,7 +35,7 @@ import { initialSidebarModel, selectLeftMode, toggleSide, setCollapsed, setWidth
 import { nextBayName, type BayBoxInput } from "./bay-boxes";
 import { clampMenuPosition, normalizeItems, firstSelectableIndex, moveSelection as ctxMoveSelection, activeItem, type ContextMenuItem, type ContextMenuModel } from "./context-menu";
 import { buildBayTree, bayTreeEmptyMessage, NOOK_TYPE_LABELS, type TreeLeaf, type TreeShoreInput, type TreeRow } from "./bay-tree";
-import { buildAgentRows, AGENT_STATE_META, type AgentCard, type AgentState } from "./agents-model";
+import { buildAgentRows, mapAgentState, AGENT_STATE_META, type AgentCard, type AgentState } from "./agents-model";
 import { resolveActiveBayId, bayAccent, sortFsEntries, joinPath, scmChipText, parseCollapsedCardIds, serializeCollapsedCardIds, toggleCardCollapsed, type FsEntry, type BayCardEntry, type ScmSummary } from "./bay-cards";
 import { BAY_ICON_CHOICES, bayGlyph } from "./bay-icons";
 import { parseQuery, filterAndSort, MruTracker, cycleCategory, categoryLabel, type PaletteItem } from "./omni-palette";
@@ -812,7 +812,7 @@ async function resumeRecentSession(adapter: string, sessionId: string, cwd: stri
   let action: ResumeAction;
   try {
     const result = await invoke<VaultResumeResult>("cove://commands/vault.resume", { adapter, sessionId, cwd, yolo: launcherYolo(adapter) });
-    action = resumeSpawnPlan(result, cwd, displayName);
+    action = resumeSpawnPlan(result, cwd, displayName, sessionId);
   } catch (e) {
     console.warn("vault.resume failed", adapter, sessionId, e);
     action = { kind: "error", toast: { title: "Resume failed", body: (e as Error).message } };
@@ -825,7 +825,7 @@ async function performResume(action: ResumeAction): Promise<void> {
     showInAppToast(action.toast.title, action.toast.body, () => {});
     return;
   }
-  const sp = (await invoke<{ nookId: string }>("app.nookSpawn", { command: action.command, args: action.args, cwd: action.cwd, inheritCwdFrom: "", cols: 80, rows: 24, adapter: action.adapter, agentName: action.shoreName, bay: "", shore: "" })).nookId;
+  const sp = (await invoke<{ nookId: string }>("app.nookSpawn", { command: action.command, args: action.args, cwd: action.cwd, inheritCwdFrom: "", cols: 80, rows: 24, adapter: action.adapter, agentName: action.shoreName, bay: "", shore: "", sessionId: action.sessionId ?? undefined })).nookId;
   const r = await invoke<{ shoreId: string }>("app.layoutMutate", { op: "createShore", newNookId: sp, name: action.shoreName, shoreId: "", targetNookId: "", orientation: "", nookId: "", dir: 0, nookType: "terminal" });
   activeShoreId = r.shoreId;
   await reload();
@@ -2252,7 +2252,7 @@ async function refreshAgents(): Promise<void> {
     const res = await invoke<{ cards: AgentCard[] }>("cove://commands/activity.list", {});
     agentCards = res.cards ?? [];
   } catch { agentCards = []; }
-  const nextStates = new Map(agentCards.map((c) => [c.nookId, c.status]));
+  const nextStates = new Map(agentCards.map((c) => [c.nookId, mapAgentState(c.status)]));
   if (agentChimesEnabled()) {
     for (const kind of detectChimes(prevAgentStates, nextStates)) playChime(kind);
   }
