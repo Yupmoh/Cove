@@ -1894,10 +1894,13 @@ function workspaceCardHead(ws: WorkspaceCardEntry, mini: boolean): HTMLElement {
   head.appendChild(swatch);
   const titles = document.createElement("div");
   titles.className = "ws-card-titles";
+  const nameRow = document.createElement("div");
+  nameRow.className = "ws-name-row";
   const name = document.createElement("span");
   name.className = "ws-card-name";
   name.textContent = ws.name;
-  titles.appendChild(name);
+  nameRow.appendChild(name);
+  titles.appendChild(nameRow);
   const dir = document.createElement("span");
   dir.className = "ws-card-dir";
   dir.textContent = ws.projectDir || "no directory";
@@ -1929,19 +1932,27 @@ function renderWorkspaceCard(ws: WorkspaceCardEntry, isActive: boolean): HTMLEle
     const summary = scmSummaryCache.get(ws.projectDir);
     const chipText = summary ? scmChipText(summary) : "";
     if (chipText) {
-      const chip = document.createElement("span");
-      chip.className = "ws-scm-chip";
-      for (const part of chipText.split(" ")) {
-        const seg = document.createElement("span");
-        seg.textContent = part;
-        if (part.startsWith("↑")) seg.className = "scm-ahead";
-        else if (part.startsWith("↓")) seg.className = "scm-behind";
-        else if (part.startsWith("●")) seg.className = "scm-dirty";
-        else seg.className = "scm-branch";
-        chip.appendChild(seg);
+      const parts = chipText.split(" ");
+      const branchEl = document.createElement("span");
+      branchEl.className = "ws-branch";
+      branchEl.textContent = parts[0];
+      branchEl.title = `${ws.projectDir} — branch`;
+      head.querySelector(".ws-name-row")?.appendChild(branchEl);
+      const stats = parts.slice(1);
+      if (stats.length > 0) {
+        const chip = document.createElement("span");
+        chip.className = "ws-scm-chip";
+        for (const part of stats) {
+          const seg = document.createElement("span");
+          seg.textContent = part;
+          if (part.startsWith("↑")) seg.className = "scm-ahead";
+          else if (part.startsWith("↓")) seg.className = "scm-behind";
+          else seg.className = "scm-dirty";
+          chip.appendChild(seg);
+        }
+        chip.title = `${ws.projectDir} — ahead/behind upstream · modified files`;
+        head.appendChild(chip);
       }
-      chip.title = `${ws.projectDir} — ahead/behind upstream · modified files`;
-      head.appendChild(chip);
     }
   }
   if (!isActive) head.addEventListener("click", () => void switchWorkspace(ws.id));
