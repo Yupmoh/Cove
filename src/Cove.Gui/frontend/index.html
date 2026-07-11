@@ -430,7 +430,7 @@
     .launch-tile .ic { font-size: 20px; color: var(--accent); }
     .launch-tile .lbl { font-size: 12px; }
     .launch-hint { color: var(--muted); font-size: 11px; margin-top: 12px; }
-    .box-launcher { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 16px; padding: clamp(16px, 4vw, 44px); overflow-y: auto; overflow-x: hidden; outline: none; }
+    .box-launcher { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 16px; padding: clamp(16px, 4vw, 44px); overflow-y: auto; overflow-x: hidden; outline: none; border-radius: 11px; border: 1px solid var(--border); background: radial-gradient(ellipse 75% 55% at 50% 34%, color-mix(in srgb, var(--accent) 6%, transparent), transparent 72%), color-mix(in srgb, var(--bg) calc(var(--cove-bg-opacity) * 100%), transparent); }
     .box-launcher > * { width: 100%; max-width: 620px; min-width: 0; flex-shrink: 0; }
     .box-launcher > :first-child { margin-top: auto; }
     .box-launcher > :last-child { margin-bottom: auto; }
