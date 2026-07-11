@@ -78,4 +78,16 @@ internal static partial class AdapterLog
 
     [ZLoggerMessage(LogLevel.Warning, "registry fetch failed url={url} error={error}")]
     public static partial void RegistryFetchFailed(this ILogger logger, string url, string error);
+
+    [ZLoggerMessage(LogLevel.Information, "bundled adapter seeded adapter={adapter}")]
+    public static partial void BundledAdapterSeeded(this ILogger logger, string adapter);
+
+    [ZLoggerMessage(LogLevel.Information, "bundled adapter refreshed adapter={adapter}")]
+    public static partial void BundledAdapterRefreshed(this ILogger logger, string adapter);
+
+    [ZLoggerMessage(LogLevel.Debug, "bundled adapter left untouched (user-managed, no stamp) adapter={adapter}")]
+    public static partial void BundledAdapterUserManaged(this ILogger logger, string adapter);
+
+    [ZLoggerMessage(LogLevel.Warning, "bundled adapter source directory not found baseDir={baseDir}")]
+    public static partial void BundledAdapterSourceMissing(this ILogger logger, string baseDir);
 }

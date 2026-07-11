@@ -29,6 +29,9 @@
     <Content Include="tools/rg/**" CopyToOutputDirectory="PreserveNewest" LinkBase="tools/rg" Condition="Exists('tools/rg')" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="../../adapters/**" CopyToOutputDirectory="PreserveNewest" LinkBase="adapters" Condition="Exists('../../adapters')" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="../Cove.SourceGen/Cove.SourceGen.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   </ItemGroup>
 

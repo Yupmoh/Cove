@@ -331,6 +331,12 @@ public sealed class DaemonHost
 
         guard.WritePid(Environment.ProcessId);
         await _hookServer.PublishPortAsync().ConfigureAwait(false);
+        var seedReport = Cove.Adapters.BundledAdapterSeeder.SeedFromBinaryLocation(adaptersRoot, logger);
+        if (seedReport.Copied.Count + seedReport.Refreshed.Count > 0)
+        {
+            logger.LogInformation("bundled adapter seeding: copied={Copied} refreshed={Refreshed} userManaged={UserManaged}", seedReport.Copied.Count, seedReport.Refreshed.Count, seedReport.SkippedUserManaged.Count);
+            OnAdaptersChanged(dataDir, logger);
+        }
         _lastActivityTicks = DateTimeOffset.UtcNow.Ticks;
         DaemonLog.Write(_paths, $"daemon up pid={Environment.ProcessId} channel={_paths.Channel} addr={_endpoint.Address}");
         logger.DaemonStarted(System.Environment.ProcessId, _paths.Channel);
