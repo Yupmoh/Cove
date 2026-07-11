@@ -1,5 +1,6 @@
 import { invoke } from "./invoke";
 import type { RecentSessionRow } from "./launcher-model";
+import { adapterAccent } from "./launcher-model";
 import { groupRecentsByAdapter, type AdapterLabel, type AdapterSessionGroup } from "./session-resume";
 
 interface SessionCorpusEntry {
@@ -15,6 +16,8 @@ interface SearchResults { entries: SessionCorpusEntry[] }
 interface RecentResults { sessions: RecentSessionRow[] }
 
 export type ResumeHandler = (adapter: string, sessionId: string, cwd: string, displayName: string) => void;
+
+const ON_ACCENT_TEXT = "#11111b";
 
 export async function renderSessionPicker(
   bayId: string,
@@ -36,21 +39,21 @@ export async function renderSessionPicker(
 
 function buildHeader(): HTMLElement {
   const header = document.createElement("div");
-  header.style.cssText = "padding:12px;border-bottom:1px solid var(--border);";
-  const title = document.createElement("h2");
-  title.style.cssText = "font-size:16px;font-weight:600;margin:0;";
-  title.textContent = "Resume Session";
+  header.style.cssText = "padding:12px 14px;border-bottom:1px solid var(--border);";
+  const title = document.createElement("div");
+  title.style.cssText = "font-size:13px;font-weight:650;margin:0;color:var(--fg);";
+  title.textContent = "Resume a session";
   header.appendChild(title);
-  const subtitle = document.createElement("p");
-  subtitle.style.cssText = "font-size:12px;color:var(--muted);margin:4px 0 0;";
-  subtitle.textContent = "Resume a past session in this bay directory";
+  const subtitle = document.createElement("div");
+  subtitle.style.cssText = "font-size:11px;color:var(--muted);margin-top:3px;";
+  subtitle.textContent = "Pick up a past session in this bay directory";
   header.appendChild(subtitle);
   return header;
 }
 
 async function buildRecentsArea(projectDir: string, adapters: AdapterLabel[], onResume: ResumeHandler): Promise<HTMLElement> {
   const container = document.createElement("div");
-  container.style.cssText = "border-bottom:1px solid var(--border);padding:8px 12px;display:flex;flex-direction:column;gap:6px;max-height:40%;overflow-y:auto;";
+  container.style.cssText = "border-bottom:1px solid var(--border);padding:10px 14px;display:flex;flex-direction:column;gap:8px;max-height:40%;overflow-y:auto;";
 
   let groups: AdapterSessionGroup[] = [];
   try {
@@ -62,7 +65,7 @@ async function buildRecentsArea(projectDir: string, adapters: AdapterLabel[], on
 
   if (groups.length === 0) {
     const empty = document.createElement("div");
-    empty.style.cssText = "padding:12px 4px;color:var(--muted);font-size:12px;";
+    empty.style.cssText = "padding:10px 2px;color:var(--muted);font-size:12px;";
     empty.textContent = "No resumable sessions for this directory";
     container.appendChild(empty);
     return container;
@@ -75,60 +78,73 @@ async function buildRecentsArea(projectDir: string, adapters: AdapterLabel[], on
 }
 
 function buildAdapterDropdown(group: AdapterSessionGroup, onResume: ResumeHandler): HTMLElement {
-  const wrap = document.createElement("div");
-  wrap.style.cssText = "border:1px solid var(--border);border-radius:6px;overflow:hidden;";
+  const accent = adapterAccent(group.adapter, "");
 
-  const head = document.createElement("button");
-  head.type = "button";
-  head.style.cssText = "width:100%;display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--panel);border:none;color:var(--fg);cursor:pointer;font-size:13px;font-weight:500;text-align:left;";
+  const dd = document.createElement("div");
+  dd.style.cssText = "display:flex;flex-direction:column;gap:4px;";
 
-  const caret = document.createElement("span");
-  caret.textContent = "▸";
-  caret.style.cssText = "font-size:10px;color:var(--muted);transition:transform .1s;";
-  head.appendChild(caret);
+  const trigger = document.createElement("button");
+  trigger.type = "button";
+  trigger.className = "cl-resume-trigger";
+  trigger.style.cssText = "width:100%;justify-content:flex-start;";
+
+  const dot = document.createElement("span");
+  dot.className = "cl-session-dot";
+  dot.style.background = accent;
+  trigger.appendChild(dot);
 
   const name = document.createElement("span");
+  name.className = "cl-resume-label";
   name.style.flex = "1";
   name.textContent = group.displayName;
-  head.appendChild(name);
+  trigger.appendChild(name);
 
   const count = document.createElement("span");
-  count.style.cssText = "font-size:11px;color:var(--muted);";
+  count.className = "cl-resume-count";
   count.textContent = String(group.sessions.length);
-  head.appendChild(count);
+  trigger.appendChild(count);
 
-  const list = document.createElement("div");
-  list.style.cssText = "display:none;flex-direction:column;";
+  const chev = document.createElement("span");
+  chev.className = "cl-resume-chev";
+  chev.textContent = "▾";
+  trigger.appendChild(chev);
+
+  const menu = document.createElement("div");
+  menu.style.cssText = "display:none;flex-direction:column;gap:1px;padding:5px;background:var(--panel);border:1px solid var(--border);border-radius:10px;";
 
   for (const s of group.sessions) {
     const row = document.createElement("button");
     row.type = "button";
-    row.style.cssText = "display:flex;align-items:baseline;gap:8px;width:100%;text-align:left;padding:8px 12px 8px 28px;background:var(--bg);border:none;border-top:1px solid var(--panel);color:var(--fg);cursor:pointer;font-size:12px;";
+    row.className = "cl-recent-row";
+    row.style.cssText = "width:100%;border:none;background:transparent;font:inherit;text-align:left;";
+    const rowDot = document.createElement("span");
+    rowDot.className = "cl-session-dot";
+    rowDot.style.background = accent;
     const label = document.createElement("span");
-    label.style.cssText = "flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;";
+    label.className = "cl-recent-cwd";
+    label.style.fontWeight = "500";
     label.textContent = s.label;
     label.title = s.label;
     const when = document.createElement("span");
-    when.style.cssText = "flex-shrink:0;color:var(--muted);font-size:10px;";
+    when.className = "cl-recent-when";
     when.textContent = s.relative;
+    row.appendChild(rowDot);
     row.appendChild(label);
     row.appendChild(when);
-    row.addEventListener("mouseenter", () => row.style.background = "var(--panel)");
-    row.addEventListener("mouseleave", () => row.style.background = "var(--bg)");
     row.addEventListener("click", () => onResume(s.adapter, s.sessionId, s.cwd, group.displayName));
-    list.appendChild(row);
+    menu.appendChild(row);
   }
 
   let open = false;
-  head.addEventListener("click", () => {
+  trigger.addEventListener("click", () => {
     open = !open;
-    list.style.display = open ? "flex" : "none";
-    caret.style.transform = open ? "rotate(90deg)" : "";
+    menu.style.display = open ? "flex" : "none";
+    chev.style.transform = open ? "rotate(180deg)" : "";
   });
 
-  wrap.appendChild(head);
-  wrap.appendChild(list);
-  return wrap;
+  dd.appendChild(trigger);
+  dd.appendChild(menu);
+  return dd;
 }
 
 function buildSearchArea(bayId: string): HTMLElement {
@@ -136,50 +152,50 @@ function buildSearchArea(bayId: string): HTMLElement {
   container.style.cssText = "flex:1;display:flex;flex-direction:column;overflow:hidden;";
 
   const searchBar = document.createElement("div");
-  searchBar.style.cssText = "padding:8px 12px;border-bottom:1px solid var(--border);display:flex;gap:8px;";
+  searchBar.style.cssText = "padding:10px 14px;border-bottom:1px solid var(--border);display:flex;gap:8px;";
 
   const input = document.createElement("input");
   input.type = "text";
   input.placeholder = "Search session transcripts...";
-  input.style.cssText = "flex:1;padding:6px 10px;background:var(--panel);border:1px solid var(--border);border-radius:4px;color:var(--fg);font-size:13px;";
+  input.style.cssText = "flex:1;height:32px;padding:0 11px;background:color-mix(in srgb, var(--panel-2) 80%, transparent);border:1px solid var(--border);border-radius:8px;color:var(--fg);font-size:12px;font-family:inherit;outline:none;";
+  input.addEventListener("focus", () => input.style.borderColor = "color-mix(in srgb, var(--accent) 55%, var(--border))");
+  input.addEventListener("blur", () => input.style.borderColor = "var(--border)");
   searchBar.appendChild(input);
 
   const searchBtn = document.createElement("button");
+  searchBtn.type = "button";
   searchBtn.textContent = "Search";
-  searchBtn.style.cssText = "padding:6px 14px;background:var(--accent);border:1px solid var(--accent);border-radius:4px;color:var(--base);cursor:pointer;font-size:12px;";
+  searchBtn.style.cssText = `height:32px;padding:0 14px;background:var(--accent);border:1px solid var(--accent);border-radius:8px;color:${ON_ACCENT_TEXT};cursor:pointer;font-size:12px;font-weight:600;font-family:inherit;`;
   searchBar.appendChild(searchBtn);
 
   container.appendChild(searchBar);
 
   const resultsList = document.createElement("div");
   resultsList.className = "session-results";
-  resultsList.style.cssText = "flex:1;overflow-y:auto;";
+  resultsList.style.cssText = "flex:1;overflow-y:auto;padding:6px 10px;display:flex;flex-direction:column;gap:2px;";
   container.appendChild(resultsList);
 
   const performSearch = async () => {
     resultsList.innerHTML = "";
     const query = input.value.trim();
     if (!query) {
-      const empty = document.createElement("div");
-      empty.style.cssText = "padding:20px;color:var(--muted);text-align:center;font-size:13px;";
-      empty.textContent = "Enter a search query to find past sessions";
-      resultsList.appendChild(empty);
+      resultsList.appendChild(buildEmptyNotice("Enter a search query to find past sessions"));
       return;
     }
     try {
       const result = await invoke<SearchResults>("cove://commands/vault.search", { bayId, query });
       const entries = result.entries || [];
       if (entries.length === 0) {
-        const empty = document.createElement("div");
-        empty.style.cssText = "padding:20px;color:var(--muted);text-align:center;font-size:13px;";
-        empty.textContent = "No sessions found";
-        resultsList.appendChild(empty);
+        resultsList.appendChild(buildEmptyNotice("No sessions found"));
         return;
       }
       for (const entry of entries)
         resultsList.appendChild(buildSearchRow(entry));
     } catch (e) {
-      resultsList.innerHTML = `<div style="padding:20px;color:var(--danger);">Search failed: ${(e as Error).message}</div>`;
+      const fail = document.createElement("div");
+      fail.style.cssText = "padding:16px;color:var(--danger);font-size:12px;";
+      fail.textContent = `Search failed: ${(e as Error).message}`;
+      resultsList.appendChild(fail);
     }
   };
 
@@ -191,25 +207,33 @@ function buildSearchArea(bayId: string): HTMLElement {
   return container;
 }
 
+function buildEmptyNotice(text: string): HTMLElement {
+  const empty = document.createElement("div");
+  empty.style.cssText = "padding:20px;color:var(--muted);text-align:center;font-size:12px;";
+  empty.textContent = text;
+  return empty;
+}
+
 function buildSearchRow(entry: SessionCorpusEntry): HTMLElement {
   const row = document.createElement("div");
-  row.style.cssText = "padding:10px 12px;border-bottom:1px solid var(--panel);display:flex;gap:10px;align-items:center;";
+  row.className = "cl-recent-row";
+  row.style.cssText = "cursor:default;";
 
-  const icon = document.createElement("span");
-  icon.style.cssText = "font-size:18px;";
-  icon.textContent = "💬";
-  row.appendChild(icon);
+  const dot = document.createElement("span");
+  dot.className = "cl-session-dot";
+  dot.style.background = adapterAccent(entry.adapter, "");
+  row.appendChild(dot);
 
   const info = document.createElement("div");
-  info.style.cssText = "flex:1;min-width:0;";
+  info.style.cssText = "flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;";
 
   const adapter = document.createElement("div");
-  adapter.style.cssText = "font-size:13px;color:var(--fg);font-weight:500;";
+  adapter.style.cssText = "font-size:12px;color:var(--fg);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
   adapter.textContent = entry.adapter;
   info.appendChild(adapter);
 
   const date = document.createElement("div");
-  date.style.cssText = "font-size:11px;color:var(--muted);";
+  date.style.cssText = "font-size:10px;color:var(--muted);";
   const startDate = new Date(entry.startedAt);
   date.textContent = startDate.toLocaleString();
   if (entry.endedAt) {
@@ -225,23 +249,23 @@ function buildSearchRow(entry: SessionCorpusEntry): HTMLElement {
 
 function buildSettingsPanel(bayId: string): HTMLElement {
   const panel = document.createElement("div");
-  panel.style.cssText = "border-top:1px solid var(--border);padding:12px;";
+  panel.style.cssText = "border-top:1px solid var(--border);padding:12px 14px;";
 
   const header = document.createElement("div");
-  header.style.cssText = "font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;";
+  header.style.cssText = "font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;font-weight:700;margin-bottom:10px;";
   header.textContent = "Vault Settings";
   panel.appendChild(header);
 
   const depthRow = document.createElement("div");
-  depthRow.style.cssText = "display:flex;align-items:center;gap:8px;margin-bottom:8px;";
+  depthRow.style.cssText = "display:flex;align-items:center;gap:8px;margin-bottom:9px;";
 
   const depthLabel = document.createElement("label");
-  depthLabel.style.cssText = "font-size:13px;color:var(--fg);min-width:80px;";
-  depthLabel.textContent = "Depth:";
+  depthLabel.style.cssText = "font-size:12px;color:var(--fg);min-width:80px;";
+  depthLabel.textContent = "Depth";
   depthRow.appendChild(depthLabel);
 
   const depthSelect = document.createElement("select");
-  depthSelect.style.cssText = "flex:1;padding:4px 8px;background:var(--panel);border:1px solid var(--border);border-radius:4px;color:var(--fg);font-size:12px;";
+  depthSelect.style.cssText = "flex:1;height:30px;padding:0 10px;background:color-mix(in srgb, var(--panel-2) 80%, transparent);border:1px solid var(--border);border-radius:8px;color:var(--fg);font-size:12px;font-family:inherit;outline:none;";
   for (const depth of ["quick", "standard", "deep"]) {
     const opt = document.createElement("option");
     opt.value = depth;
@@ -255,11 +279,11 @@ function buildSettingsPanel(bayId: string): HTMLElement {
   panel.appendChild(depthRow);
 
   const horizonRow = document.createElement("div");
-  horizonRow.style.cssText = "display:flex;align-items:center;gap:8px;margin-bottom:8px;";
+  horizonRow.style.cssText = "display:flex;align-items:center;gap:8px;margin-bottom:12px;";
 
   const horizonLabel = document.createElement("label");
-  horizonLabel.style.cssText = "font-size:13px;color:var(--fg);min-width:80px;";
-  horizonLabel.textContent = "Horizon:";
+  horizonLabel.style.cssText = "font-size:12px;color:var(--fg);min-width:80px;";
+  horizonLabel.textContent = "Horizon";
   horizonRow.appendChild(horizonLabel);
 
   const horizonInput = document.createElement("input");
@@ -267,15 +291,18 @@ function buildSettingsPanel(bayId: string): HTMLElement {
   horizonInput.value = "30";
   horizonInput.min = "1";
   horizonInput.max = "365";
-  horizonInput.style.cssText = "flex:1;padding:4px 8px;background:var(--panel);border:1px solid var(--border);border-radius:4px;color:var(--fg);font-size:12px;";
+  horizonInput.style.cssText = "flex:1;height:30px;padding:0 10px;background:color-mix(in srgb, var(--panel-2) 80%, transparent);border:1px solid var(--border);border-radius:8px;color:var(--fg);font-size:12px;font-family:inherit;outline:none;";
   horizonInput.addEventListener("change", () => updateVaultSetting(bayId, "horizon", horizonInput.value));
   horizonRow.appendChild(horizonInput);
 
   panel.appendChild(horizonRow);
 
   const reindexBtn = document.createElement("button");
+  reindexBtn.type = "button";
   reindexBtn.textContent = "Reindex All";
-  reindexBtn.style.cssText = "padding:4px 12px;background:var(--border);border:1px solid var(--border);border-radius:4px;color:var(--fg);cursor:pointer;font-size:12px;";
+  reindexBtn.style.cssText = "height:30px;padding:0 14px;background:color-mix(in srgb, var(--panel-2) 80%, transparent);border:1px solid var(--border);border-radius:8px;color:var(--fg);cursor:pointer;font-size:12px;font-family:inherit;";
+  reindexBtn.addEventListener("mouseenter", () => reindexBtn.style.borderColor = "color-mix(in srgb, var(--accent) 55%, var(--border))");
+  reindexBtn.addEventListener("mouseleave", () => reindexBtn.style.borderColor = "var(--border)");
   reindexBtn.addEventListener("click", () => reindexVault(bayId));
   panel.appendChild(reindexBtn);
 
