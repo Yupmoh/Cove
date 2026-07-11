@@ -92,6 +92,16 @@ public sealed class LaunchOrchestrator
         return new AgentResumeResult(AgentResumeState.Succeeded, cmd, null, sessionId);
     }
 
+    public BinaryDiscoveryResult DescribeAdapterBinary(AdapterManifest manifest)
+    {
+        if (_binaryDiscovery is null || manifest.BinaryDiscovery is not { } discovery)
+        {
+            _logger?.AdapterBinaryDiscoveryUnavailable(manifest.Name);
+            return new BinaryDiscoveryResult(AdapterDetectionState.Missing, null, null);
+        }
+        return _binaryDiscovery.Discover(discovery, manifest.WellKnownPaths, _loginShellPath);
+    }
+
     private async Task<string?> ResolveBinaryAsync(AdapterManifest manifest, string adapterDir, System.Threading.CancellationToken cancellationToken)
     {
         if (manifest.BinaryDiscovery is { } discovery)
@@ -267,4 +277,7 @@ internal static partial class LauncherOptionsLog
 
     [ZLoggerMessage(LogLevel.Warning, "launcher options script failed adapter={adapter} exit={exit} stderr={stderr}")]
     public static partial void LauncherOptionsScriptFailed(this Microsoft.Extensions.Logging.ILogger logger, string adapter, int exit, string stderr);
+
+    [ZLoggerMessage(LogLevel.Warning, "adapter binary discovery unavailable adapter={adapter}")]
+    public static partial void AdapterBinaryDiscoveryUnavailable(this Microsoft.Extensions.Logging.ILogger logger, string adapter);
 }

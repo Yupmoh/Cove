@@ -137,7 +137,7 @@ public sealed record LaunchOverrideGetParams(string PaneId);
 public sealed record ResumeCommandDto(string Command, string[] Args, string Cwd);
 public sealed record LauncherOverridesDto(bool Yolo, string? WorkingDir, string[] ExtraFlags, Dictionary<string, string> Env);
 
-public sealed record AdapterListItemDto(string Name, string DisplayName, string Accent, string Binary);
+public sealed record AdapterListItemDto(string Name, string DisplayName, string Accent, string Binary, string? Status = null, string? Version = null, string? BinaryPath = null);
 public sealed record AdapterListResult(System.Collections.Generic.IReadOnlyList<AdapterListItemDto> Adapters);
 public sealed record RegistryEntryDto(string Name, string DisplayName, string Version, bool Official);
 public sealed record RegistryFetchResult(RegistryEntryDto[] Adapters);

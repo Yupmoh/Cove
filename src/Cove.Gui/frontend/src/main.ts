@@ -38,6 +38,7 @@ import { splitWorkspaceCards, workspaceAccent, sortFsEntries, joinPath, dirBasen
 import { parseQuery, filterAndSort, MruTracker, cycleCategory, categoryLabel, type PaletteItem } from "./omni-palette";
 import { buildEmptyState, EmptyStateMessages } from "./empty-states";
 import { brandLogoAt, nextBrandIndex, parseBrandIndex } from "./brand";
+import { adapterCardSubtitle, adapterStatusMeta } from "./tools-tab";
 import { DEFAULT_DRAFT, draftFromTheme, themeFromDraft, cssVarsFromTheme, xtermThemeFromDto, isCustom, isBuiltin, canSaveDraft, canDelete, isValidHex, contrastRatio, contrastTier, THEME_COLOR_FIELDS, type ThemeDto, type ThemeDraft } from "./theme-editor";
 import { categorizeBindings, isReservedChord, isValidChord, chordDisplay, canRecordChord, normalizeChord as normalizeChordStr, type KeybindDto } from "./keyboard-editor";
 import { ONBOARDING_STEPS, INITIAL_ONBOARDING_STATE, nextStep, prevStep, dismiss as dismissOnboarding, currentStepData, isLastStep, isFirstStep, progressPercent, selectAdapter, setTelemetryOptIn, shouldShowOnboarding, onboardingSeenFromConfig, ONBOARDING_COMPLETED_KEY, type OnboardingState } from "./onboarding";
@@ -2600,6 +2601,7 @@ function renderSettings(): void {
     setBodyEl.innerHTML = `<div style="padding:20px;color:var(--muted);text-align:center;">No settings available</div>`;
     return;
   }
+  if (!tabs.includes("tools")) tabs.push("tools");
   if (!activeSettingsTab || !tabs.includes(activeSettingsTab)) activeSettingsTab = tabs[0];
 
   setTabsEl.innerHTML = "";
@@ -2618,6 +2620,10 @@ function renderSettings(): void {
   }
   if (activeSettingsTab === "keyboard") {
     renderKeyboardEditor(setBodyEl);
+    return;
+  }
+  if (activeSettingsTab === "tools") {
+    void renderToolsTab(setBodyEl);
     return;
   }
   const entries = configSchema.filter((e) => e.tab === activeSettingsTab && (e.control === "section" || isRealSetting(e)));
@@ -2648,6 +2654,78 @@ function renderSettings(): void {
     setBodyEl.appendChild(row);
   }
   if (activeSettingsTab === "diagnostics") renderDiagnosticsExtras(setBodyEl);
+}
+
+async function renderToolsTab(container: HTMLElement): Promise<void> {
+  container.innerHTML = "";
+  let adapters: AdapterInfo[];
+  try {
+    const result = await invoke<AdapterListResult>("app.adapterList", {});
+    adapters = result.adapters ?? [];
+  } catch (err) {
+    console.warn("adapter.list failed for tools tab", err);
+    const failed = document.createElement("div");
+    failed.className = "tools-empty";
+    failed.textContent = "adapter list unavailable";
+    container.appendChild(failed);
+    return;
+  }
+  if (adapters.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "tools-empty";
+    empty.textContent = "no adapters installed";
+    container.appendChild(empty);
+    return;
+  }
+  const list = document.createElement("div");
+  list.className = "tools-list";
+  for (const a of adapters) {
+    const card = document.createElement("div");
+    card.className = "tools-card";
+
+    const swatch = document.createElement("span");
+    swatch.className = "tools-accent";
+    swatch.style.background = a.accent || "var(--accent)";
+    card.appendChild(swatch);
+
+    const body = document.createElement("div");
+    body.className = "tools-body";
+
+    const titleRow = document.createElement("div");
+    titleRow.className = "tools-title-row";
+    const name = document.createElement("span");
+    name.className = "tools-name";
+    name.textContent = a.displayName || a.name;
+    titleRow.appendChild(name);
+
+    const meta = adapterStatusMeta(a.status);
+    const status = document.createElement("span");
+    status.className = "tools-status";
+    const dot = document.createElement("span");
+    dot.className = "tools-dot";
+    dot.style.background = meta.cssColor;
+    const statusLabel = document.createElement("span");
+    statusLabel.textContent = meta.label;
+    statusLabel.style.color = meta.cssColor;
+    status.appendChild(dot);
+    status.appendChild(statusLabel);
+    titleRow.appendChild(status);
+    body.appendChild(titleRow);
+
+    const subtitle = document.createElement("div");
+    subtitle.className = "tools-subtitle";
+    subtitle.textContent = adapterCardSubtitle(a.version, a.binaryPath);
+    body.appendChild(subtitle);
+
+    const manifestName = document.createElement("div");
+    manifestName.className = "tools-manifest";
+    manifestName.textContent = a.name;
+    body.appendChild(manifestName);
+
+    card.appendChild(body);
+    list.appendChild(card);
+  }
+  container.appendChild(list);
 }
 
 function diagnosticsSectionHeader(text: string): HTMLElement {
@@ -3461,7 +3539,7 @@ launcherEl.addEventListener("mousedown", (e) => { if (e.target === launcherEl) c
 launcherEl.addEventListener("keydown", (e) => { if (e.key === "Escape") closeLauncher(); });
 
 const launchAgentsEl = document.getElementById("launch-agents")!;
-interface AdapterInfo { name: string; displayName: string; accent: string; binary: string; }
+interface AdapterInfo { name: string; displayName: string; accent: string; binary: string; status?: string | null; version?: string | null; binaryPath?: string | null; }
 interface AdapterListResult { adapters: AdapterInfo[]; }
 async function loadLauncherAgents(): Promise<void> {
   try {

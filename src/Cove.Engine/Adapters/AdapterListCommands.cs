@@ -1,3 +1,4 @@
+using Cove.Adapters;
 using Cove.Generated;
 using Cove.Protocol;
 
@@ -13,8 +14,27 @@ public static class AdapterListCommands
 
         var items = new List<AdapterListItemDto>();
         foreach (var manifest in manifestStore.LoadAll())
-            items.Add(new AdapterListItemDto(manifest.Name, manifest.DisplayName, manifest.Accent, manifest.Binary));
+        {
+            string? status = null;
+            string? version = null;
+            string? binaryPath = null;
+            if (ctx.Launcher is { } launcher)
+            {
+                var detection = launcher.DescribeAdapterBinary(manifest);
+                status = DetectionStatus(detection.State);
+                version = detection.Version;
+                binaryPath = detection.BinaryPath;
+            }
+            items.Add(new AdapterListItemDto(manifest.Name, manifest.DisplayName, manifest.Accent, manifest.Binary, status, version, binaryPath));
+        }
 
         return Task.FromResult(ctx.Ok(new AdapterListResult(items), CoveJsonContext.Default.AdapterListResult));
     }
+
+    private static string DetectionStatus(AdapterDetectionState state) => state switch
+    {
+        AdapterDetectionState.Detected => "detected",
+        AdapterDetectionState.Broken => "broken",
+        _ => "missing",
+    };
 }
