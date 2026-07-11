@@ -30,7 +30,7 @@ public sealed class FrameCodecTests
         byte[] frame = HexUtil.Bytes(
             "43 4f 56 45 01 01 00 00 00 00 00 00 00 00 00 00 01 00 00 00 2c 00 00 00" +
             "7b 22 69 64 22 3a 22 31 22 2c 22 75 72 69 22 3a 22 63 6f 76 65 3a 2f 2f" +
-            "63 6f 6d 6d 61 6e 64 73 2f 70 61 6e 65 2e 6c 69 73 74 22 7d");
+            "63 6f 6d 6d 61 6e 64 73 2f 6e 6f 6f 6b 2e 6c 69 73 74 22 7d");
         Assert.True(FrameHeader.TryRead(frame, out FrameHeader h, out _));
         Assert.Equal(FrameType.Request, h.Type);
         Assert.Equal(0UL, h.StreamId);
@@ -48,7 +48,7 @@ public sealed class FrameCodecTests
         byte[] frame = HexUtil.Bytes(
             "43 4f 56 45 01 02 00 00 00 00 00 00 00 00 00 00 01 00 00 00 28 00 00 00" +
             "7b 22 69 64 22 3a 22 31 22 2c 22 6f 6b 22 3a 74 72 75 65 2c 22 64 61 74" +
-            "61 22 3a 7b 22 70 61 6e 65 73 22 3a 5b 5d 7d 7d");
+            "61 22 3a 7b 22 6e 6f 6f 6b 73 22 3a 5b 5d 7d 7d");
         Assert.True(FrameHeader.TryRead(frame, out FrameHeader h, out _));
         Assert.Equal(FrameType.Response, h.Type);
         Assert.Equal(40u, h.Length);

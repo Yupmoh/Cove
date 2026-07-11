@@ -57,6 +57,26 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/attribution.find-by-range` | core |  |
 | `cove://commands/attribution.find-by-tool-use` | core |  |
 | `cove://commands/attribution.record` | core |  |
+| `cove://commands/bay-command.clear` | core |  |
+| `cove://commands/bay-command.create` | core |  |
+| `cove://commands/bay-command.delete` | core |  |
+| `cove://commands/bay-command.edit` | core |  |
+| `cove://commands/bay-command.list` | core |  |
+| `cove://commands/bay-command.logs` | core |  |
+| `cove://commands/bay-command.restart` | core |  |
+| `cove://commands/bay-command.start` | core |  |
+| `cove://commands/bay-command.status` | core |  |
+| `cove://commands/bay-command.stop` | core |  |
+| `cove://commands/bay.create` | core |  |
+| `cove://commands/bay.delete` | core |  |
+| `cove://commands/bay.hide` | core |  |
+| `cove://commands/bay.list` | core |  |
+| `cove://commands/bay.move-shore` | core |  |
+| `cove://commands/bay.rename` | core |  |
+| `cove://commands/bay.reorder` | core |  |
+| `cove://commands/bay.set-accent` | core |  |
+| `cove://commands/bay.set-icon` | core |  |
+| `cove://commands/bay.switch` | core |  |
 | `cove://commands/blackboard.post` | core |  |
 | `cove://commands/blackboard.show` | core |  |
 | `cove://commands/browser.automation.result` | core |  |
@@ -149,6 +169,17 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/memory.search` | core |  |
 | `cove://commands/memory.show` | core |  |
 | `cove://commands/memory.supersede` | core |  |
+| `cove://commands/nook-types.list` | core |  |
+| `cove://commands/nook.kill` | core |  |
+| `cove://commands/nook.list` | core |  |
+| `cove://commands/nook.read` | core |  |
+| `cove://commands/nook.rename` | core |  |
+| `cove://commands/nook.resize` | core |  |
+| `cove://commands/nook.scope.get` | core |  |
+| `cove://commands/nook.scope.set` | core |  |
+| `cove://commands/nook.search` | core |  |
+| `cove://commands/nook.spawn` | core |  |
+| `cove://commands/nook.write` | core |  |
 | `cove://commands/note.create` | core |  |
 | `cove://commands/note.delete` | core |  |
 | `cove://commands/note.get` | core |  |
@@ -164,17 +195,6 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/omni-chat.append` | core |  |
 | `cove://commands/omni-chat.clear` | core |  |
 | `cove://commands/omni-chat.history` | core |  |
-| `cove://commands/nook-types.list` | core |  |
-| `cove://commands/nook.kill` | core |  |
-| `cove://commands/nook.list` | core |  |
-| `cove://commands/nook.read` | core |  |
-| `cove://commands/nook.rename` | core |  |
-| `cove://commands/nook.resize` | core |  |
-| `cove://commands/nook.scope.get` | core |  |
-| `cove://commands/nook.scope.set` | core |  |
-| `cove://commands/nook.search` | core |  |
-| `cove://commands/nook.spawn` | core |  |
-| `cove://commands/nook.write` | core |  |
 | `cove://commands/perf.bundle.create` | core |  |
 | `cove://commands/perf.bundle.delete` | core |  |
 | `cove://commands/perf.bundle.list` | core |  |
@@ -197,13 +217,6 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/review.reopen` | core |  |
 | `cove://commands/review.resolve` | core |  |
 | `cove://commands/review.telemetry` | core |  |
-| `cove://commands/shore.close` | core |  |
-| `cove://commands/shore.create` | core |  |
-| `cove://commands/shore.list` | core |  |
-| `cove://commands/shore.move-to-wing` | core |  |
-| `cove://commands/shore.pin` | core |  |
-| `cove://commands/shore.rename` | core |  |
-| `cove://commands/shore.switch` | core |  |
 | `cove://commands/run.cancel` | core |  |
 | `cove://commands/run.complete` | core |  |
 | `cove://commands/run.list` | core |  |
@@ -228,6 +241,13 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/session.recent` | core |  |
 | `cove://commands/session.state` | core |  |
 | `cove://commands/session.stop` | core |  |
+| `cove://commands/shore.close` | core |  |
+| `cove://commands/shore.create` | core |  |
+| `cove://commands/shore.list` | core |  |
+| `cove://commands/shore.move-to-wing` | core |  |
+| `cove://commands/shore.pin` | core |  |
+| `cove://commands/shore.rename` | core |  |
+| `cove://commands/shore.switch` | core |  |
 | `cove://commands/skills.index` | core |  |
 | `cove://commands/skills.resolve-manifest` | core |  |
 | `cove://commands/skills.resolve-prompt-sigils` | core |  |
@@ -304,26 +324,6 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/wing.reorder` | core |  |
 | `cove://commands/wing.set-icon` | core |  |
 | `cove://commands/wing.switch` | core |  |
-| `cove://commands/bay-command.clear` | core |  |
-| `cove://commands/bay-command.create` | core |  |
-| `cove://commands/bay-command.delete` | core |  |
-| `cove://commands/bay-command.edit` | core |  |
-| `cove://commands/bay-command.list` | core |  |
-| `cove://commands/bay-command.logs` | core |  |
-| `cove://commands/bay-command.restart` | core |  |
-| `cove://commands/bay-command.start` | core |  |
-| `cove://commands/bay-command.status` | core |  |
-| `cove://commands/bay-command.stop` | core |  |
-| `cove://commands/bay.create` | core |  |
-| `cove://commands/bay.delete` | core |  |
-| `cove://commands/bay.hide` | core |  |
-| `cove://commands/bay.list` | core |  |
-| `cove://commands/bay.move-shore` | core |  |
-| `cove://commands/bay.rename` | core |  |
-| `cove://commands/bay.reorder` | core |  |
-| `cove://commands/bay.set-accent` | core |  |
-| `cove://commands/bay.set-icon` | core |  |
-| `cove://commands/bay.switch` | core |  |
 | `cove://commands/worktree.adopt` | core |  |
 | `cove://commands/worktree.create` | core |  |
 | `cove://commands/worktree.list` | core |  |
@@ -362,6 +362,8 @@ Generated from the command registry. Do not edit by hand.
 | `memory show` | cli |  |
 | `memory supersede` | cli |  |
 | `migrate` | cli |  |
+| `nook list` | cli |  |
+| `nook-types list` | cli |  |
 | `note create` | cli |  |
 | `note delete` | cli |  |
 | `note get` | cli |  |
@@ -374,8 +376,6 @@ Generated from the command registry. Do not edit by hand.
 | `note search` | cli |  |
 | `note update` | cli |  |
 | `note write` | cli |  |
-| `nook list` | cli |  |
-| `nook-types list` | cli |  |
 | `perf bundle create` | cli |  |
 | `perf bundle delete` | cli |  |
 | `perf bundle list` | cli |  |

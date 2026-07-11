@@ -213,6 +213,86 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/bay-command.clear",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/bay-command.create",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/bay-command.delete",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/bay-command.edit",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/bay-command.list",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/bay-command.logs",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/bay-command.restart",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/bay-command.start",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/bay-command.status",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/bay-command.stop",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/bay.create",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/bay.delete",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/bay.hide",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/bay.list",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/bay.move-shore",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/bay.rename",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/bay.reorder",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/bay.set-accent",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/bay.set-icon",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/bay.switch",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/blackboard.post",
     "source": "core"
   },
@@ -597,6 +677,50 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/nook-types.list",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/nook.kill",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/nook.list",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/nook.read",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/nook.rename",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/nook.resize",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/nook.scope.get",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/nook.scope.set",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/nook.search",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/nook.spawn",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/nook.write",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/note.create",
     "source": "core"
   },
@@ -654,50 +778,6 @@
   },
   {
     "command": "cove://commands/omni-chat.history",
-    "source": "core"
-  },
-  {
-    "command": "cove://commands/nook-types.list",
-    "source": "core"
-  },
-  {
-    "command": "cove://commands/nook.kill",
-    "source": "core"
-  },
-  {
-    "command": "cove://commands/nook.list",
-    "source": "core"
-  },
-  {
-    "command": "cove://commands/nook.read",
-    "source": "core"
-  },
-  {
-    "command": "cove://commands/nook.rename",
-    "source": "core"
-  },
-  {
-    "command": "cove://commands/nook.resize",
-    "source": "core"
-  },
-  {
-    "command": "cove://commands/nook.scope.get",
-    "source": "core"
-  },
-  {
-    "command": "cove://commands/nook.scope.set",
-    "source": "core"
-  },
-  {
-    "command": "cove://commands/nook.search",
-    "source": "core"
-  },
-  {
-    "command": "cove://commands/nook.spawn",
-    "source": "core"
-  },
-  {
-    "command": "cove://commands/nook.write",
     "source": "core"
   },
   {
@@ -786,34 +866,6 @@
   },
   {
     "command": "cove://commands/review.telemetry",
-    "source": "core"
-  },
-  {
-    "command": "cove://commands/shore.close",
-    "source": "core"
-  },
-  {
-    "command": "cove://commands/shore.create",
-    "source": "core"
-  },
-  {
-    "command": "cove://commands/shore.list",
-    "source": "core"
-  },
-  {
-    "command": "cove://commands/shore.move-to-wing",
-    "source": "core"
-  },
-  {
-    "command": "cove://commands/shore.pin",
-    "source": "core"
-  },
-  {
-    "command": "cove://commands/shore.rename",
-    "source": "core"
-  },
-  {
-    "command": "cove://commands/shore.switch",
     "source": "core"
   },
   {
@@ -910,6 +962,34 @@
   },
   {
     "command": "cove://commands/session.stop",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/shore.close",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/shore.create",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/shore.list",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/shore.move-to-wing",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/shore.pin",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/shore.rename",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/shore.switch",
     "source": "core"
   },
   {
@@ -1220,86 +1300,6 @@
     "source": "core"
   },
   {
-    "command": "cove://commands/bay-command.clear",
-    "source": "core"
-  },
-  {
-    "command": "cove://commands/bay-command.create",
-    "source": "core"
-  },
-  {
-    "command": "cove://commands/bay-command.delete",
-    "source": "core"
-  },
-  {
-    "command": "cove://commands/bay-command.edit",
-    "source": "core"
-  },
-  {
-    "command": "cove://commands/bay-command.list",
-    "source": "core"
-  },
-  {
-    "command": "cove://commands/bay-command.logs",
-    "source": "core"
-  },
-  {
-    "command": "cove://commands/bay-command.restart",
-    "source": "core"
-  },
-  {
-    "command": "cove://commands/bay-command.start",
-    "source": "core"
-  },
-  {
-    "command": "cove://commands/bay-command.status",
-    "source": "core"
-  },
-  {
-    "command": "cove://commands/bay-command.stop",
-    "source": "core"
-  },
-  {
-    "command": "cove://commands/bay.create",
-    "source": "core"
-  },
-  {
-    "command": "cove://commands/bay.delete",
-    "source": "core"
-  },
-  {
-    "command": "cove://commands/bay.hide",
-    "source": "core"
-  },
-  {
-    "command": "cove://commands/bay.list",
-    "source": "core"
-  },
-  {
-    "command": "cove://commands/bay.move-shore",
-    "source": "core"
-  },
-  {
-    "command": "cove://commands/bay.rename",
-    "source": "core"
-  },
-  {
-    "command": "cove://commands/bay.reorder",
-    "source": "core"
-  },
-  {
-    "command": "cove://commands/bay.set-accent",
-    "source": "core"
-  },
-  {
-    "command": "cove://commands/bay.set-icon",
-    "source": "core"
-  },
-  {
-    "command": "cove://commands/bay.switch",
-    "source": "core"
-  },
-  {
     "command": "cove://commands/worktree.adopt",
     "source": "core"
   },
@@ -1452,6 +1452,14 @@
     "source": "cli"
   },
   {
+    "command": "nook list",
+    "source": "cli"
+  },
+  {
+    "command": "nook-types list",
+    "source": "cli"
+  },
+  {
     "command": "note create",
     "source": "cli"
   },
@@ -1497,14 +1505,6 @@
   },
   {
     "command": "note write",
-    "source": "cli"
-  },
-  {
-    "command": "nook list",
-    "source": "cli"
-  },
-  {
-    "command": "nook-types list",
     "source": "cli"
   },
   {
