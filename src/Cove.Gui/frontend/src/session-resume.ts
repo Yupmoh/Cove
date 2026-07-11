@@ -37,6 +37,7 @@ export type ResumeAction =
       cwd: string;
       shoreName: string;
       sessionId: string | null;
+      yolo: boolean;
       toast: { title: string; body: string } | null;
     }
   | { kind: "error"; toast: { title: string; body: string } };
@@ -88,7 +89,7 @@ export function groupRecentsByAdapter(
   }));
 }
 
-export function resumeSpawnPlan(result: VaultResumeResult, projectDir: string, displayName: string, sessionId?: string): ResumeAction {
+export function resumeSpawnPlan(result: VaultResumeResult, projectDir: string, displayName: string, sessionId?: string, yolo?: boolean): ResumeAction {
   const name = displayName || result.adapter;
   if (!result.ok || result.command.length === 0) {
     return { kind: "error", toast: { title: "Resume failed", body: result.error ?? "could not resume session" } };
@@ -99,5 +100,5 @@ export function resumeSpawnPlan(result: VaultResumeResult, projectDir: string, d
       ? { title: "Couldn't resume", body: `couldn't resume — started a fresh ${name} session` }
       : null;
   const resumedSessionId = result.fallback === "fresh" ? null : (sessionId ?? null);
-  return { kind: "spawn", adapter: result.adapter, command, args, cwd: projectDir, shoreName: name, sessionId: resumedSessionId, toast };
+  return { kind: "spawn", adapter: result.adapter, command, args, cwd: projectDir, shoreName: name, sessionId: resumedSessionId, yolo: yolo ?? false, toast };
 }

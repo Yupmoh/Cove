@@ -18,10 +18,29 @@ import {
   relativeTime,
   shapeRecentSessions,
   computeLauncherCols,
+  resolveLauncherYolo,
   type LauncherGeometry,
   type LauncherSession,
   type RecentSessionRow,
 } from "./launcher-model";
+
+describe("resolveLauncherYolo", () => {
+  it("defaults claude-code to bypass permissions", () => {
+    expect(resolveLauncherYolo(null, "claude-code")).toBe(true);
+  });
+
+  it("defaults other adapters to prompting", () => {
+    expect(resolveLauncherYolo(null, "codex")).toBe(false);
+  });
+
+  it("honors a stored true regardless of adapter", () => {
+    expect(resolveLauncherYolo("true", "codex")).toBe(true);
+  });
+
+  it("honors a stored false for claude-code", () => {
+    expect(resolveLauncherYolo("false", "claude-code")).toBe(false);
+  });
+});
 
 describe("detectedHarnessTiles", () => {
   it("keeps only detected harnesses, dropping undetected ones", () => {

@@ -47,7 +47,8 @@ public sealed record SpawnParams(
     string? Shore = null,
     string McpAccessScope = "same-tab",
     bool McpVisible = true,
-    string? SessionId = null);
+    string? SessionId = null,
+    bool Yolo = false);
 
 public sealed record SubscribeParams(string NookId, ulong SinceOffset = 0);
 public sealed record SubscribeResult(ulong StreamId, ulong BaseOffset, int Window);

@@ -144,6 +144,11 @@ export function mostRecentSession(sessions: LauncherSession[]): LauncherSession 
   return sessions.length > 0 ? sessions[0] : null;
 }
 
+export function resolveLauncherYolo(stored: string | null, adapter: string): boolean {
+  if (stored !== null) return stored === "true";
+  return adapter === "claude-code";
+}
+
 export interface RecentSessionRow {
   adapter: string;
   sessionId: string;

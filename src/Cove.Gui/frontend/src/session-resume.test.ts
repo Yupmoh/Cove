@@ -41,6 +41,52 @@ describe("resumeSpawnPlan", () => {
     expect(action.toast).toBeNull();
   });
 
+  it("carries the yolo choice so the engine can persist bypass permissions", () => {
+    const result: VaultResumeResult = {
+      ok: true,
+      adapter: "claude-code",
+      command: ["claude", "--resume", "abc", "--dangerously-skip-permissions"],
+      cwd: "/some/other/dir",
+      fallback: "none",
+      error: null,
+    };
+    const action = resumeSpawnPlan(result, projectDir, "Claude Code", "abc", true);
+    expect(action.kind).toBe("spawn");
+    if (action.kind !== "spawn") return;
+    expect(action.yolo).toBe(true);
+  });
+
+  it("keeps yolo on a fresh fallback so the fresh session still bypasses", () => {
+    const result: VaultResumeResult = {
+      ok: true,
+      adapter: "claude-code",
+      command: ["claude", "--dangerously-skip-permissions"],
+      cwd: "",
+      fallback: "fresh",
+      error: "session reaped",
+    };
+    const action = resumeSpawnPlan(result, projectDir, "Claude Code", "abc", true);
+    expect(action.kind).toBe("spawn");
+    if (action.kind !== "spawn") return;
+    expect(action.yolo).toBe(true);
+    expect(action.sessionId).toBeNull();
+  });
+
+  it("defaults yolo to false when the caller omits it", () => {
+    const result: VaultResumeResult = {
+      ok: true,
+      adapter: "claude-code",
+      command: ["claude", "--resume", "abc"],
+      cwd: "/some/other/dir",
+      fallback: "none",
+      error: null,
+    };
+    const action = resumeSpawnPlan(result, projectDir, "Claude Code", "abc");
+    expect(action.kind).toBe("spawn");
+    if (action.kind !== "spawn") return;
+    expect(action.yolo).toBe(false);
+  });
+
   it("carries the resumed sessionId so the engine can persist it", () => {
     const result: VaultResumeResult = {
       ok: true,

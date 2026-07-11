@@ -30,6 +30,7 @@ internal static class EngineCommands
         {
             ctx.AgentRouter?.Register(info.NookId, adapter, p.AgentName, p.Bay, p.Shore, mcpAccessScope: p.McpAccessScope, mcpVisible: p.McpVisible);
             ctx.Sessions?.Register(info.NookId, adapter, p.SessionId);
+            ctx.Launcher?.PersistOverrides(info.NookId, new Cove.Engine.Restart.LauncherOverrides { Yolo = p.Yolo });
             ctx.HookRouter?.Seed(info.NookId, adapter);
             ctx.RecentSessions?.RecordStart(adapter, info.NookId, p.Bay ?? "", p.Cwd ?? bayDir ?? "", System.DateTimeOffset.UtcNow);
         }
