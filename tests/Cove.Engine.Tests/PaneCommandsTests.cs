@@ -86,6 +86,25 @@ public sealed class PaneCommandsTests
     }
 
     [Fact]
+    public async Task ScmLog_ReturnsUnpushedAndUnpulledLists()
+    {
+        var (repoDir, git) = SetupTestRepo();
+        var prm = JsonDocument.Parse($$"""{"repoRoot":"{{repoDir.Replace("\\", "\\\\")}}"}""").RootElement.Clone();
+        var resp = await EngineCommandRouter.RouteAsync(new ControlRequest("r1", "cove://commands/scm.log", prm), gitReadModel: git);
+        Assert.True(resp!.Ok);
+        var json = resp.Data!.Value.GetRawText();
+        Assert.Contains("unpushed", json);
+        Assert.Contains("unpulled", json);
+    }
+
+    [Fact]
+    public async Task ScmLog_MissingParams_Fails()
+    {
+        var resp = await EngineCommandRouter.RouteAsync(new ControlRequest("r1", "cove://commands/scm.log"), gitReadModel: null);
+        Assert.False(resp!.Ok);
+    }
+
+    [Fact]
     public async Task ScmStage_ReturnsOk()
     {
         var (repoDir, git) = SetupTestRepo();

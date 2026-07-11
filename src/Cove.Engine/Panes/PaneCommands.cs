@@ -119,6 +119,23 @@ public static class PaneScmCommands
         var result = new ScmDiffResult(p.FilePath, OldContent: null, NewContent: fileDiff.Patch, OldRef: p.Ref);
         return ctx.Ok(result, PaneScmJsonContext.Default.ScmDiffResult);
     }
+    [CoveCommand("cove://commands/scm.log")]
+    public static async Task<ControlResponse> Log(EngineDispatchContext ctx)
+    {
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(PaneScmJsonContext.Default.ScmLogParams) is not { } p)
+            return ctx.Fail("invalid_params", "scm log params required");
+        if (ctx.GitReadModel is not { } git)
+            return ctx.Fail("not_ready", "git read model not available");
+
+        var unpushed = await git.GetUnpushedAsync(p.RepoRoot, default);
+        var unpulled = await git.GetUnpulledAsync(p.RepoRoot, default);
+        var result = new ScmLogResult(p.RepoRoot, ToDtos(unpushed), ToDtos(unpulled));
+        return ctx.Ok(result, PaneScmJsonContext.Default.ScmLogResult);
+    }
+
+    private static IReadOnlyList<ScmCommit> ToDtos(Cove.Engine.Workspaces.GitLog log)
+        => log.Commits.Select(c => new ScmCommit(c.Sha, c.Author, c.Message, c.Date.ToString("o"))).ToList();
+
     [CoveCommand("cove://commands/scm.stage")]
     public static async Task<ControlResponse> Stage(EngineDispatchContext ctx)
     {
@@ -208,6 +225,9 @@ public sealed record ScmCommitResult(string Message, bool Success);
 public sealed record ScmBlameParams(string RepoRoot, string FilePath, string? Ref);
 public sealed record ScmBlameResult(string FilePath, IReadOnlyList<ScmBlameLine> Lines);
 public sealed record ScmBlameLine(int Line, string Commit, string Author, string RelativeTime);
+public sealed record ScmLogParams(string RepoRoot);
+public sealed record ScmLogResult(string RepoRoot, IReadOnlyList<ScmCommit> Unpushed, IReadOnlyList<ScmCommit> Unpulled);
+public sealed record ScmCommit(string Sha, string Author, string Message, string Date);
 
 public sealed record ViewerOpenParams(string FilePath, string? Ref, int? ContextLines);
 public sealed record ViewerStateParams(string FilePath);
@@ -244,6 +264,9 @@ public sealed partial class PaneSearchJsonContext : JsonSerializerContext { }
 [JsonSerializable(typeof(ScmBlameParams))]
 [JsonSerializable(typeof(ScmBlameResult))]
 [JsonSerializable(typeof(ScmBlameLine))]
+[JsonSerializable(typeof(ScmLogParams))]
+[JsonSerializable(typeof(ScmLogResult))]
+[JsonSerializable(typeof(ScmCommit))]
 public sealed partial class PaneScmJsonContext : JsonSerializerContext { }
 
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase, DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
