@@ -363,6 +363,12 @@ function makePane(paneId: string, since: number): PaneView {
     header.appendChild(b);
   }
   header.appendChild(moreBtn);
+  const closeBtn = document.createElement("button");
+  closeBtn.className = "pmore pclose";
+  closeBtn.textContent = "✕";
+  closeBtn.title = "Close pane";
+  closeBtn.addEventListener("click", (e) => { e.stopPropagation(); focusPane(paneId); void closeFocused(); });
+  header.appendChild(closeBtn);
   el.appendChild(header);
   const host = document.createElement("div");
   host.className = "term-host";
@@ -441,7 +447,9 @@ function makePane(paneId: string, since: number): PaneView {
     e.preventDefault();
     if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
     const rect = el.getBoundingClientRect();
-    paintDropOverlay(el, dropZoneFor(e.clientX - rect.left, e.clientY - rect.top, rect.width, rect.height));
+    const zone = dropZoneFor(e.clientX - rect.left, e.clientY - rect.top, rect.width, rect.height);
+    if (zone.kind === "center") clearDropOverlay();
+    else paintDropOverlay(el, zone);
   });
   el.addEventListener("dragleave", (e) => { if (e.target === el) clearDropOverlay(); });
   el.addEventListener("drop", (e) => {

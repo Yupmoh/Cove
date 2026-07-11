@@ -24,10 +24,13 @@ describe("dropZoneFor", () => {
 });
 
 describe("moveMutationFor", () => {
+  it("refuses a center drop so dragging never merges panes into subtabs", () => {
+    expect(moveMutationFor({ kind: "center" }, "a", "b")).toBeNull();
+  });
+
   it("builds movePane for edges and centerDrop for center", () => {
     const edge = dropZoneFor(10, 100, 400, 200);
     expect(moveMutationFor(edge, "a", "b")).toEqual({ op: "movePane", paneId: "a", targetPaneId: "b", orientation: "row", dir: -1 });
-    expect(moveMutationFor({ kind: "center" }, "a", "b")).toEqual({ op: "centerDrop", paneId: "a", targetPaneId: "b", orientation: "", dir: 0 });
   });
 
   it("refuses self-drop", () => {

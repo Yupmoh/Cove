@@ -39,9 +39,7 @@ export interface MoveMutation {
 
 export function moveMutationFor(zone: DropZone, sourcePaneId: string, targetPaneId: string): MoveMutation | null {
   if (sourcePaneId === targetPaneId) return null;
-  if (zone.kind === "center") {
-    return { op: "centerDrop", paneId: sourcePaneId, targetPaneId, orientation: "", dir: 0 };
-  }
+  if (zone.kind === "center") return null;
   return { op: "movePane", paneId: sourcePaneId, targetPaneId, orientation: zone.orientation, dir: zone.dir };
 }
 
