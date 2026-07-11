@@ -1,4 +1,6 @@
 import { invoke } from "./invoke";
+import type { RecentSessionRow } from "./launcher-model";
+import { groupRecentsByAdapter, type AdapterLabel, type AdapterSessionGroup } from "./session-resume";
 
 interface SessionCorpusEntry {
   id: string;
@@ -10,14 +12,23 @@ interface SessionCorpusEntry {
 }
 
 interface SearchResults { entries: SessionCorpusEntry[] }
+interface RecentResults { sessions: RecentSessionRow[] }
 
-export async function renderSessionPicker(workspaceId: string): Promise<HTMLElement> {
+export type ResumeHandler = (adapter: string, sessionId: string, cwd: string, displayName: string) => void;
+
+export async function renderSessionPicker(
+  workspaceId: string,
+  projectDir: string,
+  adapters: AdapterLabel[],
+  onResume: ResumeHandler,
+): Promise<HTMLElement> {
   const el = document.createElement("div");
   el.className = "session-picker";
   el.style.cssText = "display:flex;flex-direction:column;height:100%;background:#0b1622;color:#e5e9f0;font-family:system-ui,sans-serif;";
 
   el.appendChild(buildHeader());
-  el.appendChild(await buildSearchArea(workspaceId));
+  el.appendChild(await buildRecentsArea(projectDir, adapters, onResume));
+  el.appendChild(buildSearchArea(workspaceId));
   el.appendChild(buildSettingsPanel(workspaceId));
 
   return el;
@@ -32,12 +43,87 @@ function buildHeader(): HTMLElement {
   header.appendChild(title);
   const subtitle = document.createElement("p");
   subtitle.style.cssText = "font-size:12px;color:#6b7d8f;margin:4px 0 0;";
-  subtitle.textContent = "Search past sessions and resume in a new pane";
+  subtitle.textContent = "Resume a past session in this workspace directory";
   header.appendChild(subtitle);
   return header;
 }
 
-async function buildSearchArea(workspaceId: string): Promise<HTMLElement> {
+async function buildRecentsArea(projectDir: string, adapters: AdapterLabel[], onResume: ResumeHandler): Promise<HTMLElement> {
+  const container = document.createElement("div");
+  container.style.cssText = "border-bottom:1px solid #1e2d3f;padding:8px 12px;display:flex;flex-direction:column;gap:6px;max-height:40%;overflow-y:auto;";
+
+  let groups: AdapterSessionGroup[] = [];
+  try {
+    const res = await invoke<RecentResults>("cove://commands/session.recent", { limit: 50 });
+    groups = groupRecentsByAdapter(res.sessions ?? [], projectDir, adapters, Date.now());
+  } catch (e) {
+    console.warn("session.recent unavailable", e);
+  }
+
+  if (groups.length === 0) {
+    const empty = document.createElement("div");
+    empty.style.cssText = "padding:12px 4px;color:#6b7d8f;font-size:12px;";
+    empty.textContent = "No resumable sessions for this directory";
+    container.appendChild(empty);
+    return container;
+  }
+
+  for (const group of groups)
+    container.appendChild(buildAdapterDropdown(group, onResume));
+
+  return container;
+}
+
+function buildAdapterDropdown(group: AdapterSessionGroup, onResume: ResumeHandler): HTMLElement {
+  const wrap = document.createElement("div");
+  wrap.style.cssText = "border:1px solid #1e2d3f;border-radius:6px;overflow:hidden;";
+
+  const head = document.createElement("button");
+  head.type = "button";
+  head.style.cssText = "width:100%;display:flex;align-items:center;gap:8px;padding:8px 10px;background:#14202e;border:none;color:#e5e9f0;cursor:pointer;font-size:13px;font-weight:500;text-align:left;";
+
+  const caret = document.createElement("span");
+  caret.textContent = "▸";
+  caret.style.cssText = "font-size:10px;color:#6b7d8f;transition:transform .1s;";
+  head.appendChild(caret);
+
+  const name = document.createElement("span");
+  name.style.flex = "1";
+  name.textContent = group.displayName;
+  head.appendChild(name);
+
+  const count = document.createElement("span");
+  count.style.cssText = "font-size:11px;color:#6b7d8f;";
+  count.textContent = String(group.sessions.length);
+  head.appendChild(count);
+
+  const list = document.createElement("div");
+  list.style.cssText = "display:none;flex-direction:column;";
+
+  for (const s of group.sessions) {
+    const row = document.createElement("button");
+    row.type = "button";
+    row.style.cssText = "display:block;width:100%;text-align:left;padding:8px 12px 8px 28px;background:#0b1622;border:none;border-top:1px solid #14202e;color:#cdd6e3;cursor:pointer;font-size:12px;";
+    row.textContent = s.label;
+    row.addEventListener("mouseenter", () => row.style.background = "#14202e");
+    row.addEventListener("mouseleave", () => row.style.background = "#0b1622");
+    row.addEventListener("click", () => onResume(s.adapter, s.sessionId, s.cwd, group.displayName));
+    list.appendChild(row);
+  }
+
+  let open = false;
+  head.addEventListener("click", () => {
+    open = !open;
+    list.style.display = open ? "flex" : "none";
+    caret.style.transform = open ? "rotate(90deg)" : "";
+  });
+
+  wrap.appendChild(head);
+  wrap.appendChild(list);
+  return wrap;
+}
+
+function buildSearchArea(workspaceId: string): HTMLElement {
   const container = document.createElement("div");
   container.style.cssText = "flex:1;display:flex;flex-direction:column;overflow:hidden;";
 
@@ -82,9 +168,8 @@ async function buildSearchArea(workspaceId: string): Promise<HTMLElement> {
         resultsList.appendChild(empty);
         return;
       }
-      for (const entry of entries) {
-        resultsList.appendChild(buildSessionRow(entry, workspaceId));
-      }
+      for (const entry of entries)
+        resultsList.appendChild(buildSearchRow(entry));
     } catch (e) {
       resultsList.innerHTML = `<div style="padding:20px;color:#ef4444;">Search failed: ${(e as Error).message}</div>`;
     }
@@ -98,11 +183,9 @@ async function buildSearchArea(workspaceId: string): Promise<HTMLElement> {
   return container;
 }
 
-function buildSessionRow(entry: SessionCorpusEntry, workspaceId: string): HTMLElement {
+function buildSearchRow(entry: SessionCorpusEntry): HTMLElement {
   const row = document.createElement("div");
-  row.style.cssText = "padding:10px 12px;border-bottom:1px solid #14202e;cursor:pointer;display:flex;gap:10px;align-items:center;";
-  row.addEventListener("mouseenter", () => row.style.background = "#14202e");
-  row.addEventListener("mouseleave", () => row.style.background = "");
+  row.style.cssText = "padding:10px 12px;border-bottom:1px solid #14202e;display:flex;gap:10px;align-items:center;";
 
   const icon = document.createElement("span");
   icon.style.cssText = "font-size:18px;";
@@ -129,18 +212,6 @@ function buildSessionRow(entry: SessionCorpusEntry, workspaceId: string): HTMLEl
   info.appendChild(date);
 
   row.appendChild(info);
-
-  const resumeBtn = document.createElement("button");
-  resumeBtn.textContent = "Resume";
-  resumeBtn.style.cssText = "padding:4px 10px;background:#2563eb;border:1px solid #3b82f6;border-radius:4px;color:#fff;cursor:pointer;font-size:11px;";
-  resumeBtn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    resumeSession(workspaceId, entry.id);
-  });
-  row.appendChild(resumeBtn);
-
-  row.addEventListener("click", () => resumeSession(workspaceId, entry.id));
-
   return row;
 }
 
@@ -201,14 +272,6 @@ function buildSettingsPanel(workspaceId: string): HTMLElement {
   panel.appendChild(reindexBtn);
 
   return panel;
-}
-
-async function resumeSession(workspaceId: string, sessionId: string): Promise<void> {
-  try {
-    await invoke("cove://commands/vault.resume", { workspaceId, sessionId });
-  } catch (e) {
-    console.error("Resume failed:", e);
-  }
 }
 
 async function updateVaultSetting(workspaceId: string, key: string, value: string): Promise<void> {

@@ -15,6 +15,7 @@ import { renderHtmlNote } from "./html-note";
 import { renderNotepadPane, openNote } from "./notepad-pane";
 import { renderMermaidNote } from "./mermaid-note";
 import { renderSessionPicker } from "./session-picker";
+import { resumeSpawnPlan, type ResumeAction, type VaultResumeResult } from "./session-resume";
 import { renderLibraryPopover } from "./library-popover";
 import { renderSnapshotInspector } from "./snapshot-inspector";
 import { renderDiffReviewPane } from "./diff-review-pane";
@@ -777,7 +778,12 @@ function renderSessionPickerPane(paneId: string): HTMLElement {
   const placeholder = document.createElement("div");
   placeholder.className = "session-picker-placeholder";
   placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
-  renderSessionPicker("default").then(el => {
+  const workspaceId = layout?.id ?? "default";
+  const projectDir = activeProjectDir();
+  const adapters = launcherAdapters.map((a) => ({ name: a.name, displayName: a.displayName }));
+  renderSessionPicker(workspaceId, projectDir, adapters, (adapter, sessionId, cwd, displayName) => {
+    void resumeRecentSession(adapter, sessionId, cwd, displayName);
+  }).then(el => {
     el.style.flex = "1 1 0";
     el.style.minWidth = "0";
     el.style.minHeight = "0";
@@ -787,6 +793,32 @@ function renderSessionPickerPane(paneId: string): HTMLElement {
   });
   return placeholder;
 }
+
+async function resumeRecentSession(adapter: string, sessionId: string, cwd: string, displayName: string): Promise<void> {
+  let action: ResumeAction;
+  try {
+    const result = await invoke<VaultResumeResult>("cove://commands/vault.resume", { adapter, sessionId, cwd });
+    action = resumeSpawnPlan(result, cwd, displayName);
+  } catch (e) {
+    console.warn("vault.resume failed", adapter, sessionId, e);
+    action = { kind: "error", toast: { title: "Resume failed", body: (e as Error).message } };
+  }
+  await performResume(action);
+}
+
+async function performResume(action: ResumeAction): Promise<void> {
+  if (action.kind === "error") {
+    showInAppToast(action.toast.title, action.toast.body, () => {});
+    return;
+  }
+  const sp = (await invoke<{ paneId: string }>("app.paneSpawn", { command: action.command, args: action.args, cwd: action.cwd, inheritCwdFrom: "", cols: 80, rows: 24, adapter: action.adapter, agentName: action.roomName, workspace: "", room: "" })).paneId;
+  const r = await invoke<{ roomId: string }>("app.layoutMutate", { op: "createRoom", newPaneId: sp, name: action.roomName, roomId: "", targetPaneId: "", orientation: "", paneId: "", dir: 0, paneType: "terminal" });
+  activeRoomId = r.roomId;
+  await reload();
+  focusPane(sp);
+  if (action.toast) showInAppToast(action.toast.title, action.toast.body, () => revealPane(sp));
+}
+
 function renderLibraryPane(paneId: string): HTMLElement {
   const placeholder = document.createElement("div");
   placeholder.className = "library-pane-placeholder";
@@ -4008,6 +4040,7 @@ function renderCardExpansion(ctx: LauncherContext, tile: LauncherTile): HTMLElem
     for (const s of shaped) {
       const row = document.createElement("div");
       row.className = "cl-recent-row";
+      row.style.cursor = "pointer";
       const base = document.createElement("span");
       base.className = "cl-recent-cwd";
       base.textContent = s.cwdBase;
@@ -4017,12 +4050,9 @@ function renderCardExpansion(ctx: LauncherContext, tile: LauncherTile): HTMLElem
       when.textContent = s.relative;
       row.appendChild(base);
       row.appendChild(when);
+      row.addEventListener("click", (e) => { e.stopPropagation(); void resumeRecentSession(s.adapter, s.sessionId, s.cwd, tile.label); });
       list.appendChild(row);
     }
-    const note = document.createElement("div");
-    note.className = "cl-recent-note";
-    note.textContent = "resume coming";
-    list.appendChild(note);
     body.appendChild(list);
   }
   return body;

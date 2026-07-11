@@ -429,11 +429,56 @@ public static class KnowledgeCommands
     }
 
     [CoveCommand("cove://commands/vault.resume")]
-    public static Task<ControlResponse> VaultResume(EngineDispatchContext ctx)
+    public static async Task<ControlResponse> VaultResume(EngineDispatchContext ctx)
     {
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.VaultResumeParams) is not { } p)
-            return Task.FromResult(ctx.Fail("invalid_params", "vault resume params required"));
-        return Task.FromResult(ctx.Ok());
+            return ctx.Fail("invalid_params", "vault resume params required");
+        if (string.IsNullOrWhiteSpace(p.Adapter) || string.IsNullOrWhiteSpace(p.SessionId))
+            return ctx.Fail("invalid_params", "adapter and sessionId are required");
+        if (ctx.ManifestStore is not { } manifests)
+            return ctx.Fail("not_ready", "adapter manifest store not available");
+        if (manifests.Load(p.Adapter) is null)
+            return ctx.Fail("not_found", $"unknown adapter: {p.Adapter}");
+
+        var overrides = new Cove.Engine.Restart.LauncherOverrides { WorkingDir = p.Cwd };
+        var protocol = new Cove.Engine.Launch.AdapterResumeProtocol(manifests, new Cove.Adapters.MethodRunner());
+        try
+        {
+            var cmd = await protocol.BuildResumeCommandAsync(p.Adapter, p.SessionId, overrides).ConfigureAwait(false);
+            return ctx.Ok(new VaultResumeResult(true, p.Adapter, ToArgv(cmd), cmd.Cwd, "none", null), CoveJsonContext.Default.VaultResumeResult);
+        }
+        catch (Cove.Engine.Restart.ResumeFailedException ex)
+        {
+            var fresh = await BuildFreshLaunchAsync(ctx, p.Adapter, overrides).ConfigureAwait(false);
+            if (fresh is null)
+                return ctx.Fail("resume_failed", ex.Message);
+            return ctx.Ok(new VaultResumeResult(true, p.Adapter, ToArgv(fresh), fresh.Cwd, "fresh", ex.Message), CoveJsonContext.Default.VaultResumeResult);
+        }
+    }
+
+    private static string[] ToArgv(Cove.Engine.Restart.ResumeCommand cmd)
+    {
+        var argv = new System.Collections.Generic.List<string>(1 + cmd.Args.Count) { cmd.Command };
+        argv.AddRange(cmd.Args);
+        return argv.ToArray();
+    }
+
+    private static async Task<Cove.Engine.Restart.ResumeCommand?> BuildFreshLaunchAsync(EngineDispatchContext ctx, string adapter, Cove.Engine.Restart.LauncherOverrides overrides)
+    {
+        if (ctx.Launcher is not { } orch || ctx.LaunchProfiles is not { } profiles)
+            return null;
+        var profile = profiles.Load(adapter, "default")
+            ?? new Cove.Adapters.LaunchProfile("Default", "default", adapter, true, null, null,
+                System.Array.Empty<string>(), new System.Collections.Generic.Dictionary<string, string>(),
+                new System.Collections.Generic.Dictionary<string, bool>(), System.Array.Empty<string>(), null, 1);
+        try
+        {
+            return await orch.BuildLaunchCommandAsync(profile, overrides).ConfigureAwait(false);
+        }
+        catch (Cove.Engine.Restart.ResumeFailedException)
+        {
+            return null;
+        }
     }
 
     [CoveCommand("cove://commands/vault.set-setting")]
