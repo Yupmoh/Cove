@@ -9,6 +9,14 @@ import {
   type DiffStackCursor,
   type DiffStackFile,
 } from "./diff-stack-nav";
+import {
+  shortSha,
+  truncateCommitMessage,
+  syncSectionHeader,
+  isInSync,
+  type SyncCommit,
+  type ScmLogResult,
+} from "./scm-sync";
 
 interface ScmFileStatus {
   filePath: string;
@@ -90,6 +98,10 @@ export async function renderSourceControlPane(repoRoot: string, openFile?: (path
   fileList.style.cssText = "flex:1;overflow-y:auto;";
   el.appendChild(fileList);
 
+  const syncBox = document.createElement("div");
+  syncBox.style.cssText = "border-top:1px solid var(--border);max-height:40%;overflow-y:auto;flex-shrink:0;";
+  el.appendChild(syncBox);
+
   const navStatus = document.createElement("div");
   navStatus.style.cssText = "padding:4px 12px;border-top:1px solid var(--border);font-size:11px;color:var(--muted);flex-shrink:0;";
   navStatus.textContent = "j/k file · n/p hunk · Enter open · Space review";
@@ -124,7 +136,22 @@ export async function renderSourceControlPane(repoRoot: string, openFile?: (path
     }
   };
 
+  const refreshSync = async () => {
+    if (!repoRoot) {
+      renderSyncUnavailable(syncBox);
+      return;
+    }
+    try {
+      const log = await invoke<ScmLogResult>("cove://commands/scm.log", { repoRoot });
+      renderSyncSection(syncBox, log.unpushed ?? [], log.unpulled ?? []);
+    } catch (err) {
+      console.warn("scm log failed", repoRoot, err);
+      renderSyncUnavailable(syncBox);
+    }
+  };
+
   const refresh = async () => {
+    void refreshSync();
     try {
       const result = await invoke<ScmStatusResult>("cove://commands/scm.status", { repoRoot });
       rows = renderFileList(result.staged, result.unstaged, fileList, repoRoot, (idx) => {
@@ -240,6 +267,75 @@ function buildFileRow(file: ScmFileStatus, repoRoot: string, isStaged: boolean, 
     onFocus();
     invoke<ScmDiffResult>("cove://commands/scm.diff", { repoRoot, filePath: file.filePath, ref: "HEAD" }).catch(() => {});
   });
+
+  return row;
+}
+
+function renderSyncUnavailable(container: HTMLElement): void {
+  container.innerHTML = "";
+  const header = document.createElement("div");
+  header.style.cssText = "padding:6px 12px;font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600;";
+  header.textContent = "Sync";
+  container.appendChild(header);
+  const line = document.createElement("div");
+  line.style.cssText = "padding:6px 12px;font-size:12px;color:var(--muted);";
+  line.textContent = "sync info unavailable";
+  container.appendChild(line);
+}
+
+function renderSyncSection(container: HTMLElement, unpushed: SyncCommit[], unpulled: SyncCommit[]): void {
+  container.innerHTML = "";
+  const header = document.createElement("div");
+  header.style.cssText = "padding:6px 12px;font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600;";
+  header.textContent = "Sync";
+  container.appendChild(header);
+
+  if (isInSync(unpushed, unpulled)) {
+    const line = document.createElement("div");
+    line.style.cssText = "padding:6px 12px;font-size:12px;color:var(--muted);";
+    line.textContent = "in sync with upstream";
+    container.appendChild(line);
+    return;
+  }
+
+  container.appendChild(buildSyncSubSection("Unpushed", unpushed));
+  container.appendChild(buildSyncSubSection("Incoming", unpulled));
+}
+
+function buildSyncSubSection(label: string, commits: SyncCommit[]): HTMLElement {
+  const section = document.createElement("details");
+  section.open = commits.length > 0;
+
+  const summary = document.createElement("summary");
+  summary.style.cssText = "padding:4px 12px;font-size:11px;color:var(--muted);font-weight:600;cursor:pointer;list-style:none;";
+  summary.textContent = syncSectionHeader(label, commits.length);
+  section.appendChild(summary);
+
+  for (const commit of commits) {
+    section.appendChild(buildCommitRow(commit));
+  }
+  return section;
+}
+
+function buildCommitRow(commit: SyncCommit): HTMLElement {
+  const row = document.createElement("div");
+  row.style.cssText = "padding:3px 12px 3px 20px;display:flex;gap:8px;align-items:baseline;font-size:12px;";
+
+  const shaEl = document.createElement("span");
+  shaEl.style.cssText = "font-family:var(--mono,monospace);color:var(--muted);flex-shrink:0;";
+  shaEl.textContent = shortSha(commit.sha);
+  row.appendChild(shaEl);
+
+  const msgEl = document.createElement("span");
+  msgEl.style.cssText = "flex:1;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;";
+  msgEl.textContent = truncateCommitMessage(commit.message);
+  msgEl.title = commit.message;
+  row.appendChild(msgEl);
+
+  const authorEl = document.createElement("span");
+  authorEl.style.cssText = "color:var(--muted);flex-shrink:0;";
+  authorEl.textContent = commit.author;
+  row.appendChild(authorEl);
 
   return row;
 }
