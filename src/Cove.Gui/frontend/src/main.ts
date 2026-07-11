@@ -21,7 +21,7 @@ import { renderDiffReviewPane } from "./diff-review-pane";
 import { renderEditorPane } from "./editor-pane";
 import { renderSourceControlPane } from "./source-control-pane";
 import { renderSearchPane } from "./search-pane";
-import { browserWebviewRegistry, closeBrowserWebview, renderBrowserPane } from "./browser-pane";
+import { browserWebviewRegistry, closeBrowserWebview, reconcileBrowserBounds, renderBrowserPane } from "./browser-pane";
 import { buildAutomationJs, type AutomationExecEvent } from "./automation-snapshot";
 import { renderDiffViewerPane } from "./diff-viewer-pane";
 import { renderMarkdownPane } from "./markdown-pane";
@@ -642,6 +642,9 @@ function renderKanbanPane(paneId: string): HTMLElement {
   placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
   const workspaceId = "default";
   renderKanbanBoard(workspaceId).then(el => {
+    el.style.flex = "1 1 0";
+    el.style.minWidth = "0";
+    el.style.minHeight = "0";
     placeholder.replaceWith(el);
   }).catch(e => {
     placeholder.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to load kanban: ${(e as Error).message}</div>`;
@@ -654,6 +657,9 @@ function renderTaskListPane(paneId: string): HTMLElement {
   placeholder.className = "task-list-placeholder";
   placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
   renderTaskList("default").then(el => {
+    el.style.flex = "1 1 0";
+    el.style.minWidth = "0";
+    el.style.minHeight = "0";
     placeholder.replaceWith(el);
   }).catch(e => {
     placeholder.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to load task list: ${(e as Error).message}</div>`;
@@ -673,6 +679,9 @@ function renderTimelinePane(paneId: string): HTMLElement {
   placeholder.className = "timeline-pane-placeholder";
   placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
   renderTimelineFeed("default").then(el => {
+    el.style.flex = "1 1 0";
+    el.style.minWidth = "0";
+    el.style.minHeight = "0";
     placeholder.replaceWith(el);
   }).catch(e => {
     placeholder.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to load timeline: ${(e as Error).message}</div>`;
@@ -684,6 +693,9 @@ function renderMarkdownNotePane(paneId: string): HTMLElement {
   placeholder.className = "markdown-note-placeholder";
   placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
   renderMarkdownNote("default", paneId).then(el => {
+    el.style.flex = "1 1 0";
+    el.style.minWidth = "0";
+    el.style.minHeight = "0";
     placeholder.replaceWith(el);
   }).catch(e => {
     placeholder.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to load note: ${(e as Error).message}</div>`;
@@ -695,6 +707,9 @@ function renderSketchNotePane(paneId: string): HTMLElement {
   placeholder.className = "sketch-note-placeholder";
   placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
   renderSketchNote("default", paneId).then(el => {
+    el.style.flex = "1 1 0";
+    el.style.minWidth = "0";
+    el.style.minHeight = "0";
     placeholder.replaceWith(el);
   }).catch(e => {
     placeholder.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to load sketch: ${(e as Error).message}</div>`;
@@ -706,6 +721,9 @@ function renderCanvasNotePane(paneId: string): HTMLElement {
   placeholder.className = "canvas-note-placeholder";
   placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
   renderCanvasNote("default", paneId).then(el => {
+    el.style.flex = "1 1 0";
+    el.style.minWidth = "0";
+    el.style.minHeight = "0";
     placeholder.replaceWith(el);
   }).catch(e => {
     placeholder.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to load canvas: ${(e as Error).message}</div>`;
@@ -717,6 +735,9 @@ function renderHtmlNotePane(paneId: string): HTMLElement {
   placeholder.className = "html-note-placeholder";
   placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
   renderHtmlNote("default", paneId).then(el => {
+    el.style.flex = "1 1 0";
+    el.style.minWidth = "0";
+    el.style.minHeight = "0";
     placeholder.replaceWith(el);
   }).catch(e => {
     placeholder.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to load HTML note: ${(e as Error).message}</div>`;
@@ -728,6 +749,9 @@ function renderNotepadPaneWrapper(paneId: string): HTMLElement {
   placeholder.className = "notepad-pane-placeholder";
   placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
   renderNotepadPane("default").then(el => {
+    el.style.flex = "1 1 0";
+    el.style.minWidth = "0";
+    el.style.minHeight = "0";
     placeholder.replaceWith(el);
   }).catch(e => {
     placeholder.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to load notepad: ${(e as Error).message}</div>`;
@@ -739,6 +763,9 @@ function renderMermaidNotePane(paneId: string): HTMLElement {
   placeholder.className = "mermaid-note-placeholder";
   placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
   renderMermaidNote("default", paneId).then(el => {
+    el.style.flex = "1 1 0";
+    el.style.minWidth = "0";
+    el.style.minHeight = "0";
     placeholder.replaceWith(el);
   }).catch(e => {
     placeholder.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to load mermaid note: ${(e as Error).message}</div>`;
@@ -750,6 +777,9 @@ function renderSessionPickerPane(paneId: string): HTMLElement {
   placeholder.className = "session-picker-placeholder";
   placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
   renderSessionPicker("default").then(el => {
+    el.style.flex = "1 1 0";
+    el.style.minWidth = "0";
+    el.style.minHeight = "0";
     placeholder.replaceWith(el);
   }).catch(e => {
     placeholder.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to load session picker: ${(e as Error).message}</div>`;
@@ -761,6 +791,9 @@ function renderLibraryPane(paneId: string): HTMLElement {
   placeholder.className = "library-pane-placeholder";
   placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
   renderLibraryPopover("default").then(el => {
+    el.style.flex = "1 1 0";
+    el.style.minWidth = "0";
+    el.style.minHeight = "0";
     placeholder.replaceWith(el);
   }).catch(e => {
     placeholder.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to load library: ${(e as Error).message}</div>`;
@@ -772,6 +805,9 @@ function renderSnapshotInspectorPane(paneId: string): HTMLElement {
   placeholder.className = "snapshot-inspector-placeholder";
   placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
   renderSnapshotInspector("default").then(el => {
+    el.style.flex = "1 1 0";
+    el.style.minWidth = "0";
+    el.style.minHeight = "0";
     placeholder.replaceWith(el);
   }).catch(e => {
     placeholder.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to load snapshots: ${(e as Error).message}</div>`;
@@ -783,6 +819,9 @@ function renderDiffReviewPaneWrapper(paneId: string): HTMLElement {
   placeholder.className = "diff-review-placeholder";
   placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
   renderDiffReviewPane("default").then(el => {
+    el.style.flex = "1 1 0";
+    el.style.minWidth = "0";
+    el.style.minHeight = "0";
     placeholder.replaceWith(el);
   }).catch(e => {
     placeholder.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to load diff review: ${(e as Error).message}</div>`;
@@ -794,6 +833,9 @@ function renderEditorPaneWrapper(paneId: string): HTMLElement {
   placeholder.className = "editor-pane-placeholder";
   placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
   renderEditorPane(paneId, paneFilePaths.get(paneId) ?? paneId).then(el => {
+    el.style.flex = "1 1 0";
+    el.style.minWidth = "0";
+    el.style.minHeight = "0";
     placeholder.replaceWith(el);
   }).catch(e => {
     placeholder.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to load editor: ${(e as Error).message}</div>`;
@@ -838,6 +880,9 @@ function renderGitPaneWrapper(paneId: string): HTMLElement {
   placeholder.className = "git-pane-placeholder";
   placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
   renderSourceControlPane(activeProjectDir(), (path) => { void openFileInEditor(path); }).then(el => {
+    el.style.flex = "1 1 0";
+    el.style.minWidth = "0";
+    el.style.minHeight = "0";
     placeholder.replaceWith(el);
   }).catch(e => {
     placeholder.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to load source control: ${(e as Error).message}</div>`;
@@ -849,6 +894,9 @@ function renderSearchPaneWrapper(paneId: string): HTMLElement {
   placeholder.className = "search-pane-placeholder";
   placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
   renderSearchPane("default").then(el => {
+    el.style.flex = "1 1 0";
+    el.style.minWidth = "0";
+    el.style.minHeight = "0";
     placeholder.replaceWith(el);
   }).catch(e => {
     placeholder.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to load search: ${(e as Error).message}</div>`;
@@ -860,6 +908,9 @@ function renderBrowserPaneWrapper(paneId: string, url: string): HTMLElement {
   placeholder.className = "browser-pane-placeholder";
   placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
   renderBrowserPane(paneId, url).then(el => {
+    el.style.flex = "1 1 0";
+    el.style.minWidth = "0";
+    el.style.minHeight = "0";
     placeholder.replaceWith(el);
   }).catch(e => {
     placeholder.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to load browser: ${(e as Error).message}</div>`;
@@ -871,6 +922,9 @@ function renderDiffViewerPaneWrapper(paneId: string, refInput: string): HTMLElem
   placeholder.className = "diff-viewer-placeholder";
   placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
   renderDiffViewerPane(paneId, paneId, refInput).then(el => {
+    el.style.flex = "1 1 0";
+    el.style.minWidth = "0";
+    el.style.minHeight = "0";
     placeholder.replaceWith(el);
   }).catch(e => {
     placeholder.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to load diff: ${(e as Error).message}</div>`;
@@ -882,6 +936,9 @@ function renderMarkdownPaneWrapper(paneId: string): HTMLElement {
   placeholder.className = "markdown-pane-placeholder";
   placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
   renderMarkdownPane(paneId, paneId).then(el => {
+    el.style.flex = "1 1 0";
+    el.style.minWidth = "0";
+    el.style.minHeight = "0";
     placeholder.replaceWith(el);
   }).catch(e => {
     placeholder.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to load markdown: ${(e as Error).message}</div>`;
@@ -1057,7 +1114,7 @@ function renderRoom(): void {
     pv.el.classList.toggle("focused", id === focusedPaneId);
   }
   fitAll();
-  requestAnimationFrame(() => fitAll());
+  requestAnimationFrame(() => { fitAll(); reconcileBrowserBounds(); });
 }
 
 function focusPane(paneId: string): void {

@@ -24,7 +24,7 @@ let viewport: { scrollX: number; scrollY: number; zoom: number } = { scrollX: 0,
 export async function renderNotepadPane(workspaceId: string): Promise<HTMLElement> {
   const el = document.createElement("div");
   el.className = "notepad-pane";
-  el.style.cssText = "display:flex;height:100%;background:var(--panel);color:var(--fg);";
+  el.style.cssText = "display:flex;flex:1 1 0;min-width:0;min-height:0;height:100%;background:var(--panel);color:var(--fg);";
 
   currentWorkspaceId = workspaceId;
 

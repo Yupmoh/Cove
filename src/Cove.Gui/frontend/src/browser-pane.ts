@@ -6,6 +6,18 @@ import { DownloadShelfState, downloadPercent, formatBytes, joinPath, type Downlo
 
 export const browserWebviewRegistry = new Map<string, number>();
 
+interface BrowserPaneInstance { el: HTMLElement; sync: () => void; }
+const browserPaneInstances = new Map<string, BrowserPaneInstance>();
+
+export function reconcileBrowserBounds(): void {
+  for (const [paneId, instance] of browserPaneInstances) {
+    const id = browserWebviewRegistry.get(paneId);
+    if (id === undefined) continue;
+    if (instance.el.isConnected) instance.sync();
+    else void invoke("webviewPane.setBounds", { id, x: -20000, y: 0, width: 2, height: 2 }).catch(() => void 0);
+  }
+}
+
 export let browserDownloadsDir = "";
 export function setBrowserDownloadsDir(dir: string): void { browserDownloadsDir = dir; }
 
@@ -87,12 +99,18 @@ export function extractWebviewId(openResult: unknown): number | null {
 
 export async function closeBrowserWebview(paneId: string): Promise<void> {
   const id = browserWebviewRegistry.get(paneId);
+  browserPaneInstances.delete(paneId);
   if (id === undefined) return;
   browserWebviewRegistry.delete(paneId);
   await invoke("webviewPane.close", { id }).catch((err) => console.warn("webviewPane.close failed", paneId, err));
 }
 
 export async function renderBrowserPane(paneId: string, initialUrl: string, userAgent?: string): Promise<HTMLElement> {
+  const cached = browserPaneInstances.get(paneId);
+  if (cached) {
+    requestAnimationFrame(() => requestAnimationFrame(() => reconcileBrowserBounds()));
+    return cached.el;
+  }
   const el = document.createElement("div");
   el.className = "browser-pane";
   el.tabIndex = 0;
@@ -586,6 +604,7 @@ export async function renderBrowserPane(paneId: string, initialUrl: string, user
   updateChrome();
   renderFind();
 
+  browserPaneInstances.set(paneId, { el, sync: syncBounds });
   return el;
 }
 
