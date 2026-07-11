@@ -14,7 +14,7 @@ public sealed record ControlEnvelope(
     JsonElement? Result,
     JsonElement? Error,
     string? Topic,
-    string? PaneId,
+    string? NookId,
     long? Offset,
     int? BinaryLength);
 
@@ -81,23 +81,23 @@ public sealed class ControlClient : IAsyncDisposable
         await SendAsync("subscribe", doc.RootElement.Clone(), ct).ConfigureAwait(false);
     }
 
-    public IAsyncEnumerable<PtyChunk> StreamPtyAsync(string paneId, long offset, CancellationToken ct = default)
+    public IAsyncEnumerable<PtyChunk> StreamPtyAsync(string nookId, long offset, CancellationToken ct = default)
     {
-        _ = SendPtyReplayAsync(paneId, offset, ct);
+        _ = SendPtyReplayAsync(nookId, offset, ct);
         return _ptyChannel.Reader.ReadAllAsync(ct);
     }
 
-    private async Task SendPtyReplayAsync(string paneId, long offset, CancellationToken ct)
+    private async Task SendPtyReplayAsync(string nookId, long offset, CancellationToken ct)
     {
-        using var doc = JsonDocument.Parse($$"""{"paneId":"{{paneId}}","offset":{{offset}}}""");
+        using var doc = JsonDocument.Parse($$"""{"nookId":"{{nookId}}","offset":{{offset}}}""");
         await SendAsync("pty.replay", doc.RootElement.Clone(), ct).ConfigureAwait(false);
     }
 
-    public async Task SendPtyInputAsync(string paneId, byte[] data, CancellationToken ct = default)
+    public async Task SendPtyInputAsync(string nookId, byte[] data, CancellationToken ct = default)
     {
         if (_stream is null) throw new System.InvalidOperationException("not connected");
 
-        var envelope = new ControlEnvelope("pty-in", null, null, null, null, null, null, paneId, null, data.Length);
+        var envelope = new ControlEnvelope("pty-in", null, null, null, null, null, null, nookId, null, data.Length);
         var json = JsonSerializer.SerializeToUtf8Bytes(envelope, ControlJsonContext.Default.ControlEnvelope);
         var totalLength = json.Length + data.Length;
         var lengthPrefix = System.BitConverter.GetBytes(totalLength);
@@ -187,10 +187,10 @@ public sealed class ControlClient : IAsyncDisposable
                 break;
 
             case "pty":
-                if (binaryData is not null && envelope.PaneId is not null)
+                if (binaryData is not null && envelope.NookId is not null)
                 {
                     await _ptyChannel.Writer.WriteAsync(new PtyChunk(
-                        envelope.PaneId, envelope.Offset ?? 0, binaryData)).ConfigureAwait(false);
+                        envelope.NookId, envelope.Offset ?? 0, binaryData)).ConfigureAwait(false);
                 }
                 break;
         }
@@ -209,6 +209,6 @@ public sealed class ControlClient : IAsyncDisposable
     }
 }
 
-public sealed record PtyChunk(string PaneId, long Offset, byte[] Data);
+public sealed record PtyChunk(string NookId, long Offset, byte[] Data);
 
 public sealed class ControlException(string message) : Exception(message);

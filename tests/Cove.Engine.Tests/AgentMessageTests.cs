@@ -35,7 +35,7 @@ public sealed class AgentMessageFramerTests
     }
 
     [Fact]
-    public void Frame_AnonymousSender_UsesPaneId()
+    public void Frame_AnonymousSender_UsesNookId()
     {
         var sender = new AgentMessageSender("p1", "claude-code", null);
         var framed = AgentMessageFramer.Frame(sender, "hi", replyPrefix: "p1");
@@ -46,13 +46,13 @@ public sealed class AgentMessageFramerTests
 public sealed class AgentMessageRouterTests
 {
     [Fact]
-    public void ResolveTarget_FullPaneId_Matches()
+    public void ResolveTarget_FullNookId_Matches()
     {
         var router = new AgentMessageRouter();
         router.Register("p1abc123", "claude-code", "Researcher");
         var target = router.ResolveTarget("p1abc123");
         Assert.NotNull(target);
-        Assert.Equal("p1abc123", target!.PaneId);
+        Assert.Equal("p1abc123", target!.NookId);
     }
 
     [Fact]
@@ -63,7 +63,7 @@ public sealed class AgentMessageRouterTests
         router.Register("p2def456", "codex", "Writer");
         var target = router.ResolveTarget("p1");
         Assert.NotNull(target);
-        Assert.Equal("p1abc123", target!.PaneId);
+        Assert.Equal("p1abc123", target!.NookId);
     }
 
     [Fact]
@@ -102,8 +102,8 @@ public sealed class AgentMessageRouterTests
         router.Register("p2def", "codex", "B");
         var agents = router.List().ToList();
         Assert.Equal(2, agents.Count);
-        Assert.Contains(agents, a => a.PaneId == "p1abc" && a.Adapter == "claude-code" && a.Name == "A");
-        Assert.Contains(agents, a => a.PaneId == "p2def" && a.Adapter == "codex" && a.Name == "B");
+        Assert.Contains(agents, a => a.NookId == "p1abc" && a.Adapter == "claude-code" && a.Name == "A");
+        Assert.Contains(agents, a => a.NookId == "p2def" && a.Adapter == "codex" && a.Name == "B");
     }
 
     [Fact]
@@ -114,29 +114,29 @@ public sealed class AgentMessageRouterTests
         router.Register("p2def", "codex", "B", mcpVisible: true);
         var agents = router.List().ToList();
         Assert.Single(agents);
-        Assert.Equal("p2def", agents[0].PaneId);
+        Assert.Equal("p2def", agents[0].NookId);
     }
 
     [Fact]
-    public void List_ScopeSameWorkspace_FiltersByWorkspace()
+    public void List_ScopeSameBay_FiltersByBay()
     {
         var router = new AgentMessageRouter();
-        router.Register("p1abc", "claude-code", "A", workspace: "ws1");
-        router.Register("p2def", "codex", "B", workspace: "ws2");
-        var agents = router.List(scope: "same-workspace", requesterWorkspace: "ws1").ToList();
+        router.Register("p1abc", "claude-code", "A", bay: "ws1");
+        router.Register("p2def", "codex", "B", bay: "ws2");
+        var agents = router.List(scope: "same-bay", requesterBay: "ws1").ToList();
         Assert.Single(agents);
-        Assert.Equal("p1abc", agents[0].PaneId);
+        Assert.Equal("p1abc", agents[0].NookId);
     }
 
     [Fact]
-    public void List_ScopeSameTab_FiltersByRoomExcludingSelf()
+    public void List_ScopeSameTab_FiltersByShoreExcludingSelf()
     {
         var router = new AgentMessageRouter();
-        router.Register("p1abc", "claude-code", "A", room: "room1");
-        router.Register("p2def", "codex", "B", room: "room1");
-        router.Register("p3ghi", "gemini", "C", room: "room2");
-        var agents = router.List(scope: "same-tab", requesterPaneId: "p1abc", requesterRoom: "room1").ToList();
+        router.Register("p1abc", "claude-code", "A", shore: "shore1");
+        router.Register("p2def", "codex", "B", shore: "shore1");
+        router.Register("p3ghi", "gemini", "C", shore: "shore2");
+        var agents = router.List(scope: "same-tab", requesterNookId: "p1abc", requesterShore: "shore1").ToList();
         Assert.Single(agents);
-        Assert.Equal("p2def", agents[0].PaneId);
+        Assert.Equal("p2def", agents[0].NookId);
     }
 }

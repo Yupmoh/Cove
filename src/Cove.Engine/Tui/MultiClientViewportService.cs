@@ -2,12 +2,12 @@ using Microsoft.Extensions.Logging;
 
 namespace Cove.Engine.Tui;
 
-public sealed record ClientViewport(string ClientId, int Rows, int Cols, int PaneId);
+public sealed record ClientViewport(string ClientId, int Rows, int Cols, int NookId);
 
 public sealed class MultiClientViewportService
 {
     private readonly Dictionary<string, ClientViewport> _viewports = new();
-    private readonly Dictionary<int, HashSet<string>> _paneClients = new();
+    private readonly Dictionary<int, HashSet<string>> _nookClients = new();
     private readonly ILogger _logger;
     private readonly object _lock = new();
 
@@ -33,21 +33,21 @@ public sealed class MultiClientViewportService
         {
             if (_viewports.TryGetValue(viewport.ClientId, out var existing))
             {
-                if (existing.PaneId != viewport.PaneId && _paneClients.TryGetValue(existing.PaneId, out var oldClients))
+                if (existing.NookId != viewport.NookId && _nookClients.TryGetValue(existing.NookId, out var oldClients))
                 {
                     oldClients.Remove(viewport.ClientId);
                     if (oldClients.Count == 0)
-                        _paneClients.Remove(existing.PaneId);
+                        _nookClients.Remove(existing.NookId);
                 }
             }
             _viewports[viewport.ClientId] = viewport;
-            if (!_paneClients.TryGetValue(viewport.PaneId, out var clients))
+            if (!_nookClients.TryGetValue(viewport.NookId, out var clients))
             {
                 clients = new HashSet<string>();
-                _paneClients[viewport.PaneId] = clients;
+                _nookClients[viewport.NookId] = clients;
             }
             clients.Add(viewport.ClientId);
-            _logger.LogInformation("viewport: client {id} attached to pane {pane} ({rows}x{cols})", viewport.ClientId, viewport.PaneId, viewport.Rows, viewport.Cols);
+            _logger.LogInformation("viewport: client {id} attached to nook {nook} ({rows}x{cols})", viewport.ClientId, viewport.NookId, viewport.Rows, viewport.Cols);
         }
     }
 
@@ -65,22 +65,22 @@ public sealed class MultiClientViewportService
                 return false;
 
             _viewports.Remove(clientId);
-            if (_paneClients.TryGetValue(viewport.PaneId, out var clients))
+            if (_nookClients.TryGetValue(viewport.NookId, out var clients))
             {
                 clients.Remove(clientId);
                 if (clients.Count == 0)
-                    _paneClients.Remove(viewport.PaneId);
+                    _nookClients.Remove(viewport.NookId);
             }
-            _logger.LogInformation("viewport: client {id} detached from pane {pane}", clientId, viewport.PaneId);
+            _logger.LogInformation("viewport: client {id} detached from nook {nook}", clientId, viewport.NookId);
             return true;
         }
     }
 
-    public (int Rows, int Cols)? ReconcilePtySize(int paneId)
+    public (int Rows, int Cols)? ReconcilePtySize(int nookId)
     {
         lock (_lock)
         {
-            if (!_paneClients.TryGetValue(paneId, out var clients) || clients.Count == 0)
+            if (!_nookClients.TryGetValue(nookId, out var clients) || clients.Count == 0)
                 return null;
 
             int minRows = int.MaxValue;
@@ -101,21 +101,21 @@ public sealed class MultiClientViewportService
         }
     }
 
-    public IReadOnlyList<string> GetClientsForPane(int paneId)
+    public IReadOnlyList<string> GetClientsForNook(int nookId)
     {
         lock (_lock)
         {
-            if (!_paneClients.TryGetValue(paneId, out var clients))
+            if (!_nookClients.TryGetValue(nookId, out var clients))
                 return Array.Empty<string>();
             return clients.ToList();
         }
     }
 
-    public int GetClientCount(int paneId)
+    public int GetClientCount(int nookId)
     {
         lock (_lock)
         {
-            if (!_paneClients.TryGetValue(paneId, out var clients))
+            if (!_nookClients.TryGetValue(nookId, out var clients))
                 return 0;
             return clients.Count;
         }

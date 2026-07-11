@@ -1,6 +1,6 @@
 # Cove
 
-An open-source, native-webview terminal workspace.
+An open-source, native-webview terminal bay.
 
 Created & maintained by Moh — https://github.com/Yupmoh
 
@@ -12,7 +12,7 @@ source-gen dispatch). Interfaces and layout may still change.
 
 ## What Cove is
 
-Cove is a fast, quiet terminal workspace: a headless engine owns your shells,
+Cove is a fast, quiet terminal bay: a headless engine owns your shells,
 sessions, and state, while thin GUI and terminal clients attach to it over a
 local control channel. Cove aims to stay out of your way — no engagement
 nudges, no forced ceremonies — and to treat latency and losslessness as
@@ -51,7 +51,7 @@ unsigned build. Cove starts its own engine and opens a live terminal.
 
 ## Run the desktop GUI (from source)
 
-The graphical workspace is a native-webview terminal that renders a real shell
+The graphical bay is a native-webview terminal that renders a real shell
 losslessly. macOS ships the prebuilt `Cove.app` above; on Linux and Windows, or
 for development, run it from source. Start the engine, then the GUI:
 
@@ -63,7 +63,7 @@ dotnet run --project src/Cove.Gui
 ## Platform support
 
 The engine, control channel, and persistence run on macOS, Linux, and Windows.
-Interactive PTY panes are supported on macOS and Linux; the Windows PTY backend
+Interactive PTY nooks are supported on macOS and Linux; the Windows PTY backend
 is not yet implemented.
 
 ## License

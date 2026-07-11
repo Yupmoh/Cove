@@ -43,7 +43,7 @@ public sealed class KeybindingCommandsTests
     public async Task KeybindSet_OverridesBinding()
     {
         var kb = NewEngine();
-        var prm = JsonDocument.Parse("""{"chord":"cmd+t","actionType":"app-command","action":"room.new","description":"New room"}""").RootElement.Clone();
+        var prm = JsonDocument.Parse("""{"chord":"cmd+t","actionType":"app-command","action":"shore.new","description":"New shore"}""").RootElement.Clone();
         var resp = await EngineCommandRouter.RouteAsync(new ControlRequest("r1", "cove://commands/keybind.set", prm), keybindings: kb);
         Assert.True(resp!.Ok);
         Assert.True(resp.Data!.Value.GetProperty("success").GetBoolean());
@@ -84,7 +84,7 @@ public sealed class KeybindingCommandsTests
         Assert.True(resp!.Ok);
 
         var resolved = kb.Resolve("cmd+t");
-        Assert.Equal("room.new", resolved?.Action);
+        Assert.Equal("shore.new", resolved?.Action);
     }
 
     [Fact]

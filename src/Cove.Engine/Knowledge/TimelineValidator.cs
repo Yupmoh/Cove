@@ -15,7 +15,7 @@ public sealed partial class TimelineValidator
 
     private static readonly System.Collections.Generic.HashSet<string> ValidScopes = new(System.StringComparer.OrdinalIgnoreCase)
     {
-        "workspace", "room", "pane", "task", "session",
+        "bay", "shore", "nook", "task", "session",
     };
 
     public void Validate(TimelineEntry entry)
@@ -24,7 +24,7 @@ public sealed partial class TimelineValidator
         {
             var scopeBase = entry.Scope.Contains(':') ? entry.Scope.AsSpan(0, entry.Scope.IndexOf(':')).ToString() : entry.Scope;
             if (!ValidScopes.Contains(scopeBase))
-                throw new TimelineValidationException("invalid_scope", $"scope '{entry.Scope}' is not a valid canonical scope (workspace/room/pane/task/session)");
+                throw new TimelineValidationException("invalid_scope", $"scope '{entry.Scope}' is not a valid canonical scope (bay/shore/nook/task/session)");
         }
 
         if (entry.Tags is { } tags)

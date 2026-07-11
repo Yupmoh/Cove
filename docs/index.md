@@ -1,6 +1,6 @@
 # Cove
 
-A free, open-source, AI-native terminal workspace — a permissively licensed alternative to atrium, built in C# on the Ryn framework, shipping as a small Native-AOT native-webview binary.
+A free, open-source, AI-native terminal bay — a permissively licensed alternative to atrium, built in C# on the Ryn framework, shipping as a small Native-AOT native-webview binary.
 
 Cove is **headless-first**: a `cove daemon` engine owns PTYs, sessions, and SQLite state; the Ryn GUI, the TUI, and the `cove` CLI are all thin clients of one `cove://` control socket.
 

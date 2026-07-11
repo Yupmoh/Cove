@@ -26,7 +26,7 @@ public sealed class LaunchOrchestrator
     private readonly MethodRunner? _methodRunner;
     private readonly BinaryDiscoveryService? _binaryDiscovery;
     private readonly string? _loginShellPath;
-    private readonly Dictionary<string, LauncherOverrides> _paneOverrides = new();
+    private readonly Dictionary<string, LauncherOverrides> _nookOverrides = new();
     private readonly LauncherOverrideStore? _overrideStore;
     private readonly Microsoft.Extensions.Logging.ILogger? _logger;
 
@@ -242,28 +242,28 @@ public sealed class LaunchOrchestrator
             args.Add($"--env={env.Key}={env.Value}");
     }
 
-    public void PersistOverrides(string paneId, LauncherOverrides overrides)
+    public void PersistOverrides(string nookId, LauncherOverrides overrides)
     {
-        _paneOverrides[paneId] = overrides;
-        _overrideStore?.Save(paneId, overrides);
+        _nookOverrides[nookId] = overrides;
+        _overrideStore?.Save(nookId, overrides);
     }
 
-    public LauncherOverrides? GetOverrides(string paneId)
+    public LauncherOverrides? GetOverrides(string nookId)
     {
-        if (_paneOverrides.TryGetValue(paneId, out var overrides))
+        if (_nookOverrides.TryGetValue(nookId, out var overrides))
             return overrides;
-        if (_overrideStore is not null && _overrideStore.TryLoad(paneId, out var loaded) && loaded is not null)
+        if (_overrideStore is not null && _overrideStore.TryLoad(nookId, out var loaded) && loaded is not null)
         {
-            _paneOverrides[paneId] = loaded;
+            _nookOverrides[nookId] = loaded;
             return loaded;
         }
         return null;
     }
 
-    public void ClearOverrides(string paneId)
+    public void ClearOverrides(string nookId)
     {
-        _paneOverrides.Remove(paneId);
-        _overrideStore?.Delete(paneId);
+        _nookOverrides.Remove(nookId);
+        _overrideStore?.Delete(nookId);
     }
 }
 

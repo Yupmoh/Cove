@@ -24,14 +24,14 @@ public sealed class TimelineStoreTests
         var (_, store) = NewStore();
         var entry = store.Append(new TimelineEntry
         {
-            WorkspaceId = "ws1",
+            BayId = "ws1",
             Kind = "note.created",
             Source = "manual",
-            Scope = "workspace",
+            Scope = "bay",
             Summary = "Created a markdown note",
         });
 
-        var list = store.ListByWorkspace("ws1");
+        var list = store.ListByBay("ws1");
         Assert.Single(list);
         Assert.Equal(entry.Id, list[0].Id);
         Assert.Equal("note.created", list[0].Kind);
@@ -44,7 +44,7 @@ public sealed class TimelineStoreTests
         var (_, store) = NewStore();
         store.Append(new TimelineEntry
         {
-            WorkspaceId = "ws1",
+            BayId = "ws1",
             Kind = "note.created",
             Source = "manual",
             Summary = "Deployed the flibbertigibbet module to production",
@@ -62,7 +62,7 @@ public sealed class TimelineStoreTests
         var ts = System.DateTimeOffset.UtcNow;
         var entry = new TimelineEntry
         {
-            WorkspaceId = "ws1",
+            BayId = "ws1",
             Kind = "git.commit",
             Source = "git-ingester",
             Summary = "fix: resolve race in scheduler",
@@ -72,7 +72,7 @@ public sealed class TimelineStoreTests
         store.Append(entry);
         store.Append(entry);
 
-        var list = store.ListByWorkspace("ws1");
+        var list = store.ListByBay("ws1");
         Assert.Single(list);
     }
 
@@ -82,7 +82,7 @@ public sealed class TimelineStoreTests
         var (_, store) = NewStore();
         var entry = new TimelineEntry
         {
-            WorkspaceId = "ws1",
+            BayId = "ws1",
             Kind = "note.created",
             Source = "manual",
             Summary = "manual entry",
@@ -91,19 +91,19 @@ public sealed class TimelineStoreTests
         store.Append(entry);
         store.Append(entry);
 
-        var list = store.ListByWorkspace("ws1");
+        var list = store.ListByBay("ws1");
         Assert.Equal(2, list.Count);
     }
 
     [Fact]
-    public void List_FiltersByWorkspace()
+    public void List_FiltersByBay()
     {
         var (_, store) = NewStore();
-        store.Append(new TimelineEntry { WorkspaceId = "ws1", Kind = "a", Source = "manual", Summary = "one" });
-        store.Append(new TimelineEntry { WorkspaceId = "ws2", Kind = "b", Source = "manual", Summary = "two" });
+        store.Append(new TimelineEntry { BayId = "ws1", Kind = "a", Source = "manual", Summary = "one" });
+        store.Append(new TimelineEntry { BayId = "ws2", Kind = "b", Source = "manual", Summary = "two" });
 
-        var ws1 = store.ListByWorkspace("ws1");
-        var ws2 = store.ListByWorkspace("ws2");
+        var ws1 = store.ListByBay("ws1");
+        var ws2 = store.ListByBay("ws2");
         Assert.Single(ws1);
         Assert.Single(ws2);
         Assert.Equal("a", ws1[0].Kind);
@@ -116,7 +116,7 @@ public sealed class TimelineStoreTests
         var (_, store) = NewStore();
         var ex = Assert.Throws<TimelineValidationException>(() => store.Append(new TimelineEntry
         {
-            WorkspaceId = "ws1",
+            BayId = "ws1",
             Kind = "note.created",
             Source = "manual",
             Summary = "test",
@@ -132,14 +132,14 @@ public sealed class TimelineStoreTests
         var (_, store) = NewStore();
         store.Append(new TimelineEntry
         {
-            WorkspaceId = "ws1",
+            BayId = "ws1",
             Kind = "note.created",
             Source = "manual",
             Summary = "test",
             Tags = ["kind:feature", "team:cove"],
         });
 
-        var list = store.ListByWorkspace("ws1");
+        var list = store.ListByBay("ws1");
         Assert.Single(list);
         Assert.NotNull(list[0].Tags);
         Assert.Equal(2, list[0].Tags!.Count);
@@ -153,7 +153,7 @@ public sealed class TimelineStoreTests
         var (_, store) = NewStore();
         var ex = Assert.Throws<TimelineValidationException>(() => store.Append(new TimelineEntry
         {
-            WorkspaceId = "ws1",
+            BayId = "ws1",
             Kind = "note.created",
             Source = "manual",
             Scope = "galaxy",
@@ -169,15 +169,15 @@ public sealed class TimelineStoreTests
         var (_, store) = NewStore();
         store.Append(new TimelineEntry
         {
-            WorkspaceId = "ws1",
+            BayId = "ws1",
             Kind = "note.created",
             Source = "manual",
-            Scope = "room:abc123",
+            Scope = "shore:abc123",
             Summary = "test",
         });
 
-        var list = store.ListByWorkspace("ws1");
+        var list = store.ListByBay("ws1");
         Assert.Single(list);
-        Assert.Equal("room:abc123", list[0].Scope);
+        Assert.Equal("shore:abc123", list[0].Scope);
     }
 }

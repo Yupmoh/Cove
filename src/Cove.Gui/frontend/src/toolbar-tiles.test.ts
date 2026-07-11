@@ -3,12 +3,12 @@ import { toolbarTiles, type ToolbarTile } from "./toolbar-tiles";
 
 describe("toolbarTiles", () => {
   const tiles = toolbarTiles();
-  it("exposes the spec pane-type tiles in order T B ⌕ G K N", () => {
+  it("exposes the spec nook-type tiles in order T B ⌕ G K N", () => {
     expect(tiles.map((t: ToolbarTile) => t.letter)).toEqual(["T", "B", "F", "G", "K", "N"]);
   });
-  it("routes each tile to a pane-creating action", () => {
+  it("routes each tile to a nook-creating action", () => {
     const byId = Object.fromEntries(tiles.map((t) => [t.id, t.action]));
-    expect(byId.terminal).toBe("room.new");
+    expect(byId.terminal).toBe("shore.new");
     expect(byId.browser).toBe("tool.browser");
     expect(byId.search).toBe("tool.search");
     expect(byId.git).toBe("tool.git");

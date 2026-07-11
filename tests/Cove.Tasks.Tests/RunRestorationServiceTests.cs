@@ -20,7 +20,7 @@ public sealed class RunRestorationServiceTests
     {
         var cardId = (await svc.CreateCardAsync("ws1", "restore card", "user:test", "", 1, 2, null)).Id;
         var run = await svc.CreateRunAsync(cardId, "ws1", null);
-        await svc.AddRunSegmentAsync(run!.Id, "pane-dead", "adapter-session-xyz");
+        await svc.AddRunSegmentAsync(run!.Id, "nook-dead", "adapter-session-xyz");
         return (svc, cardId, run.Id);
     }
 
@@ -114,7 +114,7 @@ public sealed class RunRestorationServiceTests
 
         var restoration = new RunRestorationService(svc, NullLogger.Instance);
         restoration.RestoreOnStartup();
-        var restored = new RestoredRun(runId, "", "ws1", "pane-1", "adapter-session-xyz", RestoredRunOutcome.Interrupted);
+        var restored = new RestoredRun(runId, "", "ws1", "nook-1", "adapter-session-xyz", RestoredRunOutcome.Interrupted);
 
         var result = await restoration.ResumeOnRestartAsync(restored, _ => System.Threading.Tasks.Task.FromResult(false), default);
 
@@ -130,7 +130,7 @@ public sealed class RunRestorationServiceTests
 
         var restoration = new RunRestorationService(svc, NullLogger.Instance);
         restoration.RestoreOnStartup();
-        var restored = new RestoredRun(runId, "", "ws1", "pane-1", "adapter-session-xyz", RestoredRunOutcome.Interrupted);
+        var restored = new RestoredRun(runId, "", "ws1", "nook-1", "adapter-session-xyz", RestoredRunOutcome.Interrupted);
 
         var result = await restoration.ResumeOnRestartAsync(restored, null, default);
 
@@ -150,7 +150,7 @@ public sealed class RunRestorationServiceTests
         var cardId = (await svc1.CreateCardAsync("ws1", "needs-input card", "user:test", "", 1, 2, null)).Id;
         var run = await svc1.CreateRunAsync(cardId, "ws1", null);
         runId = run!.Id;
-        await svc1.AddRunSegmentAsync(runId, "pane-1", "adapter-session-abc");
+        await svc1.AddRunSegmentAsync(runId, "nook-1", "adapter-session-abc");
         await svc1.SetPendingPromptAsync(runId, "Should I proceed with the refactor?");
 
         var svc2 = new TaskService(dir, NullLogger.Instance);

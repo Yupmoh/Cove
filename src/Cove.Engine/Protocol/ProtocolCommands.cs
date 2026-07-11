@@ -13,7 +13,7 @@ public static class ProtocolCommands
             return Task.FromResult(ctx.Fail("invalid_params", "protocol resolve params required"));
 
         var resolver = new ProtocolResolver();
-        var (uri, resolvedParams) = resolver.Resolve(p.Uri, p.FocusedPaneId, p.ActiveRoomId);
+        var (uri, resolvedParams) = resolver.Resolve(p.Uri, p.FocusedNookId, p.ActiveShoreId);
         if (uri is null)
             return Task.FromResult(ctx.Fail("not_found", $"unresolvable cove:// URI: {p.Uri}"));
 

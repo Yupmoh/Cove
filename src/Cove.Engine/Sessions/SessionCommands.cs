@@ -15,13 +15,13 @@ public static class SessionCommands
     {
         if (ctx.Sessions is not { } orch)
             return Task.FromResult(ctx.Fail("not_ready", "session orchestrator not available"));
-        if (ctx.Panes is not { } panes)
-            return Task.FromResult(ctx.Fail("not_ready", "pane registry not available"));
-        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.PaneRefParams) is not { } p)
-            return Task.FromResult(ctx.Fail("invalid_params", "pane ref required"));
+        if (ctx.Nooks is not { } nooks)
+            return Task.FromResult(ctx.Fail("not_ready", "nook registry not available"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.NookRefParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "nook ref required"));
 
-        orch.Dismiss(p.PaneId);
-        panes.Kill(p.PaneId);
+        orch.Dismiss(p.NookId);
+        nooks.Kill(p.NookId);
         return Task.FromResult(ctx.Ok());
     }
 
@@ -30,10 +30,10 @@ public static class SessionCommands
     {
         if (ctx.Sessions is not { } orch)
             return Task.FromResult(ctx.Fail("not_ready", "session orchestrator not available"));
-        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.PaneRefParams) is not { } p)
-            return Task.FromResult(ctx.Fail("invalid_params", "pane ref required"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.NookRefParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "nook ref required"));
 
-        orch.Background(p.PaneId);
+        orch.Background(p.NookId);
         return Task.FromResult(ctx.Ok());
     }
 
@@ -42,10 +42,10 @@ public static class SessionCommands
     {
         if (ctx.Sessions is not { } orch)
             return Task.FromResult(ctx.Fail("not_ready", "session orchestrator not available"));
-        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.PaneRefParams) is not { } p)
-            return Task.FromResult(ctx.Fail("invalid_params", "pane ref required"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.NookRefParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "nook ref required"));
 
-        orch.Foreground(p.PaneId);
+        orch.Foreground(p.NookId);
         return Task.FromResult(ctx.Ok());
     }
 
@@ -54,13 +54,13 @@ public static class SessionCommands
     {
         if (ctx.Sessions is not { } orch)
             return Task.FromResult(ctx.Fail("not_ready", "session orchestrator not available"));
-        if (ctx.Panes is not { } panes)
-            return Task.FromResult(ctx.Fail("not_ready", "pane registry not available"));
-        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.PaneRefParams) is not { } p)
-            return Task.FromResult(ctx.Fail("invalid_params", "pane ref required"));
+        if (ctx.Nooks is not { } nooks)
+            return Task.FromResult(ctx.Fail("not_ready", "nook registry not available"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.NookRefParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "nook ref required"));
 
-        orch.Stop(p.PaneId);
-        panes.Kill(p.PaneId);
+        orch.Stop(p.NookId);
+        nooks.Kill(p.NookId);
         return Task.FromResult(ctx.Ok());
     }
 
@@ -70,8 +70,8 @@ public static class SessionCommands
         if (ctx.Sessions is not { } orch)
             return Task.FromResult(ctx.Fail("not_ready", "session orchestrator not available"));
 
-        var dismissed = orch.ListDismissed().Select(s => new SessionStateDto(s.PaneId, s.Adapter, s.SessionId, s.Lifecycle.ToString().ToLowerInvariant(), s.Resumable)).ToList();
-        var background = orch.ListBackground().Select(s => new SessionStateDto(s.PaneId, s.Adapter, s.SessionId, s.Lifecycle.ToString().ToLowerInvariant(), s.Resumable)).ToList();
+        var dismissed = orch.ListDismissed().Select(s => new SessionStateDto(s.NookId, s.Adapter, s.SessionId, s.Lifecycle.ToString().ToLowerInvariant(), s.Resumable)).ToList();
+        var background = orch.ListBackground().Select(s => new SessionStateDto(s.NookId, s.Adapter, s.SessionId, s.Lifecycle.ToString().ToLowerInvariant(), s.Resumable)).ToList();
         var all = dismissed.Concat(background).ToList();
         return Task.FromResult(ctx.Ok(new SessionListResult(all), CoveJsonContext.Default.SessionListResult));
     }
@@ -126,7 +126,7 @@ public static class SessionCommands
 }
 
 public sealed record SessionRecentParams(string? Adapter = null, int? Limit = null, string? Cwd = null);
-public sealed record RecentSessionDto(string Adapter, string SessionId, string WorkspaceId, string Cwd, string StartedAt, string? Label = null);
+public sealed record RecentSessionDto(string Adapter, string SessionId, string BayId, string Cwd, string StartedAt, string? Label = null);
 public sealed record SessionRecentResult(System.Collections.Generic.IReadOnlyList<RecentSessionDto> Sessions);
 
 [JsonSourceGenerationOptions(

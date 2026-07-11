@@ -9,47 +9,47 @@ public sealed class ProtocolResolverTests
     public void Resolve_CommandsAction_MapsToEngineUri()
     {
         var resolver = new ProtocolResolver();
-        var (uri, params_) = resolver.Resolve("cove://commands/pane.split.horizontal?pane=$FOCUS", focusedPaneId: "p1", activeRoomId: "room1");
+        var (uri, params_) = resolver.Resolve("cove://commands/nook.split.horizontal?nook=$FOCUS", focusedNookId: "p1", activeShoreId: "shore1");
         Assert.Equal("cove://commands/layout.mutate", uri);
     }
 
     [Fact]
-    public void Resolve_FocusSigil_ExpandsToFocusedPaneId()
+    public void Resolve_FocusSigil_ExpandsToFocusedNookId()
     {
         var resolver = new ProtocolResolver();
-        var (uri, params_) = resolver.Resolve("cove://commands/pane.close?pane=$FOCUS", focusedPaneId: "p1", activeRoomId: null);
+        var (uri, params_) = resolver.Resolve("cove://commands/nook.close?nook=$FOCUS", focusedNookId: "p1", activeShoreId: null);
         Assert.Contains("p1", params_?.ToString() ?? "");
     }
 
     [Fact]
-    public void Resolve_ActiveSigil_ExpandsToActiveRoomId()
+    public void Resolve_ActiveSigil_ExpandsToActiveShoreId()
     {
         var resolver = new ProtocolResolver();
-        var (uri, params_) = resolver.Resolve("cove://commands/room.switch?roomId=$ACTIVE", focusedPaneId: null, activeRoomId: "room1");
-        Assert.Contains("room1", params_?.ToString() ?? "");
+        var (uri, params_) = resolver.Resolve("cove://commands/shore.switch?shoreId=$ACTIVE", focusedNookId: null, activeShoreId: "shore1");
+        Assert.Contains("shore1", params_?.ToString() ?? "");
     }
 
     [Fact]
-    public void Resolve_PanesCategory_MapsToPaneCommands()
+    public void Resolve_NooksCategory_MapsToNookCommands()
     {
         var resolver = new ProtocolResolver();
-        var (uri, params_) = resolver.Resolve("cove://panes/", focusedPaneId: null, activeRoomId: null);
-        Assert.Equal("cove://commands/pane.list", uri);
+        var (uri, params_) = resolver.Resolve("cove://nooks/", focusedNookId: null, activeShoreId: null);
+        Assert.Equal("cove://commands/nook.list", uri);
     }
 
     [Fact]
-    public void Resolve_PanesWrite_MapsToPaneWrite()
+    public void Resolve_NooksWrite_MapsToNookWrite()
     {
         var resolver = new ProtocolResolver();
-        var (uri, params_) = resolver.Resolve("cove://panes/p1/write", focusedPaneId: null, activeRoomId: null);
-        Assert.Equal("cove://commands/pane.write", uri);
+        var (uri, params_) = resolver.Resolve("cove://nooks/p1/write", focusedNookId: null, activeShoreId: null);
+        Assert.Equal("cove://commands/nook.write", uri);
     }
 
     [Fact]
     public void Resolve_AgentsMessage_MapsToAgentMessage()
     {
         var resolver = new ProtocolResolver();
-        var (uri, params_) = resolver.Resolve("cove://agents/p1/message", focusedPaneId: null, activeRoomId: null);
+        var (uri, params_) = resolver.Resolve("cove://agents/p1/message", focusedNookId: null, activeShoreId: null);
         Assert.Equal("cove://commands/agent.message", uri);
     }
 
@@ -57,7 +57,7 @@ public sealed class ProtocolResolverTests
     public void Resolve_AgentsList_MapsToAgentList()
     {
         var resolver = new ProtocolResolver();
-        var (uri, params_) = resolver.Resolve("cove://agents/list", focusedPaneId: null, activeRoomId: null);
+        var (uri, params_) = resolver.Resolve("cove://agents/list", focusedNookId: null, activeShoreId: null);
         Assert.Equal("cove://commands/agent.list", uri);
     }
 
@@ -65,15 +65,15 @@ public sealed class ProtocolResolverTests
     public void Resolve_SkillsIndex_MapsToSkillsIndex()
     {
         var resolver = new ProtocolResolver();
-        var (uri, params_) = resolver.Resolve("cove://skills/index", focusedPaneId: null, activeRoomId: null);
+        var (uri, params_) = resolver.Resolve("cove://skills/index", focusedNookId: null, activeShoreId: null);
         Assert.Equal("cove://commands/skills.index", uri);
     }
 
     [Fact]
-    public void Resolve_ExplicitPaneId_NotSigil_PassedThrough()
+    public void Resolve_ExplicitNookId_NotSigil_PassedThrough()
     {
         var resolver = new ProtocolResolver();
-        var (uri, params_) = resolver.Resolve("cove://commands/pane.close?pane=explicit-id", focusedPaneId: "p1", activeRoomId: null);
+        var (uri, params_) = resolver.Resolve("cove://commands/nook.close?nook=explicit-id", focusedNookId: "p1", activeShoreId: null);
         Assert.Contains("explicit-id", params_?.ToString() ?? "");
     }
 
@@ -81,7 +81,7 @@ public sealed class ProtocolResolverTests
     public void Resolve_UnknownCategory_ReturnsNull()
     {
         var resolver = new ProtocolResolver();
-        var (uri, params_) = resolver.Resolve("cove://unknown/action", focusedPaneId: null, activeRoomId: null);
+        var (uri, params_) = resolver.Resolve("cove://unknown/action", focusedNookId: null, activeShoreId: null);
         Assert.Null(uri);
     }
 }

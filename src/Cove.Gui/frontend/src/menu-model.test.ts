@@ -25,11 +25,11 @@ describe("chordToAccelerator", () => {
 describe("buildAcceleratorMap", () => {
   it("maps each action to its accelerator", () => {
     const m = buildAcceleratorMap([
-      { action: "room.new", chord: "cmd+t" },
-      { action: "pane.split-right", chord: "cmd+d" },
+      { action: "shore.new", chord: "cmd+t" },
+      { action: "nook.split-right", chord: "cmd+d" },
     ]);
-    expect(m["room.new"]).toBe("CmdOrCtrl+T");
-    expect(m["pane.split-right"]).toBe("CmdOrCtrl+D");
+    expect(m["shore.new"]).toBe("CmdOrCtrl+T");
+    expect(m["nook.split-right"]).toBe("CmdOrCtrl+D");
   });
 });
 
@@ -38,7 +38,7 @@ describe("menuIA", () => {
     const labels = menuIA().map((s) => s.role ?? s.label);
     expect(labels).toContain("File");
     expect(labels).toContain("View");
-    expect(labels).toContain("Pane");
+    expect(labels).toContain("Nook");
     expect(labels).toContain("appMenu");
     expect(labels).toContain("windowMenu");
   });
@@ -46,21 +46,21 @@ describe("menuIA", () => {
 
 describe("buildMenu", () => {
   it("injects accelerators sourced from the bindings", () => {
-    const menu = buildMenu([{ action: "room.new", chord: "cmd+shift+n" }]);
+    const menu = buildMenu([{ action: "shore.new", chord: "cmd+shift+n" }]);
     const file = menu.find((s) => s.label === "File")!;
-    const newRoom = file.items!.find((i) => i.action === "room.new")!;
-    expect(newRoom.accelerator).toBe("CmdOrCtrl+Shift+N");
+    const newShore = file.items!.find((i) => i.action === "shore.new")!;
+    expect(newShore.accelerator).toBe("CmdOrCtrl+Shift+N");
   });
   it("omits an accelerator when the action is unbound", () => {
     const menu = buildMenu([]);
     const file = menu.find((s) => s.label === "File")!;
-    const newRoom = file.items!.find((i) => i.action === "room.new")!;
-    expect(newRoom.accelerator).toBeUndefined();
+    const newShore = file.items!.find((i) => i.action === "shore.new")!;
+    expect(newShore.accelerator).toBeUndefined();
   });
   it("re-sourcing after a rebind updates the accelerator", () => {
-    const before = buildMenu([{ action: "room.new", chord: "cmd+t" }]);
-    const after = buildMenu([{ action: "room.new", chord: "cmd+shift+r" }]);
-    const acc = (m: ReturnType<typeof buildMenu>) => m.find((s) => s.label === "File")!.items!.find((i) => i.action === "room.new")!.accelerator;
+    const before = buildMenu([{ action: "shore.new", chord: "cmd+t" }]);
+    const after = buildMenu([{ action: "shore.new", chord: "cmd+shift+r" }]);
+    const acc = (m: ReturnType<typeof buildMenu>) => m.find((s) => s.label === "File")!.items!.find((i) => i.action === "shore.new")!.accelerator;
     expect(acc(before)).toBe("CmdOrCtrl+T");
     expect(acc(after)).toBe("CmdOrCtrl+Shift+R");
   });
@@ -92,8 +92,8 @@ describe("buildMenu enabled stamp removed", () => {
 describe("menuActionIds", () => {
   it("collects every action referenced by the menu", () => {
     const ids = menuActionIds();
-    expect(ids.has("room.new")).toBe(true);
-    expect(ids.has("pane.split-right")).toBe(true);
+    expect(ids.has("shore.new")).toBe(true);
+    expect(ids.has("nook.split-right")).toBe(true);
     expect(ids.has("view.zen-mode")).toBe(true);
   });
 });
@@ -101,8 +101,8 @@ describe("menuActionIds", () => {
 describe("menuChordSet", () => {
   it("collects only the chords of menu-referenced actions", () => {
     const set = menuChordSet([
-      { action: "room.new", chord: "cmd+t" },
-      { action: "pane.split-right", chord: "cmd+d" },
+      { action: "shore.new", chord: "cmd+t" },
+      { action: "nook.split-right", chord: "cmd+d" },
       { action: "not.in.menu", chord: "cmd+j" },
     ]);
     expect(set.has("cmd+t")).toBe(true);

@@ -19,6 +19,6 @@ public static class CoveGitIgnore
         "*.db-shm\n" +
         "*.tmp-*\n" +
         "*.bak\n" +
-        "workspaces/*/scrollback*\n" +
-        "workspaces/*/.cache/\n";
+        "bays/*/scrollback*\n" +
+        "bays/*/.cache/\n";
 }

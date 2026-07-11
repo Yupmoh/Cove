@@ -17,7 +17,7 @@ public sealed class ReviewScopeResolver
 
     public System.Collections.Generic.IReadOnlyList<ReviewComment> Resolve(string commitSha, ReviewScope? scope)
     {
-        if (scope is null || scope.Type == "workspace")
+        if (scope is null || scope.Type == "bay")
             return _store.ListComments(commitSha);
 
         if (scope.Type == "session")

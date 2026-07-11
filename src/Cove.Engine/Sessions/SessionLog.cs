@@ -5,6 +5,6 @@ namespace Cove.Engine.Sessions;
 
 internal static partial class SessionLog
 {
-    [ZLoggerMessage(LogLevel.Warning, "session {op} requested for unknown pane {paneId}")]
-    public static partial void SessionUnknownPane(this ILogger logger, string op, string paneId);
+    [ZLoggerMessage(LogLevel.Warning, "session {op} requested for unknown nook {nookId}")]
+    public static partial void SessionUnknownNook(this ILogger logger, string op, string nookId);
 }

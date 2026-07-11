@@ -2,7 +2,7 @@ import { invoke } from "./invoke";
 
 interface TimelineEntry {
   id: string;
-  workspaceId: string;
+  bayId: string;
   kind: string;
   source: string;
   scope: string | null;
@@ -18,28 +18,28 @@ let searchQuery = "";
 let scopeFilter = "";
 let allEntries: TimelineEntry[] = [];
 
-export async function renderTimelineFeed(workspaceId: string): Promise<HTMLElement> {
+export async function renderTimelineFeed(bayId: string): Promise<HTMLElement> {
   const el = document.createElement("div");
   el.className = "timeline-feed-view";
   el.style.cssText = "display:flex;flex-direction:column;height:100%;background:#0b1622;color:#e5e9f0;font-family:system-ui,sans-serif;";
 
-  await refreshFeed(el, workspaceId);
+  await refreshFeed(el, bayId);
   return el;
 }
 
-async function refreshFeed(el: HTMLElement, workspaceId: string): Promise<void> {
+async function refreshFeed(el: HTMLElement, bayId: string): Promise<void> {
   try {
-    const result = await invoke<TimelineListResult>("cove://commands/timeline.list", { workspaceId });
+    const result = await invoke<TimelineListResult>("cove://commands/timeline.list", { bayId });
     allEntries = result.entries || [];
     el.innerHTML = "";
-    el.appendChild(buildToolbar(workspaceId, el));
+    el.appendChild(buildToolbar(bayId, el));
     el.appendChild(buildFeed());
   } catch (e) {
     el.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to load timeline: ${(e as Error).message}</div>`;
   }
 }
 
-function buildToolbar(workspaceId: string, el: HTMLElement): HTMLElement {
+function buildToolbar(bayId: string, el: HTMLElement): HTMLElement {
   const toolbar = document.createElement("div");
   toolbar.style.cssText = "padding:8px 12px;display:flex;gap:8px;align-items:center;border-bottom:1px solid #1e2d3f;flex-wrap:wrap;";
 
@@ -57,7 +57,7 @@ function buildToolbar(workspaceId: string, el: HTMLElement): HTMLElement {
 
   const scopeSelect = document.createElement("select");
   scopeSelect.style.cssText = "padding:4px 8px;background:#14202e;border:1px solid #2b3d52;border-radius:4px;color:#e5e9f0;font-size:12px;";
-  const scopes = ["", "workspace", "room", "pane", "task", "session"];
+  const scopes = ["", "bay", "shore", "nook", "task", "session"];
   for (const s of scopes) {
     const opt = document.createElement("option");
     opt.value = s;
@@ -75,7 +75,7 @@ function buildToolbar(workspaceId: string, el: HTMLElement): HTMLElement {
   const refresh = document.createElement("button");
   refresh.textContent = "↻";
   refresh.style.cssText = "padding:4px 8px;background:#1e2d3f;border:1px solid #2b3d52;border-radius:4px;color:#e5e9f0;cursor:pointer;font-size:12px;";
-  refresh.addEventListener("click", () => refreshFeed(el, workspaceId));
+  refresh.addEventListener("click", () => refreshFeed(el, bayId));
   toolbar.appendChild(refresh);
 
   return toolbar;

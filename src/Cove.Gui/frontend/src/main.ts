@@ -13,31 +13,31 @@ import { renderMarkdownNote } from "./markdown-note";
 import { renderSketchNote } from "./sketch-note";
 import { renderCanvasNote } from "./canvas-note";
 import { renderHtmlNote } from "./html-note";
-import { renderNotepadPane, openNote } from "./notepad-pane";
+import { renderNotepadNook, openNote } from "./notepad-nook";
 import { renderMermaidNote } from "./mermaid-note";
 import { renderSessionPicker } from "./session-picker";
 import { resumeSpawnPlan, type ResumeAction, type VaultResumeResult } from "./session-resume";
 import { renderLibraryPopover } from "./library-popover";
 import { renderSnapshotInspector } from "./snapshot-inspector";
-import { renderDiffReviewPane } from "./diff-review-pane";
-import { renderEditorPane } from "./editor-pane";
-import { renderSourceControlPane } from "./source-control-pane";
-import { renderSearchPane } from "./search-pane";
-import { browserWebviewRegistry, closeBrowserWebview, reconcileBrowserBounds, renderBrowserPane } from "./browser-pane";
+import { renderDiffReviewNook } from "./diff-review-nook";
+import { renderEditorNook } from "./editor-nook";
+import { renderSourceControlNook } from "./source-control-nook";
+import { renderSearchNook } from "./search-nook";
+import { browserWebviewRegistry, closeBrowserWebview, reconcileBrowserBounds, renderBrowserNook } from "./browser-nook";
 import { buildAutomationJs, type AutomationExecEvent } from "./automation-snapshot";
-import { renderDiffViewerPane } from "./diff-viewer-pane";
-import { renderMarkdownPane } from "./markdown-pane";
-import { renderPdfPane } from "./pdf-pane";
-import { renderVideoPane } from "./video-pane";
-import { partitionPinned, reorderRoom, glyphForPaneType, visibleRoomIds, buildWingModel, filterRoomsByWing } from "./room-tabs";
-import { groupByWorkspace, moveSelection, selectedNote, kindIcon, kindColor, type NoteListItem, type NavState } from "./notepad-sidebar";
+import { renderDiffViewerNook } from "./diff-viewer-nook";
+import { renderMarkdownNook } from "./markdown-nook";
+import { renderPdfNook } from "./pdf-nook";
+import { renderVideoNook } from "./video-nook";
+import { partitionPinned, reorderShore, glyphForNookType, visibleShoreIds, buildWingModel, filterShoresByWing } from "./shore-tabs";
+import { groupByBay, moveSelection, selectedNote, kindIcon, kindColor, type NoteListItem, type NavState } from "./notepad-sidebar";
 import { initialSidebarModel, selectLeftMode, toggleSide, setCollapsed, setWidth, collapsedOf, widthOf, SIDEBAR_MODES, SIDEBAR_MODE_META, type SidebarModel, type SidebarSide, type SidebarMode } from "./sidebar-model";
-import { nextWorkspaceName, type WorkspaceBoxInput } from "./workspace-boxes";
+import { nextBayName, type BayBoxInput } from "./bay-boxes";
 import { clampMenuPosition, normalizeItems, firstSelectableIndex, moveSelection as ctxMoveSelection, activeItem, type ContextMenuItem, type ContextMenuModel } from "./context-menu";
-import { buildWorkspaceTree, workspaceTreeEmptyMessage, PANE_TYPE_LABELS, type TreeLeaf, type TreeRoomInput, type TreeRow } from "./workspace-tree";
+import { buildBayTree, bayTreeEmptyMessage, NOOK_TYPE_LABELS, type TreeLeaf, type TreeShoreInput, type TreeRow } from "./bay-tree";
 import { buildAgentRows, AGENT_STATE_META, type AgentCard, type AgentState } from "./agents-model";
-import { resolveActiveWorkspaceId, workspaceAccent, sortFsEntries, joinPath, scmChipText, parseCollapsedCardIds, serializeCollapsedCardIds, toggleCardCollapsed, type FsEntry, type WorkspaceCardEntry, type ScmSummary } from "./workspace-cards";
-import { WORKSPACE_ICON_CHOICES, workspaceGlyph } from "./workspace-icons";
+import { resolveActiveBayId, bayAccent, sortFsEntries, joinPath, scmChipText, parseCollapsedCardIds, serializeCollapsedCardIds, toggleCardCollapsed, type FsEntry, type BayCardEntry, type ScmSummary } from "./bay-cards";
+import { BAY_ICON_CHOICES, bayGlyph } from "./bay-icons";
 import { parseQuery, filterAndSort, MruTracker, cycleCategory, categoryLabel, type PaletteItem } from "./omni-palette";
 import { buildEmptyState, EmptyStateMessages } from "./empty-states";
 import { brandLogoAt, nextBrandIndex, parseBrandIndex } from "./brand";
@@ -49,16 +49,16 @@ import { initBackdrop, setBackdropMaterial, nextToggleMaterial, coerceMaterial, 
 import { NotificationBridge, type NotificationBridgeDeps, type NotificationDeliverPayload } from "./notifications";
 import { buildMenu, menuChordSet } from "./menu-model";
 import { toolbarTiles } from "./toolbar-tiles";
-import { shouldShowLauncher, buildAdapterTiles, buildBuiltinTiles, isEmptyRoomTree, placeablePaneForAction, type LauncherAdapter, type LauncherBuiltin, type LauncherTile } from "./box-launcher";
+import { shouldShowLauncher, buildAdapterTiles, buildBuiltinTiles, isEmptyShoreTree, placeableNookForAction, type LauncherAdapter, type LauncherBuiltin, type LauncherTile } from "./box-launcher";
 import { adapterAccent, toolAccent, assignHotkeys, detectedHarnessTiles, clampLauncherSelection, moveLauncherSelection, hotkeyTarget, shapeRecentSessions, tipAt, computeLauncherCols, type LauncherSelection, type LauncherGeometry, type LauncherArrowKey, type RecentSessionRow } from "./launcher-model";
-import { iconSvg, iconForPaneType, monogram } from "./icons";
-import { dropZoneFor, moveMutationFor, zoneOverlayRect } from "./pane-dnd";
+import { iconSvg, iconForNookType, monogram } from "./icons";
+import { dropZoneFor, moveMutationFor, zoneOverlayRect } from "./nook-dnd";
 import { cssPath, buildFeedbackReport, feedbackSlug, harnessPrompt } from "./inspect-mode";
 import { clusterTools } from "./title-cluster";
 import { nextUpdateState, updateButtonLabel, updateAffordanceVisible, type UpdateState, type UpdateEvent } from "./update-flow";
 import { initialZenState, toggleZen, type ChromeVisibility, type ZenState } from "./zen-mode";
 import { eventToChord, buildChordMap, resolveDispatch, defaultBindings, type ResolvedBinding } from "./keymap-dispatch";
-import { enqueuePaneWrite } from "./write-queue";
+import { enqueueNookWrite } from "./write-queue";
 
 const RYN_MENUBAR_EVENTS_BROKEN = false;
 import { initHud, toggleHud, recordFrame, hudMetrics, readJsHeapBytes, hudLines, type HudState, type JsHeapProbe } from "./perf-hud";
@@ -125,13 +125,13 @@ async function invoke<T>(cmd: string, args: unknown): Promise<T> {
 
 interface Subtab {
   documentId: string;
-  paneType: string;
+  nookType: string;
   title: string | null;
 }
 
-interface PaneLeaf {
+interface NookLeaf {
   kind: "leaf";
-  paneId: string;
+  nookId: string;
   subtabs: Subtab[];
   activeSubtab: number;
 }
@@ -144,26 +144,26 @@ interface SplitNode {
   childB: MosaicNode;
 }
 
-type MosaicNode = SplitNode | PaneLeaf;
+type MosaicNode = SplitNode | NookLeaf;
 
-interface RoomSnapshot {
+interface ShoreSnapshot {
   id: string;
   name: string;
   layoutTree: MosaicNode;
-  zoomedPaneId: string | null;
+  zoomedNookId: string | null;
 }
 
-interface WorkspaceSnapshot {
+interface BaySnapshot {
   schemaVersion: number;
   id: string;
   name: string;
   projectDir: string;
-  activeRoomId: string | null;
-  rooms: RoomSnapshot[];
+  activeShoreId: string | null;
+  shores: ShoreSnapshot[];
 }
 
-interface PaneView {
-  paneId: string;
+interface NookView {
+  nookId: string;
   term: Terminal;
   fit: FitAddon;
   ws: WebSocket;
@@ -177,10 +177,10 @@ interface PaneView {
   replaying: boolean;
 }
 
-const panes = new Map<string, PaneView>();
-let layout: WorkspaceSnapshot | null = null;
-let activeRoomId: string | null = null;
-let focusedPaneId: string | null = null;
+const nooks = new Map<string, NookView>();
+let layout: BaySnapshot | null = null;
+let activeShoreId: string | null = null;
+let focusedNookId: string | null = null;
 interface TermSettings {
   fontFamily: string;
   fontSize: number;
@@ -250,7 +250,7 @@ function normalizeChord(e: KeyboardEvent): string {
 
 const gridEl = document.getElementById("grid")!;
 const paletteEl = document.getElementById("palette")!;
-const roomTabsEl = document.getElementById("room-tabs")!;
+const shoreTabsEl = document.getElementById("shore-tabs")!;
 const leftSidebarEl = document.getElementById("left-sidebar")!;
 const leftRailEl = document.getElementById("left-rail")!;
 const leftContentEl = document.getElementById("left-content")!;
@@ -263,14 +263,14 @@ gridEl.style.padding = "8px";
 
 function fitAll() {
   requestAnimationFrame(() => {
-    for (const pv of panes.values()) {
+    for (const pv of nooks.values()) {
       try { pv.fit.fit(); } catch { void 0; }
     }
   });
 }
 
 function applySettings() {
-  for (const pv of panes.values()) {
+  for (const pv of nooks.values()) {
     if (settings.fontFamily) pv.term.options.fontFamily = settings.fontFamily;
     pv.term.options.fontSize = settings.fontSize;
     pv.term.options.lineHeight = settings.lineHeight;
@@ -299,42 +299,42 @@ function persistSettings() {
   for (const [k, v] of entries)
     invoke("app.configSet", { key: k, value: v }).catch((e) => console.warn("configSet failed", k, e));
 }
-function attachWs(pane: PaneView) {
-  const ws = pane.ws;
+function attachWs(nook: NookView) {
+  const ws = nook.ws;
   ws.binaryType = "arraybuffer";
   const sendAck = () => {
-    if (ws.readyState === 1 && pane.consumed > pane.lastAck) {
-      ws.send(JSON.stringify({ t: "ack", off: pane.consumed }));
-      pane.lastAck = pane.consumed;
+    if (ws.readyState === 1 && nook.consumed > nook.lastAck) {
+      ws.send(JSON.stringify({ t: "ack", off: nook.consumed }));
+      nook.lastAck = nook.consumed;
     }
   };
   ws.onmessage = (ev) => {
     if (typeof ev.data === "string") {
       const m = parseRelayText(ev.data);
       if (!m) return;
-      if (m.t === "base") { pane.consumed = m.off; pane.lastAck = m.off; }
-      else if (m.t === "resync") { pane.term.reset(); pane.consumed = m.base; pane.lastAck = m.base; }
+      if (m.t === "base") { nook.consumed = m.off; nook.lastAck = m.off; }
+      else if (m.t === "resync") { nook.term.reset(); nook.consumed = m.base; nook.lastAck = m.base; }
       else if (m.t === "end") {
-        pane.term.write(`\r\n\x1b[38;5;244m[process exited: ${m.code}]\x1b[0m\r\n`);
+        nook.term.write(`\r\n\x1b[38;5;244m[process exited: ${m.code}]\x1b[0m\r\n`);
         launcherRecentsAt = 0;
         void refreshLauncherRecents();
-        window.setTimeout(() => { void closePaneById(pane.paneId); }, 400);
+        window.setTimeout(() => { void closeNookById(nook.nookId); }, 400);
       }
       return;
     }
     const raw = new Uint8Array(ev.data as ArrayBuffer);
-    const bytes = scrubTerminalReports(raw, { includeOscColorReports: pane.replaying });
-    pane.term.write(bytes, () => {
-      pane.consumed += raw.length;
-      if (pane.consumed - pane.lastAck >= CREDIT_THRESHOLD) sendAck();
+    const bytes = scrubTerminalReports(raw, { includeOscColorReports: nook.replaying });
+    nook.term.write(bytes, () => {
+      nook.consumed += raw.length;
+      if (nook.consumed - nook.lastAck >= CREDIT_THRESHOLD) sendAck();
     });
   };
   setInterval(sendAck, 100);
-  pane.term.onData((d) => { pane.replaying = false; void enqueuePaneWrite(pane.paneId, toBase64Utf8(d), (paneId, dataBase64) => invoke("app.paneWrite", { paneId, dataBase64 })); });
-  pane.term.onResize(({ cols, rows }) => { void invoke("app.paneResize", { paneId: pane.paneId, cols, rows }); });
+  nook.term.onData((d) => { nook.replaying = false; void enqueueNookWrite(nook.nookId, toBase64Utf8(d), (nookId, dataBase64) => invoke("app.nookWrite", { nookId, dataBase64 })); });
+  nook.term.onResize(({ cols, rows }) => { void invoke("app.nookResize", { nookId: nook.nookId, cols, rows }); });
 }
 
-function makePane(paneId: string, since: number): PaneView {
+function makeNook(nookId: string, since: number): NookView {
   const term = new Terminal({ allowTransparency: true, scrollback: settings.scrollback, convertEol: false, fontFamily: settings.fontFamily || "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: settings.fontSize, lineHeight: settings.lineHeight, cursorStyle: settings.cursorStyle, cursorBlink: settings.cursorBlink, theme: currentTermTheme() });
   const fitAddon = new FitAddon();
   term.loadAddon(fitAddon);
@@ -343,10 +343,10 @@ function makePane(paneId: string, since: number): PaneView {
   term.loadAddon(searchAddon);
 
   const el = document.createElement("div");
-  el.className = "pane";
+  el.className = "nook";
   el.style.flexGrow = "1";
   const header = document.createElement("div");
-  header.className = "pane-header";
+  header.className = "nook-header";
   const titleSpan = document.createElement("span");
   titleSpan.className = "pt";
   titleSpan.textContent = "shell";
@@ -363,15 +363,15 @@ function makePane(paneId: string, since: number): PaneView {
     b.className = "pmore psplit";
     b.innerHTML = iconSvg(ctl.icon);
     b.title = ctl.title;
-    b.addEventListener("click", (e) => { e.stopPropagation(); focusPane(paneId); openSplitChooser(e, ctl.dir); });
+    b.addEventListener("click", (e) => { e.stopPropagation(); focusNook(nookId); openSplitChooser(e, ctl.dir); });
     header.appendChild(b);
   }
   header.appendChild(moreBtn);
   const closeBtn = document.createElement("button");
   closeBtn.className = "pmore pclose";
   closeBtn.textContent = "✕";
-  closeBtn.title = "Close pane";
-  closeBtn.addEventListener("click", (e) => { e.stopPropagation(); focusPane(paneId); void closeFocused(); });
+  closeBtn.title = "Close nook";
+  closeBtn.addEventListener("click", (e) => { e.stopPropagation(); focusNook(nookId); void closeFocused(); });
   header.appendChild(closeBtn);
   el.appendChild(header);
   const host = document.createElement("div");
@@ -380,36 +380,36 @@ function makePane(paneId: string, since: number): PaneView {
   term.open(host);
 
   header.addEventListener("contextmenu", (e) => {
-    focusPane(paneId);
+    focusNook(nookId);
     openContextMenuAt(e, [
-      { id: "pane.split-right", label: "Split Right" },
-      { id: "pane.split-down", label: "Split Down" },
-      { id: "pane.maximize", label: "Maximize" },
+      { id: "nook.split-right", label: "Split Right" },
+      { id: "nook.split-down", label: "Split Down" },
+      { id: "nook.maximize", label: "Maximize" },
       { id: "sep", label: "", separator: true },
-      { id: "pane.close", label: "Close", danger: true },
+      { id: "nook.close", label: "Close", danger: true },
     ], (id) => runAction(id));
   });
   host.addEventListener("contextmenu", (e) => {
-    focusPane(paneId);
+    focusNook(nookId);
     const hasSel = term.hasSelection();
     openContextMenuAt(e, [
       { id: "copy", label: "Copy", disabled: !hasSel },
       { id: "paste", label: "Paste" },
       { id: "clear", label: "Clear" },
       { id: "sep", label: "", separator: true },
-      { id: "find", label: "Find in Pane" },
+      { id: "find", label: "Find in Nook" },
     ], (id) => {
       if (id === "copy") { const s = term.getSelection(); if (s && navigator.clipboard) void navigator.clipboard.writeText(s); }
-      else if (id === "paste") { if (navigator.clipboard && navigator.clipboard.readText) void navigator.clipboard.readText().then((t) => { if (t) void invoke("app.paneWrite", { paneId, dataBase64: toBase64Utf8(t) }); }); }
+      else if (id === "paste") { if (navigator.clipboard && navigator.clipboard.readText) void navigator.clipboard.readText().then((t) => { if (t) void invoke("app.nookWrite", { nookId, dataBase64: toBase64Utf8(t) }); }); }
       else if (id === "clear") term.clear();
       else if (id === "find") openFind();
     });
   });
 
-  const ws = new WebSocket(`ws://${location.host}/pty?pane=${encodeURIComponent(paneId)}&since=${since}`);
-  const pv: PaneView = { paneId, term, fit: fitAddon, ws, el, consumed: 0, lastAck: 0, title: "", customTitle: "", headerTitleEl: titleSpan, search: searchAddon, replaying: true };
+  const ws = new WebSocket(`ws://${location.host}/pty?nook=${encodeURIComponent(nookId)}&since=${since}`);
+  const pv: NookView = { nookId, term, fit: fitAddon, ws, el, consumed: 0, lastAck: 0, title: "", customTitle: "", headerTitleEl: titleSpan, search: searchAddon, replaying: true };
 
-  el.addEventListener("mousedown", () => focusPane(paneId));
+  el.addEventListener("mousedown", () => focusNook(nookId));
   attachWs(pv);
   const overrides = loadKeybindings();
   term.attachCustomKeyEventHandler((e) => {
@@ -417,37 +417,37 @@ function makePane(paneId: string, since: number): PaneView {
     if (e.key === "Tab") { e.preventDefault(); return true; }
     const chord = normalizeChord(e);
     const action = overrides[chord];
-    if (action && action.startsWith("send-text:")) { void invoke("app.paneWrite", { paneId, dataBase64: toBase64Utf8(action.slice("send-text:".length)) }); return false; }
-    if (e.shiftKey && e.key === "Enter") { void invoke("app.paneWrite", { paneId, dataBase64: toBase64Utf8("\x1b\r") }); return false; }
+    if (action && action.startsWith("send-text:")) { void invoke("app.nookWrite", { nookId, dataBase64: toBase64Utf8(action.slice("send-text:".length)) }); return false; }
+    if (e.shiftKey && e.key === "Enter") { void invoke("app.nookWrite", { nookId, dataBase64: toBase64Utf8("\x1b\r") }); return false; }
     if (!e.metaKey || e.altKey || e.ctrlKey) return true;
     const k = e.key.toLowerCase();
     if (k === "c") {
       if (term.hasSelection()) { const s = term.getSelection(); if (s && navigator.clipboard) void navigator.clipboard.writeText(s); }
-      else { void invoke("app.paneWrite", { paneId, dataBase64: toBase64Utf8("\u0003") }); }
+      else { void invoke("app.nookWrite", { nookId, dataBase64: toBase64Utf8("\u0003") }); }
       return false;
     }
     if (k === "a") { term.selectAll(); return false; }
     if (k === "v") {
-      if (navigator.clipboard && navigator.clipboard.readText) void navigator.clipboard.readText().then((t) => { if (t) void invoke("app.paneWrite", { paneId, dataBase64: toBase64Utf8(t) }); });
+      if (navigator.clipboard && navigator.clipboard.readText) void navigator.clipboard.readText().then((t) => { if (t) void invoke("app.nookWrite", { nookId, dataBase64: toBase64Utf8(t) }); });
       return false;
     }
-    if (e.key === "ArrowLeft") { void invoke("app.paneWrite", { paneId, dataBase64: toBase64Utf8("\u0001") }); return false; }
-    if (e.key === "ArrowRight") { void invoke("app.paneWrite", { paneId, dataBase64: toBase64Utf8("\u0005") }); return false; }
-    if (e.key === "Backspace") { void invoke("app.paneWrite", { paneId, dataBase64: toBase64Utf8("\u0015") }); return false; }
+    if (e.key === "ArrowLeft") { void invoke("app.nookWrite", { nookId, dataBase64: toBase64Utf8("\u0001") }); return false; }
+    if (e.key === "ArrowRight") { void invoke("app.nookWrite", { nookId, dataBase64: toBase64Utf8("\u0005") }); return false; }
+    if (e.key === "Backspace") { void invoke("app.nookWrite", { nookId, dataBase64: toBase64Utf8("\u0015") }); return false; }
     return true;
   });
   const setTitle = () => { titleSpan.textContent = pv.customTitle || pv.title || "shell"; };
-  header.addEventListener("mousedown", (e) => { if (e.target !== moreBtn) focusPane(paneId); });
+  header.addEventListener("mousedown", (e) => { if (e.target !== moreBtn) focusNook(nookId); });
   header.draggable = true;
   header.addEventListener("dragstart", (e) => {
     if (!e.dataTransfer) return;
-    e.dataTransfer.setData("text/cove-pane", paneId);
+    e.dataTransfer.setData("text/cove-nook", nookId);
     e.dataTransfer.effectAllowed = "move";
-    draggingPaneId = paneId;
+    draggingNookId = nookId;
   });
-  header.addEventListener("dragend", () => { draggingPaneId = null; clearDropOverlay(); });
+  header.addEventListener("dragend", () => { draggingNookId = null; clearDropOverlay(); });
   el.addEventListener("dragover", (e) => {
-    if (!draggingPaneId || draggingPaneId === paneId) return;
+    if (!draggingNookId || draggingNookId === nookId) return;
     e.preventDefault();
     if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
     const rect = el.getBoundingClientRect();
@@ -458,15 +458,15 @@ function makePane(paneId: string, since: number): PaneView {
   el.addEventListener("dragleave", (e) => { if (e.target === el) clearDropOverlay(); });
   el.addEventListener("drop", (e) => {
     e.preventDefault();
-    const src = e.dataTransfer?.getData("text/cove-pane") || draggingPaneId;
+    const src = e.dataTransfer?.getData("text/cove-nook") || draggingNookId;
     clearDropOverlay();
-    draggingPaneId = null;
-    if (!src || !activeRoomId) { console.warn("pane drop without source or active room"); return; }
+    draggingNookId = null;
+    if (!src || !activeShoreId) { console.warn("nook drop without source or active shore"); return; }
     const rect = el.getBoundingClientRect();
     const zone = dropZoneFor(e.clientX - rect.left, e.clientY - rect.top, rect.width, rect.height);
-    const m = moveMutationFor(zone, src, paneId);
+    const m = moveMutationFor(zone, src, nookId);
     if (!m) return;
-    void applyPaneMove(m, src);
+    void applyNookMove(m, src);
   });
   const startRename = () => {
     const input = document.createElement("input");
@@ -479,8 +479,8 @@ function makePane(paneId: string, since: number): PaneView {
       const newTitle = commit ? input.value.trim() : pv.customTitle;
       if (commit && newTitle !== pv.customTitle) {
         pv.customTitle = newTitle;
-        rememberPaneTitle(paneId, newTitle || pv.title);
-        void invoke("app.paneRename", { paneId, title: newTitle }).catch(() => void 0);
+        rememberNookTitle(nookId, newTitle || pv.title);
+        void invoke("app.nookRename", { nookId, title: newTitle }).catch(() => void 0);
       }
       input.replaceWith(titleSpan);
       setTitle();
@@ -491,32 +491,32 @@ function makePane(paneId: string, since: number): PaneView {
   titleSpan.addEventListener("dblclick", startRename);
   moreBtn.addEventListener("click", (e) => {
     e.stopPropagation();
-    closePaneMenus();
+    closeNookMenus();
     const menu = document.createElement("div");
     menu.className = "pmenu";
-    const mk = (label: string, fn: () => void) => { const r = document.createElement("div"); r.className = "pmi"; r.textContent = label; r.addEventListener("click", (ev) => { ev.stopPropagation(); closePaneMenus(); fn(); }); menu.appendChild(r); };
-    mk("Copy Pane ID", () => { if (navigator.clipboard) void navigator.clipboard.writeText(paneId); });
+    const mk = (label: string, fn: () => void) => { const r = document.createElement("div"); r.className = "pmi"; r.textContent = label; r.addEventListener("click", (ev) => { ev.stopPropagation(); closeNookMenus(); fn(); }); menu.appendChild(r); };
+    mk("Copy Nook ID", () => { if (navigator.clipboard) void navigator.clipboard.writeText(nookId); });
     mk("Rename", startRename);
-    mk("New subtab", () => void addSubtab(paneId));
-    mk("Close", () => { focusPane(paneId); void closeFocused(); });
-    mk("Close Others", () => { void closeOthers(paneId); });
+    mk("New subtab", () => void addSubtab(nookId));
+    mk("Close", () => { focusNook(nookId); void closeFocused(); });
+    mk("Close Others", () => { void closeOthers(nookId); });
     header.appendChild(menu);
   });
-  term.onTitleChange((t) => { pv.title = t; rememberPaneTitle(paneId, pv.customTitle || t); setTitle(); refreshTitles(); });
-  panes.set(paneId, pv);
+  term.onTitleChange((t) => { pv.title = t; rememberNookTitle(nookId, pv.customTitle || t); setTitle(); refreshTitles(); });
+  nooks.set(nookId, pv);
   return pv;
 }
 
-function getPane(paneId: string): PaneView {
-  const existing = panes.get(paneId);
+function getNook(nookId: string): NookView {
+  const existing = nooks.get(nookId);
   if (existing) return existing;
-  return makePane(paneId, 0);
+  return makeNook(nookId, 0);
 }
 
-function closePaneMenus(): void {
+function closeNookMenus(): void {
   document.querySelectorAll(".pmenu").forEach((m) => m.remove());
 }
-document.addEventListener("click", closePaneMenus);
+document.addEventListener("click", closeNookMenus);
 
 document.addEventListener("contextmenu", (e) => e.preventDefault());
 
@@ -593,32 +593,32 @@ function isColumn(orientation: number | string): boolean {
 }
 
 function collectLeafIds(node: MosaicNode): string[] {
-  if (node.kind === "leaf") return node.subtabs.length > 0 ? node.subtabs.map((s) => s.documentId) : [node.paneId];
+  if (node.kind === "leaf") return node.subtabs.length > 0 ? node.subtabs.map((s) => s.documentId) : [node.nookId];
   return [...collectLeafIds(node.childA), ...collectLeafIds(node.childB)];
 }
 function findLeafId(node: MosaicNode, termId: string): string | null {
-  if (node.kind === "leaf") return (node.paneId === termId || node.subtabs.some((s) => s.documentId === termId)) ? node.paneId : null;
+  if (node.kind === "leaf") return (node.nookId === termId || node.subtabs.some((s) => s.documentId === termId)) ? node.nookId : null;
   return findLeafId(node.childA, termId) ?? findLeafId(node.childB, termId);
 }
 async function activateSubtab(leafId: string, index: number): Promise<void> {
-  if (!activeRoomId) return;
-  await invoke("app.layoutMutate", { op: "activateSubtab", roomId: activeRoomId, paneId: leafId, targetPaneId: "", newPaneId: "", orientation: "", name: "", dir: index });
+  if (!activeShoreId) return;
+  await invoke("app.layoutMutate", { op: "activateSubtab", shoreId: activeShoreId, nookId: leafId, targetNookId: "", newNookId: "", orientation: "", name: "", dir: index });
   await reload();
 }
-async function addSubtab(termPaneId: string): Promise<void> {
-  const room = activeRoom();
-  if (!room || !activeRoomId) return;
-  const leafId = findLeafId(room.layoutTree, termPaneId);
+async function addSubtab(termNookId: string): Promise<void> {
+  const shore = activeShore();
+  if (!shore || !activeShoreId) return;
+  const leafId = findLeafId(shore.layoutTree, termNookId);
   if (!leafId) return;
-  const sp = (await invoke<{ paneId: string }>("app.paneSpawn", { command: "", cwd: "", inheritCwdFrom: termPaneId, cols: 80, rows: 24, adapter: "", agentName: "", workspace: "", room: "" })).paneId;
-  await invoke("app.layoutMutate", { op: "addSubtab", roomId: activeRoomId, paneId: leafId, newPaneId: sp, targetPaneId: "", orientation: "", name: "", dir: 0 });
+  const sp = (await invoke<{ nookId: string }>("app.nookSpawn", { command: "", cwd: "", inheritCwdFrom: termNookId, cols: 80, rows: 24, adapter: "", agentName: "", bay: "", shore: "" })).nookId;
+  await invoke("app.layoutMutate", { op: "addSubtab", shoreId: activeShoreId, nookId: leafId, newNookId: sp, targetNookId: "", orientation: "", name: "", dir: 0 });
   await reload();
-  focusPane(sp);
+  focusNook(sp);
 }
 
-function emptyPaneStrip(paneId: string): HTMLElement {
+function emptyNookStrip(nookId: string): HTMLElement {
   const el = document.createElement("div");
-  el.className = "pane empty-pane";
+  el.className = "nook empty-nook";
   el.style.flex = "1 1 0";
   el.style.minWidth = "0";
   el.style.minHeight = "0";
@@ -628,7 +628,7 @@ function emptyPaneStrip(paneId: string): HTMLElement {
   el.style.justifyContent = "flex-end";
   el.style.paddingBottom = "24px";
   const strip = document.createElement("div");
-  strip.className = "pane-dock";
+  strip.className = "nook-dock";
   strip.style.display = "flex";
   strip.style.gap = "8px";
   const tile = document.createElement("button");
@@ -636,27 +636,27 @@ function emptyPaneStrip(paneId: string): HTMLElement {
   tile.textContent = "Terminal";
   tile.addEventListener("click", (e) => {
     e.stopPropagation();
-    void spawnIntoPane(paneId);
+    void spawnIntoNook(nookId);
   });
   strip.appendChild(tile);
   el.appendChild(strip);
-  el.addEventListener("mousedown", () => focusPane(paneId));
+  el.addEventListener("mousedown", () => focusNook(nookId));
   return el;
 }
 
-async function spawnIntoPane(paneId: string): Promise<void> {
-  if (!activeRoomId) return;
-  const sp = (await invoke<{ paneId: string }>("app.paneSpawn", { command: "", cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: "", agentName: "", workspace: "", room: "" })).paneId;
-  await invoke("app.layoutMutate", { op: "addSubtab", roomId: activeRoomId, paneId: paneId, newPaneId: sp, targetPaneId: "", orientation: "", name: "", dir: 0 });
+async function spawnIntoNook(nookId: string): Promise<void> {
+  if (!activeShoreId) return;
+  const sp = (await invoke<{ nookId: string }>("app.nookSpawn", { command: "", cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: "", agentName: "", bay: "", shore: "" })).nookId;
+  await invoke("app.layoutMutate", { op: "addSubtab", shoreId: activeShoreId, nookId: nookId, newNookId: sp, targetNookId: "", orientation: "", name: "", dir: 0 });
   await reload();
 }
 
-function renderKanbanPane(paneId: string): HTMLElement {
+function renderKanbanNook(nookId: string): HTMLElement {
   const placeholder = document.createElement("div");
-  placeholder.className = "kanban-pane-placeholder";
+  placeholder.className = "kanban-nook-placeholder";
   placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
-  const workspaceId = "default";
-  renderKanbanBoard(workspaceId).then(el => {
+  const bayId = "default";
+  renderKanbanBoard(bayId).then(el => {
     el.style.flex = "1 1 0";
     el.style.minWidth = "0";
     el.style.minHeight = "0";
@@ -667,7 +667,7 @@ function renderKanbanPane(paneId: string): HTMLElement {
   return placeholder;
 }
 
-function renderTaskListPane(paneId: string): HTMLElement {
+function renderTaskListNook(nookId: string): HTMLElement {
   const placeholder = document.createElement("div");
   placeholder.className = "task-list-placeholder";
   placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
@@ -682,16 +682,16 @@ function renderTaskListPane(paneId: string): HTMLElement {
   return placeholder;
 }
 
-function renderTaskDetailPane(paneId: string): HTMLElement {
+function renderTaskDetailNook(nookId: string): HTMLElement {
   const placeholder = document.createElement("div");
   placeholder.className = "task-detail-placeholder";
   placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;display:flex;align-items:center;justify-content:center;color:#6b7280;";
   placeholder.textContent = "Select a task to view details";
   return placeholder;
 }
-function renderTimelinePane(paneId: string): HTMLElement {
+function renderTimelineNook(nookId: string): HTMLElement {
   const placeholder = document.createElement("div");
-  placeholder.className = "timeline-pane-placeholder";
+  placeholder.className = "timeline-nook-placeholder";
   placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
   renderTimelineFeed("default").then(el => {
     el.style.flex = "1 1 0";
@@ -703,11 +703,11 @@ function renderTimelinePane(paneId: string): HTMLElement {
   });
   return placeholder;
 }
-function renderMarkdownNotePane(paneId: string): HTMLElement {
+function renderMarkdownNoteNook(nookId: string): HTMLElement {
   const placeholder = document.createElement("div");
   placeholder.className = "markdown-note-placeholder";
   placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
-  renderMarkdownNote("default", paneId).then(el => {
+  renderMarkdownNote("default", nookId).then(el => {
     el.style.flex = "1 1 0";
     el.style.minWidth = "0";
     el.style.minHeight = "0";
@@ -717,11 +717,11 @@ function renderMarkdownNotePane(paneId: string): HTMLElement {
   });
   return placeholder;
 }
-function renderSketchNotePane(paneId: string): HTMLElement {
+function renderSketchNoteNook(nookId: string): HTMLElement {
   const placeholder = document.createElement("div");
   placeholder.className = "sketch-note-placeholder";
   placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
-  renderSketchNote("default", paneId).then(el => {
+  renderSketchNote("default", nookId).then(el => {
     el.style.flex = "1 1 0";
     el.style.minWidth = "0";
     el.style.minHeight = "0";
@@ -731,11 +731,11 @@ function renderSketchNotePane(paneId: string): HTMLElement {
   });
   return placeholder;
 }
-function renderCanvasNotePane(paneId: string): HTMLElement {
+function renderCanvasNoteNook(nookId: string): HTMLElement {
   const placeholder = document.createElement("div");
   placeholder.className = "canvas-note-placeholder";
   placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
-  renderCanvasNote("default", paneId).then(el => {
+  renderCanvasNote("default", nookId).then(el => {
     el.style.flex = "1 1 0";
     el.style.minWidth = "0";
     el.style.minHeight = "0";
@@ -745,11 +745,11 @@ function renderCanvasNotePane(paneId: string): HTMLElement {
   });
   return placeholder;
 }
-function renderHtmlNotePane(paneId: string): HTMLElement {
+function renderHtmlNoteNook(nookId: string): HTMLElement {
   const placeholder = document.createElement("div");
   placeholder.className = "html-note-placeholder";
   placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
-  renderHtmlNote("default", paneId).then(el => {
+  renderHtmlNote("default", nookId).then(el => {
     el.style.flex = "1 1 0";
     el.style.minWidth = "0";
     el.style.minHeight = "0";
@@ -759,11 +759,11 @@ function renderHtmlNotePane(paneId: string): HTMLElement {
   });
   return placeholder;
 }
-function renderNotepadPaneWrapper(paneId: string): HTMLElement {
+function renderNotepadNookWrapper(nookId: string): HTMLElement {
   const placeholder = document.createElement("div");
-  placeholder.className = "notepad-pane-placeholder";
+  placeholder.className = "notepad-nook-placeholder";
   placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
-  renderNotepadPane("default").then(el => {
+  renderNotepadNook("default").then(el => {
     el.style.flex = "1 1 0";
     el.style.minWidth = "0";
     el.style.minHeight = "0";
@@ -773,11 +773,11 @@ function renderNotepadPaneWrapper(paneId: string): HTMLElement {
   });
   return placeholder;
 }
-function renderMermaidNotePane(paneId: string): HTMLElement {
+function renderMermaidNoteNook(nookId: string): HTMLElement {
   const placeholder = document.createElement("div");
   placeholder.className = "mermaid-note-placeholder";
   placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
-  renderMermaidNote("default", paneId).then(el => {
+  renderMermaidNote("default", nookId).then(el => {
     el.style.flex = "1 1 0";
     el.style.minWidth = "0";
     el.style.minHeight = "0";
@@ -787,14 +787,14 @@ function renderMermaidNotePane(paneId: string): HTMLElement {
   });
   return placeholder;
 }
-function renderSessionPickerPane(paneId: string): HTMLElement {
+function renderSessionPickerNook(nookId: string): HTMLElement {
   const placeholder = document.createElement("div");
   placeholder.className = "session-picker-placeholder";
   placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
-  const workspaceId = layout?.id ?? "default";
+  const bayId = layout?.id ?? "default";
   const projectDir = activeProjectDir();
   const adapters = launcherAdapters.map((a) => ({ name: a.name, displayName: a.displayName }));
-  renderSessionPicker(workspaceId, projectDir, adapters, (adapter, sessionId, cwd, displayName) => {
+  renderSessionPicker(bayId, projectDir, adapters, (adapter, sessionId, cwd, displayName) => {
     void resumeRecentSession(adapter, sessionId, cwd, displayName);
   }).then(el => {
     el.style.flex = "1 1 0";
@@ -824,17 +824,17 @@ async function performResume(action: ResumeAction): Promise<void> {
     showInAppToast(action.toast.title, action.toast.body, () => {});
     return;
   }
-  const sp = (await invoke<{ paneId: string }>("app.paneSpawn", { command: action.command, args: action.args, cwd: action.cwd, inheritCwdFrom: "", cols: 80, rows: 24, adapter: action.adapter, agentName: action.roomName, workspace: "", room: "" })).paneId;
-  const r = await invoke<{ roomId: string }>("app.layoutMutate", { op: "createRoom", newPaneId: sp, name: action.roomName, roomId: "", targetPaneId: "", orientation: "", paneId: "", dir: 0, paneType: "terminal" });
-  activeRoomId = r.roomId;
+  const sp = (await invoke<{ nookId: string }>("app.nookSpawn", { command: action.command, args: action.args, cwd: action.cwd, inheritCwdFrom: "", cols: 80, rows: 24, adapter: action.adapter, agentName: action.shoreName, bay: "", shore: "" })).nookId;
+  const r = await invoke<{ shoreId: string }>("app.layoutMutate", { op: "createShore", newNookId: sp, name: action.shoreName, shoreId: "", targetNookId: "", orientation: "", nookId: "", dir: 0, nookType: "terminal" });
+  activeShoreId = r.shoreId;
   await reload();
-  focusPane(sp);
-  if (action.toast) showInAppToast(action.toast.title, action.toast.body, () => revealPane(sp));
+  focusNook(sp);
+  if (action.toast) showInAppToast(action.toast.title, action.toast.body, () => revealNook(sp));
 }
 
-function renderLibraryPane(paneId: string): HTMLElement {
+function renderLibraryNook(nookId: string): HTMLElement {
   const placeholder = document.createElement("div");
-  placeholder.className = "library-pane-placeholder";
+  placeholder.className = "library-nook-placeholder";
   placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
   renderLibraryPopover("default").then(el => {
     el.style.flex = "1 1 0";
@@ -846,7 +846,7 @@ function renderLibraryPane(paneId: string): HTMLElement {
   });
   return placeholder;
 }
-function renderSnapshotInspectorPane(paneId: string): HTMLElement {
+function renderSnapshotInspectorNook(nookId: string): HTMLElement {
   const placeholder = document.createElement("div");
   placeholder.className = "snapshot-inspector-placeholder";
   placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
@@ -860,11 +860,11 @@ function renderSnapshotInspectorPane(paneId: string): HTMLElement {
   });
   return placeholder;
 }
-function renderDiffReviewPaneWrapper(paneId: string): HTMLElement {
+function renderDiffReviewNookWrapper(nookId: string): HTMLElement {
   const placeholder = document.createElement("div");
   placeholder.className = "diff-review-placeholder";
   placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
-  renderDiffReviewPane("default").then(el => {
+  renderDiffReviewNook("default").then(el => {
     el.style.flex = "1 1 0";
     el.style.minWidth = "0";
     el.style.minHeight = "0";
@@ -874,11 +874,11 @@ function renderDiffReviewPaneWrapper(paneId: string): HTMLElement {
   });
   return placeholder;
 }
-function renderEditorPaneWrapper(paneId: string): HTMLElement {
+function renderEditorNookWrapper(nookId: string): HTMLElement {
   const placeholder = document.createElement("div");
-  placeholder.className = "editor-pane-placeholder";
+  placeholder.className = "editor-nook-placeholder";
   placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
-  renderEditorPane(paneId, paneFilePaths.get(paneId) ?? paneId).then(el => {
+  renderEditorNook(nookId, nookFilePaths.get(nookId) ?? nookId).then(el => {
     el.style.flex = "1 1 0";
     el.style.minWidth = "0";
     el.style.minHeight = "0";
@@ -889,13 +889,13 @@ function renderEditorPaneWrapper(paneId: string): HTMLElement {
   return placeholder;
 }
 
-function renderImagePane(paneId: string): HTMLElement {
+function renderImageNook(nookId: string): HTMLElement {
   const el = document.createElement("div");
-  el.className = "image-pane";
+  el.className = "image-nook";
   el.style.cssText = "display:flex;align-items:center;justify-content:center;height:100%;background:#0d1117;overflow:hidden;position:relative;";
   const img = document.createElement("img");
   img.style.cssText = "max-width:100%;max-height:100%;object-fit:contain;transition:transform 0.1s;";
-  img.alt = paneId;
+  img.alt = nookId;
   const controls = document.createElement("div");
   controls.style.cssText = "position:absolute;bottom:8px;right:8px;display:flex;gap:4px;background:#21262d;padding:4px;border-radius:4px;";
   const fitBtn = document.createElement("button");
@@ -919,13 +919,13 @@ function renderImagePane(paneId: string): HTMLElement {
   return el;
 }
 function activeProjectDir(): string {
-  return workspaceBoxItems.find((w) => w.id === (layout?.id ?? null))?.projectDir ?? "";
+  return bayBoxItems.find((w) => w.id === (layout?.id ?? null))?.projectDir ?? "";
 }
-function renderGitPaneWrapper(paneId: string): HTMLElement {
+function renderGitNookWrapper(nookId: string): HTMLElement {
   const placeholder = document.createElement("div");
-  placeholder.className = "git-pane-placeholder";
+  placeholder.className = "git-nook-placeholder";
   placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
-  renderSourceControlPane(activeProjectDir(), (path) => { void openFileInEditor(path); }).then(el => {
+  renderSourceControlNook(activeProjectDir(), (path) => { void openFileInEditor(path); }).then(el => {
     el.style.flex = "1 1 0";
     el.style.minWidth = "0";
     el.style.minHeight = "0";
@@ -935,11 +935,11 @@ function renderGitPaneWrapper(paneId: string): HTMLElement {
   });
   return placeholder;
 }
-function renderSearchPaneWrapper(paneId: string): HTMLElement {
+function renderSearchNookWrapper(nookId: string): HTMLElement {
   const placeholder = document.createElement("div");
-  placeholder.className = "search-pane-placeholder";
+  placeholder.className = "search-nook-placeholder";
   placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
-  renderSearchPane("default").then(el => {
+  renderSearchNook("default").then(el => {
     el.style.flex = "1 1 0";
     el.style.minWidth = "0";
     el.style.minHeight = "0";
@@ -949,12 +949,12 @@ function renderSearchPaneWrapper(paneId: string): HTMLElement {
   });
   return placeholder;
 }
-function wrapToolPaneChrome(paneId: string, label: string, content: HTMLElement): HTMLElement {
+function wrapToolNookChrome(nookId: string, label: string, content: HTMLElement): HTMLElement {
   const el = document.createElement("div");
-  el.className = "pane tool-pane";
+  el.className = "nook tool-nook";
   el.style.flexGrow = "1";
   const header = document.createElement("div");
-  header.className = "pane-header";
+  header.className = "nook-header";
   const title = document.createElement("span");
   title.className = "pt";
   title.textContent = label;
@@ -962,8 +962,8 @@ function wrapToolPaneChrome(paneId: string, label: string, content: HTMLElement)
   const closeBtn = document.createElement("button");
   closeBtn.className = "pmore pclose";
   closeBtn.textContent = "✕";
-  closeBtn.title = "Close pane";
-  closeBtn.addEventListener("click", (e) => { e.stopPropagation(); void closePaneById(paneId); });
+  closeBtn.title = "Close nook";
+  closeBtn.addEventListener("click", (e) => { e.stopPropagation(); void closeNookById(nookId); });
   header.appendChild(closeBtn);
   el.appendChild(header);
   content.style.flex = "1 1 0";
@@ -973,26 +973,26 @@ function wrapToolPaneChrome(paneId: string, label: string, content: HTMLElement)
   return el;
 }
 
-function renderBrowserPaneWrapper(paneId: string, url: string): HTMLElement {
+function renderBrowserNookWrapper(nookId: string, url: string): HTMLElement {
   const placeholder = document.createElement("div");
-  placeholder.className = "browser-pane-placeholder";
+  placeholder.className = "browser-nook-placeholder";
   placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
-  renderBrowserPane(paneId, url).then(el => {
+  renderBrowserNook(nookId, url).then(el => {
     el.style.flex = "1 1 0";
     el.style.minWidth = "0";
     el.style.minHeight = "0";
     placeholder.replaceWith(el);
   }).catch(e => {
-    console.warn("browser pane load failed", paneId, e);
+    console.warn("browser nook load failed", nookId, e);
     placeholder.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to load browser: ${(e as Error).message}</div>`;
   });
-  return wrapToolPaneChrome(paneId, "Browser", placeholder);
+  return wrapToolNookChrome(nookId, "Browser", placeholder);
 }
-function renderDiffViewerPaneWrapper(paneId: string, refInput: string): HTMLElement {
+function renderDiffViewerNookWrapper(nookId: string, refInput: string): HTMLElement {
   const placeholder = document.createElement("div");
   placeholder.className = "diff-viewer-placeholder";
   placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
-  renderDiffViewerPane(paneId, paneId, refInput).then(el => {
+  renderDiffViewerNook(nookId, nookId, refInput).then(el => {
     el.style.flex = "1 1 0";
     el.style.minWidth = "0";
     el.style.minHeight = "0";
@@ -1002,11 +1002,11 @@ function renderDiffViewerPaneWrapper(paneId: string, refInput: string): HTMLElem
   });
   return placeholder;
 }
-function renderMarkdownPaneWrapper(paneId: string): HTMLElement {
+function renderMarkdownNookWrapper(nookId: string): HTMLElement {
   const placeholder = document.createElement("div");
-  placeholder.className = "markdown-pane-placeholder";
+  placeholder.className = "markdown-nook-placeholder";
   placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
-  renderMarkdownPane(paneId, paneId).then(el => {
+  renderMarkdownNook(nookId, nookId).then(el => {
     el.style.flex = "1 1 0";
     el.style.minWidth = "0";
     el.style.minHeight = "0";
@@ -1018,35 +1018,35 @@ function renderMarkdownPaneWrapper(paneId: string): HTMLElement {
 }
 function renderNode(node: MosaicNode): HTMLElement {
   if (node.kind === "leaf") {
-    const subs = node.subtabs.length > 0 ? node.subtabs : [{ documentId: node.paneId, paneType: "terminal", title: null }];
+    const subs = node.subtabs.length > 0 ? node.subtabs : [{ documentId: node.nookId, nookType: "terminal", title: null }];
     const activeIdx = Math.min(Math.max(0, node.activeSubtab), subs.length - 1);
     const active = subs[activeIdx];
-    const isEmpty = active.paneType === "empty" || node.subtabs.length === 0;
-    if (active.paneType === "tasks-kanban") return renderKanbanPane(active.documentId);
-    if (active.paneType === "tasks-list") return renderTaskListPane(active.documentId);
-    if (active.paneType === "tasks-detail") return renderTaskDetailPane(active.documentId);
-    if (active.paneType === "timeline-feed") return renderTimelinePane(active.documentId);
-    if (active.paneType === "note-markdown") return renderMarkdownNotePane(active.documentId);
-    if (active.paneType === "note-sketch") return renderSketchNotePane(active.documentId);
-    if (active.paneType === "note-canvas") return renderCanvasNotePane(active.documentId);
-    if (active.paneType === "note-html") return renderHtmlNotePane(active.documentId);
-    if (active.paneType === "markdown") return renderMarkdownPaneWrapper(active.documentId);
-    if (active.paneType === "notepad") return renderNotepadPaneWrapper(active.documentId);
-    if (active.paneType === "note-mermaid") return renderMermaidNotePane(active.documentId);
-    if (active.paneType === "session-picker") return renderSessionPickerPane(active.documentId);
-    if (active.paneType === "library") return renderLibraryPane(active.documentId);
-    if (active.paneType === "snapshot-inspector") return renderSnapshotInspectorPane(active.documentId);
-    if (active.paneType === "diff-review") return renderDiffReviewPaneWrapper(active.documentId);
-    if (active.paneType === "editor") return renderEditorPaneWrapper(active.documentId);
-    if (active.paneType === "image") return renderImagePane(active.documentId);
-    if (active.paneType === "git" || active.paneType === "sourceControl") return renderGitPaneWrapper(active.documentId);
-    if (active.paneType === "search") return renderSearchPaneWrapper(active.documentId);
-    if (active.paneType === "browser") return renderBrowserPaneWrapper(active.documentId, active.title ?? "about:blank");
-    if (active.paneType === "diff") return renderDiffViewerPaneWrapper(active.documentId, active.title ?? "");
-    if (active.paneType === "pdf") return renderPdfPane(paneFilePaths.get(active.documentId) ?? active.title ?? active.documentId);
-    if (active.paneType === "video") return renderVideoPane(paneFilePaths.get(active.documentId) ?? active.title ?? active.documentId);
-    if (isEmpty) return emptyPaneStrip(node.paneId);
-    const activeEl = getPane(subs[activeIdx].documentId).el;
+    const isEmpty = active.nookType === "empty" || node.subtabs.length === 0;
+    if (active.nookType === "tasks-kanban") return renderKanbanNook(active.documentId);
+    if (active.nookType === "tasks-list") return renderTaskListNook(active.documentId);
+    if (active.nookType === "tasks-detail") return renderTaskDetailNook(active.documentId);
+    if (active.nookType === "timeline-feed") return renderTimelineNook(active.documentId);
+    if (active.nookType === "note-markdown") return renderMarkdownNoteNook(active.documentId);
+    if (active.nookType === "note-sketch") return renderSketchNoteNook(active.documentId);
+    if (active.nookType === "note-canvas") return renderCanvasNoteNook(active.documentId);
+    if (active.nookType === "note-html") return renderHtmlNoteNook(active.documentId);
+    if (active.nookType === "markdown") return renderMarkdownNookWrapper(active.documentId);
+    if (active.nookType === "notepad") return renderNotepadNookWrapper(active.documentId);
+    if (active.nookType === "note-mermaid") return renderMermaidNoteNook(active.documentId);
+    if (active.nookType === "session-picker") return renderSessionPickerNook(active.documentId);
+    if (active.nookType === "library") return renderLibraryNook(active.documentId);
+    if (active.nookType === "snapshot-inspector") return renderSnapshotInspectorNook(active.documentId);
+    if (active.nookType === "diff-review") return renderDiffReviewNookWrapper(active.documentId);
+    if (active.nookType === "editor") return renderEditorNookWrapper(active.documentId);
+    if (active.nookType === "image") return renderImageNook(active.documentId);
+    if (active.nookType === "git" || active.nookType === "sourceControl") return renderGitNookWrapper(active.documentId);
+    if (active.nookType === "search") return renderSearchNookWrapper(active.documentId);
+    if (active.nookType === "browser") return renderBrowserNookWrapper(active.documentId, active.title ?? "about:blank");
+    if (active.nookType === "diff") return renderDiffViewerNookWrapper(active.documentId, active.title ?? "");
+    if (active.nookType === "pdf") return renderPdfNook(nookFilePaths.get(active.documentId) ?? active.title ?? active.documentId);
+    if (active.nookType === "video") return renderVideoNook(nookFilePaths.get(active.documentId) ?? active.title ?? active.documentId);
+    if (isEmpty) return emptyNookStrip(node.nookId);
+    const activeEl = getNook(subs[activeIdx].documentId).el;
     activeEl.style.flexGrow = "1";
     if (subs.length <= 1) return activeEl;
     const wrap = document.createElement("div");
@@ -1056,9 +1056,9 @@ function renderNode(node: MosaicNode): HTMLElement {
     subs.forEach((s, i) => {
       const tab = document.createElement("div");
       tab.className = "subtab" + (i === activeIdx ? " active" : "");
-      const pvv = panes.get(s.documentId);
+      const pvv = nooks.get(s.documentId);
       tab.textContent = (pvv && (pvv.customTitle || pvv.title)) || s.title || "shell";
-      tab.addEventListener("click", () => { void activateSubtab(node.paneId, i); });
+      tab.addEventListener("click", () => { void activateSubtab(node.nookId, i); });
       strip.appendChild(tab);
     });
     wrap.appendChild(strip);
@@ -1118,154 +1118,154 @@ function wireSplitDivider(div: HTMLElement, col: boolean, a: HTMLElement, b: HTM
   });
 }
 
-function activeRoom(): RoomSnapshot | undefined {
+function activeShore(): ShoreSnapshot | undefined {
   if (!layout) return undefined;
-  return layout.rooms.find((r) => r.id === activeRoomId) ?? layout.rooms[0];
+  return layout.shores.find((r) => r.id === activeShoreId) ?? layout.shores[0];
 }
 
 function activeLeafIds(): string[] {
-  const room = activeRoom();
-  if (!room) return [];
-  return collectLeafIds(room.layoutTree);
+  const shore = activeShore();
+  if (!shore) return [];
+  return collectLeafIds(shore.layoutTree);
 }
 
-function firstLeafOf(room: RoomSnapshot): string | undefined {
-  return collectLeafIds(room.layoutTree)[0];
+function firstLeafOf(shore: ShoreSnapshot): string | undefined {
+  return collectLeafIds(shore.layoutTree)[0];
 }
 
-function renderRoom(): void {
-  const room = activeRoom();
+function renderShore(): void {
+  const shore = activeShore();
   gridEl.innerHTML = "";
-  const roomEmpty = room ? isEmptyRoomTree(room.layoutTree) : false;
+  const shoreEmpty = shore ? isEmptyShoreTree(shore.layoutTree) : false;
   let zoomed = false;
-  if (room && room.layoutTree && !roomEmpty) {
-    const treeIds = collectLeafIds(room.layoutTree);
-    const zid = room.zoomedPaneId;
+  if (shore && shore.layoutTree && !shoreEmpty) {
+    const treeIds = collectLeafIds(shore.layoutTree);
+    const zid = shore.zoomedNookId;
     if (zid && treeIds.includes(zid)) {
-      const zoomEl = getPane(zid).el;
+      const zoomEl = getNook(zid).el;
       zoomEl.style.flexGrow = "1";
       gridEl.appendChild(zoomEl);
-      focusedPaneId = zid;
+      focusedNookId = zid;
       zoomed = true;
     } else {
-      gridEl.appendChild(renderNode(room.layoutTree));
+      gridEl.appendChild(renderNode(shore.layoutTree));
     }
     if (!zoomed) {
       const keep = new Set<string>(treeIds);
-      for (const [id, pv] of panes) {
+      for (const [id, pv] of nooks) {
         if (!keep.has(id)) {
           try { pv.ws.close(); } catch { void 0; }
           pv.term.dispose();
-          panes.delete(id);
+          nooks.delete(id);
         }
       }
     }
   } else {
-    for (const [id, pv] of panes) {
+    for (const [id, pv] of nooks) {
       try { pv.ws.close(); } catch { void 0; }
       pv.term.dispose();
-      panes.delete(id);
+      nooks.delete(id);
     }
   }
-  if (room && roomEmpty) {
-    const placeholder = collectLeafIds(room.layoutTree)[0] ?? null;
-    focusedPaneId = null;
-    gridEl.appendChild(renderBoxLauncher(room.id, placeholder));
-  } else if (!room || !room.layoutTree) {
-    if (shouldShowLauncher((layout?.rooms ?? []).length)) {
+  if (shore && shoreEmpty) {
+    const placeholder = collectLeafIds(shore.layoutTree)[0] ?? null;
+    focusedNookId = null;
+    gridEl.appendChild(renderBoxLauncher(shore.id, placeholder));
+  } else if (!shore || !shore.layoutTree) {
+    if (shouldShowLauncher((layout?.shores ?? []).length)) {
       gridEl.appendChild(renderBoxLauncher(null, null));
     } else {
-      const empty = buildEmptyState({ message: EmptyStateMessages.noRooms, actionLabel: "New terminal", actionIcon: "+" });
+      const empty = buildEmptyState({ message: EmptyStateMessages.noShores, actionLabel: "New terminal", actionIcon: "+" });
       const action = empty.querySelector(".cove-empty-action");
-      if (action) action.addEventListener("click", () => void newRoom());
+      if (action) action.addEventListener("click", () => void newShore());
       gridEl.appendChild(empty);
     }
   }
-  for (const [id, pv] of panes) {
-    pv.el.classList.toggle("focused", id === focusedPaneId);
+  for (const [id, pv] of nooks) {
+    pv.el.classList.toggle("focused", id === focusedNookId);
   }
   fitAll();
   requestAnimationFrame(() => { fitAll(); reconcileBrowserBounds(); });
 }
 
-function focusPane(paneId: string): void {
-  focusedPaneId = paneId;
-  for (const [id, pv] of panes) {
-    pv.el.classList.toggle("focused", id === paneId);
+function focusNook(nookId: string): void {
+  focusedNookId = nookId;
+  for (const [id, pv] of nooks) {
+    pv.el.classList.toggle("focused", id === nookId);
   }
-  panes.get(paneId)?.term.focus();
+  nooks.get(nookId)?.term.focus();
   refreshTitles();
-  if (sidebarModel.leftMode === "workspaces" && !collapsedOf(sidebarModel, "left")) renderSidebarContent("left");
-  if (activeRoomId) {
-    void invoke("app.layoutMutate", { op: "focus", roomId: activeRoomId, paneId, targetPaneId: "", newPaneId: "", orientation: "", name: "", dir: 0 });
+  if (sidebarModel.leftMode === "bays" && !collapsedOf(sidebarModel, "left")) renderSidebarContent("left");
+  if (activeShoreId) {
+    void invoke("app.layoutMutate", { op: "focus", shoreId: activeShoreId, nookId, targetNookId: "", newNookId: "", orientation: "", name: "", dir: 0 });
   }
 }
 
 function refreshTitles(): void {
-  const tabEls = roomTabsEl.querySelectorAll<HTMLElement>(".rtab");
-  (layout?.rooms ?? []).forEach((r) => {
-    const tab = Array.from(tabEls).find((el) => el.title === roomTabName(r) || el.querySelector(".rtab-name")?.textContent === roomTabName(r));
+  const tabEls = shoreTabsEl.querySelectorAll<HTMLElement>(".rtab");
+  (layout?.shores ?? []).forEach((r) => {
+    const tab = Array.from(tabEls).find((el) => el.title === shoreTabName(r) || el.querySelector(".rtab-name")?.textContent === shoreTabName(r));
     if (tab) {
       const nameEl = tab.querySelector<HTMLElement>(".rtab-name");
-      if (nameEl) nameEl.textContent = roomTabName(r);
-      tab.title = roomTabName(r);
+      if (nameEl) nameEl.textContent = shoreTabName(r);
+      tab.title = shoreTabName(r);
     }
   });
 }
 
-async function reload(): Promise<WorkspaceSnapshot> {
-  layout = await invoke<WorkspaceSnapshot>("app.layoutGet", {});
+async function reload(): Promise<BaySnapshot> {
+  layout = await invoke<BaySnapshot>("app.layoutGet", {});
   try {
-    const list = await invoke<{ panes: { paneId: string; title: string | null }[] }>("app.paneList", {});
-    for (const p of list.panes) {
-      const pv = panes.get(p.paneId);
+    const list = await invoke<{ nooks: { nookId: string; title: string | null }[] }>("app.nookList", {});
+    for (const p of list.nooks) {
+      const pv = nooks.get(p.nookId);
       if (pv && p.title) pv.customTitle = p.title;
     }
   } catch { void 0; }
-  if (!activeRoomId) {
-    activeRoomId = layout.activeRoomId ?? layout.rooms[0]?.id ?? null;
+  if (!activeShoreId) {
+    activeShoreId = layout.activeShoreId ?? layout.shores[0]?.id ?? null;
   }
   const leaves = activeLeafIds();
-  if (!focusedPaneId || !leaves.includes(focusedPaneId)) {
-    focusedPaneId = leaves[0] ?? null;
+  if (!focusedNookId || !leaves.includes(focusedNookId)) {
+    focusedNookId = leaves[0] ?? null;
   }
   if (activeProjectDir() !== launcherRecentsCwd) await loadLauncherRecents();
-  renderRoom();
-  renderRoomTabs();
+  renderShore();
+  renderShoreTabs();
   renderSidebar();
-  if (focusedPaneId) {
-    panes.get(focusedPaneId)?.term.focus();
+  if (focusedNookId) {
+    nooks.get(focusedNookId)?.term.focus();
   }
   refreshTitles();
   return layout;
 }
 
 async function splitActive(dir: "row" | "col"): Promise<void> {
-  if (!layout || layout.rooms.length === 0 || !activeRoomId) {
-    await newRoom();
+  if (!layout || layout.shores.length === 0 || !activeShoreId) {
+    await newShore();
     return;
   }
-  const src = focusedPaneId;
+  const src = focusedNookId;
   if (!src) return;
-  const sp = (await invoke<{ paneId: string }>("app.paneSpawn", { command: "", cwd: "", inheritCwdFrom: src, cols: 80, rows: 24, adapter: "", agentName: "", workspace: "", room: "" })).paneId;
-  await invoke("app.layoutMutate", { op: "split", roomId: activeRoomId, targetPaneId: src, newPaneId: sp, orientation: dir, name: "", paneId: "", dir: 0 });
+  const sp = (await invoke<{ nookId: string }>("app.nookSpawn", { command: "", cwd: "", inheritCwdFrom: src, cols: 80, rows: 24, adapter: "", agentName: "", bay: "", shore: "" })).nookId;
+  await invoke("app.layoutMutate", { op: "split", shoreId: activeShoreId, targetNookId: src, newNookId: sp, orientation: dir, name: "", nookId: "", dir: 0 });
   await reload();
-  focusPane(sp);
+  focusNook(sp);
 }
 
-let draggingPaneId: string | null = null;
+let draggingNookId: string | null = null;
 let dropOverlayEl: HTMLElement | null = null;
 let tabSpringTimer: number | null = null;
-let tabSpringRoomId: string | null = null;
-document.addEventListener("dragend", () => { draggingPaneId = null; clearDropOverlay(); });
+let tabSpringShoreId: string | null = null;
+document.addEventListener("dragend", () => { draggingNookId = null; clearDropOverlay(); });
 
-async function movePaneToRoom(paneId: string, targetRoomId: string): Promise<void> {
+async function moveNookToShore(nookId: string, targetShoreId: string): Promise<void> {
   try {
-    await invoke("app.layoutMutate", { op: "movePaneToRoom", roomId: targetRoomId, paneId, targetPaneId: "", newPaneId: "", orientation: "", name: "", dir: 0 });
-    activeRoomId = targetRoomId;
+    await invoke("app.layoutMutate", { op: "moveNookToShore", shoreId: targetShoreId, nookId, targetNookId: "", newNookId: "", orientation: "", name: "", dir: 0 });
+    activeShoreId = targetShoreId;
     await reload();
-    focusPane(paneId);
-  } catch (err) { console.warn("move pane to room failed", paneId, targetRoomId, err); }
+    focusNook(nookId);
+  } catch (err) { console.warn("move nook to shore failed", nookId, targetShoreId, err); }
 }
 
 function paintDropOverlay(host: HTMLElement, zone: ReturnType<typeof dropZoneFor>): void {
@@ -1285,37 +1285,37 @@ function clearDropOverlay(): void {
   dropOverlayEl?.remove();
 }
 
-async function applyPaneMove(m: { op: string; paneId: string; targetPaneId: string; orientation: string; dir: number }, focusId: string): Promise<void> {
-  if (!activeRoomId) { console.warn("pane move without active room"); return; }
+async function applyNookMove(m: { op: string; nookId: string; targetNookId: string; orientation: string; dir: number }, focusId: string): Promise<void> {
+  if (!activeShoreId) { console.warn("nook move without active shore"); return; }
   try {
-    const srcRoom = layout?.rooms.find((r) => collectLeafIds(r.layoutTree).includes(m.paneId));
-    if (srcRoom && srcRoom.id !== activeRoomId) {
-      await invoke("app.layoutMutate", { op: "movePaneToRoom", roomId: activeRoomId, paneId: m.paneId, targetPaneId: "", newPaneId: "", orientation: "", name: "", dir: 0 });
+    const srcShore = layout?.shores.find((r) => collectLeafIds(r.layoutTree).includes(m.nookId));
+    if (srcShore && srcShore.id !== activeShoreId) {
+      await invoke("app.layoutMutate", { op: "moveNookToShore", shoreId: activeShoreId, nookId: m.nookId, targetNookId: "", newNookId: "", orientation: "", name: "", dir: 0 });
     }
     if (m.op === "centerDrop") {
-      const room = activeRoom();
-      const srcLeaf = room ? findLeaf(room.layoutTree, m.paneId) : null;
+      const shore = activeShore();
+      const srcLeaf = shore ? findLeaf(shore.layoutTree, m.nookId) : null;
       const idx = srcLeaf ? Math.max(0, srcLeaf.activeSubtab) : 0;
-      await invoke("app.layoutMutate", { op: "centerDrop", roomId: activeRoomId, targetPaneId: m.paneId, paneId: m.targetPaneId, dir: idx, newPaneId: "", orientation: "", name: "" });
+      await invoke("app.layoutMutate", { op: "centerDrop", shoreId: activeShoreId, targetNookId: m.nookId, nookId: m.targetNookId, dir: idx, newNookId: "", orientation: "", name: "" });
     } else {
-      await invoke("app.layoutMutate", { op: "movePane", roomId: activeRoomId, paneId: m.paneId, targetPaneId: m.targetPaneId, orientation: m.orientation, dir: m.dir, newPaneId: "", name: "" });
+      await invoke("app.layoutMutate", { op: "moveNook", shoreId: activeShoreId, nookId: m.nookId, targetNookId: m.targetNookId, orientation: m.orientation, dir: m.dir, newNookId: "", name: "" });
     }
     await reload();
-    focusPane(focusId);
-  } catch (err) { console.warn("pane move failed", m.op, err); }
+    focusNook(focusId);
+  } catch (err) { console.warn("nook move failed", m.op, err); }
 }
 
-function findLeaf(node: MosaicNode, paneId: string): { paneId: string; activeSubtab: number } | null {
-  if (node.kind === "leaf") return node.paneId === paneId ? { paneId: node.paneId, activeSubtab: node.activeSubtab } : null;
-  return findLeaf(node.childA, paneId) ?? findLeaf(node.childB, paneId);
+function findLeaf(node: MosaicNode, nookId: string): { nookId: string; activeSubtab: number } | null {
+  if (node.kind === "leaf") return node.nookId === nookId ? { nookId: node.nookId, activeSubtab: node.activeSubtab } : null;
+  return findLeaf(node.childA, nookId) ?? findLeaf(node.childB, nookId);
 }
 
-async function closePaneById(paneId: string): Promise<void> {
-  const room = layout?.rooms.find((r) => collectLeafIds(r.layoutTree).includes(paneId));
-  if (!room) { console.warn("close requested for pane not in layout", paneId); return; }
-  await closeBrowserWebview(paneId);
-  try { await invoke("app.paneKill", { paneId }); } catch (err) { console.warn("pane kill on exit failed", paneId, err); }
-  try { await invoke("app.layoutMutate", { op: "close", roomId: room.id, paneId, targetPaneId: "", newPaneId: "", orientation: "", name: "", dir: 0 }); } catch (err) { console.warn("layout close on exit failed", paneId, err); }
+async function closeNookById(nookId: string): Promise<void> {
+  const shore = layout?.shores.find((r) => collectLeafIds(r.layoutTree).includes(nookId));
+  if (!shore) { console.warn("close requested for nook not in layout", nookId); return; }
+  await closeBrowserWebview(nookId);
+  try { await invoke("app.nookKill", { nookId }); } catch (err) { console.warn("nook kill on exit failed", nookId, err); }
+  try { await invoke("app.layoutMutate", { op: "close", shoreId: shore.id, nookId, targetNookId: "", newNookId: "", orientation: "", name: "", dir: 0 }); } catch (err) { console.warn("layout close on exit failed", nookId, err); }
   await reload();
 }
 
@@ -1334,58 +1334,58 @@ function openSplitChooser(e: MouseEvent, dir: "row" | "col"): void {
 }
 
 async function splitActiveWith(dir: "row" | "col", kind: string): Promise<void> {
-  if (!activeRoomId) { console.warn("split requested with no active room"); return; }
-  const target = focusedPaneId ?? activeLeafIds()[0];
-  if (!target) { console.warn("split requested with no target pane"); return; }
-  let paneId: string;
-  let paneType = "terminal";
+  if (!activeShoreId) { console.warn("split requested with no active shore"); return; }
+  const target = focusedNookId ?? activeLeafIds()[0];
+  if (!target) { console.warn("split requested with no target nook"); return; }
+  let nookId: string;
+  let nookType = "terminal";
   if (kind === "terminal") {
-    paneId = (await invoke<{ paneId: string }>("app.paneSpawn", { command: "", cwd: "", inheritCwdFrom: target, cols: 80, rows: 24, adapter: "", agentName: "", workspace: "", room: "" })).paneId;
+    nookId = (await invoke<{ nookId: string }>("app.nookSpawn", { command: "", cwd: "", inheritCwdFrom: target, cols: 80, rows: 24, adapter: "", agentName: "", bay: "", shore: "" })).nookId;
   } else if (kind.startsWith("adapter:")) {
     const name = kind.slice("adapter:".length);
     const tile = detectedHarnessTiles(buildAdapterTiles(launcherAdapters)).find((t) => t.adapterName === name);
     if (!tile) { console.warn("split chooser: unknown adapter", name); return; }
     const launch = await buildAdapterLaunch({ name: tile.adapterName, displayName: tile.label, accent: tile.accent, binary: tile.binary });
-    paneId = (await invoke<{ paneId: string }>("app.paneSpawn", { command: launch.command, args: launch.args, cwd: "", inheritCwdFrom: target, cols: 80, rows: 24, adapter: tile.adapterName, agentName: tile.label, workspace: "", room: "" })).paneId;
+    nookId = (await invoke<{ nookId: string }>("app.nookSpawn", { command: launch.command, args: launch.args, cwd: "", inheritCwdFrom: target, cols: 80, rows: 24, adapter: tile.adapterName, agentName: tile.label, bay: "", shore: "" })).nookId;
   } else if (kind === "browser") {
-    paneId = (await invoke<{ paneId: string; currentUrl: string }>("cove://commands/browser.create", { url: "https://duckduckgo.com" })).paneId;
-    paneType = "browser";
+    nookId = (await invoke<{ nookId: string; currentUrl: string }>("cove://commands/browser.create", { url: "https://duckduckgo.com" })).nookId;
+    nookType = "browser";
   } else {
-    paneId = (await invoke<{ paneId: string }>("app.paneSpawn", { command: "", cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: "", agentName: "", workspace: "", room: "" })).paneId;
-    paneType = kind;
+    nookId = (await invoke<{ nookId: string }>("app.nookSpawn", { command: "", cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: "", agentName: "", bay: "", shore: "" })).nookId;
+    nookType = kind;
   }
-  await invoke("app.layoutMutate", { op: "split", roomId: activeRoomId, targetPaneId: target, newPaneId: paneId, orientation: dir, name: "", paneId: "", dir: 0, paneType });
+  await invoke("app.layoutMutate", { op: "split", shoreId: activeShoreId, targetNookId: target, newNookId: nookId, orientation: dir, name: "", nookId: "", dir: 0, nookType });
   await reload();
-  focusPane(paneId);
+  focusNook(nookId);
 }
 
 async function closeFocused(): Promise<void> {
-  if (!focusedPaneId || !activeRoomId) return;
-  await invoke("app.paneKill", { paneId: focusedPaneId });
-  await invoke("app.layoutMutate", { op: "close", roomId: activeRoomId, paneId: focusedPaneId, targetPaneId: "", newPaneId: "", orientation: "", name: "", dir: 0 });
+  if (!focusedNookId || !activeShoreId) return;
+  await invoke("app.nookKill", { nookId: focusedNookId });
+  await invoke("app.layoutMutate", { op: "close", shoreId: activeShoreId, nookId: focusedNookId, targetNookId: "", newNookId: "", orientation: "", name: "", dir: 0 });
   await reload();
 }
 
-async function closeOthers(keepPaneId: string): Promise<void> {
-  if (!activeRoomId) return;
-  const room = activeRoom();
-  if (!room) return;
-  const others = collectLeafIds(room.layoutTree).filter((id) => id !== keepPaneId);
+async function closeOthers(keepNookId: string): Promise<void> {
+  if (!activeShoreId) return;
+  const shore = activeShore();
+  if (!shore) return;
+  const others = collectLeafIds(shore.layoutTree).filter((id) => id !== keepNookId);
   for (const id of others) {
-    try { await invoke("app.paneKill", { paneId: id }); } catch { void 0; }
-    try { await invoke("app.layoutMutate", { op: "close", roomId: activeRoomId, paneId: id, targetPaneId: "", newPaneId: "", orientation: "", name: "", dir: 0 }); } catch { void 0; }
+    try { await invoke("app.nookKill", { nookId: id }); } catch { void 0; }
+    try { await invoke("app.layoutMutate", { op: "close", shoreId: activeShoreId, nookId: id, targetNookId: "", newNookId: "", orientation: "", name: "", dir: 0 }); } catch { void 0; }
   }
-  focusPane(keepPaneId);
+  focusNook(keepNookId);
   await reload();
 }
 
 async function toggleZoom(): Promise<void> {
-  if (!focusedPaneId || !activeRoomId) return;
-  const room = activeRoom();
-  if (room && room.zoomedPaneId === focusedPaneId) {
-    await invoke("app.layoutMutate", { op: "unzoom", roomId: activeRoomId, paneId: "", targetPaneId: "", newPaneId: "", orientation: "", name: "", dir: 0 });
+  if (!focusedNookId || !activeShoreId) return;
+  const shore = activeShore();
+  if (shore && shore.zoomedNookId === focusedNookId) {
+    await invoke("app.layoutMutate", { op: "unzoom", shoreId: activeShoreId, nookId: "", targetNookId: "", newNookId: "", orientation: "", name: "", dir: 0 });
   } else {
-    await invoke("app.layoutMutate", { op: "zoom", roomId: activeRoomId, paneId: focusedPaneId, targetPaneId: "", newPaneId: "", orientation: "", name: "", dir: 0 });
+    await invoke("app.layoutMutate", { op: "zoom", shoreId: activeShoreId, nookId: focusedNookId, targetNookId: "", newNookId: "", orientation: "", name: "", dir: 0 });
   }
   await reload();
 }
@@ -1393,9 +1393,9 @@ async function toggleZoom(): Promise<void> {
 function cycleFocus(d: number): void {
   const leaves = activeLeafIds();
   if (leaves.length === 0) return;
-  const idx = focusedPaneId ? leaves.indexOf(focusedPaneId) : -1;
+  const idx = focusedNookId ? leaves.indexOf(focusedNookId) : -1;
   const next = leaves[(idx + d + leaves.length) % leaves.length];
-  focusPane(next);
+  focusNook(next);
 }
 
 function newPlaceholderId(): string {
@@ -1403,99 +1403,99 @@ function newPlaceholderId(): string {
   return "empty-" + rnd;
 }
 
-async function newRoom(): Promise<void> {
+async function newShore(): Promise<void> {
   const placeholder = newPlaceholderId();
-  const r = await invoke<{ roomId: string }>("app.layoutMutate", { op: "createRoom", newPaneId: placeholder, name: nextRoomName(), roomId: "", targetPaneId: "", orientation: "", paneId: "", dir: 0, paneType: "empty" });
-  activeRoomId = r.roomId;
-  focusedPaneId = null;
+  const r = await invoke<{ shoreId: string }>("app.layoutMutate", { op: "createShore", newNookId: placeholder, name: nextShoreName(), shoreId: "", targetNookId: "", orientation: "", nookId: "", dir: 0, nookType: "empty" });
+  activeShoreId = r.shoreId;
+  focusedNookId = null;
   await reload();
 }
 
-async function placePaneIntoRoom(roomId: string, placeholderId: string | null, paneId: string, paneType: string, roomName?: string): Promise<void> {
+async function placeNookIntoShore(shoreId: string, placeholderId: string | null, nookId: string, nookType: string, shoreName?: string): Promise<void> {
   if (placeholderId) {
-    await invoke("app.layoutMutate", { op: "replace", roomId, targetPaneId: placeholderId, newPaneId: paneId, orientation: "", name: "", paneId: "", dir: 0, paneType });
-    if (roomName) {
-      try { await invoke("app.layoutMutate", { op: "rename", roomId, name: roomName, targetPaneId: "", newPaneId: "", orientation: "", paneId: "", dir: 0 }); } catch (err) { console.warn("room rename after place failed", err); }
+    await invoke("app.layoutMutate", { op: "replace", shoreId, targetNookId: placeholderId, newNookId: nookId, orientation: "", name: "", nookId: "", dir: 0, nookType });
+    if (shoreName) {
+      try { await invoke("app.layoutMutate", { op: "rename", shoreId, name: shoreName, targetNookId: "", newNookId: "", orientation: "", nookId: "", dir: 0 }); } catch (err) { console.warn("shore rename after place failed", err); }
     }
   } else {
-    await invoke("app.layoutMutate", { op: "createRoom", newPaneId: paneId, name: roomName === "Room" || !roomName ? nextRoomName() : roomName, roomId: "", targetPaneId: "", orientation: "", paneId: "", dir: 0, paneType });
+    await invoke("app.layoutMutate", { op: "createShore", newNookId: nookId, name: shoreName === "Shore" || !shoreName ? nextShoreName() : shoreName, shoreId: "", targetNookId: "", orientation: "", nookId: "", dir: 0, nookType });
   }
-  activeRoomId = roomId;
+  activeShoreId = shoreId;
   await reload();
-  focusPane(paneId);
+  focusNook(nookId);
 }
 
-async function launchTileInto(roomId: string | null, placeholderId: string | null, action: string): Promise<void> {
-  const placeable = placeablePaneForAction(action);
+async function launchTileInto(shoreId: string | null, placeholderId: string | null, action: string): Promise<void> {
+  const placeable = placeableNookForAction(action);
   if (!placeable) { runAction(action); return; }
-  let paneId: string;
+  let nookId: string;
   if (placeable.kind === "browser") {
-    const bp = await invoke<{ paneId: string; currentUrl: string }>("cove://commands/browser.create", { url: "https://duckduckgo.com" });
-    paneId = bp.paneId;
+    const bp = await invoke<{ nookId: string; currentUrl: string }>("cove://commands/browser.create", { url: "https://duckduckgo.com" });
+    nookId = bp.nookId;
   } else {
-    paneId = (await invoke<{ paneId: string }>("app.paneSpawn", { command: "", cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: "", agentName: "", workspace: "", room: "" })).paneId;
+    nookId = (await invoke<{ nookId: string }>("app.nookSpawn", { command: "", cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: "", agentName: "", bay: "", shore: "" })).nookId;
   }
-  if (roomId) {
-    await placePaneIntoRoom(roomId, placeholderId, paneId, placeable.paneType, placeable.roomName);
+  if (shoreId) {
+    await placeNookIntoShore(shoreId, placeholderId, nookId, placeable.nookType, placeable.shoreName);
   } else {
-    const r = await invoke<{ roomId: string }>("app.layoutMutate", { op: "createRoom", newPaneId: paneId, name: placeable.roomName === "Room" ? nextRoomName() : placeable.roomName, roomId: "", targetPaneId: "", orientation: "", paneId: "", dir: 0, paneType: placeable.paneType });
-    activeRoomId = r.roomId;
+    const r = await invoke<{ shoreId: string }>("app.layoutMutate", { op: "createShore", newNookId: nookId, name: placeable.shoreName === "Shore" ? nextShoreName() : placeable.shoreName, shoreId: "", targetNookId: "", orientation: "", nookId: "", dir: 0, nookType: placeable.nookType });
+    activeShoreId = r.shoreId;
     await reload();
-    focusPane(paneId);
+    focusNook(nookId);
   }
 }
 
-async function newBrowserRoom(url: string): Promise<void> {
-  const bp = await invoke<{ paneId: string; currentUrl: string }>("cove://commands/browser.create", { url });
-  const r = await invoke<{ roomId: string }>("app.layoutMutate", { op: "createRoom", newPaneId: bp.paneId, name: "Browser", roomId: "", targetPaneId: "", orientation: "", paneId: "", dir: 0, paneType: "browser" });
-  activeRoomId = r.roomId;
+async function newBrowserShore(url: string): Promise<void> {
+  const bp = await invoke<{ nookId: string; currentUrl: string }>("cove://commands/browser.create", { url });
+  const r = await invoke<{ shoreId: string }>("app.layoutMutate", { op: "createShore", newNookId: bp.nookId, name: "Browser", shoreId: "", targetNookId: "", orientation: "", nookId: "", dir: 0, nookType: "browser" });
+  activeShoreId = r.shoreId;
   await reload();
-  focusPane(bp.paneId);
+  focusNook(bp.nookId);
 }
 
-async function closeRoom(roomId: string): Promise<void> {
-  const room = layout?.rooms.find((r) => r.id === roomId);
-  if (!room) return;
-  const leaves = collectLeafIds(room.layoutTree);
+async function closeShore(shoreId: string): Promise<void> {
+  const shore = layout?.shores.find((r) => r.id === shoreId);
+  if (!shore) return;
+  const leaves = collectLeafIds(shore.layoutTree);
   for (const id of leaves) {
     await closeBrowserWebview(id);
-    try { await invoke("app.paneKill", { paneId: id }); } catch { void 0; }
+    try { await invoke("app.nookKill", { nookId: id }); } catch { void 0; }
   }
-  try { await invoke("app.layoutMutate", { op: "closeRoom", roomId, paneId: "", targetPaneId: "", newPaneId: "", orientation: "", name: "", dir: 0 }); } catch { void 0; }
-  if (activeRoomId === roomId) activeRoomId = null;
+  try { await invoke("app.layoutMutate", { op: "closeShore", shoreId, nookId: "", targetNookId: "", newNookId: "", orientation: "", name: "", dir: 0 }); } catch { void 0; }
+  if (activeShoreId === shoreId) activeShoreId = null;
   await reload();
 }
 
 let sidebarModel: SidebarModel = initialSidebarModel();
-const collapsedTreeRooms = new Set<string>(JSON.parse(localStorage.getItem("cove.tree.collapsedRooms") ?? "[]"));
+const collapsedTreeShores = new Set<string>(JSON.parse(localStorage.getItem("cove.tree.collapsedShores") ?? "[]"));
 let agentCards: AgentCard[] = [];
-const needsInputPanes = new Set<string>();
+const needsInputNooks = new Set<string>();
 let agentPollTimer: ReturnType<typeof setInterval> | null = null;
-let workspaceBoxItems: WorkspaceBoxInput[] = [];
+let bayBoxItems: BayBoxInput[] = [];
 
-async function loadWorkspaceBoxes(): Promise<void> {
+async function loadBayBoxes(): Promise<void> {
   try {
-    const res = await invoke<{ workspaces: { id: string; name: string; projectDir?: string; iconKind?: string | null; iconValue?: string | null }[] }>("cove://commands/workspace.list", {});
-    workspaceBoxItems = (res.workspaces ?? []).map((w) => ({ id: w.id, name: w.name, projectDir: w.projectDir, icon: w.iconKind ? { kind: w.iconKind, value: w.iconValue ?? "" } : null }));
-  } catch { workspaceBoxItems = []; }
+    const res = await invoke<{ bays: { id: string; name: string; projectDir?: string; iconKind?: string | null; iconValue?: string | null }[] }>("cove://commands/bay.list", {});
+    bayBoxItems = (res.bays ?? []).map((w) => ({ id: w.id, name: w.name, projectDir: w.projectDir, icon: w.iconKind ? { kind: w.iconKind, value: w.iconValue ?? "" } : null }));
+  } catch { bayBoxItems = []; }
   renderSidebarContent("left");
 }
 
-let draggingWorkspaceId: string | null = null;
+let draggingBayId: string | null = null;
 
-async function reorderWorkspaces(fromId: string, toId: string): Promise<void> {
-  const ids = workspaceBoxItems.map((w) => w.id);
+async function reorderBays(fromId: string, toId: string): Promise<void> {
+  const ids = bayBoxItems.map((w) => w.id);
   const fromIdx = ids.indexOf(fromId);
   const toIdx = ids.indexOf(toId);
-  if (fromIdx < 0 || toIdx < 0) { console.warn("workspace reorder with unknown ids", fromId, toId); return; }
+  if (fromIdx < 0 || toIdx < 0) { console.warn("bay reorder with unknown ids", fromId, toId); return; }
   ids.splice(toIdx, 0, ids.splice(fromIdx, 1)[0]);
-  try { await invoke("cove://commands/workspace.reorder", { orderedIds: ids }); } catch (err) { console.warn("workspace reorder failed", err); }
-  await loadWorkspaceBoxes();
+  try { await invoke("cove://commands/bay.reorder", { orderedIds: ids }); } catch (err) { console.warn("bay reorder failed", err); }
+  await loadBayBoxes();
 }
 
-let treeDragRoomId: string | null = null;
+let treeDragShoreId: string | null = null;
 
-function startWorkspaceRename(wsId: string, boxEl: HTMLElement, currentName: string): void {
+function startBayRename(wsId: string, boxEl: HTMLElement, currentName: string): void {
   const input = document.createElement("input");
   input.className = "prename";
   input.value = currentName;
@@ -1508,11 +1508,11 @@ function startWorkspaceRename(wsId: string, boxEl: HTMLElement, currentName: str
   const commit = async (save: boolean) => {
     if (done) return;
     done = true;
-    const newName = nextWorkspaceName(input.value, currentName);
+    const newName = nextBayName(input.value, currentName);
     if (save && newName !== currentName) {
-      try { await invoke("cove://commands/workspace.rename", { id: wsId, name: newName }); }
-      catch (e) { console.warn("workspace.rename failed", wsId, e); }
-      await loadWorkspaceBoxes();
+      try { await invoke("cove://commands/bay.rename", { id: wsId, name: newName }); }
+      catch (e) { console.warn("bay.rename failed", wsId, e); }
+      await loadBayBoxes();
       return;
     }
     renderSidebarContent("left");
@@ -1525,12 +1525,12 @@ function startWorkspaceRename(wsId: string, boxEl: HTMLElement, currentName: str
   });
 }
 
-async function deleteWorkspace(wsId: string): Promise<void> {
+async function deleteBay(wsId: string): Promise<void> {
   try {
-    await invoke("cove://commands/workspace.delete", { id: wsId });
-    await loadWorkspaceBoxes();
+    await invoke("cove://commands/bay.delete", { id: wsId });
+    await loadBayBoxes();
     await reload();
-  } catch (e) { console.warn("workspace.delete failed", wsId, e); }
+  } catch (e) { console.warn("bay.delete failed", wsId, e); }
 }
 
 function sideEl(_side: SidebarSide): { root: HTMLElement; content: HTMLElement } {
@@ -1595,7 +1595,7 @@ function renderSidebarContent(side: SidebarSide): void {
   if (collapsedOf(sidebarModel, side)) { content.innerHTML = ""; return; }
   content.innerHTML = "";
   const mode = sidebarModel.leftMode;
-  if (mode === "workspaces") renderWorkspacesContent(content);
+  if (mode === "bays") renderBaysContent(content);
   else if (mode === "notepad") renderNotepadContent(content);
   else renderStubContent(content, mode);
 }
@@ -1629,18 +1629,18 @@ function renderStubContent(container: HTMLElement, mode: SidebarMode): void {
   container.appendChild(empty);
 }
 
-function roomLeaves(room: RoomSnapshot): TreeLeaf[] {
+function shoreLeaves(shore: ShoreSnapshot): TreeLeaf[] {
   const collect = (node: MosaicNode): TreeLeaf[] => {
     if (node.kind === "leaf") {
-      const subs = node.subtabs.length > 0 ? node.subtabs : [{ documentId: node.paneId, paneType: "terminal", title: null }];
+      const subs = node.subtabs.length > 0 ? node.subtabs : [{ documentId: node.nookId, nookType: "terminal", title: null }];
       return subs.map((s) => {
-        const pv = panes.get(s.documentId);
-        return { paneId: s.documentId, paneType: s.paneType, title: (pv && (pv.customTitle || pv.title)) || paneTitleCache.get(s.documentId) || s.title || "" };
+        const pv = nooks.get(s.documentId);
+        return { nookId: s.documentId, nookType: s.nookType, title: (pv && (pv.customTitle || pv.title)) || nookTitleCache.get(s.documentId) || s.title || "" };
       });
     }
     return [...collect(node.childA), ...collect(node.childB)];
   };
-  return collect(room.layoutTree);
+  return collect(shore.layoutTree);
 }
 
 const fsExpandedDirs = new Set<string>(JSON.parse(localStorage.getItem("cove.files.expanded") ?? "[]"));
@@ -1671,37 +1671,37 @@ function requestScmSummary(dir: string): void {
     });
 }
 
-function loadPaneTitleCache(): Map<string, string> {
+function loadNookTitleCache(): Map<string, string> {
   try {
-    return new Map(Object.entries(JSON.parse(localStorage.getItem("cove.paneTitles") ?? "{}") as Record<string, string>));
+    return new Map(Object.entries(JSON.parse(localStorage.getItem("cove.nookTitles") ?? "{}") as Record<string, string>));
   } catch (err) {
-    console.warn("pane title cache unreadable, starting empty", err);
+    console.warn("nook title cache unreadable, starting empty", err);
     return new Map();
   }
 }
-const paneTitleCache = loadPaneTitleCache();
+const nookTitleCache = loadNookTitleCache();
 
-function rememberPaneTitle(paneId: string, title: string): void {
+function rememberNookTitle(nookId: string, title: string): void {
   if (!title) return;
-  if (paneTitleCache.get(paneId) === title) return;
-  paneTitleCache.set(paneId, title);
-  while (paneTitleCache.size > 300) paneTitleCache.delete(paneTitleCache.keys().next().value!);
-  localStorage.setItem("cove.paneTitles", JSON.stringify(Object.fromEntries(paneTitleCache)));
+  if (nookTitleCache.get(nookId) === title) return;
+  nookTitleCache.set(nookId, title);
+  while (nookTitleCache.size > 300) nookTitleCache.delete(nookTitleCache.keys().next().value!);
+  localStorage.setItem("cove.nookTitles", JSON.stringify(Object.fromEntries(nookTitleCache)));
 }
 
-const wsSnapshotCache = new Map<string, WorkspaceSnapshot>();
+const wsSnapshotCache = new Map<string, BaySnapshot>();
 const wsSnapshotFetchedAt = new Map<string, number>();
 const wsSnapshotFetching = new Set<string>();
 const WS_SNAPSHOT_TTL_MS = 10000;
 
-function requestWorkspaceSnapshot(wsId: string): void {
+function requestBaySnapshot(wsId: string): void {
   if (!wsId || wsSnapshotFetching.has(wsId)) return;
   if (Date.now() - (wsSnapshotFetchedAt.get(wsId) ?? 0) < WS_SNAPSHOT_TTL_MS) return;
   wsSnapshotFetching.add(wsId);
-  void invoke<WorkspaceSnapshot>("cove://commands/layout.get", { workspaceId: wsId })
+  void invoke<BaySnapshot>("cove://commands/layout.get", { bayId: wsId })
     .then((snap) => {
       if (snap.id !== wsId) {
-        console.warn("workspace snapshot id mismatch (daemon predates layout.get workspaceId)", wsId, snap.id);
+        console.warn("bay snapshot id mismatch (daemon predates layout.get bayId)", wsId, snap.id);
         wsSnapshotFetchedAt.set(wsId, Date.now());
         wsSnapshotFetching.delete(wsId);
         return;
@@ -1713,7 +1713,7 @@ function requestWorkspaceSnapshot(wsId: string): void {
       if (JSON.stringify(prev ?? null) !== JSON.stringify(snap)) renderSidebarContent("left");
     })
     .catch((err) => {
-      console.warn("workspace snapshot fetch failed", wsId, err);
+      console.warn("bay snapshot fetch failed", wsId, err);
       wsSnapshotFetchedAt.set(wsId, Date.now());
       wsSnapshotFetching.delete(wsId);
     });
@@ -1787,24 +1787,24 @@ function renderFsLevel(host: HTMLElement, dir: string, depth: number): void {
   }
 }
 
-function agentStateByPane(): Map<string, AgentState> {
-  return new Map(buildAgentRows(agentCards, needsInputPanes).map((r) => [r.paneId, r.state]));
+function agentStateByNook(): Map<string, AgentState> {
+  return new Map(buildAgentRows(agentCards, needsInputNooks).map((r) => [r.nookId, r.state]));
 }
 
 function adapterDisplayLabel(adapterName: string): string {
   return launcherAdapters.find((a) => a.name === adapterName)?.displayName ?? adapterName.replace(/-/g, " ");
 }
 
-function buildPaneCard(row: TreeRow, paneStates: Map<string, AgentState>): HTMLElement {
-  const paneId = row.paneId ?? "";
+function buildNookCard(row: TreeRow, nookStates: Map<string, AgentState>): HTMLElement {
+  const nookId = row.nookId ?? "";
   const cardEl = document.createElement("div");
-  cardEl.className = "pane-card";
+  cardEl.className = "nook-card";
   cardEl.style.marginLeft = `${6 + (row.depth - 1) * 14}px`;
   const titleRow = document.createElement("div");
-  titleRow.className = "pane-card-title";
+  titleRow.className = "nook-card-title";
   const glyph = document.createElement("span");
   glyph.className = "pc-ic";
-  glyph.innerHTML = iconSvg(iconForPaneType(row.paneType ?? "terminal"));
+  glyph.innerHTML = iconSvg(iconForNookType(row.nookType ?? "terminal"));
   titleRow.appendChild(glyph);
   const titleText = document.createElement("span");
   titleText.className = "pc-title-text";
@@ -1813,9 +1813,9 @@ function buildPaneCard(row: TreeRow, paneStates: Map<string, AgentState>): HTMLE
   cardEl.appendChild(titleRow);
 
   const metaRow = document.createElement("div");
-  metaRow.className = "pane-card-meta";
-  const agent = agentCards.find((c) => c.paneId === paneId);
-  const st = paneStates.get(paneId);
+  metaRow.className = "nook-card-meta";
+  const agent = agentCards.find((c) => c.nookId === nookId);
+  const st = nookStates.get(nookId);
   if (agent && st) {
     cardEl.classList.add(`state-${st}`);
     const dot = document.createElement("span");
@@ -1827,29 +1827,29 @@ function buildPaneCard(row: TreeRow, paneStates: Map<string, AgentState>): HTMLE
     metaRow.appendChild(metaText);
   } else {
     const metaText = document.createElement("span");
-    metaText.textContent = PANE_TYPE_LABELS[row.paneType ?? ""] ?? row.paneType ?? "pane";
+    metaText.textContent = NOOK_TYPE_LABELS[row.nookType ?? ""] ?? row.nookType ?? "nook";
     metaRow.appendChild(metaText);
   }
   cardEl.appendChild(metaRow);
 
-  cardEl.addEventListener("click", () => { if (paneId) revealPane(paneId); });
+  cardEl.addEventListener("click", () => { if (nookId) revealNook(nookId); });
   cardEl.addEventListener("contextmenu", (e) => {
     openContextMenuAt(e, [
       { id: "focus", label: "Go to" },
-      { id: "copy-id", label: "Copy pane id" },
+      { id: "copy-id", label: "Copy nook id" },
       { id: "close", label: "Close", danger: true },
     ], (id) => {
-      if (id === "focus") focusTreeRow("pane", row.roomId, paneId);
-      else if (id === "copy-id") { if (navigator.clipboard) void navigator.clipboard.writeText(paneId); }
-      else if (id === "close") closeTreeRow("pane", row.roomId, paneId);
+      if (id === "focus") focusTreeRow("nook", row.shoreId, nookId);
+      else if (id === "copy-id") { if (navigator.clipboard) void navigator.clipboard.writeText(nookId); }
+      else if (id === "close") closeTreeRow("nook", row.shoreId, nookId);
     });
   });
   return cardEl;
 }
 
-function renderWorkspacesContent(container: HTMLElement): void {
-  container.appendChild(sidebarHead("Workspace", [{ icon: "+", title: "New workspace", run: () => void newWorkspace() }]));
-  const emptyMessage = workspaceTreeEmptyMessage(workspaceBoxItems.length);
+function renderBaysContent(container: HTMLElement): void {
+  container.appendChild(sidebarHead("Bay", [{ icon: "+", title: "New bay", run: () => void newBay() }]));
+  const emptyMessage = bayTreeEmptyMessage(bayBoxItems.length);
   if (emptyMessage) {
     const list = document.createElement("div");
     list.className = "sb-list";
@@ -1857,23 +1857,23 @@ function renderWorkspacesContent(container: HTMLElement): void {
     container.appendChild(list);
     return;
   }
-  const entries = workspaceBoxItems.map((w) => ({ id: w.id, name: w.name, projectDir: w.projectDir ?? "" }));
-  const activeId = resolveActiveWorkspaceId(entries, layout?.id ?? null);
+  const entries = bayBoxItems.map((w) => ({ id: w.id, name: w.name, projectDir: w.projectDir ?? "" }));
+  const activeId = resolveActiveBayId(entries, layout?.id ?? null);
   const scroll = document.createElement("div");
   scroll.className = "sb-list ws-card-scroll";
-  for (const w of entries) scroll.appendChild(renderWorkspaceCard(w, w.id === activeId));
+  for (const w of entries) scroll.appendChild(renderBayCard(w, w.id === activeId));
   container.appendChild(scroll);
 }
 
-function wireWorkspaceCardDrag(el: HTMLElement, wid: string): void {
+function wireBayCardDrag(el: HTMLElement, wid: string): void {
   el.draggable = true;
   el.addEventListener("dragstart", (e) => {
-    draggingWorkspaceId = wid;
+    draggingBayId = wid;
     if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
   });
-  el.addEventListener("dragend", () => { draggingWorkspaceId = null; });
+  el.addEventListener("dragend", () => { draggingBayId = null; });
   el.addEventListener("dragover", (e) => {
-    if (!draggingWorkspaceId || draggingWorkspaceId === wid) return;
+    if (!draggingBayId || draggingBayId === wid) return;
     e.preventDefault();
     el.classList.add("drag-over");
   });
@@ -1881,13 +1881,13 @@ function wireWorkspaceCardDrag(el: HTMLElement, wid: string): void {
   el.addEventListener("drop", (e) => {
     e.preventDefault();
     el.classList.remove("drag-over");
-    if (!draggingWorkspaceId || draggingWorkspaceId === wid) return;
-    void reorderWorkspaces(draggingWorkspaceId, wid);
-    draggingWorkspaceId = null;
+    if (!draggingBayId || draggingBayId === wid) return;
+    void reorderBays(draggingBayId, wid);
+    draggingBayId = null;
   });
 }
 
-function buildWorkspaceIconGrid(selected: string | null, onSelect: (emoji: string | null) => void): HTMLElement {
+function buildBayIconGrid(selected: string | null, onSelect: (emoji: string | null) => void): HTMLElement {
   const grid = document.createElement("div");
   grid.className = "ws-icon-grid";
   const cells: HTMLElement[] = [];
@@ -1913,28 +1913,28 @@ function buildWorkspaceIconGrid(selected: string | null, onSelect: (emoji: strin
     grid.appendChild(cell);
   };
   addCell(null);
-  for (const emoji of WORKSPACE_ICON_CHOICES) addCell(emoji);
+  for (const emoji of BAY_ICON_CHOICES) addCell(emoji);
   return grid;
 }
 
-let workspaceIconPopoverEl: HTMLElement | null = null;
-let workspaceIconPopoverAway: ((e: MouseEvent) => void) | null = null;
-let workspaceIconPopoverKey: ((e: KeyboardEvent) => void) | null = null;
+let bayIconPopoverEl: HTMLElement | null = null;
+let bayIconPopoverAway: ((e: MouseEvent) => void) | null = null;
+let bayIconPopoverKey: ((e: KeyboardEvent) => void) | null = null;
 
-function closeWorkspaceIconPopover(): void {
-  if (workspaceIconPopoverAway) { document.removeEventListener("mousedown", workspaceIconPopoverAway, true); workspaceIconPopoverAway = null; }
-  if (workspaceIconPopoverKey) { document.removeEventListener("keydown", workspaceIconPopoverKey, true); workspaceIconPopoverKey = null; }
-  workspaceIconPopoverEl?.remove();
-  workspaceIconPopoverEl = null;
+function closeBayIconPopover(): void {
+  if (bayIconPopoverAway) { document.removeEventListener("mousedown", bayIconPopoverAway, true); bayIconPopoverAway = null; }
+  if (bayIconPopoverKey) { document.removeEventListener("keydown", bayIconPopoverKey, true); bayIconPopoverKey = null; }
+  bayIconPopoverEl?.remove();
+  bayIconPopoverEl = null;
 }
 
-function openWorkspaceIconPopover(anchor: HTMLElement, ws: WorkspaceCardEntry): void {
-  closeWorkspaceIconPopover();
+function openBayIconPopover(anchor: HTMLElement, ws: BayCardEntry): void {
+  closeBayIconPopover();
   const pop = document.createElement("div");
   pop.className = "ws-icon-popover";
-  pop.appendChild(buildWorkspaceIconGrid(workspaceGlyph(ws.icon), (emoji) => {
-    closeWorkspaceIconPopover();
-    void changeWorkspaceIcon(ws.id, emoji);
+  pop.appendChild(buildBayIconGrid(bayGlyph(ws.icon), (emoji) => {
+    closeBayIconPopover();
+    void changeBayIcon(ws.id, emoji);
   }));
   pop.style.cssText = "position:fixed;left:-9999px;top:-9999px;";
   document.body.appendChild(pop);
@@ -1943,30 +1943,30 @@ function openWorkspaceIconPopover(anchor: HTMLElement, ws: WorkspaceCardEntry): 
   const pos = clampMenuPosition({ x: rect.left, y: rect.bottom + 4 }, size, { width: window.innerWidth, height: window.innerHeight });
   pop.style.left = `${pos.x}px`;
   pop.style.top = `${pos.y}px`;
-  workspaceIconPopoverEl = pop;
-  workspaceIconPopoverKey = (e) => { if (e.key === "Escape") { e.preventDefault(); closeWorkspaceIconPopover(); } };
-  document.addEventListener("keydown", workspaceIconPopoverKey, true);
-  workspaceIconPopoverAway = (ev) => { if (workspaceIconPopoverEl && !workspaceIconPopoverEl.contains(ev.target as Node)) closeWorkspaceIconPopover(); };
-  setTimeout(() => { if (workspaceIconPopoverAway) document.addEventListener("mousedown", workspaceIconPopoverAway, true); }, 0);
+  bayIconPopoverEl = pop;
+  bayIconPopoverKey = (e) => { if (e.key === "Escape") { e.preventDefault(); closeBayIconPopover(); } };
+  document.addEventListener("keydown", bayIconPopoverKey, true);
+  bayIconPopoverAway = (ev) => { if (bayIconPopoverEl && !bayIconPopoverEl.contains(ev.target as Node)) closeBayIconPopover(); };
+  setTimeout(() => { if (bayIconPopoverAway) document.addEventListener("mousedown", bayIconPopoverAway, true); }, 0);
 }
 
-async function changeWorkspaceIcon(wsId: string, emoji: string | null): Promise<void> {
+async function changeBayIcon(wsId: string, emoji: string | null): Promise<void> {
   try {
-    if (emoji) await invoke("cove://commands/workspace.set-icon", { id: wsId, kind: "emoji", value: emoji });
-    else await invoke("cove://commands/workspace.set-icon", { id: wsId, kind: "", value: "" });
-    await loadWorkspaceBoxes();
+    if (emoji) await invoke("cove://commands/bay.set-icon", { id: wsId, kind: "emoji", value: emoji });
+    else await invoke("cove://commands/bay.set-icon", { id: wsId, kind: "", value: "" });
+    await loadBayBoxes();
   } catch (e) {
-    console.warn("workspace.set-icon failed", wsId, e);
-    showInAppToast("Icon not changed", "Could not update the workspace icon.", () => {});
+    console.warn("bay.set-icon failed", wsId, e);
+    showInAppToast("Icon not changed", "Could not update the bay icon.", () => {});
   }
 }
 
-function workspaceCardHead(ws: WorkspaceCardEntry, mini: boolean): HTMLElement {
+function bayCardHead(ws: BayCardEntry, mini: boolean): HTMLElement {
   const head = document.createElement("div");
   head.className = "ws-card-head";
   const swatch = document.createElement("span");
   swatch.className = "ws-card-swatch";
-  const glyph = workspaceGlyph(ws.icon);
+  const glyph = bayGlyph(ws.icon);
   if (glyph) {
     swatch.classList.add("has-glyph");
     swatch.textContent = glyph;
@@ -1989,26 +1989,26 @@ function workspaceCardHead(ws: WorkspaceCardEntry, mini: boolean): HTMLElement {
   head.appendChild(titles);
   head.addEventListener("contextmenu", (e) => {
     openContextMenuAt(e, [
-      { id: "new-room", label: "New room", disabled: mini },
+      { id: "new-shore", label: "New shore", disabled: mini },
       { id: "rename", label: "Rename" },
       { id: "change-icon", label: "Change icon" },
       { id: "sep", label: "", separator: true },
-      { id: "close-ws", label: "Close workspace", danger: true },
+      { id: "close-ws", label: "Close bay", danger: true },
     ], (id) => {
-      if (id === "new-room") void newRoom();
-      else if (id === "rename") startWorkspaceRename(ws.id, name, ws.name);
-      else if (id === "change-icon") openWorkspaceIconPopover(swatch, ws);
-      else if (id === "close-ws") void deleteWorkspace(ws.id);
+      if (id === "new-shore") void newShore();
+      else if (id === "rename") startBayRename(ws.id, name, ws.name);
+      else if (id === "change-icon") openBayIconPopover(swatch, ws);
+      else if (id === "close-ws") void deleteBay(ws.id);
     });
   });
   return head;
 }
 
-function renderWorkspaceCard(ws: WorkspaceCardEntry, isActive: boolean): HTMLElement {
+function renderBayCard(ws: BayCardEntry, isActive: boolean): HTMLElement {
   const card = document.createElement("div");
   card.className = "ws-card" + (isActive ? " ws-card-active" : "");
-  card.style.setProperty("--ws-accent", workspaceAccent(ws.id));
-  const head = workspaceCardHead(ws, !isActive);
+  card.style.setProperty("--ws-accent", bayAccent(ws.id));
+  const head = bayCardHead(ws, !isActive);
   if (ws.projectDir) {
     requestScmSummary(ws.projectDir);
     const summary = scmSummaryCache.get(ws.projectDir);
@@ -2037,37 +2037,37 @@ function renderWorkspaceCard(ws: WorkspaceCardEntry, isActive: boolean): HTMLEle
       }
     }
   }
-  if (!isActive) head.addEventListener("click", () => void switchWorkspace(ws.id));
+  if (!isActive) head.addEventListener("click", () => void switchBay(ws.id));
   card.appendChild(head);
-  wireWorkspaceCardDrag(card, ws.id);
+  wireBayCardDrag(card, ws.id);
 
   const body = document.createElement("div");
   body.className = "ws-card-body";
-  const roomsHost = document.createElement("div");
+  const shoresHost = document.createElement("div");
   if (!isActive) {
-    requestWorkspaceSnapshot(ws.id);
-    roomsHost.addEventListener("click", (e) => {
+    requestBaySnapshot(ws.id);
+    shoresHost.addEventListener("click", (e) => {
       e.stopPropagation();
-      void switchWorkspace(ws.id);
+      void switchBay(ws.id);
     }, true);
   }
-  body.appendChild(roomsHost);
-  const sourceRooms = isActive ? (layout?.rooms ?? []) : (wsSnapshotCache.get(ws.id)?.rooms ?? []);
-  const rooms: TreeRoomInput[] = sourceRooms.map((r) => ({ id: r.id, name: roomTabName(r), leaves: roomLeaves(r) }));
-  const rows = buildWorkspaceTree({
-    workspaceName: ws.name,
-    activeRoomId,
-    focusedPaneId,
-    rooms,
-    collapsedRoomIds: collapsedTreeRooms,
-    workspaceCollapsed: false,
-    workspaces: [{ id: ws.id, name: ws.name }],
-    activeWorkspaceId: ws.id,
-  }).filter((r) => r.kind !== "workspace");
-  const paneStates = agentStateByPane();
+  body.appendChild(shoresHost);
+  const sourceShores = isActive ? (layout?.shores ?? []) : (wsSnapshotCache.get(ws.id)?.shores ?? []);
+  const shores: TreeShoreInput[] = sourceShores.map((r) => ({ id: r.id, name: shoreTabName(r), leaves: shoreLeaves(r) }));
+  const rows = buildBayTree({
+    bayName: ws.name,
+    activeShoreId,
+    focusedNookId,
+    shores,
+    collapsedShoreIds: collapsedTreeShores,
+    bayCollapsed: false,
+    bays: [{ id: ws.id, name: ws.name }],
+    activeBayId: ws.id,
+  }).filter((r) => r.kind !== "bay");
+  const nookStates = agentStateByNook();
   for (const row of rows) {
-    if (row.kind === "pane" && row.paneId) {
-      roomsHost.appendChild(buildPaneCard(row, paneStates));
+    if (row.kind === "nook" && row.nookId) {
+      shoresHost.appendChild(buildNookCard(row, nookStates));
       continue;
     }
     const rowEl = document.createElement("div");
@@ -2079,10 +2079,10 @@ function renderWorkspaceCard(ws: WorkspaceCardEntry, isActive: boolean): HTMLEle
       chev.textContent = "▾";
       chev.addEventListener("click", (e) => {
         e.stopPropagation();
-        if (row.roomId) {
-          if (collapsedTreeRooms.has(row.roomId)) collapsedTreeRooms.delete(row.roomId);
-          else collapsedTreeRooms.add(row.roomId);
-          localStorage.setItem("cove.tree.collapsedRooms", JSON.stringify([...collapsedTreeRooms]));
+        if (row.shoreId) {
+          if (collapsedTreeShores.has(row.shoreId)) collapsedTreeShores.delete(row.shoreId);
+          else collapsedTreeShores.add(row.shoreId);
+          localStorage.setItem("cove.tree.collapsedShores", JSON.stringify([...collapsedTreeShores]));
         }
         renderSidebarContent("left");
       });
@@ -2096,23 +2096,23 @@ function renderWorkspaceCard(ws: WorkspaceCardEntry, isActive: boolean): HTMLEle
     label.className = "tw-label";
     label.textContent = row.label;
     rowEl.appendChild(label);
-    if (row.count > 1 && row.kind !== "pane") {
+    if (row.count > 1 && row.kind !== "nook") {
       const count = document.createElement("span");
       count.className = "tw-count";
       count.textContent = String(row.count);
       rowEl.appendChild(count);
     }
-    rowEl.addEventListener("click", () => onTreeRowClick(row.kind, row.roomId, row.paneId, row.expandable));
-    if (row.kind === "room" && row.roomId) {
-      const rid = row.roomId;
+    rowEl.addEventListener("click", () => onTreeRowClick(row.kind, row.shoreId, row.nookId, row.expandable));
+    if (row.kind === "shore" && row.shoreId) {
+      const rid = row.shoreId;
       rowEl.draggable = true;
       rowEl.addEventListener("dragstart", (e) => {
-        treeDragRoomId = rid;
+        treeDragShoreId = rid;
         if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
       });
-      rowEl.addEventListener("dragend", () => { treeDragRoomId = null; });
+      rowEl.addEventListener("dragend", () => { treeDragShoreId = null; });
       rowEl.addEventListener("dragover", (e) => {
-        if (!treeDragRoomId || treeDragRoomId === rid) return;
+        if (!treeDragShoreId || treeDragShoreId === rid) return;
         e.preventDefault();
         rowEl.classList.add("drag-over");
       });
@@ -2120,9 +2120,9 @@ function renderWorkspaceCard(ws: WorkspaceCardEntry, isActive: boolean): HTMLEle
       rowEl.addEventListener("drop", (e) => {
         e.preventDefault();
         rowEl.classList.remove("drag-over");
-        if (!treeDragRoomId || treeDragRoomId === rid) return;
-        void reorderRooms(treeDragRoomId, rid);
-        treeDragRoomId = null;
+        if (!treeDragShoreId || treeDragShoreId === rid) return;
+        void reorderShores(treeDragShoreId, rid);
+        treeDragShoreId = null;
       });
     }
     rowEl.addEventListener("contextmenu", (e) => {
@@ -2130,11 +2130,11 @@ function renderWorkspaceCard(ws: WorkspaceCardEntry, isActive: boolean): HTMLEle
         { id: "focus", label: "Go to" },
         { id: "close", label: "Close", danger: true },
       ], (id) => {
-        if (id === "focus") focusTreeRow(row.kind, row.roomId, row.paneId);
-        else if (id === "close") closeTreeRow(row.kind, row.roomId, row.paneId);
+        if (id === "focus") focusTreeRow(row.kind, row.shoreId, row.nookId);
+        else if (id === "close") closeTreeRow(row.kind, row.shoreId, row.nookId);
       });
     });
-    roomsHost.appendChild(rowEl);
+    shoresHost.appendChild(rowEl);
   }
 
   const filesExpanded = filesExpandedWs.has(ws.id);
@@ -2161,7 +2161,7 @@ function renderWorkspaceCard(ws: WorkspaceCardEntry, isActive: boolean): HTMLEle
     else {
       const none = document.createElement("div");
       none.className = "fs-row fs-note";
-      none.textContent = "no workspace directory";
+      none.textContent = "no bay directory";
       filesHost.appendChild(none);
     }
     body.appendChild(filesHost);
@@ -2170,43 +2170,43 @@ function renderWorkspaceCard(ws: WorkspaceCardEntry, isActive: boolean): HTMLEle
   return card;
 }
 
-function onTreeRowClick(kind: string, roomId: string | null, paneId: string | null, expandable: boolean): void {
-  if (kind === "workspace") {
-    console.warn("tree click: workspace rows are not rendered in card mode");
+function onTreeRowClick(kind: string, shoreId: string | null, nookId: string | null, expandable: boolean): void {
+  if (kind === "bay") {
+    console.warn("tree click: bay rows are not rendered in card mode");
     return;
   }
-  if (kind === "pane" && paneId) { revealPane(paneId); return; }
-  if (kind === "room" && roomId) {
-    const room = layout?.rooms.find((r) => r.id === roomId);
-    if (!room) { console.warn("tree click: unknown room", roomId); return; }
-    activeRoomId = roomId;
-    const f = firstLeafOf(room);
-    if (f) focusedPaneId = f;
-    renderRoom();
-    renderRoomTabs();
+  if (kind === "nook" && nookId) { revealNook(nookId); return; }
+  if (kind === "shore" && shoreId) {
+    const shore = layout?.shores.find((r) => r.id === shoreId);
+    if (!shore) { console.warn("tree click: unknown shore", shoreId); return; }
+    activeShoreId = shoreId;
+    const f = firstLeafOf(shore);
+    if (f) focusedNookId = f;
+    renderShore();
+    renderShoreTabs();
     renderSidebar();
-    if (f) focusPane(f);
+    if (f) focusNook(f);
   }
 }
 
-function focusTreeRow(kind: string, roomId: string | null, paneId: string | null): void {
-  if (kind === "pane" && paneId) { revealPane(paneId); return; }
-  if (kind === "room" && roomId) {
-    const room = layout?.rooms.find((r) => r.id === roomId);
-    if (!room) { console.warn("tree focus: unknown room", roomId); return; }
-    activeRoomId = roomId;
-    const f = firstLeafOf(room);
-    if (f) focusedPaneId = f;
-    renderRoom();
-    renderRoomTabs();
+function focusTreeRow(kind: string, shoreId: string | null, nookId: string | null): void {
+  if (kind === "nook" && nookId) { revealNook(nookId); return; }
+  if (kind === "shore" && shoreId) {
+    const shore = layout?.shores.find((r) => r.id === shoreId);
+    if (!shore) { console.warn("tree focus: unknown shore", shoreId); return; }
+    activeShoreId = shoreId;
+    const f = firstLeafOf(shore);
+    if (f) focusedNookId = f;
+    renderShore();
+    renderShoreTabs();
     renderSidebar();
-    if (f) focusPane(f);
+    if (f) focusNook(f);
   }
 }
 
-function closeTreeRow(kind: string, roomId: string | null, paneId: string | null): void {
-  if (kind === "pane" && paneId) { focusPane(paneId); void closeFocused(); return; }
-  if (kind === "room" && roomId) { void closeRoom(roomId); }
+function closeTreeRow(kind: string, shoreId: string | null, nookId: string | null): void {
+  if (kind === "nook" && nookId) { focusNook(nookId); void closeFocused(); return; }
+  if (kind === "shore" && shoreId) { void closeShore(shoreId); }
 }
 
 async function refreshAgents(): Promise<void> {
@@ -2218,7 +2218,7 @@ async function refreshAgents(): Promise<void> {
 }
 
 function agentsVisible(): boolean {
-  return !collapsedOf(sidebarModel, "left") && sidebarModel.leftMode === "workspaces";
+  return !collapsedOf(sidebarModel, "left") && sidebarModel.leftMode === "bays";
 }
 
 const SIDEBAR_PREF_KEYS = {
@@ -2283,77 +2283,77 @@ function startAgentPolling(): void {
   if (agentPollTimer === null) agentPollTimer = setInterval(() => { if (agentsVisible()) void refreshAgents(); }, 3000);
 }
 
-const pinnedRoomIds = new Set<string>(JSON.parse(localStorage.getItem("cove.pinnedRooms") ?? "[]"));
-function savePinnedRooms(): void { localStorage.setItem("cove.pinnedRooms", JSON.stringify([...pinnedRoomIds])); }
+const pinnedShoreIds = new Set<string>(JSON.parse(localStorage.getItem("cove.pinnedShores") ?? "[]"));
+function savePinnedShores(): void { localStorage.setItem("cove.pinnedShores", JSON.stringify([...pinnedShoreIds])); }
 
 interface WingInfo { id: string; name: string; }
 let wings: WingInfo[] = [];
 let activeWingId: string | null = "main";
 let wingSwitcherExpanded = false;
-let roomWingSummaries: { id: string; wingId: string; pinned: boolean }[] = [];
+let shoreWingSummaries: { id: string; wingId: string; pinned: boolean }[] = [];
 async function loadWings(): Promise<void> {
   const wsId = layout?.id ?? "default";
   try {
-    const res = await invoke<{ wings: { id: string; name: string }[] }>("cove://commands/wing.list", { workspaceId: wsId });
+    const res = await invoke<{ wings: { id: string; name: string }[] }>("cove://commands/wing.list", { bayId: wsId });
     wings = res.wings ?? [{ id: "main", name: "main" }];
   } catch { wings = [{ id: "main", name: "main" }]; }
   try {
-    const list = await invoke<{ rooms: { id: string; wingId: string; pinned: boolean }[] }>("cove://commands/room.list", { workspaceId: wsId });
-    roomWingSummaries = list.rooms ?? [];
-  } catch { roomWingSummaries = []; }
+    const list = await invoke<{ shores: { id: string; wingId: string; pinned: boolean }[] }>("cove://commands/shore.list", { bayId: wsId });
+    shoreWingSummaries = list.shores ?? [];
+  } catch { shoreWingSummaries = []; }
 }
 async function switchWingActive(wingId: string): Promise<void> {
   activeWingId = wingId;
-  try { await invoke("cove://commands/wing.switch", { workspaceId: "default", wingId }); } catch { void 0; }
+  try { await invoke("cove://commands/wing.switch", { bayId: "default", wingId }); } catch { void 0; }
   await loadWings();
   await reload();
-  renderRoomTabs();
+  renderShoreTabs();
 }
 
-function roomTabName(room: RoomSnapshot): string {
-  if (room.name.trim().length > 0) return room.name;
-  const leaves = collectLeafIds(room.layoutTree);
-  const first = leaves[0] ? panes.get(leaves[0]) : undefined;
-  return (first && first.title) || "Room";
+function shoreTabName(shore: ShoreSnapshot): string {
+  if (shore.name.trim().length > 0) return shore.name;
+  const leaves = collectLeafIds(shore.layoutTree);
+  const first = leaves[0] ? nooks.get(leaves[0]) : undefined;
+  return (first && first.title) || "Shore";
 }
 
-function nextRoomName(): string {
-  return "Room " + ((layout?.rooms.length ?? 0) + 1);
+function nextShoreName(): string {
+  return "Shore " + ((layout?.shores.length ?? 0) + 1);
 }
 
-function renderRoomTabs(): void {
-  const activeRename = roomTabsEl.querySelector(".rtab-rename-input");
+function renderShoreTabs(): void {
+  const activeRename = shoreTabsEl.querySelector(".rtab-rename-input");
   if (activeRename && activeRename === document.activeElement) return;
-  roomTabsEl.innerHTML = "";
-  const allRooms = layout?.rooms ?? [];
-  const wingModel = buildWingModel(wings, roomWingSummaries, activeWingId);
-  const visibleIds = visibleRoomIds(wingModel);
-  const rooms = visibleIds.length > 0 || wings.length > 1 ? filterRoomsByWing(allRooms, visibleIds) : allRooms;
-  if (rooms.length === 0) { roomTabsEl.style.display = "none"; return; }
-  roomTabsEl.style.display = "flex";
+  shoreTabsEl.innerHTML = "";
+  const allShores = layout?.shores ?? [];
+  const wingModel = buildWingModel(wings, shoreWingSummaries, activeWingId);
+  const visibleIds = visibleShoreIds(wingModel);
+  const shores = visibleIds.length > 0 || wings.length > 1 ? filterShoresByWing(allShores, visibleIds) : allShores;
+  if (shores.length === 0) { shoreTabsEl.style.display = "none"; return; }
+  shoreTabsEl.style.display = "flex";
 
-  const { pinned, unpinned } = partitionPinned(rooms.map((r) => ({ id: r.id, name: r.name, pinned: pinnedRoomIds.has(r.id) })));
-  const roomMap = new Map(rooms.map((r) => [r.id, r]));
+  const { pinned, unpinned } = partitionPinned(shores.map((r) => ({ id: r.id, name: r.name, pinned: pinnedShoreIds.has(r.id) })));
+  const shoreMap = new Map(shores.map((r) => [r.id, r]));
 
   let dragSrcId: string | null = null;
 
-  const makeTab = (roomId: string): HTMLElement => {
-    const room = roomMap.get(roomId);
-    if (!room) return document.createElement("div");
-    const isPinned = pinnedRoomIds.has(roomId);
+  const makeTab = (shoreId: string): HTMLElement => {
+    const shore = shoreMap.get(shoreId);
+    if (!shore) return document.createElement("div");
+    const isPinned = pinnedShoreIds.has(shoreId);
     const tab = document.createElement("div");
-    tab.className = "rtab" + (roomId === activeRoomId ? " active" : "") + (isPinned ? " pinned" : "");
+    tab.className = "rtab" + (shoreId === activeShoreId ? " active" : "") + (isPinned ? " pinned" : "");
     tab.draggable = true;
-    tab.title = roomTabName(room);
+    tab.title = shoreTabName(shore);
 
     const glyph = document.createElement("span");
     glyph.className = "rtab-glyph";
-    glyph.innerHTML = iconForPaneType(roomLeaves(room)[0]?.paneType ?? "terminal");
+    glyph.innerHTML = iconForNookType(shoreLeaves(shore)[0]?.nookType ?? "terminal");
     tab.appendChild(glyph);
 
     const nameEl = document.createElement("span");
     nameEl.className = "rtab-name";
-    nameEl.textContent = roomTabName(room);
+    nameEl.textContent = shoreTabName(shore);
     tab.appendChild(nameEl);
 
     const closeEl = document.createElement("span");
@@ -2366,29 +2366,29 @@ function renderRoomTabs(): void {
     tab.addEventListener("click", (e) => {
       if ((e.target as HTMLElement).classList.contains("rtab-close")) {
         if (isPinned) return;
-        void closeRoom(roomId);
+        void closeShore(shoreId);
         return;
       }
-      if (roomId === activeRoomId) {
+      if (shoreId === activeShoreId) {
         clickCount++;
         if (clickCount >= 2) {
-          startRename(roomId, tab, nameEl);
+          startRename(shoreId, tab, nameEl);
           clickCount = 0;
         } else {
           setTimeout(() => { clickCount = 0; }, 400);
         }
       } else {
-        activeRoomId = roomId;
-        const f = firstLeafOf(room);
-        if (f) focusedPaneId = f;
-        renderRoom();
-        renderRoomTabs();
+        activeShoreId = shoreId;
+        const f = firstLeafOf(shore);
+        if (f) focusedNookId = f;
+        renderShore();
+        renderShoreTabs();
         renderSidebar();
-        if (f) focusPane(f);
+        if (f) focusNook(f);
       }
     });
     tab.addEventListener("contextmenu", (e) => {
-      const pinned = pinnedRoomIds.has(roomId);
+      const pinned = pinnedShoreIds.has(shoreId);
       openContextMenuAt(e, [
         { id: "rename", label: "Rename" },
         { id: "pin", label: pinned ? "Unpin" : "Pin" },
@@ -2396,28 +2396,28 @@ function renderRoomTabs(): void {
         { id: "close", label: "Close", danger: true, disabled: pinned },
         { id: "close-others", label: "Close Others" },
       ], (id) => {
-        if (id === "rename") startRename(roomId, tab, tab.querySelector(".rtab-name") as HTMLElement);
-        else if (id === "pin") { if (pinned) pinnedRoomIds.delete(roomId); else pinnedRoomIds.add(roomId); savePinnedRooms(); renderRoomTabs(); }
-        else if (id === "close") void closeRoom(roomId);
-        else if (id === "close-others") void closeOtherRooms(roomId);
+        if (id === "rename") startRename(shoreId, tab, tab.querySelector(".rtab-name") as HTMLElement);
+        else if (id === "pin") { if (pinned) pinnedShoreIds.delete(shoreId); else pinnedShoreIds.add(shoreId); savePinnedShores(); renderShoreTabs(); }
+        else if (id === "close") void closeShore(shoreId);
+        else if (id === "close-others") void closeOtherShores(shoreId);
       });
     });
-    tab.addEventListener("dragstart", () => { dragSrcId = roomId; tab.classList.add("dragging"); });
+    tab.addEventListener("dragstart", () => { dragSrcId = shoreId; tab.classList.add("dragging"); });
     tab.addEventListener("dragend", () => { tab.classList.remove("dragging"); dragSrcId = null; });
     tab.addEventListener("dragover", (e) => {
       e.preventDefault();
-      if (draggingPaneId) {
-        tab.classList.add("pane-drop-target");
-        if (roomId !== activeRoomId && tabSpringRoomId !== roomId) {
+      if (draggingNookId) {
+        tab.classList.add("nook-drop-target");
+        if (shoreId !== activeShoreId && tabSpringShoreId !== shoreId) {
           if (tabSpringTimer !== null) window.clearTimeout(tabSpringTimer);
-          tabSpringRoomId = roomId;
+          tabSpringShoreId = shoreId;
           tabSpringTimer = window.setTimeout(() => {
             tabSpringTimer = null;
-            tabSpringRoomId = null;
-            if (!draggingPaneId) return;
-            activeRoomId = roomId;
-            renderRoom();
-            renderRoomTabs();
+            tabSpringShoreId = null;
+            if (!draggingNookId) return;
+            activeShoreId = shoreId;
+            renderShore();
+            renderShoreTabs();
             renderSidebar();
           }, 550);
         }
@@ -2427,27 +2427,27 @@ function renderRoomTabs(): void {
     });
     tab.addEventListener("dragleave", () => {
       tab.classList.remove("drag-over");
-      tab.classList.remove("pane-drop-target");
-      if (tabSpringRoomId === roomId && tabSpringTimer !== null) {
+      tab.classList.remove("nook-drop-target");
+      if (tabSpringShoreId === shoreId && tabSpringTimer !== null) {
         window.clearTimeout(tabSpringTimer);
         tabSpringTimer = null;
-        tabSpringRoomId = null;
+        tabSpringShoreId = null;
       }
     });
     tab.addEventListener("drop", (e) => {
       e.preventDefault();
       tab.classList.remove("drag-over");
-      tab.classList.remove("pane-drop-target");
-      if (tabSpringTimer !== null) { window.clearTimeout(tabSpringTimer); tabSpringTimer = null; tabSpringRoomId = null; }
-      const paneSrc = e.dataTransfer?.getData("text/cove-pane") || draggingPaneId;
-      if (paneSrc) {
-        draggingPaneId = null;
+      tab.classList.remove("nook-drop-target");
+      if (tabSpringTimer !== null) { window.clearTimeout(tabSpringTimer); tabSpringTimer = null; tabSpringShoreId = null; }
+      const nookSrc = e.dataTransfer?.getData("text/cove-nook") || draggingNookId;
+      if (nookSrc) {
+        draggingNookId = null;
         clearDropOverlay();
-        void movePaneToRoom(paneSrc, roomId);
+        void moveNookToShore(nookSrc, shoreId);
         return;
       }
-      if (dragSrcId && dragSrcId !== roomId) {
-        void reorderRooms(dragSrcId, roomId);
+      if (dragSrcId && dragSrcId !== shoreId) {
+        void reorderShores(dragSrcId, shoreId);
       }
     });
     return tab;
@@ -2456,17 +2456,17 @@ function renderRoomTabs(): void {
   const homeBtn = document.createElement("div");
   homeBtn.className = "rbox-ctl rbox-home";
   homeBtn.innerHTML = iconSvg("home");
-  homeBtn.title = "Workspace overview";
-  homeBtn.addEventListener("click", () => revealSidebarMode("workspaces"));
-  roomTabsEl.appendChild(homeBtn);
+  homeBtn.title = "Bay overview";
+  homeBtn.addEventListener("click", () => revealSidebarMode("bays"));
+  shoreTabsEl.appendChild(homeBtn);
 
-  for (const id of pinned) roomTabsEl.appendChild(makeTab(id));
+  for (const id of pinned) shoreTabsEl.appendChild(makeTab(id));
   if (pinned.length > 0 && unpinned.length > 0) {
     const divider = document.createElement("div");
     divider.className = "rtab-divider";
-    roomTabsEl.appendChild(divider);
+    shoreTabsEl.appendChild(divider);
   }
-  for (const id of unpinned) roomTabsEl.appendChild(makeTab(id));
+  for (const id of unpinned) shoreTabsEl.appendChild(makeTab(id));
 
   if (wings.length > 1 || wingSwitcherExpanded) {
     const switcher = document.createElement("div");
@@ -2476,7 +2476,7 @@ function renderRoomTabs(): void {
       toggle.className = "wing-btn";
       toggle.textContent = "\u27e8";
       toggle.title = "Wings";
-      toggle.addEventListener("click", () => { wingSwitcherExpanded = true; renderRoomTabs(); });
+      toggle.addEventListener("click", () => { wingSwitcherExpanded = true; renderShoreTabs(); });
       switcher.appendChild(toggle);
     } else {
       for (const wing of wings) {
@@ -2490,85 +2490,85 @@ function renderRoomTabs(): void {
       collapse.className = "wing-btn";
       collapse.textContent = "\u27e9";
       collapse.title = "Collapse wings";
-      collapse.addEventListener("click", () => { wingSwitcherExpanded = false; renderRoomTabs(); });
+      collapse.addEventListener("click", () => { wingSwitcherExpanded = false; renderShoreTabs(); });
       switcher.appendChild(collapse);
     }
-    roomTabsEl.appendChild(switcher);
+    shoreTabsEl.appendChild(switcher);
   }
 
   const addBtn = document.createElement("div");
   addBtn.className = "rbox-ctl rbox-add";
   addBtn.style.cssText = "margin-left:auto;";
   addBtn.innerHTML = iconSvg("plus");
-  addBtn.title = "New room (Cmd T)";
-  addBtn.addEventListener("click", () => void newRoom());
-  roomTabsEl.appendChild(addBtn);
+  addBtn.title = "New shore (Cmd T)";
+  addBtn.addEventListener("click", () => void newShore());
+  shoreTabsEl.appendChild(addBtn);
 
   updateEdgeFade();
 }
 
 function updateEdgeFade(): void {
-  roomTabsEl.classList.remove("edge-fade-left", "edge-fade-right");
-  if (roomTabsEl.scrollWidth > roomTabsEl.clientWidth) {
-    if (roomTabsEl.scrollLeft > 2) roomTabsEl.classList.add("edge-fade-left");
-    if (roomTabsEl.scrollLeft + roomTabsEl.clientWidth < roomTabsEl.scrollWidth - 2) roomTabsEl.classList.add("edge-fade-right");
+  shoreTabsEl.classList.remove("edge-fade-left", "edge-fade-right");
+  if (shoreTabsEl.scrollWidth > shoreTabsEl.clientWidth) {
+    if (shoreTabsEl.scrollLeft > 2) shoreTabsEl.classList.add("edge-fade-left");
+    if (shoreTabsEl.scrollLeft + shoreTabsEl.clientWidth < shoreTabsEl.scrollWidth - 2) shoreTabsEl.classList.add("edge-fade-right");
   }
 }
-roomTabsEl.addEventListener("scroll", updateEdgeFade);
+shoreTabsEl.addEventListener("scroll", updateEdgeFade);
 
-async function reorderRooms(fromId: string, toId: string): Promise<void> {
+async function reorderShores(fromId: string, toId: string): Promise<void> {
   if (!layout) return;
-  const ids = layout.rooms.map((r) => r.id);
+  const ids = layout.shores.map((r) => r.id);
   const fromIdx = ids.indexOf(fromId);
   const toIdx = ids.indexOf(toId);
   if (fromIdx < 0 || toIdx < 0) return;
-  const reordered = reorderRoom(layout.rooms, fromIdx, toIdx);
-  layout.rooms = reordered;
-  renderRoomTabs();
+  const reordered = reorderShore(layout.shores, fromIdx, toIdx);
+  layout.shores = reordered;
+  renderShoreTabs();
   renderSidebarContent("left");
   try {
     const newOrder = reordered.map((r) => r.id);
-    await invoke("app.layoutMutate", { op: "reorder", roomIds: newOrder, roomId: "", targetPaneId: "", newPaneId: "", orientation: "", name: "", paneId: "", dir: 0 });
-  } catch (err) { console.warn("room reorder failed", err); }
+    await invoke("app.layoutMutate", { op: "reorder", shoreIds: newOrder, shoreId: "", targetNookId: "", newNookId: "", orientation: "", name: "", nookId: "", dir: 0 });
+  } catch (err) { console.warn("shore reorder failed", err); }
   await reload();
 }
 
-function startRename(roomId: string, tab: HTMLElement, nameEl: HTMLElement): void {
-  const room = layout?.rooms.find((r) => r.id === roomId);
-  if (!room) return;
+function startRename(shoreId: string, tab: HTMLElement, nameEl: HTMLElement): void {
+  const shore = layout?.shores.find((r) => r.id === shoreId);
+  if (!shore) return;
   const input = document.createElement("input");
   input.className = "rtab-rename-input";
-  input.value = roomTabName(room);
+  input.value = shoreTabName(shore);
   input.spellcheck = false;
   nameEl.replaceWith(input);
   input.focus();
   input.select();
   const commit = async () => {
-    const newName = input.value.trim() || room.name;
-    if (newName !== room.name) {
-      room.name = newName;
+    const newName = input.value.trim() || shore.name;
+    if (newName !== shore.name) {
+      shore.name = newName;
       try {
-        await invoke("app.layoutMutate", { op: "rename", roomId, name: newName, paneId: "", targetPaneId: "", newPaneId: "", orientation: "", dir: 0 });
+        await invoke("app.layoutMutate", { op: "rename", shoreId, name: newName, nookId: "", targetNookId: "", newNookId: "", orientation: "", dir: 0 });
         await reload();
         return;
-      } catch (err) { console.warn("room rename failed", roomId, err); }
+      } catch (err) { console.warn("shore rename failed", shoreId, err); }
     }
-    renderRoomTabs();
+    renderShoreTabs();
     renderSidebar();
   };
   input.addEventListener("blur", commit);
   input.addEventListener("keydown", (e) => {
     e.stopPropagation();
     if (e.key === "Enter") input.blur();
-    if (e.key === "Escape") { input.value = room.name; input.blur(); }
+    if (e.key === "Escape") { input.value = shore.name; input.blur(); }
   });
 }
 
-async function closeOtherRooms(keepRoomId: string): Promise<void> {
+async function closeOtherShores(keepShoreId: string): Promise<void> {
   if (!layout) return;
-  const toClose = layout.rooms.filter((r) => r.id !== keepRoomId);
-  for (const room of toClose) {
-    await closeRoom(room.id);
+  const toClose = layout.shores.filter((r) => r.id !== keepShoreId);
+  for (const shore of toClose) {
+    await closeShore(shore.id);
   }
 }
 
@@ -2576,14 +2576,14 @@ interface Action { label: string; icon: string; key?: string; run: () => void; }
 
 function baseActions(): Action[] {
   return [
-    { label: "New terminal", icon: "+", key: "Cmd T", run: () => void newRoom() },
-    { label: "New browser", icon: "\uD83C\uDF10", run: () => void newBrowserRoom("https://duckduckgo.com") },
+    { label: "New terminal", icon: "+", key: "Cmd T", run: () => void newShore() },
+    { label: "New browser", icon: "\uD83C\uDF10", run: () => void newBrowserShore("https://duckduckgo.com") },
     { label: "Split right", icon: "\u2502", key: "Cmd D", run: () => void splitActive("row") },
     { label: "Split down", icon: "\u2500", key: "Cmd Shift D", run: () => void splitActive("col") },
-    { label: "Close pane", icon: "\u00d7", key: "Cmd W", run: () => void closeFocused() },
+    { label: "Close nook", icon: "\u00d7", key: "Cmd W", run: () => void closeFocused() },
     { label: "Toggle left sidebar", icon: "\u25e7", key: "Cmd B", run: toggleLeftSidebar },
     { label: "Show notepad", icon: "\u270e", run: () => revealSidebarMode("notepad") },
-    { label: "Show workspaces", icon: "\u25c9", key: "Cmd Shift A", run: () => revealSidebarMode("workspaces") },
+    { label: "Show bays", icon: "\u25c9", key: "Cmd Shift A", run: () => revealSidebarMode("bays") },
     { label: "Toggle window backdrop", icon: "\u25d0", run: () => void toggleBackdrop() },
     { label: "Toggle performance HUD", icon: "\ud83d\udcc8", run: doTogglePerfHud },
     { label: "Increase font size", icon: "+", key: "Cmd =", run: () => { settings.fontSize = Math.min(24, settings.fontSize + 1); applySettings(); } },
@@ -2595,14 +2595,14 @@ function baseActions(): Action[] {
 }
 
 function jumpActions(): Action[] {
-  return (layout?.rooms ?? []).map((r, i) => ({
+  return (layout?.shores ?? []).map((r, i) => ({
     label: `Go to ${r.name}`,
     icon: "\u203a",
     key: i < 9 ? `Cmd ${i + 1}` : undefined,
     run: () => {
-      activeRoomId = r.id;
+      activeShoreId = r.id;
       const f = firstLeafOf(r);
-      if (f) { focusedPaneId = f; renderRoom(); renderSidebar(); focusPane(f); }
+      if (f) { focusedNookId = f; renderShore(); renderSidebar(); focusNook(f); }
     },
   }));
 }
@@ -2611,7 +2611,7 @@ let palSel = 0;
 let palActions: PaletteItem[] = [];
 const palMru = new MruTracker(JSON.parse(localStorage.getItem("cove.palette.mru") ?? "[]"));
 let palCachedItems: PaletteItem[] | null = null;
-const paneFilePaths = new Map<string, string>();
+const nookFilePaths = new Map<string, string>();
 let palFileSearchTimer: ReturnType<typeof setTimeout> | null = null;
 let palFileResults: PaletteItem[] = [];
 let palFileQuery = "";
@@ -2637,8 +2637,8 @@ async function loadPaletteCache(): Promise<void> {
 
 function closePalette() {
   paletteEl.classList.remove("open");
-  if (focusedPaneId) {
-    const pv = panes.get(focusedPaneId);
+  if (focusedNookId) {
+    const pv = nooks.get(focusedNookId);
     if (pv) pv.term.focus();
   }
 }
@@ -2649,21 +2649,21 @@ async function paletteItems(): Promise<PaletteItem[]> {
     items.push({ id: `cmd:${a.label}`, label: a.label, category: "commands", icon: a.icon, key: a.key, run: () => { a.run(); } });
   }
   for (const a of jumpActions()) {
-    items.push({ id: `room:${a.label}`, label: a.label, category: "rooms", icon: a.icon, key: a.key, run: () => { a.run(); } });
+    items.push({ id: `shore:${a.label}`, label: a.label, category: "shores", icon: a.icon, key: a.key, run: () => { a.run(); } });
   }
-  for (const [id, pv] of panes) {
-    items.push({ id: `pane:${id}`, label: pv.title || id, category: "panes", icon: "\u25a0", run: () => focusPane(id) });
+  for (const [id, pv] of nooks) {
+    items.push({ id: `nook:${id}`, label: pv.title || id, category: "nooks", icon: "\u25a0", run: () => focusNook(id) });
   }
   try {
-    const wsResult = await invoke<{ workspaces: { id: string; name: string }[] }>("cove://commands/workspace.list", {});
-    for (const ws of wsResult.workspaces ?? []) {
-      items.push({ id: `ws:${ws.id}`, label: ws.name, category: "workspaces", icon: "\u25c8", run: () => void switchWorkspace(ws.id) });
+    const wsResult = await invoke<{ bays: { id: string; name: string }[] }>("cove://commands/bay.list", {});
+    for (const ws of wsResult.bays ?? []) {
+      items.push({ id: `ws:${ws.id}`, label: ws.name, category: "bays", icon: "\u25c8", run: () => void switchBay(ws.id) });
     }
   } catch { void 0; }
   try {
-    const taskResult = await invoke<{ cards: { id: string; title: string; humanId: string }[] }>("cove://commands/task.list", { workspaceId: "default" });
+    const taskResult = await invoke<{ cards: { id: string; title: string; humanId: string }[] }>("cove://commands/task.list", { bayId: "default" });
     for (const t of taskResult.cards ?? []) {
-      items.push({ id: `task:${t.id}`, label: `${t.humanId}: ${t.title}`, category: "tasks", icon: "#", run: () => void openTaskInPane(t.id) });
+      items.push({ id: `task:${t.id}`, label: `${t.humanId}: ${t.title}`, category: "tasks", icon: "#", run: () => void openTaskInNook(t.id) });
     }
   } catch { void 0; }
   return items;
@@ -2728,7 +2728,7 @@ async function searchFiles(query: string): Promise<void> {
   const tag = ++palFileSearchTag;
   palFileQuery = query;
   try {
-    const result = await invoke<{ matches: { file: string; line: number; text: string }[] }>("cove://commands/search.query", { query, workspaceId: "default" });
+    const result = await invoke<{ matches: { file: string; line: number; text: string }[] }>("cove://commands/search.query", { query, bayId: "default" });
     if (tag !== palFileSearchTag) return;
     const seen = new Set<string>();
     palFileResults = (result.matches ?? []).filter((m) => {
@@ -2748,36 +2748,36 @@ async function searchFiles(query: string): Promise<void> {
   }
 }
 
-async function switchWorkspace(wsId: string): Promise<void> {
+async function switchBay(wsId: string): Promise<void> {
   try {
-    await invoke("cove://commands/workspace.switch", { id: wsId });
-    activeRoomId = null;
-    focusedPaneId = null;
+    await invoke("cove://commands/bay.switch", { id: wsId });
+    activeShoreId = null;
+    focusedNookId = null;
     await reload();
     await loadWings();
-    renderRoomTabs();
+    renderShoreTabs();
   } catch { void 0; }
 }
 
-async function openTaskInPane(taskId: string): Promise<void> {
+async function openTaskInNook(taskId: string): Promise<void> {
   try {
-    const sp = (await invoke<{ paneId: string }>("app.paneSpawn", { command: "", cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: "", agentName: "", workspace: "", room: "" })).paneId;
-    const r = await invoke<{ roomId: string }>("app.layoutMutate", { op: "createRoom", newPaneId: sp, name: "Task", roomId: "", targetPaneId: "", orientation: "", paneId: "", dir: 0, paneType: "tasks-kanban" });
-    activeRoomId = r.roomId;
-    paneFilePaths.set(sp, taskId);
+    const sp = (await invoke<{ nookId: string }>("app.nookSpawn", { command: "", cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: "", agentName: "", bay: "", shore: "" })).nookId;
+    const r = await invoke<{ shoreId: string }>("app.layoutMutate", { op: "createShore", newNookId: sp, name: "Task", shoreId: "", targetNookId: "", orientation: "", nookId: "", dir: 0, nookType: "tasks-kanban" });
+    activeShoreId = r.shoreId;
+    nookFilePaths.set(sp, taskId);
     await reload();
-    focusPane(sp);
+    focusNook(sp);
   } catch { void 0; }
 }
 
 async function openFileInEditor(filePath: string): Promise<void> {
   try {
-    const sp = (await invoke<{ paneId: string }>("app.paneSpawn", { command: "", cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: "", agentName: "", workspace: "", room: "" })).paneId;
-    const r = await invoke<{ roomId: string }>("app.layoutMutate", { op: "createRoom", newPaneId: sp, name: filePath.split("/").pop() || "Editor", roomId: "", targetPaneId: "", orientation: "", paneId: "", dir: 0, paneType: "editor" });
-    activeRoomId = r.roomId;
-    paneFilePaths.set(sp, filePath);
+    const sp = (await invoke<{ nookId: string }>("app.nookSpawn", { command: "", cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: "", agentName: "", bay: "", shore: "" })).nookId;
+    const r = await invoke<{ shoreId: string }>("app.layoutMutate", { op: "createShore", newNookId: sp, name: filePath.split("/").pop() || "Editor", shoreId: "", targetNookId: "", orientation: "", nookId: "", dir: 0, nookType: "editor" });
+    activeShoreId = r.shoreId;
+    nookFilePaths.set(sp, filePath);
     await reload();
-    focusPane(sp);
+    focusNook(sp);
   } catch { void 0; }
 }
 
@@ -2847,7 +2847,7 @@ function openSettings(): void {
 
 function closeSettings(): void {
   settingsEl.classList.remove("open");
-  if (focusedPaneId) panes.get(focusedPaneId)?.term.focus();
+  if (focusedNookId) nooks.get(focusedNookId)?.term.focus();
 }
 function isRealSetting(e: ConfigSchemaEntry): boolean {
   return e.control !== "section" && e.type !== "object";
@@ -3062,7 +3062,7 @@ function renderDiagnosticsExtras(container: HTMLElement): void {
   container.appendChild(diagnosticsSectionHeader("Not yet available"));
   const note = document.createElement("div");
   note.className = "diag-note";
-  note.textContent = "In-page flame graphs are not available yet: a bundle's optional trace is a binary .nettrace with no in-webview parser or viewer — open it in an external profiler such as PerfView or dotnet-trace. Per-pane element inspection is available now from any browser pane menu (DevTools).";
+  note.textContent = "In-page flame graphs are not available yet: a bundle's optional trace is a binary .nettrace with no in-webview parser or viewer — open it in an external profiler such as PerfView or dotnet-trace. Per-nook element inspection is available now from any browser nook menu (DevTools).";
   container.appendChild(note);
 }
 
@@ -3319,7 +3319,7 @@ async function applyAppearance(changedKey: string | null): Promise<void> {
   if (changedKey === null || changedKey === "appearance.layoutGap") { const gap = parseInt(await get("appearance.layoutGap")) || 4; root.style.setProperty("--layout-gap", `${gap}px`); gridEl.style.gap = `${gap}px`; }
   if (changedKey === null || changedKey === "appearance.accent") { const accent = await get("appearance.accent"); if (accent) { root.style.setProperty("--accent", accent); root.style.setProperty("--accent-dim", accent); } }
   if (changedKey === null || changedKey === "appearance.wallpaper") { const wp = await get("appearance.wallpaper"); if (wp) { document.body.style.backgroundImage = `url("${wp}")`; document.body.style.backgroundSize = "cover"; } else { document.body.style.backgroundImage = ""; } }
-  if (changedKey === null || changedKey === "appearance.paneLight") { const pl = await get("appearance.paneLight") === "true"; root.style.setProperty("--pane-light", pl ? "1" : "0"); }
+  if (changedKey === null || changedKey === "appearance.nookLight") { const pl = await get("appearance.nookLight") === "true"; root.style.setProperty("--nook-light", pl ? "1" : "0"); }
   if (changedKey === null || changedKey === "appearance.iconSet") { const ic = (await get("appearance.iconSet")) || "default"; document.body.classList.remove("icon-set-outline", "icon-set-filled"); if (ic === "outline") document.body.classList.add("icon-set-outline"); else if (ic === "filled") document.body.classList.add("icon-set-filled"); }
 }
 let themeList: ThemeDto[] = [];
@@ -3352,7 +3352,7 @@ function applyThemeVars(theme: ThemeDto): void {
   activeThemeDto = theme;
   const termTheme = xtermThemeFromDto(theme, settings.backgroundOpacity);
   themeAppliedTermTheme = termTheme as typeof THEME;
-  for (const pv of panes.values()) { pv.term.options.theme = termTheme; }
+  for (const pv of nooks.values()) { pv.term.options.theme = termTheme; }
 }
 
 function revertThemeVars(): void {
@@ -3363,7 +3363,7 @@ function revertThemeVars(): void {
   activeThemeDto = null;
   if (themeAppliedTermTheme) {
     const restored = { ...THEME, background: themeBackgroundWithOpacity(settings.backgroundOpacity) };
-    for (const pv of panes.values()) { pv.term.options.theme = restored; }
+    for (const pv of nooks.values()) { pv.term.options.theme = restored; }
     themeAppliedTermTheme = null;
   }
 }
@@ -3769,16 +3769,16 @@ settingsEl.addEventListener("keydown", (e) => { if (e.key === "Escape") closeSet
 const findEl = document.getElementById("findbar")!;
 const findInput = document.getElementById("find-input") as HTMLInputElement;
 const findDecor = { matchBackground: "#6c5b8e", activeMatchBackground: "#cba6f7", matchOverviewRuler: "#cba6f7", activeMatchColorOverviewRuler: "#cba6f7" };
-function activeSearch(): SearchAddon | null { return focusedPaneId ? (panes.get(focusedPaneId)?.search ?? null) : null; }
+function activeSearch(): SearchAddon | null { return focusedNookId ? (nooks.get(focusedNookId)?.search ?? null) : null; }
 function openFind() { findEl.classList.add("open"); findInput.focus(); findInput.select(); }
-function closeFind() { findEl.classList.remove("open"); activeSearch()?.clearDecorations(); if (focusedPaneId) panes.get(focusedPaneId)?.term.focus(); }
+function closeFind() { findEl.classList.remove("open"); activeSearch()?.clearDecorations(); if (focusedNookId) nooks.get(focusedNookId)?.term.focus(); }
 async function doFind(dir: number) {
   const s = activeSearch();
   const q = findInput.value;
   if (!s || !q) return;
-  const paneId = focusedPaneId!;
+  const nookId = focusedNookId!;
   try {
-    const res = await invoke<{ matches: { line: number; text: string }[] }>("app.paneSearch", { paneId, query: q, caseSensitive: false });
+    const res = await invoke<{ matches: { line: number; text: string }[] }>("app.nookSearch", { nookId, query: q, caseSensitive: false });
     if (res.matches.length === 0) { s.clearDecorations(); return; }
   } catch { void 0; }
   if (dir >= 0) s.findNext(q, { caseSensitive: false, decorations: findDecor });
@@ -3795,7 +3795,7 @@ document.getElementById("find-close")!.addEventListener("click", closeFind);
 
 const launcherEl = document.getElementById("launcher")!;
 function openLauncher() { launcherEl.classList.add("open"); void loadLauncherAgents(); }
-function closeLauncher() { launcherEl.classList.remove("open"); if (focusedPaneId) panes.get(focusedPaneId)?.term.focus(); }
+function closeLauncher() { launcherEl.classList.remove("open"); if (focusedNookId) nooks.get(focusedNookId)?.term.focus(); }
 launcherEl.addEventListener("mousedown", (e) => { if (e.target === launcherEl) closeLauncher(); });
 launcherEl.addEventListener("keydown", (e) => { if (e.key === "Escape") closeLauncher(); });
 
@@ -3839,20 +3839,20 @@ async function buildAdapterLaunch(a: AdapterInfo): Promise<{ command: string; ar
   return { command: a.binary, args: [] };
 }
 
-async function spawnAgentInto(roomId: string | null, placeholderId: string | null, a: AdapterInfo): Promise<void> {
+async function spawnAgentInto(shoreId: string | null, placeholderId: string | null, a: AdapterInfo): Promise<void> {
   const launch = await buildAdapterLaunch(a);
-  const sp = (await invoke<{ paneId: string }>("app.paneSpawn", { command: launch.command, args: launch.args, cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: a.name, agentName: a.displayName, workspace: "", room: "" })).paneId;
-  if (roomId) {
+  const sp = (await invoke<{ nookId: string }>("app.nookSpawn", { command: launch.command, args: launch.args, cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: a.name, agentName: a.displayName, bay: "", shore: "" })).nookId;
+  if (shoreId) {
     if (placeholderId) {
-      await invoke("app.layoutMutate", { op: "replace", roomId, targetPaneId: placeholderId, newPaneId: sp, orientation: "", name: "", paneId: "", dir: 0, paneType: "terminal" });
+      await invoke("app.layoutMutate", { op: "replace", shoreId, targetNookId: placeholderId, newNookId: sp, orientation: "", name: "", nookId: "", dir: 0, nookType: "terminal" });
     }
-    activeRoomId = roomId;
+    activeShoreId = shoreId;
   } else {
-    const r = await invoke<{ roomId: string }>("app.layoutMutate", { op: "createRoom", newPaneId: sp, name: nextRoomName(), roomId: "", targetPaneId: "", orientation: "", paneId: "", dir: 0 });
-    activeRoomId = r.roomId;
+    const r = await invoke<{ shoreId: string }>("app.layoutMutate", { op: "createShore", newNookId: sp, name: nextShoreName(), shoreId: "", targetNookId: "", orientation: "", nookId: "", dir: 0 });
+    activeShoreId = r.shoreId;
   }
   await reload();
-  focusPane(sp);
+  focusNook(sp);
 }
 
 let launcherAdapters: LauncherAdapter[] = [];
@@ -3864,7 +3864,7 @@ async function loadLauncherAdapters(): Promise<void> {
     launcherAdapters = (result.adapters ?? []).map((a) => ({ name: a.name, displayName: a.displayName, accent: a.accent, binary: a.binary, version: a.version ?? "" }));
   } catch { launcherAdapters = []; }
   await loadLauncherRecents();
-  if ((layout?.rooms ?? []).length === 0) renderRoom();
+  if ((layout?.shores ?? []).length === 0) renderShore();
 }
 
 let launcherRecentsCwd: string | null = null;
@@ -3886,7 +3886,7 @@ async function refreshLauncherRecents(): Promise<void> {
   if (activeProjectDir() === launcherRecentsCwd && Date.now() - launcherRecentsAt < 4000) return;
   const before = JSON.stringify(launcherRecents);
   await loadLauncherRecents();
-  if (JSON.stringify(launcherRecents) !== before) renderRoom();
+  if (JSON.stringify(launcherRecents) !== before) renderShore();
 }
 
 function builtinLauncherDefs(): LauncherBuiltin[] {
@@ -3894,7 +3894,7 @@ function builtinLauncherDefs(): LauncherBuiltin[] {
 }
 
 interface LauncherContext {
-  targetRoomId: string | null;
+  targetShoreId: string | null;
   targetPlaceholderId: string | null;
 }
 
@@ -3909,11 +3909,11 @@ function launcherGeometry(harnessCount: number, toolCount: number): LauncherGeom
 }
 
 function launchHarnessTile(ctx: LauncherContext, tile: LauncherTile): void {
-  void spawnAgentInto(ctx.targetRoomId, ctx.targetPlaceholderId, { name: tile.adapterName, displayName: tile.label, accent: tile.accent, binary: tile.binary });
+  void spawnAgentInto(ctx.targetShoreId, ctx.targetPlaceholderId, { name: tile.adapterName, displayName: tile.label, accent: tile.accent, binary: tile.binary });
 }
 
 function launchToolTile(ctx: LauncherContext, tile: LauncherTile): void {
-  void launchTileInto(ctx.targetRoomId, ctx.targetPlaceholderId, tile.action);
+  void launchTileInto(ctx.targetShoreId, ctx.targetPlaceholderId, tile.action);
 }
 
 function activateLauncherSelection(ctx: LauncherContext, harness: LauncherTile[], tools: LauncherTile[]): void {
@@ -3927,13 +3927,13 @@ function activateLauncherSelection(ctx: LauncherContext, harness: LauncherTile[]
   }
 }
 
-function renderBoxLauncher(targetRoomId: string | null, targetPlaceholderId: string | null): HTMLElement {
+function renderBoxLauncher(targetShoreId: string | null, targetPlaceholderId: string | null): HTMLElement {
   void refreshLauncherRecents();
-  const ctx: LauncherContext = { targetRoomId, targetPlaceholderId };
+  const ctx: LauncherContext = { targetShoreId, targetPlaceholderId };
   const wrap = document.createElement("div");
   wrap.className = "box-launcher";
   wrap.tabIndex = 0;
-  if (targetRoomId) wrap.dataset.roomId = targetRoomId;
+  if (targetShoreId) wrap.dataset.shoreId = targetShoreId;
   if (targetPlaceholderId) wrap.dataset.placeholderId = targetPlaceholderId;
   paintBoxLauncher(wrap, ctx);
   const ro = new ResizeObserver(() => {
@@ -4045,7 +4045,7 @@ function paintBoxLauncher(wrap: HTMLElement, ctx: LauncherContext): void {
   if (tools.length > 0) {
     const toolLabel = document.createElement("div");
     toolLabel.className = "cl-section-label";
-    toolLabel.textContent = "open a pane";
+    toolLabel.textContent = "open a nook";
     wrap.appendChild(toolLabel);
   }
 
@@ -4139,9 +4139,9 @@ function harnessIndexOf(tile: LauncherTile): number {
 function repaintActiveLauncher(): void {
   const wrap = document.querySelector(".box-launcher") as HTMLElement | null;
   if (!wrap) return;
-  const targetRoomId = wrap.dataset.roomId || null;
+  const targetShoreId = wrap.dataset.shoreId || null;
   const targetPlaceholderId = wrap.dataset.placeholderId || null;
-  paintBoxLauncher(wrap, { targetRoomId, targetPlaceholderId });
+  paintBoxLauncher(wrap, { targetShoreId, targetPlaceholderId });
   wrap.focus();
 }
 
@@ -4407,8 +4407,8 @@ async function submitInspectFeedback(
     note: trimmed,
     target,
     regionRect,
-    workspace: layout?.name ?? "",
-    room: activeRoom()?.name ?? "",
+    bay: layout?.name ?? "",
+    shore: activeShore()?.name ?? "",
     appVersion: document.getElementById("wordmark-ver")?.textContent ?? "dev",
     htmlExcerpt: el instanceof HTMLElement ? el.outerHTML : "",
     nowIso: new Date().toISOString(),
@@ -4423,13 +4423,13 @@ async function submitInspectFeedback(
   } catch (err) { console.warn("feedback save failed", err); }
 }
 
-async function spawnFeedbackAgent(tile: LauncherTile, prompt: string, roomName: string): Promise<void> {
+async function spawnFeedbackAgent(tile: LauncherTile, prompt: string, shoreName: string): Promise<void> {
   const launch = await buildAdapterLaunch({ name: tile.adapterName, displayName: tile.label, accent: tile.accent, binary: tile.binary });
-  const sp = (await invoke<{ paneId: string }>("app.paneSpawn", { command: launch.command, args: [...launch.args, prompt], cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: tile.adapterName, agentName: tile.label, workspace: "", room: "" })).paneId;
-  const r = await invoke<{ roomId: string }>("app.layoutMutate", { op: "createRoom", newPaneId: sp, name: roomName, roomId: "", targetPaneId: "", orientation: "", paneId: "", dir: 0, paneType: "terminal" });
-  activeRoomId = r.roomId;
+  const sp = (await invoke<{ nookId: string }>("app.nookSpawn", { command: launch.command, args: [...launch.args, prompt], cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: tile.adapterName, agentName: tile.label, bay: "", shore: "" })).nookId;
+  const r = await invoke<{ shoreId: string }>("app.layoutMutate", { op: "createShore", newNookId: sp, name: shoreName, shoreId: "", targetNookId: "", orientation: "", nookId: "", dir: 0, nookType: "terminal" });
+  activeShoreId = r.shoreId;
   await reload();
-  focusPane(sp);
+  focusNook(sp);
 }
 
 function renderToolTile(ctx: LauncherContext, tile: LauncherTile, letter: string, selected: boolean): HTMLElement {
@@ -4492,40 +4492,40 @@ window.addEventListener("keydown", (e) => {
 
 window.addEventListener("resize", () => fitAll());
 
-async function openToolRoom(paneType: string, name: string): Promise<void> {
+async function openToolShore(nookType: string, name: string): Promise<void> {
   try {
-    const sp = (await invoke<{ paneId: string }>("app.paneSpawn", { command: "", cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: "", agentName: "", workspace: "", room: "" })).paneId;
-    const r = await invoke<{ roomId: string }>("app.layoutMutate", { op: "createRoom", newPaneId: sp, name, roomId: "", targetPaneId: "", orientation: "", paneId: "", dir: 0, paneType });
-    activeRoomId = r.roomId;
+    const sp = (await invoke<{ nookId: string }>("app.nookSpawn", { command: "", cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: "", agentName: "", bay: "", shore: "" })).nookId;
+    const r = await invoke<{ shoreId: string }>("app.layoutMutate", { op: "createShore", newNookId: sp, name, shoreId: "", targetNookId: "", orientation: "", nookId: "", dir: 0, nookType });
+    activeShoreId = r.shoreId;
     await reload();
-    focusPane(sp);
-  } catch (e) { console.warn("openToolRoom failed", paneType, e); }
+    focusNook(sp);
+  } catch (e) { console.warn("openToolShore failed", nookType, e); }
 }
 
-function scrollActivePane(toTop: boolean): void {
-  if (!focusedPaneId) { console.warn("scroll requested with no focused pane"); return; }
-  const pv = panes.get(focusedPaneId);
-  if (!pv) { console.warn("scroll requested for unknown pane", focusedPaneId); return; }
+function scrollActiveNook(toTop: boolean): void {
+  if (!focusedNookId) { console.warn("scroll requested with no focused nook"); return; }
+  const pv = nooks.get(focusedNookId);
+  if (!pv) { console.warn("scroll requested for unknown nook", focusedNookId); return; }
   if (toTop) pv.term.scrollToTop();
   else pv.term.scrollToBottom();
 }
 
-function nextRoom(dir: number): void {
-  const rooms = layout?.rooms ?? [];
-  if (rooms.length === 0) { console.warn("room cycle requested with no rooms"); return; }
-  const idx = rooms.findIndex((r) => r.id === activeRoomId);
-  const next = rooms[((idx < 0 ? 0 : idx) + dir + rooms.length) % rooms.length];
-  activeRoomId = next.id;
+function nextShore(dir: number): void {
+  const shores = layout?.shores ?? [];
+  if (shores.length === 0) { console.warn("shore cycle requested with no shores"); return; }
+  const idx = shores.findIndex((r) => r.id === activeShoreId);
+  const next = shores[((idx < 0 ? 0 : idx) + dir + shores.length) % shores.length];
+  activeShoreId = next.id;
   const f = firstLeafOf(next);
-  if (f) { focusedPaneId = f; renderRoom(); renderSidebar(); renderRoomTabs(); focusPane(f); }
+  if (f) { focusedNookId = f; renderShore(); renderSidebar(); renderShoreTabs(); focusNook(f); }
 }
 
-function pinActiveRoom(): void {
-  if (!activeRoomId) { console.warn("pin requested with no active room"); return; }
-  if (pinnedRoomIds.has(activeRoomId)) pinnedRoomIds.delete(activeRoomId);
-  else pinnedRoomIds.add(activeRoomId);
-  savePinnedRooms();
-  renderRoomTabs();
+function pinActiveShore(): void {
+  if (!activeShoreId) { console.warn("pin requested with no active shore"); return; }
+  if (pinnedShoreIds.has(activeShoreId)) pinnedShoreIds.delete(activeShoreId);
+  else pinnedShoreIds.add(activeShoreId);
+  savePinnedShores();
+  renderShoreTabs();
 }
 
 const wsCreateEl = document.getElementById("ws-create")!;
@@ -4539,14 +4539,14 @@ function renderWscIconGrid(): void {
   const host = document.getElementById("wsc-icon-grid");
   if (!host) { console.warn("wsc-icon-grid element missing"); return; }
   host.textContent = "";
-  host.appendChild(buildWorkspaceIconGrid(wscSelectedIcon, (emoji) => { wscSelectedIcon = emoji; }));
+  host.appendChild(buildBayIconGrid(wscSelectedIcon, (emoji) => { wscSelectedIcon = emoji; }));
 }
 
-function closeWorkspaceDialog(): void {
+function closeBayDialog(): void {
   wsCreateEl.classList.remove("open");
 }
 
-function newWorkspace(): void {
+function newBay(): void {
   wscNameEl.value = "";
   wscPathEl.value = "";
   wscErrorEl.textContent = "";
@@ -4556,7 +4556,7 @@ function newWorkspace(): void {
   wscNameEl.focus();
 }
 
-async function browseWorkspaceDir(): Promise<void> {
+async function browseBayDir(): Promise<void> {
   try {
     const typed = wscPathEl.value.trim();
     const initial = typed.startsWith("/") ? typed : (activeProjectDir() || "/");
@@ -4568,45 +4568,45 @@ async function browseWorkspaceDir(): Promise<void> {
   } catch (e) { console.warn("folder picker failed", e); }
 }
 
-async function submitWorkspaceDialog(): Promise<void> {
+async function submitBayDialog(): Promise<void> {
   const name = wscNameEl.value.trim();
   const path = wscPathEl.value.trim();
   if (!name) { wscErrorEl.textContent = "Name is required."; wscNameEl.focus(); return; }
   if (!path) { wscErrorEl.textContent = "Directory is required."; wscPathEl.focus(); return; }
   try {
-    const created = await invoke<{ id: string }>("cove://commands/workspace.create", { name, projectDir: path, collectionId: "" });
-    closeWorkspaceDialog();
+    const created = await invoke<{ id: string }>("cove://commands/bay.create", { name, projectDir: path, collectionId: "" });
+    closeBayDialog();
     if (wscSelectedIcon && created?.id) {
-      try { await invoke("cove://commands/workspace.set-icon", { id: created.id, kind: "emoji", value: wscSelectedIcon }); }
+      try { await invoke("cove://commands/bay.set-icon", { id: created.id, kind: "emoji", value: wscSelectedIcon }); }
       catch (iconErr) {
-        console.warn("workspace.set-icon failed", created.id, iconErr);
-        showInAppToast("Icon not set", "Workspace created without the chosen icon.", () => {});
+        console.warn("bay.set-icon failed", created.id, iconErr);
+        showInAppToast("Icon not set", "Bay created without the chosen icon.", () => {});
       }
     }
-    await loadWorkspaceBoxes();
+    await loadBayBoxes();
     await reload();
   } catch (e) {
-    console.warn("workspace.create failed", e);
-    wscErrorEl.textContent = "Could not create workspace at that directory.";
+    console.warn("bay.create failed", e);
+    wscErrorEl.textContent = "Could not create bay at that directory.";
   }
 }
 
-document.getElementById("wsc-close")!.addEventListener("click", closeWorkspaceDialog);
-document.getElementById("wsc-browse")!.addEventListener("click", () => void browseWorkspaceDir());
-document.getElementById("wsc-create")!.addEventListener("click", () => void submitWorkspaceDialog());
-wsCreateEl.addEventListener("mousedown", (e) => { if (e.target === wsCreateEl) closeWorkspaceDialog(); });
+document.getElementById("wsc-close")!.addEventListener("click", closeBayDialog);
+document.getElementById("wsc-browse")!.addEventListener("click", () => void browseBayDir());
+document.getElementById("wsc-create")!.addEventListener("click", () => void submitBayDialog());
+wsCreateEl.addEventListener("mousedown", (e) => { if (e.target === wsCreateEl) closeBayDialog(); });
 wsCreateEl.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") { e.stopPropagation(); closeWorkspaceDialog(); }
-  else if (e.key === "Enter") { e.stopPropagation(); void submitWorkspaceDialog(); }
+  if (e.key === "Escape") { e.stopPropagation(); closeBayDialog(); }
+  else if (e.key === "Enter") { e.stopPropagation(); void submitBayDialog(); }
 });
 
-async function switchWorkspaceByIndex(n: number): Promise<void> {
+async function switchBayByIndex(n: number): Promise<void> {
   try {
-    const res = await invoke<{ workspaces: { id: string }[] }>("cove://commands/workspace.list", {});
-    const ws = (res.workspaces ?? [])[n - 1];
-    if (!ws) { console.warn("no workspace at index", n); return; }
-    await switchWorkspace(ws.id);
-  } catch (e) { console.warn("workspace switch by index failed", e); }
+    const res = await invoke<{ bays: { id: string }[] }>("cove://commands/bay.list", {});
+    const ws = (res.bays ?? [])[n - 1];
+    if (!ws) { console.warn("no bay at index", n); return; }
+    await switchBay(ws.id);
+  } catch (e) { console.warn("bay switch by index failed", e); }
 }
 
 let zenState: ZenState = initialZenState();
@@ -4678,28 +4678,28 @@ function doTogglePerfHud(): void {
 }
 
 function runAction(action: string): void {
-  if (action.startsWith("workspace.switch-")) {
-    const n = Number(action.slice("workspace.switch-".length));
-    if (Number.isFinite(n)) void switchWorkspaceByIndex(n);
+  if (action.startsWith("bay.switch-")) {
+    const n = Number(action.slice("bay.switch-".length));
+    if (Number.isFinite(n)) void switchBayByIndex(n);
     return;
   }
   switch (action) {
-    case "room.new": void newRoom(); break;
-    case "room.close": if (activeRoomId) void closeRoom(activeRoomId); break;
-    case "room.next": nextRoom(1); break;
-    case "room.prev": nextRoom(-1); break;
-    case "room.pin": pinActiveRoom(); break;
-    case "room.omni-jump": openPalette(); break;
-    case "pane.close": void closeFocused(); break;
-    case "pane.split-right": void splitActive("row"); break;
-    case "pane.split-down": void splitActive("col"); break;
-    case "pane.focus-next": cycleFocus(1); break;
-    case "pane.focus-prev": cycleFocus(-1); break;
-    case "pane.find": openFind(); break;
-    case "pane.scroll-top": scrollActivePane(true); break;
-    case "pane.scroll-bottom": scrollActivePane(false); break;
-    case "pane.maximize": void toggleZoom(); break;
-    case "workspace.create": void newWorkspace(); break;
+    case "shore.new": void newShore(); break;
+    case "shore.close": if (activeShoreId) void closeShore(activeShoreId); break;
+    case "shore.next": nextShore(1); break;
+    case "shore.prev": nextShore(-1); break;
+    case "shore.pin": pinActiveShore(); break;
+    case "shore.omni-jump": openPalette(); break;
+    case "nook.close": void closeFocused(); break;
+    case "nook.split-right": void splitActive("row"); break;
+    case "nook.split-down": void splitActive("col"); break;
+    case "nook.focus-next": cycleFocus(1); break;
+    case "nook.focus-prev": cycleFocus(-1); break;
+    case "nook.find": openFind(); break;
+    case "nook.scroll-top": scrollActiveNook(true); break;
+    case "nook.scroll-bottom": scrollActiveNook(false); break;
+    case "nook.maximize": void toggleZoom(); break;
+    case "bay.create": void newBay(); break;
     case "view.toggle-sidebar": toggleLeftSidebar(); break;
     case "view.toggle-notepad": revealSidebarMode("notepad"); break;
     case "view.zen-mode": doToggleZen(); break;
@@ -4708,11 +4708,11 @@ function runAction(action: string): void {
     case "view.zoom-reset": settings.fontSize = 13; applySettings(); break;
     case "view.toggle-backdrop": void toggleBackdrop(); break;
     case "tool.inspect": startInspectMode(); break;
-    case "tool.git": void openToolRoom("git", "Source Control"); break;
-    case "tool.search": void openToolRoom("search", "Search"); break;
-    case "tool.tasks": void openToolRoom("tasks-list", "Tasks"); break;
-    case "tool.library": void openToolRoom("library", "Library"); break;
-    case "tool.browser": void newBrowserRoom("https://duckduckgo.com"); break;
+    case "tool.git": void openToolShore("git", "Source Control"); break;
+    case "tool.search": void openToolShore("search", "Search"); break;
+    case "tool.tasks": void openToolShore("tasks-list", "Tasks"); break;
+    case "tool.library": void openToolShore("library", "Library"); break;
+    case "tool.browser": void newBrowserShore("https://duckduckgo.com"); break;
     case "tool.notepad": revealSidebarMode("notepad"); break;
     case "tool.palette": paletteEl.classList.contains("open") ? closePalette() : openPalette(); break;
     case "tool.launcher": launcherEl.classList.contains("open") ? closeLauncher() : openLauncher(); break;
@@ -4940,7 +4940,7 @@ function renderUpdatesExtras(container: HTMLElement): void {
 const engineEventHandlers = new Map<string, (payload: unknown) => void>();
 
 function onNeedsInputChanged(): void {
-  const count = needsInputPanes.size;
+  const count = needsInputNooks.size;
   if (count === 0) invoke("badge.clear", {}).catch(() => void 0);
   else invoke("badge.setCount", count).catch(() => void 0);
   if (agentsVisible()) renderSidebarContent("left");
@@ -4948,14 +4948,14 @@ function onNeedsInputChanged(): void {
 
 function setupBadge(): void {
   engineEventHandlers.set("dock.badge", (payload) => {
-    const evt = payload as { paneId?: string };
-    if (evt?.paneId) { needsInputPanes.add(evt.paneId); onNeedsInputChanged(); }
+    const evt = payload as { nookId?: string };
+    if (evt?.nookId) { needsInputNooks.add(evt.nookId); onNeedsInputChanged(); }
   });
   engineEventHandlers.set("needs-input.clear", (payload) => {
-    const evt = payload as { paneId?: string };
-    if (evt?.paneId) { needsInputPanes.delete(evt.paneId); onNeedsInputChanged(); }
+    const evt = payload as { nookId?: string };
+    if (evt?.nookId) { needsInputNooks.delete(evt.nookId); onNeedsInputChanged(); }
   });
-  engineEventHandlers.set("dock.badge.clear", () => { needsInputPanes.clear(); onNeedsInputChanged(); });
+  engineEventHandlers.set("dock.badge.clear", () => { needsInputNooks.clear(); onNeedsInputChanged(); });
   engineEventHandlers.set("state.changed", () => { if (agentsVisible()) void refreshAgents(); });
   engineEventHandlers.set("restore.summary", (payload) => {
     const p = payload as { restored?: number; fresh?: number; skipped?: number };
@@ -4985,18 +4985,18 @@ async function toggleBackdrop(): Promise<void> {
   backdropMaterial = coerceMaterial(await setBackdropMaterial(next, backdropDeps));
 }
 
-function revealPane(paneId: string): void {
+function revealNook(nookId: string): void {
   if (!layout) return;
-  const room = layout.rooms.find((r) => findLeafId(r.layoutTree, paneId) !== null);
-  if (!room) { console.warn("notification reveal: no room for pane", paneId); return; }
-  if (activeRoomId !== room.id) {
-    activeRoomId = room.id;
-    renderRoom();
-    renderRoomTabs();
+  const shore = layout.shores.find((r) => findLeafId(r.layoutTree, nookId) !== null);
+  if (!shore) { console.warn("notification reveal: no shore for nook", nookId); return; }
+  if (activeShoreId !== shore.id) {
+    activeShoreId = shore.id;
+    renderShore();
+    renderShoreTabs();
     renderSidebar();
   }
-  const leaf = findLeafId(room.layoutTree, paneId) ?? paneId;
-  focusPane(leaf);
+  const leaf = findLeafId(shore.layoutTree, nookId) ?? nookId;
+  focusNook(leaf);
 }
 
 function toastHost(): HTMLElement {
@@ -5042,8 +5042,8 @@ function setupNotifications(): void {
     isPermissionGranted: () => invoke<boolean>("notification.isPermissionGranted", {}).catch(() => false),
     requestPermission: () => invoke<boolean>("notification.requestPermission", {}).catch(() => false),
     send: async (payload) => { await window.__ryn.invoke("notification.sendWithId", { id: payload.id, title: payload.title, body: payload.body }); },
-    reveal: (paneId) => revealPane(paneId),
-    toast: (payload) => showInAppToast(payload.title, payload.body, () => revealPane(payload.paneId)),
+    reveal: (nookId) => revealNook(nookId),
+    toast: (payload) => showInAppToast(payload.title, payload.body, () => revealNook(payload.nookId)),
     warn: (message) => console.warn(message),
   };
   const bridge = new NotificationBridge(deps);
@@ -5084,9 +5084,9 @@ async function handleAutomationExec(ev: AutomationExecEvent): Promise<void> {
   if (!ev?.requestId) return;
   let resultJson: string;
   try {
-    const webviewId = browserWebviewRegistry.get(ev.paneId);
+    const webviewId = browserWebviewRegistry.get(ev.nookId);
     if (!webviewId) {
-      resultJson = JSON.stringify({ ok: false, error: `no live webview for pane ${ev.paneId}` });
+      resultJson = JSON.stringify({ ok: false, error: `no live webview for nook ${ev.nookId}` });
     } else if (ev.kind === "screenshot") {
       const png = await invoke<string>("webviewPane.screenshot", { id: webviewId });
       resultJson = JSON.stringify({ ok: true, png });
@@ -5108,7 +5108,7 @@ async function handleAutomationExec(ev: AutomationExecEvent): Promise<void> {
   }
 }
 
-let notepadGroups: { workspaceId: string; workspaceName: string; notes: NoteListItem[] }[] = [];
+let notepadGroups: { bayId: string; bayName: string; notes: NoteListItem[] }[] = [];
 let notepadNav: NavState = { groupIdx: -1, noteIdx: -1 };
 let notepadLoaded = false;
 const collapsedGroups = new Set<string>(JSON.parse(localStorage.getItem("cove.notepad.collapsedGroups") ?? "[]"));
@@ -5122,8 +5122,8 @@ function rerenderNotepad(): void {
 
 async function loadNotepadNotes(): Promise<void> {
   try {
-    const res = await invoke<{ notes: NoteListItem[] }>("cove://commands/note.list", { workspaceId: "default" });
-    notepadGroups = groupByWorkspace(res.notes ?? [], { default: "Default" });
+    const res = await invoke<{ notes: NoteListItem[] }>("cove://commands/note.list", { bayId: "default" });
+    notepadGroups = groupByBay(res.notes ?? [], { default: "Default" });
   } catch {
     notepadGroups = [];
   }
@@ -5153,16 +5153,16 @@ function renderNotepadContent(container: HTMLElement): void {
   for (let gi = 0; gi < notepadGroups.length; gi++) {
     const group = notepadGroups[gi];
     const groupEl = document.createElement("div");
-    groupEl.className = "ns-group" + (collapsedGroups.has(group.workspaceId) ? " collapsed" : "");
+    groupEl.className = "ns-group" + (collapsedGroups.has(group.bayId) ? " collapsed" : "");
 
     const head = document.createElement("div");
     head.className = "ns-group-head";
     head.innerHTML = `<span class="chevron">\u25bc</span><span class="ns-group-name"></span><span class="ns-group-count"></span>`;
-    head.querySelector(".ns-group-name")!.textContent = group.workspaceName;
+    head.querySelector(".ns-group-name")!.textContent = group.bayName;
     head.querySelector(".ns-group-count")!.textContent = String(group.notes.length);
     head.addEventListener("click", () => {
-      if (collapsedGroups.has(group.workspaceId)) collapsedGroups.delete(group.workspaceId);
-      else collapsedGroups.add(group.workspaceId);
+      if (collapsedGroups.has(group.bayId)) collapsedGroups.delete(group.bayId);
+      else collapsedGroups.add(group.bayId);
       localStorage.setItem("cove.notepad.collapsedGroups", JSON.stringify([...collapsedGroups]));
       rerenderNotepad();
     });
@@ -5182,7 +5182,7 @@ function renderNotepadContent(container: HTMLElement): void {
       noteEl.querySelector(".ns-note-title")!.textContent = note.title || "Untitled";
       noteEl.addEventListener("click", () => {
         notepadNav = { groupIdx: gi, noteIdx: ni };
-        void openNoteInPane(note.id, note.workspaceId);
+        void openNoteInNook(note.id, note.bayId);
         rerenderNotepad();
       });
       notesEl.appendChild(noteEl);
@@ -5199,19 +5199,19 @@ function onNotepadKey(e: KeyboardEvent): void {
   else if (e.key === "Enter") {
     e.preventDefault();
     const note = selectedNote(notepadGroups, notepadNav);
-    if (note) void openNoteInPane(note.id, note.workspaceId);
+    if (note) void openNoteInNook(note.id, note.bayId);
   }
 }
 
-async function openNoteInPane(noteId: string, workspaceId: string): Promise<void> {
+async function openNoteInNook(noteId: string, bayId: string): Promise<void> {
   try {
-    const sp = (await invoke<{ paneId: string }>("app.paneSpawn", { command: "", cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: "", agentName: "", workspace: "", room: "" })).paneId;
-    const r = await invoke<{ roomId: string }>("app.layoutMutate", { op: "createRoom", newPaneId: sp, name: "Note", roomId: "", targetPaneId: "", orientation: "", paneId: "", dir: 0, paneType: "notepad" });
-    activeRoomId = r.roomId;
+    const sp = (await invoke<{ nookId: string }>("app.nookSpawn", { command: "", cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: "", agentName: "", bay: "", shore: "" })).nookId;
+    const r = await invoke<{ shoreId: string }>("app.layoutMutate", { op: "createShore", newNookId: sp, name: "Note", shoreId: "", targetNookId: "", orientation: "", nookId: "", dir: 0, nookType: "notepad" });
+    activeShoreId = r.shoreId;
     await reload();
-    focusPane(sp);
+    focusNook(sp);
     await waitForElement(".notepad-editor", 3000);
-    await openNote(workspaceId, noteId);
+    await openNote(bayId, noteId);
   } catch { void 0; }
 }
 
@@ -5230,7 +5230,7 @@ function waitForElement(selector: string, timeoutMs: number): Promise<HTMLElemen
 
 async function createNote(): Promise<void> {
   try {
-    await invoke("cove://commands/note.create", { title: "Untitled", workspaceId: "default", source: "user", content: "", kind: "markdown" });
+    await invoke("cove://commands/note.create", { title: "Untitled", bayId: "default", source: "user", content: "", kind: "markdown" });
     await loadNotepadNotes();
   } catch { void 0; }
 }
@@ -5250,7 +5250,7 @@ async function createNote(): Promise<void> {
   setupNotifications();
   void setupBackdrop();
   void loadWings();
-  void loadWorkspaceBoxes();
+  void loadBayBoxes();
   void loadLauncherAdapters();
   await reload();
   startAgentPolling();

@@ -38,32 +38,32 @@ public sealed class DispatchSagaTests
         public bool RemoveAsync(string ws, string branchName) { RemoveCalls++; return true; }
     }
 
-    private sealed class FakePaneHost : IPaneHost
+    private sealed class FakeNookHost : INookHost
     {
         public bool ShouldFail { get; set; }
         public int CreateCalls { get; private set; }
         public Dictionary<string, Dictionary<string, string>> InjectedEnvs { get; } = new();
         public Dictionary<string, string> BoundCards { get; } = new();
-        public PaneCreationResult? CreatePane(string? adapter, int cols, int rows)
+        public NookCreationResult? CreateNook(string? adapter, int cols, int rows)
         {
             CreateCalls++;
-            return ShouldFail ? null : new PaneCreationResult($"pane-{CreateCalls}");
+            return ShouldFail ? null : new NookCreationResult($"nook-{CreateCalls}");
         }
-        public bool InjectEnv(string paneId, IReadOnlyDictionary<string, string> env)
+        public bool InjectEnv(string nookId, IReadOnlyDictionary<string, string> env)
         {
-            InjectedEnvs[paneId] = new Dictionary<string, string>(env);
+            InjectedEnvs[nookId] = new Dictionary<string, string>(env);
             return true;
         }
-        public bool BindTaskCard(string paneId, string cardId) { BoundCards[paneId] = cardId; return true; }
+        public bool BindTaskCard(string nookId, string cardId) { BoundCards[nookId] = cardId; return true; }
     }
 
-    private sealed class FakeRoomService : IRoomService
+    private sealed class FakeShoreService : IShoreService
     {
-        public List<string> CreatedRoomNames { get; } = new();
-        public RoomCreationResult? CreateRoom(string ws, string name, string? parent)
+        public List<string> CreatedShoreNames { get; } = new();
+        public ShoreCreationResult? CreateShore(string ws, string name, string? parent)
         {
-            CreatedRoomNames.Add(name);
-            return new RoomCreationResult($"room-{CreatedRoomNames.Count}");
+            CreatedShoreNames.Add(name);
+            return new ShoreCreationResult($"shore-{CreatedShoreNames.Count}");
         }
     }
 
@@ -73,7 +73,7 @@ public sealed class DispatchSagaTests
         public string? Error { get; set; }
         public int LaunchCalls { get; private set; }
         public string? LastPrompt { get; private set; }
-        public AdapterLaunchResult Launch(string paneId, string adapter, string cmd, IReadOnlyDictionary<string, string> env, string prompt)
+        public AdapterLaunchResult Launch(string nookId, string adapter, string cmd, IReadOnlyDictionary<string, string> env, string prompt)
         {
             LaunchCalls++;
             LastPrompt = prompt;
@@ -93,21 +93,21 @@ public sealed class DispatchSagaTests
         var cardId = await SeedCardAsync(svc);
         var resolver = new FakeProfileResolver();
         var worktree = new FakeWorktreeService();
-        var paneHost = new FakePaneHost();
-        var rooms = new FakeRoomService();
+        var nookHost = new FakeNookHost();
+        var shores = new FakeShoreService();
         var launcher = new FakeAgentLauncher();
-        var saga = new DispatchSaga(svc, resolver, worktree, paneHost, rooms, launcher, NullLogger.Instance);
+        var saga = new DispatchSaga(svc, resolver, worktree, nookHost, shores, launcher, NullLogger.Instance);
 
         var result = await saga.LaunchAsync(cardId, "ws1", null);
 
         Assert.True(result.Success, result.Error);
         Assert.Equal(DispatchStep.Completed, result.ReachedStep);
         Assert.NotNull(result.RunId);
-        Assert.Equal(1, paneHost.CreateCalls);
+        Assert.Equal(1, nookHost.CreateCalls);
         Assert.Equal(1, launcher.LaunchCalls);
-        Assert.Contains("COVE_TASK_ID", paneHost.InjectedEnvs["pane-1"].Keys);
-        Assert.Contains("COVE_TASK_RUN_ID", paneHost.InjectedEnvs["pane-1"].Keys);
-        Assert.Equal(cardId, paneHost.BoundCards["pane-1"]);
+        Assert.Contains("COVE_TASK_ID", nookHost.InjectedEnvs["nook-1"].Keys);
+        Assert.Contains("COVE_TASK_RUN_ID", nookHost.InjectedEnvs["nook-1"].Keys);
+        Assert.Equal(cardId, nookHost.BoundCards["nook-1"]);
         var card = svc.GetCard(cardId);
         Assert.Equal("in-progress", card!.StatusId);
         Assert.Equal(result.RunId, card.CurrentPrimaryRunId);
@@ -119,7 +119,7 @@ public sealed class DispatchSagaTests
         var svc = await NewSvcAsync();
         var cardId = await SeedCardAsync(svc);
         var resolver = new FakeProfileResolver { Result = null };
-        var saga = new DispatchSaga(svc, resolver, new FakeWorktreeService(), new FakePaneHost(), new FakeRoomService(), new FakeAgentLauncher(), NullLogger.Instance);
+        var saga = new DispatchSaga(svc, resolver, new FakeWorktreeService(), new FakeNookHost(), new FakeShoreService(), new FakeAgentLauncher(), NullLogger.Instance);
 
         var result = await saga.LaunchAsync(cardId, "ws1", null);
 
@@ -145,7 +145,7 @@ public sealed class DispatchSagaTests
             new HashSet<string> { "default" }));
         var resolver = new FakeProfileResolver();
         var worktree = new FakeWorktreeService { ShouldFail = true };
-        var saga = new DispatchSaga(svc, resolver, worktree, new FakePaneHost(), new FakeRoomService(), new FakeAgentLauncher(), NullLogger.Instance);
+        var saga = new DispatchSaga(svc, resolver, worktree, new FakeNookHost(), new FakeShoreService(), new FakeAgentLauncher(), NullLogger.Instance);
 
         var result = await saga.LaunchAsync(cardId, "ws1", "worktree");
 
@@ -157,19 +157,19 @@ public sealed class DispatchSagaTests
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task PaneCreationFails_CompensatesRunAndWorktree()
+    public async System.Threading.Tasks.Task NookCreationFails_CompensatesRunAndWorktree()
     {
         var svc = await NewSvcAsync();
         var cardId = await SeedCardAsync(svc);
         var resolver = new FakeProfileResolver();
         var worktree = new FakeWorktreeService();
-        var paneHost = new FakePaneHost { ShouldFail = true };
-        var saga = new DispatchSaga(svc, resolver, worktree, paneHost, new FakeRoomService(), new FakeAgentLauncher(), NullLogger.Instance);
+        var nookHost = new FakeNookHost { ShouldFail = true };
+        var saga = new DispatchSaga(svc, resolver, worktree, nookHost, new FakeShoreService(), new FakeAgentLauncher(), NullLogger.Instance);
 
         var result = await saga.LaunchAsync(cardId, "ws1", null);
 
         Assert.False(result.Success);
-        Assert.Equal(DispatchStep.EnsurePane, result.ReachedStep);
+        Assert.Equal(DispatchStep.EnsureNook, result.ReachedStep);
         var runs = svc.ListRuns(cardId, null, null);
         Assert.Equal("cancelled", runs[0].State);
     }
@@ -181,7 +181,7 @@ public sealed class DispatchSagaTests
         var cardId = await SeedCardAsync(svc);
         var resolver = new FakeProfileResolver();
         var launcher = new FakeAgentLauncher { ShouldFail = true, Error = "adapter crashed" };
-        var saga = new DispatchSaga(svc, resolver, new FakeWorktreeService(), new FakePaneHost(), new FakeRoomService(), launcher, NullLogger.Instance);
+        var saga = new DispatchSaga(svc, resolver, new FakeWorktreeService(), new FakeNookHost(), new FakeShoreService(), launcher, NullLogger.Instance);
 
         var result = await saga.LaunchAsync(cardId, "ws1", null);
 
@@ -193,7 +193,7 @@ public sealed class DispatchSagaTests
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task WorktreeMode_CreatesAutoNamedRoom()
+    public async System.Threading.Tasks.Task WorktreeMode_CreatesAutoNamedShore()
     {
         var svc = await NewSvcAsync();
         var cardId = await SeedCardAsync(svc);
@@ -208,14 +208,14 @@ public sealed class DispatchSagaTests
             new HashSet<string> { "todo", "in-progress" },
             new HashSet<string> { "default" }));
         var resolver = new FakeProfileResolver();
-        var rooms = new FakeRoomService();
-        var saga = new DispatchSaga(svc, resolver, new FakeWorktreeService(), new FakePaneHost(), rooms, new FakeAgentLauncher(), NullLogger.Instance);
+        var shores = new FakeShoreService();
+        var saga = new DispatchSaga(svc, resolver, new FakeWorktreeService(), new FakeNookHost(), shores, new FakeAgentLauncher(), NullLogger.Instance);
 
         var result = await saga.LaunchAsync(cardId, "ws1", "worktree");
 
         Assert.True(result.Success);
-        Assert.Single(rooms.CreatedRoomNames);
-        Assert.Contains("COVE-1 - test card", rooms.CreatedRoomNames[0]);
+        Assert.Single(shores.CreatedShoreNames);
+        Assert.Contains("COVE-1 - test card", shores.CreatedShoreNames[0]);
     }
 
     [Fact]
@@ -224,7 +224,7 @@ public sealed class DispatchSagaTests
         var svc = await NewSvcAsync();
         var cardId = await SeedCardAsync(svc);
         var launcher = new FakeAgentLauncher();
-        var saga = new DispatchSaga(svc, new FakeProfileResolver(), new FakeWorktreeService(), new FakePaneHost(), new FakeRoomService(), launcher, NullLogger.Instance);
+        var saga = new DispatchSaga(svc, new FakeProfileResolver(), new FakeWorktreeService(), new FakeNookHost(), new FakeShoreService(), launcher, NullLogger.Instance);
 
         await saga.LaunchAsync(cardId, "ws1", null);
 

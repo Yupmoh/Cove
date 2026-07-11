@@ -6,18 +6,18 @@ namespace Cove.Engine.Layout;
 
 public static class MosaicOps
 {
-    public static IReadOnlyList<PaneLeaf> Leaves(MosaicNode root)
+    public static IReadOnlyList<NookLeaf> Leaves(MosaicNode root)
     {
-        var list = new List<PaneLeaf>();
+        var list = new List<NookLeaf>();
         Collect(root, list);
         return list;
     }
 
-    private static void Collect(MosaicNode node, List<PaneLeaf> list)
+    private static void Collect(MosaicNode node, List<NookLeaf> list)
     {
         switch (node)
         {
-            case PaneLeaf leaf:
+            case NookLeaf leaf:
                 list.Add(leaf);
                 break;
             case SplitNode split:
@@ -27,25 +27,25 @@ public static class MosaicOps
         }
     }
 
-    public static PaneLeaf? Find(MosaicNode root, string paneId)
+    public static NookLeaf? Find(MosaicNode root, string nookId)
     {
         return root switch
         {
-            PaneLeaf leaf => leaf.PaneId == paneId ? leaf : null,
-            SplitNode split => Find(split.ChildA, paneId) ?? Find(split.ChildB, paneId),
+            NookLeaf leaf => leaf.NookId == nookId ? leaf : null,
+            SplitNode split => Find(split.ChildA, nookId) ?? Find(split.ChildB, nookId),
             _ => null,
         };
     }
 
-    public static MosaicNode ReplaceLeaf(MosaicNode root, string paneId, Func<PaneLeaf, PaneLeaf> transform)
+    public static MosaicNode ReplaceLeaf(MosaicNode root, string nookId, Func<NookLeaf, NookLeaf> transform)
     {
         return Replace(root);
 
         MosaicNode Replace(MosaicNode node)
         {
-            if (node is PaneLeaf leaf)
+            if (node is NookLeaf leaf)
             {
-                if (leaf.PaneId == paneId)
+                if (leaf.NookId == nookId)
                     return transform(leaf);
                 return leaf;
             }
@@ -63,19 +63,19 @@ public static class MosaicOps
         }
     }
 
-    public static MosaicNode Split(MosaicNode root, string targetPaneId, SplitOrientation orient, PaneLeaf newLeaf, double ratio = 0.5, bool before = false)
+    public static MosaicNode Split(MosaicNode root, string targetNookId, SplitOrientation orient, NookLeaf newLeaf, double ratio = 0.5, bool before = false)
     {
         var found = false;
         var result = Replace(root);
         if (!found)
-            throw new InvalidOperationException($"Target pane '{targetPaneId}' not found.");
+            throw new InvalidOperationException($"Target nook '{targetNookId}' not found.");
         return result;
 
         MosaicNode Replace(MosaicNode node)
         {
-            if (node is PaneLeaf leaf)
+            if (node is NookLeaf leaf)
             {
-                if (leaf.PaneId == targetPaneId)
+                if (leaf.NookId == targetNookId)
                 {
                     found = true;
                     return new SplitNode
@@ -102,27 +102,27 @@ public static class MosaicOps
         }
     }
 
-    public static MosaicNode? Close(MosaicNode root, string paneId)
+    public static MosaicNode? Close(MosaicNode root, string nookId)
     {
-        return CloseNode(root, paneId);
+        return CloseNode(root, nookId);
     }
 
-    private static MosaicNode? CloseNode(MosaicNode node, string paneId)
+    private static MosaicNode? CloseNode(MosaicNode node, string nookId)
     {
-        if (node is PaneLeaf leaf)
+        if (node is NookLeaf leaf)
         {
-            return leaf.PaneId == paneId ? null : node;
+            return leaf.NookId == nookId ? null : node;
         }
 
         if (node is SplitNode split)
         {
-            if (split.ChildA is PaneLeaf a && a.PaneId == paneId)
+            if (split.ChildA is NookLeaf a && a.NookId == nookId)
                 return split.ChildB;
-            if (split.ChildB is PaneLeaf b && b.PaneId == paneId)
+            if (split.ChildB is NookLeaf b && b.NookId == nookId)
                 return split.ChildA;
 
-            var newA = CloseNode(split.ChildA, paneId);
-            var newB = CloseNode(split.ChildB, paneId);
+            var newA = CloseNode(split.ChildA, nookId);
+            var newB = CloseNode(split.ChildB, nookId);
 
             if (newA is null)
                 return split.ChildB;
@@ -137,7 +137,7 @@ public static class MosaicOps
         return node;
     }
 
-    public static string? NextPane(MosaicNode root, string activePaneId, int dir)
+    public static string? NextNook(MosaicNode root, string activeNookId, int dir)
     {
         var leaves = Leaves(root);
         if (leaves.Count < 2)
@@ -146,7 +146,7 @@ public static class MosaicOps
         var index = -1;
         for (var i = 0; i < leaves.Count; i++)
         {
-            if (leaves[i].PaneId == activePaneId)
+            if (leaves[i].NookId == activeNookId)
             {
                 index = i;
                 break;
@@ -158,6 +158,6 @@ public static class MosaicOps
 
         var count = leaves.Count;
         var next = ((index + dir) % count + count) % count;
-        return leaves[next].PaneId;
+        return leaves[next].NookId;
     }
 }

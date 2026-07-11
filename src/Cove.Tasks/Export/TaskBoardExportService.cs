@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Cove.Tasks.Export;
 
-public sealed record ExportManifest(System.DateTimeOffset ExportedAt, int SchemaVersion, int WorkspaceCount);
+public sealed record ExportManifest(System.DateTimeOffset ExportedAt, int SchemaVersion, int BayCount);
 public sealed record ExportResult(bool Success, string? ExportPath, ExportManifest? Manifest, string? Error);
 public sealed record RestoreDiffResult(bool Success, System.Collections.Generic.IReadOnlyList<RowDiff> Diffs, string? Error);
 
@@ -12,12 +12,12 @@ public sealed record RowDiff(string Table, string Id, string ChangeType, string?
 
 public interface ISnapshotSink
 {
-    System.Threading.Tasks.Task<bool> WriteSnapshotAsync(string workspaceId, byte[] data, ExportManifest manifest);
+    System.Threading.Tasks.Task<bool> WriteSnapshotAsync(string bayId, byte[] data, ExportManifest manifest);
 }
 
 public sealed class NullSnapshotSink : ISnapshotSink
 {
-    public System.Threading.Tasks.Task<bool> WriteSnapshotAsync(string workspaceId, byte[] data, ExportManifest manifest)
+    public System.Threading.Tasks.Task<bool> WriteSnapshotAsync(string bayId, byte[] data, ExportManifest manifest)
         => System.Threading.Tasks.Task.FromResult(true);
 }
 
@@ -32,7 +32,7 @@ public sealed class TaskBoardExportService
         _logger = logger;
     }
 
-    public ExportResult Export(string exportPath, int workspaceCount)
+    public ExportResult Export(string exportPath, int bayCount)
     {
         try
         {
@@ -45,8 +45,8 @@ public sealed class TaskBoardExportService
             using var cmd = conn.CreateCommand();
             cmd.CommandText = $"VACUUM INTO '{exportPath.Replace("'", "''")}'";
             cmd.ExecuteNonQuery();
-            var manifest = new ExportManifest(System.DateTimeOffset.UtcNow, 1, workspaceCount);
-            _logger.LogWarning("export: tasks.db exported to {path} ({workspaceCount} workspaces)", exportPath, workspaceCount);
+            var manifest = new ExportManifest(System.DateTimeOffset.UtcNow, 1, bayCount);
+            _logger.LogWarning("export: tasks.db exported to {path} ({bayCount} bays)", exportPath, bayCount);
             return new ExportResult(true, exportPath, manifest, null);
         }
         catch (System.Exception ex)

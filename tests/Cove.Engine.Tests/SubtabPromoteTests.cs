@@ -6,23 +6,23 @@ namespace Cove.Engine.Tests;
 
 public sealed class SubtabPromoteTests
 {
-    private static PaneLeaf Leaf(string id, params string[] docIds) => new()
+    private static NookLeaf Leaf(string id, params string[] docIds) => new()
     {
-        PaneId = id,
-        Subtabs = docIds.Length == 0 ? new[] { new Subtab(id, PaneType.Terminal) } : System.Array.ConvertAll(docIds, d => new Subtab(d, PaneType.Terminal)),
+        NookId = id,
+        Subtabs = docIds.Length == 0 ? new[] { new Subtab(id, NookType.Terminal) } : System.Array.ConvertAll(docIds, d => new Subtab(d, NookType.Terminal)),
     };
 
     [Fact]
-    public void Promote_RemovesSubtabFromSource_SplitsIntoNewPane()
+    public void Promote_RemovesSubtabFromSource_SplitsIntoNewNook()
     {
         var layout = new LayoutService();
-        string roomId = layout.CreateRoom("main", Leaf("p1", "p1", "p2", "p3"));
-        layout.PromoteSubtab(roomId, "p1", 1, "newPane");
-        var root = layout.GetRoot(roomId)!;
+        string shoreId = layout.CreateShore("main", Leaf("p1", "p1", "p2", "p3"));
+        layout.PromoteSubtab(shoreId, "p1", 1, "newNook");
+        var root = layout.GetRoot(shoreId)!;
         Assert.IsType<SplitNode>(root);
         var split = (SplitNode)root;
-        var source = split.ChildA is PaneLeaf la && la.PaneId == "p1" ? la : (split.ChildB as PaneLeaf)!;
-        var promoted = split.ChildA is PaneLeaf lb && lb.PaneId == "newPane" ? lb : (split.ChildB as PaneLeaf)!;
+        var source = split.ChildA is NookLeaf la && la.NookId == "p1" ? la : (split.ChildB as NookLeaf)!;
+        var promoted = split.ChildA is NookLeaf lb && lb.NookId == "newNook" ? lb : (split.ChildB as NookLeaf)!;
         Assert.Equal(2, source.Subtabs.Count);
         Assert.DoesNotContain(source.Subtabs, s => s.DocumentId == "p2");
         Assert.Single(promoted.Subtabs);
@@ -33,28 +33,28 @@ public sealed class SubtabPromoteTests
     public void Promote_SingleSubtab_Fails()
     {
         var layout = new LayoutService();
-        string roomId = layout.CreateRoom("main", Leaf("p1", "p1"));
-        Assert.Throws<System.InvalidOperationException>(() => layout.PromoteSubtab(roomId, "p1", 0, "newPane"));
+        string shoreId = layout.CreateShore("main", Leaf("p1", "p1"));
+        Assert.Throws<System.InvalidOperationException>(() => layout.PromoteSubtab(shoreId, "p1", 0, "newNook"));
     }
 
     [Fact]
     public void CenterDrop_MovesSubtabBetweenLeaves()
     {
         var layout = new LayoutService();
-        string roomId = layout.CreateRoom("main", Leaf("p1", "p1", "p2", "p3"));
-        layout.SplitPane(roomId, "p1", SplitOrientation.Row, Leaf("p2", "p2"));
-        var beforeSplit = (SplitNode)layout.GetRoot(roomId)!;
-        var targetBefore = beforeSplit.ChildA is PaneLeaf la && la.PaneId == "p2" ? la
-            : beforeSplit.ChildB is PaneLeaf lb && lb.PaneId == "p2" ? lb
+        string shoreId = layout.CreateShore("main", Leaf("p1", "p1", "p2", "p3"));
+        layout.SplitNook(shoreId, "p1", SplitOrientation.Row, Leaf("p2", "p2"));
+        var beforeSplit = (SplitNode)layout.GetRoot(shoreId)!;
+        var targetBefore = beforeSplit.ChildA is NookLeaf la && la.NookId == "p2" ? la
+            : beforeSplit.ChildB is NookLeaf lb && lb.NookId == "p2" ? lb
             : throw new System.Exception("p2 leaf not found");
         Assert.Single(targetBefore.Subtabs);
 
-        layout.CenterDrop(roomId, "p1", 1, "p2");
+        layout.CenterDrop(shoreId, "p1", 1, "p2");
 
-        var root = layout.GetRoot(roomId)!;
+        var root = layout.GetRoot(shoreId)!;
         var split = (SplitNode)root;
-        var source = split.ChildA is PaneLeaf sa && sa.PaneId == "p1" ? sa : (split.ChildB as PaneLeaf)!;
-        var target = split.ChildA is PaneLeaf sb && sb.PaneId == "p2" ? sb : (split.ChildB as PaneLeaf)!;
+        var source = split.ChildA is NookLeaf sa && sa.NookId == "p1" ? sa : (split.ChildB as NookLeaf)!;
+        var target = split.ChildA is NookLeaf sb && sb.NookId == "p2" ? sb : (split.ChildB as NookLeaf)!;
         Assert.Equal(2, source.Subtabs.Count);
         Assert.DoesNotContain(source.Subtabs, s => s.DocumentId == "p2");
         Assert.Equal(2, target.Subtabs.Count);
@@ -62,16 +62,16 @@ public sealed class SubtabPromoteTests
     }
 
     [Fact]
-    public void CenterDrop_MergesTwoSingleSubtabPanes_SourceCollapses()
+    public void CenterDrop_MergesTwoSingleSubtabNooks_SourceCollapses()
     {
         var layout = new LayoutService();
-        string roomId = layout.CreateRoom("main", Leaf("p1", "p1"));
-        layout.SplitPane(roomId, "p1", SplitOrientation.Row, Leaf("p2", "p2"));
-        layout.CenterDrop(roomId, "p2", 0, "p1");
-        var root = layout.GetRoot(roomId)!;
-        Assert.IsType<PaneLeaf>(root);
-        var merged = (PaneLeaf)root;
-        Assert.Equal("p1", merged.PaneId);
+        string shoreId = layout.CreateShore("main", Leaf("p1", "p1"));
+        layout.SplitNook(shoreId, "p1", SplitOrientation.Row, Leaf("p2", "p2"));
+        layout.CenterDrop(shoreId, "p2", 0, "p1");
+        var root = layout.GetRoot(shoreId)!;
+        Assert.IsType<NookLeaf>(root);
+        var merged = (NookLeaf)root;
+        Assert.Equal("p1", merged.NookId);
         Assert.Equal(2, merged.Subtabs.Count);
         Assert.Contains(merged.Subtabs, s => s.DocumentId == "p2");
     }
@@ -80,12 +80,12 @@ public sealed class SubtabPromoteTests
     public void Subtabs_PersistAcrossSnapshotRoundTrip()
     {
         var layout = new LayoutService();
-        string roomId = layout.CreateRoom("main", Leaf("p1", "p1", "p2", "p3"));
+        string shoreId = layout.CreateShore("main", Leaf("p1", "p1", "p2", "p3"));
         var snap = layout.ToSnapshot("ws1", "demo", "/proj");
         var layout2 = new LayoutService();
         layout2.LoadSnapshot(snap);
-        var root = layout2.GetRoot(snap.Rooms[0].Id)!;
-        Assert.IsType<PaneLeaf>(root);
-        Assert.Equal(3, ((PaneLeaf)root).Subtabs.Count);
+        var root = layout2.GetRoot(snap.Shores[0].Id)!;
+        Assert.IsType<NookLeaf>(root);
+        Assert.Equal(3, ((NookLeaf)root).Subtabs.Count);
     }
 }

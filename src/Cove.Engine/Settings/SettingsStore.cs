@@ -124,11 +124,11 @@ public sealed class KeybindingStore
 
     private static string? BuiltinDefault(string action) => action switch
     {
-        "pane.newTerminal" => "cmd+t",
-        "pane.splitHorizontal" => "cmd+d",
-        "pane.splitVertical" => "cmd+shift+d",
-        "pane.close" => "cmd+w",
-        "pane.zoom" => "cmd+z",
+        "nook.newTerminal" => "cmd+t",
+        "nook.splitHorizontal" => "cmd+d",
+        "nook.splitVertical" => "cmd+shift+d",
+        "nook.close" => "cmd+w",
+        "nook.zoom" => "cmd+z",
         "sidebar.toggle" => "cmd+b",
         "palette.open" => "cmd+k",
         "launcher.open" => "cmd+l",

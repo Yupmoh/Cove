@@ -25,12 +25,12 @@ public sealed class CardRepositoryTests
         return (factory, store, channel, counter, cards);
     }
 
-    private static void SeedStatus(SqliteConnectionFactory factory, string workspaceId, string id)
+    private static void SeedStatus(SqliteConnectionFactory factory, string bayId, string id)
     {
         using var conn = factory.Open();
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = "INSERT OR IGNORE INTO statuses (workspace_id, id, name, hex_color, position, created_at, updated_at) VALUES (@WorkspaceId, @Id, @Id, '808080', 0, @Now, @Now)";
-        cmd.Parameters.AddWithValue("@WorkspaceId", workspaceId);
+        cmd.CommandText = "INSERT OR IGNORE INTO statuses (bay_id, id, name, hex_color, position, created_at, updated_at) VALUES (@BayId, @Id, @Id, '808080', 0, @Now, @Now)";
+        cmd.Parameters.AddWithValue("@BayId", bayId);
         cmd.Parameters.AddWithValue("@Id", id);
         cmd.Parameters.AddWithValue("@Now", System.DateTimeOffset.UtcNow.ToString("o"));
         cmd.ExecuteNonQuery();
@@ -39,7 +39,7 @@ public sealed class CardRepositoryTests
     private static CardRow Card(string ws, int num, string title, double orderKey, string status = "todo") => new()
     {
         Id = System.Guid.NewGuid().ToString("N"),
-        WorkspaceId = ws,
+        BayId = ws,
         TaskNumber = num,
         Title = title,
         StatusId = status,
@@ -85,13 +85,13 @@ public sealed class CardRepositoryTests
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task GetByWorkspaceAndNumber_ReturnsCard()
+    public async System.Threading.Tasks.Task GetByBayAndNumber_ReturnsCard()
     {
         var (_, _, _, _, cards) = await NewAsync();
         var row = Card("ws1", 42, "find me", 0);
         await cards.InsertAsync(row);
 
-        var fetched = cards.GetByWorkspaceAndNumber("ws1", 42);
+        var fetched = cards.GetByBayAndNumber("ws1", 42);
         Assert.NotNull(fetched);
         Assert.Equal("find me", fetched!.Title);
     }
@@ -109,7 +109,7 @@ public sealed class CardRepositoryTests
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task ListByStatus_IsolatesByWorkspace()
+    public async System.Threading.Tasks.Task ListByStatus_IsolatesByBay()
     {
         var (_, _, _, _, cards) = await NewAsync();
         await cards.InsertAsync(Card("ws1", 1, "ws1-card", 100.0, "todo"));
@@ -179,7 +179,7 @@ public sealed class CardRepositoryTests
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task MoveCardToPosition_DoesNotAffectOtherWorkspace()
+    public async System.Threading.Tasks.Task MoveCardToPosition_DoesNotAffectOtherBay()
     {
         var (_, _, _, _, cards) = await NewAsync();
         var ws1Card = Card("ws1", 1, "ws1-a", 100.0, "todo");
@@ -209,7 +209,7 @@ public sealed class CardRepositoryTests
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task NextOrderKey_IsolatesByWorkspace()
+    public async System.Threading.Tasks.Task NextOrderKey_IsolatesByBay()
     {
         var (_, _, _, _, cards) = await NewAsync();
         await cards.InsertAsync(Card("ws1", 1, "ws1-card", 100.0, "todo"));

@@ -36,34 +36,34 @@ public sealed class TimelineStore
         conn.Open();
         using var cmd = conn.CreateCommand();
         cmd.CommandText = """
-            INSERT INTO timeline (id, workspace_id, kind, scope, title, body, metadata_json, tags_json, pane_id, created_at, backfill_key)
-            VALUES (@id, @ws, @kind, @scope, @title, @body, @meta, @tags, @pane, @ts, @bf)
+            INSERT INTO timeline (id, bay_id, kind, scope, title, body, metadata_json, tags_json, nook_id, created_at, backfill_key)
+            VALUES (@id, @ws, @kind, @scope, @title, @body, @meta, @tags, @nook, @ts, @bf)
             ON CONFLICT(backfill_key) WHERE backfill_key IS NOT NULL DO NOTHING;
             """;
         cmd.Parameters.AddWithValue("@id", created.Id);
-        cmd.Parameters.AddWithValue("@ws", created.WorkspaceId);
+        cmd.Parameters.AddWithValue("@ws", created.BayId);
         cmd.Parameters.AddWithValue("@kind", created.Kind);
         cmd.Parameters.AddWithValue("@scope", (object?)created.Scope ?? System.DBNull.Value);
         cmd.Parameters.AddWithValue("@title", (object?)created.Summary ?? System.DBNull.Value);
         cmd.Parameters.AddWithValue("@body", System.DBNull.Value);
         cmd.Parameters.AddWithValue("@meta", (object?)created.JsonPayload ?? System.DBNull.Value);
         cmd.Parameters.AddWithValue("@tags", (object?)tagsJson ?? System.DBNull.Value);
-        cmd.Parameters.AddWithValue("@pane", System.DBNull.Value);
+        cmd.Parameters.AddWithValue("@nook", System.DBNull.Value);
         cmd.Parameters.AddWithValue("@ts", created.Timestamp.ToString("o"));
         cmd.Parameters.AddWithValue("@bf", (object?)ComputeBackfillKey(created) ?? System.DBNull.Value);
         cmd.ExecuteNonQuery();
-        _logger.LogWarning("timeline: appended {kind} for {ws}", created.Kind, created.WorkspaceId);
+        _logger.LogWarning("timeline: appended {kind} for {ws}", created.Kind, created.BayId);
         return created;
     }
 
-    public System.Collections.Generic.IReadOnlyList<TimelineEntry> ListByWorkspace(string workspaceId, int limit = 100)
+    public System.Collections.Generic.IReadOnlyList<TimelineEntry> ListByBay(string bayId, int limit = 100)
     {
         var result = new System.Collections.Generic.List<TimelineEntry>();
         using var conn = new SqliteConnection($"Data Source={_dbPath}");
         conn.Open();
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT id, workspace_id, kind, scope, title, body, metadata_json, tags_json, created_at FROM timeline WHERE workspace_id = @ws ORDER BY created_at DESC LIMIT @limit";
-        cmd.Parameters.AddWithValue("@ws", workspaceId);
+        cmd.CommandText = "SELECT id, bay_id, kind, scope, title, body, metadata_json, tags_json, created_at FROM timeline WHERE bay_id = @ws ORDER BY created_at DESC LIMIT @limit";
+        cmd.Parameters.AddWithValue("@ws", bayId);
         cmd.Parameters.AddWithValue("@limit", limit);
         using var reader = cmd.ExecuteReader();
         while (reader.Read())
@@ -73,21 +73,21 @@ public sealed class TimelineStore
         return result;
     }
 
-    public System.Collections.Generic.IReadOnlyList<TimelineEntry> Search(string workspaceId, string query, int limit = 20)
+    public System.Collections.Generic.IReadOnlyList<TimelineEntry> Search(string bayId, string query, int limit = 20)
     {
         var result = new System.Collections.Generic.List<TimelineEntry>();
         using var conn = new SqliteConnection($"Data Source={_dbPath}");
         conn.Open();
         using var cmd = conn.CreateCommand();
         cmd.CommandText = """
-            SELECT t.id, t.workspace_id, t.kind, t.scope, t.title, t.body, t.metadata_json, t.tags_json, t.created_at
+            SELECT t.id, t.bay_id, t.kind, t.scope, t.title, t.body, t.metadata_json, t.tags_json, t.created_at
             FROM timeline_fts f
             JOIN timeline t ON t.rowid = f.rowid
-            WHERE t.workspace_id = @ws AND timeline_fts MATCH @query
+            WHERE t.bay_id = @ws AND timeline_fts MATCH @query
             ORDER BY rank
             LIMIT @limit
             """;
-        cmd.Parameters.AddWithValue("@ws", workspaceId);
+        cmd.Parameters.AddWithValue("@ws", bayId);
         cmd.Parameters.AddWithValue("@query", query);
         cmd.Parameters.AddWithValue("@limit", limit);
         using var reader = cmd.ExecuteReader();
@@ -111,7 +111,7 @@ public sealed class TimelineStore
         return new TimelineEntry
         {
             Id = reader.GetString(0),
-            WorkspaceId = reader.GetString(1),
+            BayId = reader.GetString(1),
             Kind = reader.GetString(2),
             Source = "timeline.db",
             Scope = reader.IsDBNull(3) ? null : reader.GetString(3),
@@ -125,7 +125,7 @@ public sealed class TimelineStore
     private static string? ComputeBackfillKey(TimelineEntry entry)
     {
         if (entry.Source == "manual") return null;
-        return $"{entry.Source}:{entry.Kind}:{entry.WorkspaceId}:{entry.Timestamp.ToUnixTimeSeconds()}";
+        return $"{entry.Source}:{entry.Kind}:{entry.BayId}:{entry.Timestamp.ToUnixTimeSeconds()}";
     }
 }
 

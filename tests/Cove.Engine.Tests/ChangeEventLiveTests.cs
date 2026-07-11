@@ -1,5 +1,5 @@
 using System.Text.Json;
-using Cove.Engine.Workspaces;
+using Cove.Engine.Bays;
 using Cove.Platform.Ipc;
 using Cove.Protocol;
 using Xunit;
@@ -9,7 +9,7 @@ namespace Cove.Engine.Tests;
 public sealed class ChangeEventLiveTests
 {
     [Fact]
-    public async Task WorkspaceMutation_EmitsStateChangedEvent()
+    public async Task BayMutation_EmitsStateChangedEvent()
     {
         if (System.OperatingSystem.IsWindows())
             return;
@@ -19,9 +19,9 @@ public sealed class ChangeEventLiveTests
         await using var h = await DaemonTestHarness.StartAsync();
         await using FrameConnection ctl = await h.ConnectAsync("gui");
 
-        JsonElement sp = JsonSerializer.SerializeToElement(new WorkspaceCreateParams("evt-proj", "/tmp/evt-proj", null), WorkspacesJsonContext.Default.WorkspaceCreateParams);
+        JsonElement sp = JsonSerializer.SerializeToElement(new BayCreateParams("evt-proj", "/tmp/evt-proj", null), BaysJsonContext.Default.BayCreateParams);
         await ctl.WriteFrameAsync(FrameType.Request, 0,
-            ControlCodec.Encode(new ControlRequest("create", "cove://commands/workspace.create", sp)), ct);
+            ControlCodec.Encode(new ControlRequest("create", "cove://commands/bay.create", sp)), ct);
 
         string? eventChannel = null;
         bool gotResponse = false;

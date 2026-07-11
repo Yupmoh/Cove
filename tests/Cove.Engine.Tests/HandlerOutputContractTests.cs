@@ -147,8 +147,8 @@ public sealed class HandlerOutputContractTests
         try
         {
             var svc = new SnapshotService(dir, System.IO.Path.Combine(dir, "snapshots"),
-                new Cove.Engine.Workspaces.ProcessGitRunner(), NullLogger.Instance);
-            var state = new Dictionary<string, string> { ["workspace.json"] = "v1" };
+                new Cove.Engine.Bays.ProcessGitRunner(), NullLogger.Instance);
+            var state = new Dictionary<string, string> { ["bay.json"] = "v1" };
             var snap = await svc.TakeAsync(state, SnapshotTrigger.Manual);
             Assert.NotNull(snap);
 

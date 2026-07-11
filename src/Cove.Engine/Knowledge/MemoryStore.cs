@@ -32,11 +32,11 @@ public sealed class MemoryStore
         conn.Open();
         using var cmd = conn.CreateCommand();
         cmd.CommandText = """
-            INSERT INTO facts (id, workspace_id, kind, content, confidence, access_count, audience, locus, file_path, superseded_by, created_at, updated_at)
+            INSERT INTO facts (id, bay_id, kind, content, confidence, access_count, audience, locus, file_path, superseded_by, created_at, updated_at)
             VALUES (@id, @ws, @kind, @content, @conf, 0, @aud, @locus, @fp, NULL, @created, @updated);
             """;
         cmd.Parameters.AddWithValue("@id", fact.Id);
-        cmd.Parameters.AddWithValue("@ws", fact.WorkspaceId);
+        cmd.Parameters.AddWithValue("@ws", fact.BayId);
         cmd.Parameters.AddWithValue("@kind", fact.Kind);
         cmd.Parameters.AddWithValue("@content", fact.Content);
         cmd.Parameters.AddWithValue("@conf", fact.Confidence);
@@ -49,35 +49,35 @@ public sealed class MemoryStore
 
         OffloadFactToFile(fact);
 
-        _logger.LogWarning("memory: added fact {id} ({kind}) in {ws}", fact.Id, fact.Kind, fact.WorkspaceId);
+        _logger.LogWarning("memory: added fact {id} ({kind}) in {ws}", fact.Id, fact.Kind, fact.BayId);
         return fact;
     }
 
-    public Fact? GetFact(string workspaceId, string id)
+    public Fact? GetFact(string bayId, string id)
     {
         using var conn = new SqliteConnection($"Data Source={_dbPath}");
         conn.Open();
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT id, workspace_id, kind, content, confidence, access_count, audience, locus, file_path, superseded_by, created_at, updated_at FROM facts WHERE workspace_id = @ws AND id = @id";
-        cmd.Parameters.AddWithValue("@ws", workspaceId);
+        cmd.CommandText = "SELECT id, bay_id, kind, content, confidence, access_count, audience, locus, file_path, superseded_by, created_at, updated_at FROM facts WHERE bay_id = @ws AND id = @id";
+        cmd.Parameters.AddWithValue("@ws", bayId);
         cmd.Parameters.AddWithValue("@id", id);
         using var reader = cmd.ExecuteReader();
         if (!reader.Read()) return null;
         return ReadFact(reader);
     }
 
-    public System.Collections.Generic.IReadOnlyList<Fact> ListFacts(string workspaceId, string? kind = null, string? audience = null)
+    public System.Collections.Generic.IReadOnlyList<Fact> ListFacts(string bayId, string? kind = null, string? audience = null)
     {
         var result = new System.Collections.Generic.List<Fact>();
         using var conn = new SqliteConnection($"Data Source={_dbPath}");
         conn.Open();
         using var cmd = conn.CreateCommand();
-        var sql = "SELECT id, workspace_id, kind, content, confidence, access_count, audience, locus, file_path, superseded_by, created_at, updated_at FROM facts WHERE workspace_id = @ws";
+        var sql = "SELECT id, bay_id, kind, content, confidence, access_count, audience, locus, file_path, superseded_by, created_at, updated_at FROM facts WHERE bay_id = @ws";
         if (kind is not null) sql += " AND kind = @kind";
         if (audience is not null) sql += " AND (audience = @aud OR audience IS NULL)";
         sql += " AND superseded_by IS NULL ORDER BY confidence DESC, updated_at DESC";
         cmd.CommandText = sql;
-        cmd.Parameters.AddWithValue("@ws", workspaceId);
+        cmd.Parameters.AddWithValue("@ws", bayId);
         if (kind is not null) cmd.Parameters.AddWithValue("@kind", kind);
         if (audience is not null) cmd.Parameters.AddWithValue("@aud", audience);
         using var reader = cmd.ExecuteReader();
@@ -86,21 +86,21 @@ public sealed class MemoryStore
         return result;
     }
 
-    public System.Collections.Generic.IReadOnlyList<Fact> SearchFacts(string workspaceId, string query, int limit = 20)
+    public System.Collections.Generic.IReadOnlyList<Fact> SearchFacts(string bayId, string query, int limit = 20)
     {
         var result = new System.Collections.Generic.List<Fact>();
         using var conn = new SqliteConnection($"Data Source={_dbPath}");
         conn.Open();
         using var cmd = conn.CreateCommand();
         cmd.CommandText = """
-            SELECT f.id, f.workspace_id, f.kind, f.content, f.confidence, f.access_count, f.audience, f.locus, f.file_path, f.superseded_by, f.created_at, f.updated_at
+            SELECT f.id, f.bay_id, f.kind, f.content, f.confidence, f.access_count, f.audience, f.locus, f.file_path, f.superseded_by, f.created_at, f.updated_at
             FROM facts_fts ft
             JOIN facts f ON f.rowid = ft.rowid
-            WHERE f.workspace_id = @ws AND facts_fts MATCH @query
+            WHERE f.bay_id = @ws AND facts_fts MATCH @query
             ORDER BY rank
             LIMIT @limit
             """;
-        cmd.Parameters.AddWithValue("@ws", workspaceId);
+        cmd.Parameters.AddWithValue("@ws", bayId);
         cmd.Parameters.AddWithValue("@query", query);
         cmd.Parameters.AddWithValue("@limit", limit);
         using var reader = cmd.ExecuteReader();
@@ -109,12 +109,12 @@ public sealed class MemoryStore
         return result;
     }
 
-    public Fact? Supersede(string workspaceId, string oldFactId, Fact newFact)
+    public Fact? Supersede(string bayId, string oldFactId, Fact newFact)
     {
-        var oldFact = GetFact(workspaceId, oldFactId);
+        var oldFact = GetFact(bayId, oldFactId);
         if (oldFact is null)
         {
-            _logger.LogWarning("memory: supersede failed — fact {id} not found in {ws}", oldFactId, workspaceId);
+            _logger.LogWarning("memory: supersede failed — fact {id} not found in {ws}", oldFactId, bayId);
             return null;
         }
 
@@ -129,22 +129,22 @@ public sealed class MemoryStore
         cmd.Parameters.AddWithValue("@ts", System.DateTimeOffset.UtcNow.ToString("o"));
         cmd.ExecuteNonQuery();
 
-        var chain = GetSupersedeChain(workspaceId, oldFactId);
+        var chain = GetSupersedeChain(bayId, oldFactId);
         _logger.LogWarning("memory: superseded {oldId} → {newId} (chain length: {len})", oldFactId, created.Id, chain.Count);
 
         return created;
     }
 
-    public System.Collections.Generic.IReadOnlyList<Fact> GetSupersedeChain(string workspaceId, string factId)
+    public System.Collections.Generic.IReadOnlyList<Fact> GetSupersedeChain(string bayId, string factId)
     {
         var chain = new System.Collections.Generic.List<Fact>();
-        var current = GetFact(workspaceId, factId);
+        var current = GetFact(bayId, factId);
         if (current is null) return chain;
         chain.Add(current);
 
         while (current!.SupersededBy is { } nextId)
         {
-            var next = GetFact(workspaceId, nextId);
+            var next = GetFact(bayId, nextId);
             if (next is null) break;
             chain.Add(next);
             current = next;
@@ -153,17 +153,17 @@ public sealed class MemoryStore
         return chain;
     }
 
-    public void ReindexFromDisk(string workspaceId)
+    public void ReindexFromDisk(string bayId)
     {
         System.IO.Directory.CreateDirectory(_factsDir);
-        var wsDir = System.IO.Path.Combine(_factsDir, workspaceId);
+        var wsDir = System.IO.Path.Combine(_factsDir, bayId);
         if (!System.IO.Directory.Exists(wsDir)) return;
 
         using var conn = new SqliteConnection($"Data Source={_dbPath}");
         conn.Open();
         using var clearCmd = conn.CreateCommand();
-        clearCmd.CommandText = "DELETE FROM facts WHERE workspace_id = @ws";
-        clearCmd.Parameters.AddWithValue("@ws", workspaceId);
+        clearCmd.CommandText = "DELETE FROM facts WHERE bay_id = @ws";
+        clearCmd.Parameters.AddWithValue("@ws", bayId);
         clearCmd.ExecuteNonQuery();
 
         int count = 0;
@@ -175,11 +175,11 @@ public sealed class MemoryStore
                 if (fact is null) continue;
                 using var cmd = conn.CreateCommand();
                 cmd.CommandText = """
-                    INSERT INTO facts (id, workspace_id, kind, content, confidence, access_count, audience, locus, file_path, superseded_by, created_at, updated_at)
+                    INSERT INTO facts (id, bay_id, kind, content, confidence, access_count, audience, locus, file_path, superseded_by, created_at, updated_at)
                     VALUES (@id, @ws, @kind, @content, @conf, @ac, @aud, @locus, @fp, @sb, @created, @updated);
                     """;
                 cmd.Parameters.AddWithValue("@id", fact.Id);
-                cmd.Parameters.AddWithValue("@ws", fact.WorkspaceId);
+                cmd.Parameters.AddWithValue("@ws", fact.BayId);
                 cmd.Parameters.AddWithValue("@kind", fact.Kind);
                 cmd.Parameters.AddWithValue("@content", fact.Content);
                 cmd.Parameters.AddWithValue("@conf", fact.Confidence);
@@ -199,24 +199,24 @@ public sealed class MemoryStore
             }
         }
 
-        _logger.LogWarning("memory: reindexed {count} facts from disk for {ws}", count, workspaceId);
+        _logger.LogWarning("memory: reindexed {count} facts from disk for {ws}", count, bayId);
     }
 
-    public void IncrementAccessCount(string workspaceId, string factId)
+    public void IncrementAccessCount(string bayId, string factId)
     {
         using var conn = new SqliteConnection($"Data Source={_dbPath}");
         conn.Open();
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = "UPDATE facts SET access_count = access_count + 1, updated_at = @ts WHERE id = @id AND workspace_id = @ws";
+        cmd.CommandText = "UPDATE facts SET access_count = access_count + 1, updated_at = @ts WHERE id = @id AND bay_id = @ws";
         cmd.Parameters.AddWithValue("@id", factId);
-        cmd.Parameters.AddWithValue("@ws", workspaceId);
+        cmd.Parameters.AddWithValue("@ws", bayId);
         cmd.Parameters.AddWithValue("@ts", System.DateTimeOffset.UtcNow.ToString("o"));
         cmd.ExecuteNonQuery();
     }
 
     private void OffloadFactToFile(Fact fact)
     {
-        var wsDir = System.IO.Path.Combine(_factsDir, fact.WorkspaceId);
+        var wsDir = System.IO.Path.Combine(_factsDir, fact.BayId);
         System.IO.Directory.CreateDirectory(wsDir);
         var path = System.IO.Path.Combine(wsDir, fact.Id + ".json");
         fact = fact with { FilePath = path };
@@ -229,7 +229,7 @@ public sealed class MemoryStore
         return new Fact
         {
             Id = reader.GetString(0),
-            WorkspaceId = reader.GetString(1),
+            BayId = reader.GetString(1),
             Kind = reader.GetString(2),
             Content = reader.GetString(3),
             Confidence = reader.GetDouble(4),

@@ -6,7 +6,7 @@ namespace Cove.Engine.Tests;
 public sealed class AgentLifecycleControllerTests
 {
     [Fact]
-    public void Stop_RecordsStopRequest_KeepsPane()
+    public void Stop_RecordsStopRequest_KeepsNook()
     {
         var ctrl = new AgentLifecycleController();
         ctrl.Register("p1", "claude-code");
@@ -15,11 +15,11 @@ public sealed class AgentLifecycleControllerTests
 
         var state = ctrl.GetState("p1");
         Assert.Equal(LifecycleState.Stopped, state!.State);
-        Assert.True(state.PanePreserved);
+        Assert.True(state.NookPreserved);
     }
 
     [Fact]
-    public void Close_RecordsCloseRequest_RemovesPane()
+    public void Close_RecordsCloseRequest_RemovesNook()
     {
         var ctrl = new AgentLifecycleController();
         ctrl.Register("p1", "claude-code");
@@ -28,7 +28,7 @@ public sealed class AgentLifecycleControllerTests
 
         var state = ctrl.GetState("p1");
         Assert.Equal(LifecycleState.Closed, state!.State);
-        Assert.False(state.PanePreserved);
+        Assert.False(state.NookPreserved);
     }
 
     [Fact]
@@ -81,41 +81,41 @@ public sealed class AgentLifecycleControllerTests
     }
 
     [Fact]
-    public void RecordSpawnedPane_TracksChildPane()
+    public void RecordSpawnedNook_TracksChildNook()
     {
         var ctrl = new AgentLifecycleController();
         ctrl.Register("p1", "claude-code");
         ctrl.Register("p2", "codex");
 
-        ctrl.RecordSpawnedPane("p1", "p2");
+        ctrl.RecordSpawnedNook("p1", "p2");
 
-        var children = ctrl.GetSpawnedPanes("p1");
+        var children = ctrl.GetSpawnedNooks("p1");
         Assert.Single(children);
         Assert.Equal("p2", children[0]);
     }
 
     [Fact]
-    public void RecordSpawnedPane_MultipleChildren_TracksAll()
+    public void RecordSpawnedNook_MultipleChildren_TracksAll()
     {
         var ctrl = new AgentLifecycleController();
         ctrl.Register("p1", "claude-code");
         ctrl.Register("p2", "codex");
         ctrl.Register("p3", "gemini");
 
-        ctrl.RecordSpawnedPane("p1", "p2");
-        ctrl.RecordSpawnedPane("p1", "p3");
+        ctrl.RecordSpawnedNook("p1", "p2");
+        ctrl.RecordSpawnedNook("p1", "p3");
 
-        var children = ctrl.GetSpawnedPanes("p1");
+        var children = ctrl.GetSpawnedNooks("p1");
         Assert.Equal(2, children.Count);
     }
 
     [Fact]
-    public void GetSpawnedPanes_NoChildren_ReturnsEmpty()
+    public void GetSpawnedNooks_NoChildren_ReturnsEmpty()
     {
         var ctrl = new AgentLifecycleController();
         ctrl.Register("p1", "claude-code");
 
-        var children = ctrl.GetSpawnedPanes("p1");
+        var children = ctrl.GetSpawnedNooks("p1");
         Assert.Empty(children);
     }
 

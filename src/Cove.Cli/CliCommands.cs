@@ -10,7 +10,7 @@ internal static class CliCommands
     public static async Task<int> Version(CommandContext ctx)
     {
         var cliVersion = CoveBuild.InformationalVersion;
-        var tagline = "an open-source AI-native terminal workspace";
+        var tagline = "an open-source AI-native terminal bay";
 
         ctx.Stdout.WriteLine("""
               ___
@@ -70,9 +70,9 @@ internal static class CliCommands
         return 0;
     }
 
-    [CoveCommand("pane list")]
-    public static Task<int> PaneList(CommandContext ctx)
-        => ctx.RouteCoreAsync("cove://commands/pane.list");
+    [CoveCommand("nook list")]
+    public static Task<int> NookList(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/nook.list");
 
     [CoveCommand("docs generate")]
     public static Task<int> DocsGenerate(CommandContext ctx)
@@ -115,8 +115,8 @@ internal static class CliCommands
             }
             return await ctx.RouteCoreWithParamsAsync("cove://commands/attach.raw", System.Text.Encoding.UTF8.GetString(attachBuf.ToArray()));
         }
-        var paneId = args.Length > 0 ? args[0] : "";
-        return await AttachCompositor.RunAsync(ctx.Paths, ctx.Endpoint, paneId, ctx.Source);
+        var nookId = args.Length > 0 ? args[0] : "";
+        return await AttachCompositor.RunAsync(ctx.Paths, ctx.Endpoint, nookId, ctx.Source);
     }
 
     [CoveCommand("skills list")]
@@ -179,7 +179,7 @@ internal static class CliCommands
             return 1;
         }
         var adapter = ArgValue(args, "--adapter");
-        var paneId = ArgValue(args, "--pane-id");
+        var nookId = ArgValue(args, "--nook-id");
         var verbose = Array.IndexOf(args, "--verbose") >= 0;
         var @event = args.Length > 0 && !args[0].StartsWith("--") ? args[0] : null;
         if (adapter is null || @event is null)
@@ -196,7 +196,7 @@ internal static class CliCommands
                 payload = stdinPayload;
         }
         var client = new Cove.Engine.Hooks.HookEmitClient(port);
-        var result = await client.EmitAsync(adapter, @event, payload, paneId);
+        var result = await client.EmitAsync(adapter, @event, payload, nookId);
         if (!result.Ok)
         {
             await ctx.Stderr.WriteLineAsync($"error: hook emit failed status={result.StatusCode}");
@@ -355,13 +355,13 @@ internal static class CliCommands
     [CoveCommand("context")]
     public static Task<int> Context(CommandContext ctx)
     {
-        var paneId = System.Environment.GetEnvironmentVariable("COVE_PANE_ID") ?? "(unset)";
+        var nookId = System.Environment.GetEnvironmentVariable("COVE_NOOK_ID") ?? "(unset)";
         var cwd = System.Environment.CurrentDirectory;
-        var workspace = System.Environment.GetEnvironmentVariable("COVE_WORKSPACE_ID") ?? "(unset)";
-        var room = System.Environment.GetEnvironmentVariable("COVE_ROOM_ID") ?? "(unset)";
-        ctx.Stdout.WriteLine($"pane: {paneId}");
-        ctx.Stdout.WriteLine($"workspace: {workspace}");
-        ctx.Stdout.WriteLine($"room: {room}");
+        var bay = System.Environment.GetEnvironmentVariable("COVE_BAY_ID") ?? "(unset)";
+        var shore = System.Environment.GetEnvironmentVariable("COVE_SHORE_ID") ?? "(unset)";
+        ctx.Stdout.WriteLine($"nook: {nookId}");
+        ctx.Stdout.WriteLine($"bay: {bay}");
+        ctx.Stdout.WriteLine($"shore: {shore}");
         ctx.Stdout.WriteLine($"cwd: {cwd}");
         return Task.FromResult(0);
     }
@@ -799,9 +799,9 @@ internal static class CliCommands
     public static Task<int> BlackboardShow(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/blackboard.show");
 
-    [CoveCommand("pane-types list")]
-    public static Task<int> PaneTypesList(CommandContext ctx)
-        => ctx.RouteCoreAsync("cove://commands/pane-types.list");
+    [CoveCommand("nook-types list")]
+    public static Task<int> NookTypesList(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/nook-types.list");
 
     [CoveCommand("browser open")]
     public static Task<int> BrowserOpen(CommandContext ctx)
@@ -937,11 +937,11 @@ internal static class CliCommands
     {
         var args = ctx.Args;
         var region = ArgValue(args, "--region") ?? "fullscreen";
-        var workspaceId = ArgValue(args, "--workspace") ?? "";
+        var bayId = ArgValue(args, "--bay") ?? "";
         var audio = args.Contains("--audio");
         var mic = args.Contains("--mic");
         var cursor = args.Contains("--cursor");
-        return ctx.RouteCoreWithParamsAsync("cove://commands/capture.start", $$"""{"workspaceId":"{{workspaceId}}","region":"{{region}}","audio":{{audio.ToString().ToLowerInvariant()}},"mic":{{mic.ToString().ToLowerInvariant()}},"cursor":{{cursor.ToString().ToLowerInvariant()}}}""");
+        return ctx.RouteCoreWithParamsAsync("cove://commands/capture.start", $$"""{"bayId":"{{bayId}}","region":"{{region}}","audio":{{audio.ToString().ToLowerInvariant()}},"mic":{{mic.ToString().ToLowerInvariant()}},"cursor":{{cursor.ToString().ToLowerInvariant()}}}""");
     }
 
     [CoveCommand("capture stop")]
@@ -998,10 +998,10 @@ internal static class CliCommands
     public static Task<int> DiagnosticsSnapshot(CommandContext ctx)
     {
         var args = ctx.Args;
-        var activePanes = ArgValue(args, "--panes") ?? "0";
-        var activeWorkspaces = ArgValue(args, "--workspaces") ?? "0";
+        var activeNooks = ArgValue(args, "--nooks") ?? "0";
+        var activeBays = ArgValue(args, "--bays") ?? "0";
         var activeAgents = ArgValue(args, "--agents") ?? "0";
-        return ctx.RouteCoreWithParamsAsync("cove://commands/diagnostics.snapshot.take", $$"""{"activePanes":{{activePanes}},"activeWorkspaces":{{activeWorkspaces}},"activeAgents":{{activeAgents}}}""");
+        return ctx.RouteCoreWithParamsAsync("cove://commands/diagnostics.snapshot.take", $$"""{"activeNooks":{{activeNooks}},"activeBays":{{activeBays}},"activeAgents":{{activeAgents}}}""");
     }
 
     [CoveCommand("diagnostics snapshots")]

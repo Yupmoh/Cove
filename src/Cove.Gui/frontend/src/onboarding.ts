@@ -5,10 +5,10 @@ export interface OnboardingStep {
 }
 
 export const ONBOARDING_STEPS: ReadonlyArray<OnboardingStep> = [
-  { id: "welcome", title: "Welcome to Cove", body: "A free, open-source, AI-native terminal workspace. Let's get you set up in a few steps." },
+  { id: "welcome", title: "Welcome to Cove", body: "A free, open-source, AI-native terminal bay. Let's get you set up in a few steps." },
   { id: "adapters", title: "Choose your adapter", body: "Adapters connect Cove to your AI coding tools. Pick one to start, or skip and configure later in Settings." },
   { id: "telemetry", title: "Telemetry", body: "Cove collects anonymous usage data only if you opt in. No scrollback, file paths, or personal content is ever sent. You can change this anytime in Settings → Privacy." },
-  { id: "ready", title: "You're all set", body: "Press Cmd+T to create a new room, Cmd+, for settings, or Cmd+Shift+P for the command palette." },
+  { id: "ready", title: "You're all set", body: "Press Cmd+T to create a new shore, Cmd+, for settings, or Cmd+Shift+P for the command palette." },
 ];
 
 export interface OnboardingState {

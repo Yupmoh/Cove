@@ -27,7 +27,7 @@ public sealed class SkillsBindingTests
     {
         using var conn = factory.Open();
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = "INSERT OR IGNORE INTO statuses (workspace_id, id, name, hex_color, position, created_at, updated_at) VALUES (@Ws, @Id, @Id, '808080', 0, @Now, @Now)";
+        cmd.CommandText = "INSERT OR IGNORE INTO statuses (bay_id, id, name, hex_color, position, created_at, updated_at) VALUES (@Ws, @Id, @Id, '808080', 0, @Now, @Now)";
         cmd.Parameters.AddWithValue("@Ws", ws);
         cmd.Parameters.AddWithValue("@Id", id);
         cmd.Parameters.AddWithValue("@Now", System.DateTimeOffset.UtcNow.ToString("o"));
@@ -39,7 +39,7 @@ public sealed class SkillsBindingTests
         var row = new CardRow
         {
             Id = System.Guid.NewGuid().ToString("N"),
-            WorkspaceId = ws,
+            BayId = ws,
             TaskNumber = num,
             Title = "card-" + num,
             StatusId = "todo",

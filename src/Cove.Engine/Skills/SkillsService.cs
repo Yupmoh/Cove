@@ -10,13 +10,13 @@ public sealed class SkillsService : IDisposable
     private readonly SkillIndexWatcher? _watcher;
     private bool _disposed;
 
-    public SkillsService(string dataDir, string? workspaceSkillsDir = null, bool includeHarnessRoots = true, ILogger? logger = null)
+    public SkillsService(string dataDir, string? baySkillsDir = null, bool includeHarnessRoots = true, ILogger? logger = null)
     {
         _index = new SkillIndex();
         var userSkills = Path.Combine(dataDir, "skills");
         _index.AddRoot(userSkills, SkillSource.CoveUser);
-        if (workspaceSkillsDir is not null)
-            _index.AddRoot(workspaceSkillsDir, SkillSource.CoveProject);
+        if (baySkillsDir is not null)
+            _index.AddRoot(baySkillsDir, SkillSource.CoveProject);
         if (includeHarnessRoots)
             AddHarnessRoots(_index);
         _index.Rebuild();

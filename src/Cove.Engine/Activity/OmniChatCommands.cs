@@ -14,7 +14,7 @@ public static class OmniChatCommands
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.OmniChatAppendParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "omni chat append params required"));
 
-        store.Append(p.PaneId, new OmniChatMessage(p.Role, p.Body, DateTimeOffset.UtcNow));
+        store.Append(p.NookId, new OmniChatMessage(p.Role, p.Body, DateTimeOffset.UtcNow));
         return Task.FromResult(ctx.Ok());
     }
 
@@ -26,7 +26,7 @@ public static class OmniChatCommands
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.OmniChatHistoryParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "omni chat history params required"));
 
-        var messages = store.LoadHistory(p.PaneId);
+        var messages = store.LoadHistory(p.NookId);
         var dtos = messages.Select(m => new OmniChatMessageDto(m.Role, m.Body, m.SentAt)).ToArray();
         return Task.FromResult(ctx.Ok(new OmniChatHistoryResult(dtos), CoveJsonContext.Default.OmniChatHistoryResult));
     }
@@ -39,7 +39,7 @@ public static class OmniChatCommands
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.OmniChatClearParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "omni chat clear params required"));
 
-        store.Clear(p.PaneId);
+        store.Clear(p.NookId);
         return Task.FromResult(ctx.Ok());
     }
 }

@@ -15,13 +15,13 @@ public static class CaptureCommands
         if (ctx.Request.Params is not JsonElement el)
             return Task.FromResult(ctx.Fail("handler_error", "missing params"));
 
-        var workspaceId = el.TryGetProperty("workspaceId", out var ws) ? ws.GetString() ?? "" : "";
+        var bayId = el.TryGetProperty("bayId", out var ws) ? ws.GetString() ?? "" : "";
         var region = el.TryGetProperty("region", out var r) ? r.GetString() ?? "fullscreen" : "fullscreen";
         var audio = el.TryGetProperty("audio", out var a) && a.GetBoolean();
         var mic = el.TryGetProperty("mic", out var m) && m.GetBoolean();
         var cursor = el.TryGetProperty("cursor", out var c) && c.GetBoolean();
 
-        var cap = store.StartCapture(workspaceId, region, audio, mic, cursor);
+        var cap = store.StartCapture(bayId, region, audio, mic, cursor);
         return Task.FromResult(ctx.OkJson(SerializeCapture(cap)));
     }
 
@@ -119,6 +119,6 @@ public static class CaptureCommands
 
     private static string SerializeCapture(Capture cap)
     {
-        return $$"""{"id":"{{cap.Id}}","number":{{cap.Number}},"bundleDir":"{{cap.BundleDir}}","workspaceId":"{{cap.WorkspaceId}}","region":"{{cap.Region}}","audio":{{cap.Audio.ToString().ToLowerInvariant()}},"mic":{{cap.Mic.ToString().ToLowerInvariant()}},"cursor":{{cap.Cursor.ToString().ToLowerInvariant()}},"createdAt":"{{cap.CreatedAt:o}}","durationMs":{{(long)cap.Duration.TotalMilliseconds}},"status":"{{cap.Status}}"}""";
+        return $$"""{"id":"{{cap.Id}}","number":{{cap.Number}},"bundleDir":"{{cap.BundleDir}}","bayId":"{{cap.BayId}}","region":"{{cap.Region}}","audio":{{cap.Audio.ToString().ToLowerInvariant()}},"mic":{{cap.Mic.ToString().ToLowerInvariant()}},"cursor":{{cap.Cursor.ToString().ToLowerInvariant()}},"createdAt":"{{cap.CreatedAt:o}}","durationMs":{{(long)cap.Duration.TotalMilliseconds}},"status":"{{cap.Status}}"}""";
     }
 }

@@ -113,7 +113,7 @@ public sealed class ContextInjectorTests
         var matrix = new HookEnvelopeMatrix();
         matrix.Register("claude-code", "sessionStartManifest", HookEnvelopeKind.Identity);
         var injector = new ContextInjector(matrix);
-        var context = JsonDocument.Parse("""{"workspace":"ws1"}""").RootElement.Clone();
+        var context = JsonDocument.Parse("""{"bay":"ws1"}""").RootElement.Clone();
         var result = injector.Render("claude-code", "sessionStartManifest", context);
         Assert.Equal(context.GetRawText(), result);
     }

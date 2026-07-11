@@ -11,13 +11,13 @@ public static class LifecycleCommands
     {
         if (ctx.Lifecycle is not { } ctrl)
             return Task.FromResult(ctx.Fail("not_ready", "lifecycle controller not available"));
-        if (ctx.Panes is not { } panes)
-            return Task.FromResult(ctx.Fail("not_ready", "pane registry not available"));
-        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.PaneRefParams) is not { } p)
-            return Task.FromResult(ctx.Fail("invalid_params", "pane ref required"));
+        if (ctx.Nooks is not { } nooks)
+            return Task.FromResult(ctx.Fail("not_ready", "nook registry not available"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.NookRefParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "nook ref required"));
 
-        ctrl.Stop(p.PaneId);
-        panes.Stop(p.PaneId);
+        ctrl.Stop(p.NookId);
+        nooks.Stop(p.NookId);
         return Task.FromResult(ctx.Ok());
     }
 
@@ -26,13 +26,13 @@ public static class LifecycleCommands
     {
         if (ctx.Lifecycle is not { } ctrl)
             return Task.FromResult(ctx.Fail("not_ready", "lifecycle controller not available"));
-        if (ctx.Panes is not { } panes)
-            return Task.FromResult(ctx.Fail("not_ready", "pane registry not available"));
-        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.PaneRefParams) is not { } p)
-            return Task.FromResult(ctx.Fail("invalid_params", "pane ref required"));
+        if (ctx.Nooks is not { } nooks)
+            return Task.FromResult(ctx.Fail("not_ready", "nook registry not available"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.NookRefParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "nook ref required"));
 
-        ctrl.Close(p.PaneId);
-        panes.Kill(p.PaneId);
+        ctrl.Close(p.NookId);
+        nooks.Kill(p.NookId);
         return Task.FromResult(ctx.Ok());
     }
 
@@ -41,24 +41,24 @@ public static class LifecycleCommands
     {
         if (ctx.Lifecycle is not { } ctrl)
             return Task.FromResult(ctx.Fail("not_ready", "lifecycle controller not available"));
-        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.PaneRefParams) is not { } p)
-            return Task.FromResult(ctx.Fail("invalid_params", "pane ref required"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.NookRefParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "nook ref required"));
 
-        var info = ctrl.GetReplayInfo(p.PaneId);
+        var info = ctrl.GetReplayInfo(p.NookId);
         if (info is null)
-            return Task.FromResult(ctx.Fail("not_found", "no replay info for pane"));
+            return Task.FromResult(ctx.Fail("not_found", "no replay info for nook"));
         return Task.FromResult(ctx.Ok(new ReplayInfoDto(info.Command, info.ExitCode, info.Signal), CoveJsonContext.Default.ReplayInfoDto));
     }
 
-    [CoveCommand("cove://commands/agent.spawned-panes")]
-    public static Task<ControlResponse> SpawnedPanes(EngineDispatchContext ctx)
+    [CoveCommand("cove://commands/agent.spawned-nooks")]
+    public static Task<ControlResponse> SpawnedNooks(EngineDispatchContext ctx)
     {
         if (ctx.Lifecycle is not { } ctrl)
             return Task.FromResult(ctx.Fail("not_ready", "lifecycle controller not available"));
-        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.PaneRefParams) is not { } p)
-            return Task.FromResult(ctx.Fail("invalid_params", "pane ref required"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.NookRefParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "nook ref required"));
 
-        var panes = ctrl.GetSpawnedPanes(p.PaneId);
-        return Task.FromResult(ctx.Ok(new SpawnedPanesResult(panes), CoveJsonContext.Default.SpawnedPanesResult));
+        var nooks = ctrl.GetSpawnedNooks(p.NookId);
+        return Task.FromResult(ctx.Ok(new SpawnedNooksResult(nooks), CoveJsonContext.Default.SpawnedNooksResult));
     }
 }

@@ -43,8 +43,8 @@ public sealed class DiagnosticsRouteTests
         var resp = await DiagnosticsCommands.SnapshotTake(Ctx("cove://commands/diagnostics.snapshot.take", hub, p));
 
         Assert.True(resp.Ok);
-        Assert.Equal(3, resp.Data!.Value.GetProperty("activePanes").GetInt32());
-        Assert.Equal(1, resp.Data!.Value.GetProperty("activeWorkspaces").GetInt32());
+        Assert.Equal(3, resp.Data!.Value.GetProperty("activeNooks").GetInt32());
+        Assert.Equal(1, resp.Data!.Value.GetProperty("activeBays").GetInt32());
         Assert.Equal(2, resp.Data!.Value.GetProperty("activeAgents").GetInt32());
     }
 
@@ -55,7 +55,7 @@ public sealed class DiagnosticsRouteTests
         var resp = await DiagnosticsCommands.SnapshotTake(Ctx("cove://commands/diagnostics.snapshot.take", hub));
 
         Assert.True(resp.Ok);
-        Assert.Equal(0, resp.Data!.Value.GetProperty("activePanes").GetInt32());
+        Assert.Equal(0, resp.Data!.Value.GetProperty("activeNooks").GetInt32());
     }
 
     [Fact]

@@ -18,11 +18,11 @@ public sealed class LosslessFloodLiveTests
         await using var h = await DaemonTestHarness.StartAsync();
         await using FrameConnection ctl = await h.ConnectAsync("cli");
 
-        string paneId = await SpawnAsync(ctl, "/bin/sh", new[] { "-c", "yes FLOOD_MARK_LINE; sleep 30" }, ct);
+        string nookId = await SpawnAsync(ctl, "/bin/sh", new[] { "-c", "yes FLOOD_MARK_LINE; sleep 30" }, ct);
         await Task.Delay(3000, ct);
 
-        ControlResponse subResp = await RequestAsync(ctl, "sub", "cove://commands/pane.subscribe",
-            JsonSerializer.SerializeToElement(new PaneRefParams(paneId), CoveJsonContext.Default.PaneRefParams), ct);
+        ControlResponse subResp = await RequestAsync(ctl, "sub", "cove://commands/nook.subscribe",
+            JsonSerializer.SerializeToElement(new NookRefParams(nookId), CoveJsonContext.Default.NookRefParams), ct);
         Assert.True(subResp.Ok, subResp.Error?.Message);
 
         var seen = new System.Collections.Generic.HashSet<string>();
@@ -54,9 +54,9 @@ public sealed class LosslessFloodLiveTests
         JsonElement sp = JsonSerializer.SerializeToElement(
             new SpawnParams(command, args, null, null, 80, 24),
             CoveJsonContext.Default.SpawnParams);
-        ControlResponse r = await RequestAsync(ctl, "spawn", "cove://commands/pane.spawn", sp, ct);
+        ControlResponse r = await RequestAsync(ctl, "spawn", "cove://commands/nook.spawn", sp, ct);
         Assert.True(r.Ok, r.Error?.Message);
-        return r.Data!.Value.Deserialize(CoveJsonContext.Default.PaneInfo)!.PaneId;
+        return r.Data!.Value.Deserialize(CoveJsonContext.Default.NookInfo)!.NookId;
     }
 
     private static async Task<ControlResponse> RequestAsync(FrameConnection ctl, string id, string uri, JsonElement? p, CancellationToken ct)

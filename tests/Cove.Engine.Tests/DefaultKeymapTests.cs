@@ -6,19 +6,19 @@ namespace Cove.Engine.Tests;
 public sealed class DefaultKeymapTests
 {
     [Fact]
-    public void RegisterAll_RegistersRoomShortcuts()
+    public void RegisterAll_RegistersShoreShortcuts()
     {
         var engine = new KeybindingEngine();
         DefaultKeymap.RegisterAll(engine);
 
         Assert.NotNull(engine.Resolve("cmd+t"));
-        Assert.Equal("room.new", engine.Resolve("cmd+t")!.Action);
+        Assert.Equal("shore.new", engine.Resolve("cmd+t")!.Action);
         Assert.NotNull(engine.Resolve("cmd+shift+w"));
-        Assert.Equal("room.close", engine.Resolve("cmd+shift+w")!.Action);
+        Assert.Equal("shore.close", engine.Resolve("cmd+shift+w")!.Action);
     }
 
     [Fact]
-    public void RegisterAll_RegistersWorkspaceShortcuts()
+    public void RegisterAll_RegistersBayShortcuts()
     {
         var engine = new KeybindingEngine();
         DefaultKeymap.RegisterAll(engine);
@@ -27,7 +27,7 @@ public sealed class DefaultKeymapTests
         {
             var binding = engine.Resolve($"cmd+{i}");
             Assert.NotNull(binding);
-            Assert.Equal($"workspace.switch-{i}", binding!.Action);
+            Assert.Equal($"bay.switch-{i}", binding!.Action);
         }
     }
 
@@ -43,7 +43,7 @@ public sealed class DefaultKeymapTests
     }
 
     [Fact]
-    public void RegisterAll_RegistersToolPaneShortcuts()
+    public void RegisterAll_RegistersToolNookShortcuts()
     {
         var engine = new KeybindingEngine();
         DefaultKeymap.RegisterAll(engine);
@@ -53,14 +53,14 @@ public sealed class DefaultKeymapTests
     }
 
     [Fact]
-    public void RegisterAll_RegistersPaneShortcuts()
+    public void RegisterAll_RegistersNookShortcuts()
     {
         var engine = new KeybindingEngine();
         DefaultKeymap.RegisterAll(engine);
 
-        Assert.Equal("pane.split-right", engine.Resolve("cmd+d")!.Action);
-        Assert.Equal("pane.focus-next", engine.Resolve("cmd+]")!.Action);
-        Assert.Equal("pane.find", engine.Resolve("cmd+f")!.Action);
+        Assert.Equal("nook.split-right", engine.Resolve("cmd+d")!.Action);
+        Assert.Equal("nook.focus-next", engine.Resolve("cmd+]")!.Action);
+        Assert.Equal("nook.find", engine.Resolve("cmd+f")!.Action);
     }
 
     [Fact]

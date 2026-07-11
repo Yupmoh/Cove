@@ -32,7 +32,7 @@ public static class LaunchConfigCommands
         {
             Adapter = p.Adapter,
             ProfileSlug = p.ProfileSlug,
-            ExecutionMode = p.ExecutionMode ?? "pane",
+            ExecutionMode = p.ExecutionMode ?? "nook",
             InProgressStatusId = p.InProgressStatusId,
             ReviewStatusId = p.ReviewStatusId,
             CompletionStatusId = p.CompletionStatusId,
@@ -50,8 +50,8 @@ public static class LaunchConfigCommands
     private static LaunchConfigValidationContext BuildValidationContext(EngineDispatchContext ctx, string cardId)
     {
         var card = ctx.TaskService?.GetCard(cardId);
-        var workspaceId = card?.WorkspaceId ?? "";
-        var statuses = ctx.TaskService?.ListStatuses(workspaceId, includeHidden: true).Select(s => s.Id).ToHashSet() ?? new HashSet<string>();
+        var bayId = card?.BayId ?? "";
+        var statuses = ctx.TaskService?.ListStatuses(bayId, includeHidden: true).Select(s => s.Id).ToHashSet() ?? new HashSet<string>();
         var adapters = ctx.ManifestStore?.LoadAll().Select(m => m.Name).ToHashSet() ?? new HashSet<string>();
         var profiles = ctx.LaunchProfiles?.ListAll().Select(p => p.Slug).ToHashSet() ?? new HashSet<string>();
         return new LaunchConfigValidationContext(adapters, statuses, profiles);

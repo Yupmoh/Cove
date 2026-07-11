@@ -18,8 +18,8 @@ public sealed class EditsIndexTests
         return (dir, new EditsIndex(dir, NullLogger.Instance), corpus);
     }
 
-    private static string CreateSession(SessionCorpusIndexer corpus, string workspaceId = "ws1")
-        => corpus.IndexSession(workspaceId, "claude", System.DateTimeOffset.UtcNow.ToString("o"), "session content", "v1.0");
+    private static string CreateSession(SessionCorpusIndexer corpus, string bayId = "ws1")
+        => corpus.IndexSession(bayId, "claude", System.DateTimeOffset.UtcNow.ToString("o"), "session content", "v1.0");
 
     [Fact]
     public void RecordEdit_ThenFindByAbsolute_FindsByFilePath()

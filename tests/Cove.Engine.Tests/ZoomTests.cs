@@ -6,43 +6,43 @@ namespace Cove.Engine.Tests;
 
 public sealed class ZoomTests
 {
-    private static PaneLeaf Leaf(string id) => new()
+    private static NookLeaf Leaf(string id) => new()
     {
-        PaneId = id,
-        Subtabs = new[] { new Subtab(id, PaneType.Terminal) },
+        NookId = id,
+        Subtabs = new[] { new Subtab(id, NookType.Terminal) },
     };
 
     [Fact]
-    public void SetZoom_SetsRoomOverlay()
+    public void SetZoom_SetsShoreOverlay()
     {
         var layout = new LayoutService();
-        string roomId = layout.CreateRoom("main", Leaf("p1"));
-        layout.SplitPane(roomId, "p1", SplitOrientation.Row, Leaf("p2"));
-        layout.SetZoom(roomId, "p1");
+        string shoreId = layout.CreateShore("main", Leaf("p1"));
+        layout.SplitNook(shoreId, "p1", SplitOrientation.Row, Leaf("p2"));
+        layout.SetZoom(shoreId, "p1");
         var snap = layout.ToSnapshot("ws", "demo", "/proj");
-        Assert.Equal("p1", snap.Rooms[0].ZoomedPaneId);
+        Assert.Equal("p1", snap.Shores[0].ZoomedNookId);
     }
 
     [Fact]
     public void Unzoom_ClearsOverlay()
     {
         var layout = new LayoutService();
-        string roomId = layout.CreateRoom("main", Leaf("p1"));
-        layout.SetZoom(roomId, "p1");
-        layout.SetZoom(roomId, null);
+        string shoreId = layout.CreateShore("main", Leaf("p1"));
+        layout.SetZoom(shoreId, "p1");
+        layout.SetZoom(shoreId, null);
         var snap = layout.ToSnapshot("ws", "demo", "/proj");
-        Assert.Null(snap.Rooms[0].ZoomedPaneId);
+        Assert.Null(snap.Shores[0].ZoomedNookId);
     }
 
     [Fact]
     public void Zoom_DoesNotMutateTree()
     {
         var layout = new LayoutService();
-        string roomId = layout.CreateRoom("main", Leaf("p1"));
-        layout.SplitPane(roomId, "p1", SplitOrientation.Row, Leaf("p2"));
-        var before = layout.GetRoot(roomId)!;
-        layout.SetZoom(roomId, "p1");
-        var after = layout.GetRoot(roomId)!;
+        string shoreId = layout.CreateShore("main", Leaf("p1"));
+        layout.SplitNook(shoreId, "p1", SplitOrientation.Row, Leaf("p2"));
+        var before = layout.GetRoot(shoreId)!;
+        layout.SetZoom(shoreId, "p1");
+        var after = layout.GetRoot(shoreId)!;
         Assert.Same(before, after);
     }
 
@@ -50,14 +50,14 @@ public sealed class ZoomTests
     public void Zoom_SurvivesReload()
     {
         var layout = new LayoutService();
-        string roomId = layout.CreateRoom("main", Leaf("p1"));
-        layout.SplitPane(roomId, "p1", SplitOrientation.Row, Leaf("p2"));
-        layout.SetZoom(roomId, "p2");
+        string shoreId = layout.CreateShore("main", Leaf("p1"));
+        layout.SplitNook(shoreId, "p1", SplitOrientation.Row, Leaf("p2"));
+        layout.SetZoom(shoreId, "p2");
         var snap = layout.ToSnapshot("ws", "demo", "/proj");
 
         var reloaded = new LayoutService();
         reloaded.LoadSnapshot(snap);
         var reloadedSnap = reloaded.ToSnapshot("ws", "demo", "/proj");
-        Assert.Equal("p2", reloadedSnap.Rooms[0].ZoomedPaneId);
+        Assert.Equal("p2", reloadedSnap.Shores[0].ZoomedNookId);
     }
 }

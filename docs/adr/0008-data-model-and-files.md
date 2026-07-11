@@ -8,7 +8,7 @@ M0 must establish where Cove keeps state and the substrate the lossless transpor
 
 ## Decision
 
-`Cove.Platform` resolves `~/.cove/` on macOS/Linux and `%USERPROFILE%\.cove\` on Windows, plus the `~/.cove-beta` / `~/.cove-dev` channel roots, honoring `COVE_DATA_DIR`. It scaffolds the canonical tree (`ipc/ logs/ workspaces/ themes/ bin/ cache/` and more) and writes an internal `.gitignore` that splits versioned intent from regenerable cache (`ipc/`, `cache/`, `bin/`, `logs/`, `*.db*` ignored). Each PTY session gets a bounded in-memory ring buffer with a monotonic total offset and per-client cursors — the substrate for replay-since-offset. Persisting scrollback to disk is a later milestone; M0 proves the in-memory replay contract.
+`Cove.Platform` resolves `~/.cove/` on macOS/Linux and `%USERPROFILE%\.cove\` on Windows, plus the `~/.cove-beta` / `~/.cove-dev` channel roots, honoring `COVE_DATA_DIR`. It scaffolds the canonical tree (`ipc/ logs/ bays/ themes/ bin/ cache/` and more) and writes an internal `.gitignore` that splits versioned intent from regenerable cache (`ipc/`, `cache/`, `bin/`, `logs/`, `*.db*` ignored). Each PTY session gets a bounded in-memory ring buffer with a monotonic total offset and per-client cursors — the substrate for replay-since-offset. Persisting scrollback to disk is a later milestone; M0 proves the in-memory replay contract.
 
 ## Consequences
 

@@ -143,7 +143,7 @@ public sealed class KeybindingStoreTests
         try
         {
             var store = new KeybindingStore(dir);
-            Assert.Equal("cmd+t", store.Get("pane.newTerminal", "none"));
+            Assert.Equal("cmd+t", store.Get("nook.newTerminal", "none"));
         }
         finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
     }
@@ -156,8 +156,8 @@ public sealed class KeybindingStoreTests
         try
         {
             var store = new KeybindingStore(dir);
-            store.Set("pane.newTerminal", "ctrl+t");
-            Assert.Equal("ctrl+t", store.Get("pane.newTerminal", "none"));
+            store.Set("nook.newTerminal", "ctrl+t");
+            Assert.Equal("ctrl+t", store.Get("nook.newTerminal", "none"));
         }
         finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
     }

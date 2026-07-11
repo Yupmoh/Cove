@@ -4,9 +4,9 @@ using Microsoft.Extensions.Logging;
 
 namespace Cove.Engine.Restart;
 
-public sealed record RestoreProgressEvent(string WorkspaceId, string Step, RestorePhase Phase, string? Detail = null);
+public sealed record RestoreProgressEvent(string BayId, string Step, RestorePhase Phase, string? Detail = null);
 
-public enum RestorePhase { Started, WorkspaceLoaded, PanesMaterialized, Completed, Failed }
+public enum RestorePhase { Started, BayLoaded, NooksMaterialized, Completed, Failed }
 
 public sealed class RestorationService
 {
@@ -52,11 +52,11 @@ public sealed class RestorationService
     public void SaveState(CoveState state)
         => AtomicJsonStore.Write(StatePath, state, CoveJsonContext.Default.CoveState);
 
-    public void EmitProgress(string workspaceId, string step, RestorePhase phase, string? detail = null)
-        => _emitProgress?.Invoke(new RestoreProgressEvent(workspaceId, step, phase, detail));
+    public void EmitProgress(string bayId, string step, RestorePhase phase, string? detail = null)
+        => _emitProgress?.Invoke(new RestoreProgressEvent(bayId, step, phase, detail));
 }
 
-public sealed record RestoreStateResult(bool WasClean, IReadOnlyList<string> OpenWorkspaces, string? FocusedWorkspace);
+public sealed record RestoreStateResult(bool WasClean, IReadOnlyList<string> OpenBays, string? FocusedBay);
 
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase, DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
 [JsonSerializable(typeof(RestoreProgressEvent))]

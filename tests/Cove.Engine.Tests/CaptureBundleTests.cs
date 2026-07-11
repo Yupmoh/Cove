@@ -47,7 +47,7 @@ public sealed class CaptureBundleTests
         Assert.Contains("\"id\":", json);
         Assert.Contains("\"number\":", json);
         Assert.Contains("\"region\":", json);
-        Assert.Contains("\"workspaceId\":", json);
+        Assert.Contains("\"bayId\":", json);
         Assert.Contains("\"ws-1\"", json);
     }
 

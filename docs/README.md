@@ -1,6 +1,6 @@
 # Cove documentation
 
-Cove is a free, open-source, AI-native terminal workspace: a headless engine that owns your terminals, sessions, and workspaces, with a native-webview GUI and a full terminal-mode client as symmetric clients over one local control plane.
+Cove is a free, open-source, AI-native terminal bay: a headless engine that owns your terminals, sessions, and bays, with a native-webview GUI and a full terminal-mode client as symmetric clients over one local control plane.
 
 Created & maintained by Moh (github.com/Yupmoh).
 

@@ -18,7 +18,7 @@ public sealed class NotificationPolicyEngineTests
     {
         var engine = NewEngine();
         var result = engine.Evaluate(new NotificationTrigger(
-            NeedsInput: true, AppFocused: true, PaneId: "pane-1", BannerId: null));
+            NeedsInput: true, AppFocused: true, NookId: "nook-1", BannerId: null));
 
         Assert.True(result.SuppressOsNotification);
         Assert.False(result.SuppressToast);
@@ -29,7 +29,7 @@ public sealed class NotificationPolicyEngineTests
     {
         var engine = NewEngine();
         var result = engine.Evaluate(new NotificationTrigger(
-            NeedsInput: true, AppFocused: false, PaneId: "pane-1", BannerId: null));
+            NeedsInput: true, AppFocused: false, NookId: "nook-1", BannerId: null));
 
         Assert.False(result.SuppressOsNotification);
     }
@@ -39,7 +39,7 @@ public sealed class NotificationPolicyEngineTests
     {
         var engine = NewEngine();
         var result = engine.Evaluate(new NotificationTrigger(
-            NeedsInput: false, AppFocused: false, PaneId: "pane-1", BannerId: null));
+            NeedsInput: false, AppFocused: false, NookId: "nook-1", BannerId: null));
 
         Assert.True(result.SuppressOsNotification);
     }
@@ -51,7 +51,7 @@ public sealed class NotificationPolicyEngineTests
         engine.SetTierEnabled(NotificationTier.OsNotification, false);
 
         var result = engine.Evaluate(new NotificationTrigger(
-            NeedsInput: true, AppFocused: false, PaneId: "pane-1", BannerId: null));
+            NeedsInput: true, AppFocused: false, NookId: "nook-1", BannerId: null));
 
         Assert.True(result.SuppressOsNotification);
     }
@@ -63,7 +63,7 @@ public sealed class NotificationPolicyEngineTests
         engine.SetTierEnabled(NotificationTier.Toast, false);
 
         var result = engine.Evaluate(new NotificationTrigger(
-            NeedsInput: true, AppFocused: true, PaneId: "pane-1", BannerId: null));
+            NeedsInput: true, AppFocused: true, NookId: "nook-1", BannerId: null));
 
         Assert.True(result.SuppressToast);
     }
@@ -94,7 +94,7 @@ public sealed class NotificationPolicyEngineTests
         engine.DismissBanner("banner-1");
 
         var result = engine.Evaluate(new NotificationTrigger(
-            NeedsInput: false, AppFocused: true, PaneId: "pane-1", BannerId: "banner-1"));
+            NeedsInput: false, AppFocused: true, NookId: "nook-1", BannerId: "banner-1"));
 
         Assert.True(result.SuppressBanner);
     }
@@ -105,7 +105,7 @@ public sealed class NotificationPolicyEngineTests
         var engine = NewEngine();
 
         var result = engine.Evaluate(new NotificationTrigger(
-            NeedsInput: false, AppFocused: true, PaneId: "pane-1", BannerId: "banner-2"));
+            NeedsInput: false, AppFocused: true, NookId: "nook-1", BannerId: "banner-2"));
 
         Assert.False(result.SuppressBanner);
     }
@@ -128,7 +128,7 @@ public sealed class NotificationPolicyEngineTests
     {
         var engine = NewEngine();
         var result = engine.Evaluate(new NotificationTrigger(
-            NeedsInput: false, AppFocused: true, PaneId: "pane-1", BannerId: null));
+            NeedsInput: false, AppFocused: true, NookId: "nook-1", BannerId: null));
 
         Assert.False(result.SuppressAmbient);
     }
@@ -147,11 +147,11 @@ public sealed class NotificationPolicyEngineTests
     }
 
     [Fact]
-    public void Evaluate_OsNotificationFiresOncePerPaneNeedsInput()
+    public void Evaluate_OsNotificationFiresOncePerNookNeedsInput()
     {
         var engine = NewEngine();
         var trigger = new NotificationTrigger(
-            NeedsInput: true, AppFocused: false, PaneId: "pane-1", BannerId: null);
+            NeedsInput: true, AppFocused: false, NookId: "nook-1", BannerId: null);
 
         var result1 = engine.Evaluate(trigger);
         Assert.False(result1.SuppressOsNotification);
@@ -165,12 +165,12 @@ public sealed class NotificationPolicyEngineTests
     {
         var engine = NewEngine();
         engine.Evaluate(new NotificationTrigger(
-            NeedsInput: true, AppFocused: false, PaneId: "pane-1", BannerId: null));
+            NeedsInput: true, AppFocused: false, NookId: "nook-1", BannerId: null));
 
-        engine.ClearNeedsInput("pane-1");
+        engine.ClearNeedsInput("nook-1");
 
         var result = engine.Evaluate(new NotificationTrigger(
-            NeedsInput: true, AppFocused: false, PaneId: "pane-1", BannerId: null));
+            NeedsInput: true, AppFocused: false, NookId: "nook-1", BannerId: null));
         Assert.False(result.SuppressOsNotification);
     }
 }

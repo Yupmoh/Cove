@@ -6,7 +6,7 @@ public static class CoveTree
 {
     private static readonly string[] SkeletonDirs =
     {
-        "ipc", "logs", "bin", "cache", "workspaces",
+        "ipc", "logs", "bin", "cache", "bays",
         "themes", "library", "run-commands", "skills"
     };
 

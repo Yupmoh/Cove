@@ -3,7 +3,7 @@ using Cove.Persistence;
 
 namespace Cove.Engine.Restart;
 
-public sealed record RestoreChoiceItem(string WorkspaceId, string RoomId, string PaneId, string Label, bool WasRunning, bool Hidden);
+public sealed record RestoreChoiceItem(string BayId, string ShoreId, string NookId, string Label, bool WasRunning, bool Hidden);
 
 public sealed record RestoreChooserResult(bool AutoRelaunch, IReadOnlyList<RestoreChoiceItem> Items);
 
@@ -13,19 +13,19 @@ public sealed class RestoreChooserService
 
     public RestoreChooserService(RestorationService restoration) => _restoration = restoration;
 
-    public RestoreChooserResult Evaluate(IReadOnlyList<RestoreChoiceItem> knownPanes)
+    public RestoreChooserResult Evaluate(IReadOnlyList<RestoreChoiceItem> knownNooks)
     {
         var state = _restoration.LoadState();
         var settings = LoadSettings();
         if (settings.AutoRestoreOnLaunch)
-            return new RestoreChooserResult(true, knownPanes);
+            return new RestoreChooserResult(true, knownNooks);
 
         var wasClean = state.CleanShutdown;
         if (wasClean)
-            return new RestoreChooserResult(true, knownPanes);
+            return new RestoreChooserResult(true, knownNooks);
 
-        var restorable = knownPanes
-            .Where(p => !string.IsNullOrEmpty(p.PaneId))
+        var restorable = knownNooks
+            .Where(p => !string.IsNullOrEmpty(p.NookId))
             .ToList();
         return new RestoreChooserResult(false, restorable);
     }

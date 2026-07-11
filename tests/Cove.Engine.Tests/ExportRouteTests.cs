@@ -32,10 +32,10 @@ public sealed class ExportRouteTests
         await using var h = await DaemonTestHarness.StartAsync();
         await using FrameConnection ctl = await h.ConnectAsync("cli");
 
-        await SendAsync(ctl, "c", "cove://commands/task.create", P("""{"title":"export card","workspaceId":"ws1","source":"user:test"}"""), ct);
+        await SendAsync(ctl, "c", "cove://commands/task.create", P("""{"title":"export card","bayId":"ws1","source":"user:test"}"""), ct);
 
         var exportPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "cove-export-" + System.Guid.NewGuid().ToString("N") + ".db");
-        var exportResp = await SendAsync(ctl, "e", "cove://commands/task-board.export", P($"{{\"exportPath\":\"{exportPath}\",\"workspaceCount\":1}}"), ct);
+        var exportResp = await SendAsync(ctl, "e", "cove://commands/task-board.export", P($"{{\"exportPath\":\"{exportPath}\",\"bayCount\":1}}"), ct);
         Assert.True(exportResp.Ok, exportResp.Error?.Code);
         Assert.True(exportResp.Data!.Value.GetProperty("success").GetBoolean());
         Assert.Equal(1, exportResp.Data!.Value.GetProperty("schemaVersion").GetInt32());
@@ -55,10 +55,10 @@ public sealed class ExportRouteTests
         await using FrameConnection ctl = await h.ConnectAsync("cli");
 
         var exportPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "cove-diff-" + System.Guid.NewGuid().ToString("N") + ".db");
-        await SendAsync(ctl, "c", "cove://commands/task.create", P("""{"title":"diff card 1","workspaceId":"ws1","source":"user:test"}"""), ct);
-        await SendAsync(ctl, "e", "cove://commands/task-board.export", P($"{{\"exportPath\":\"{exportPath}\",\"workspaceCount\":1}}"), ct);
+        await SendAsync(ctl, "c", "cove://commands/task.create", P("""{"title":"diff card 1","bayId":"ws1","source":"user:test"}"""), ct);
+        await SendAsync(ctl, "e", "cove://commands/task-board.export", P($"{{\"exportPath\":\"{exportPath}\",\"bayCount\":1}}"), ct);
 
-        await SendAsync(ctl, "c2", "cove://commands/task.create", P("""{"title":"diff card 2","workspaceId":"ws1","source":"user:test"}"""), ct);
+        await SendAsync(ctl, "c2", "cove://commands/task.create", P("""{"title":"diff card 2","bayId":"ws1","source":"user:test"}"""), ct);
 
         var diffResp = await SendAsync(ctl, "d", "cove://commands/task-board.diff", P($"{{\"importPath\":\"{exportPath}\"}}"), ct);
         Assert.True(diffResp.Ok, diffResp.Error?.Code);

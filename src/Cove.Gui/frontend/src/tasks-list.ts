@@ -5,7 +5,7 @@ interface TaskCard {
   title: string;
   description: string;
   taskNumber: number;
-  workspaceId: string;
+  bayId: string;
   statusId: string;
   priority: number;
   size: number;
@@ -18,7 +18,7 @@ interface TaskCard {
 
 interface StatusRow {
   id: string;
-  workspaceId: string;
+  bayId: string;
   name: string;
   color: string;
   position: number;
@@ -39,20 +39,20 @@ let selectedRow = 0;
 let allCards: TaskCard[] = [];
 let statusMap: Record<string, StatusRow> = {};
 
-export async function renderTaskList(workspaceId: string): Promise<HTMLElement> {
+export async function renderTaskList(bayId: string): Promise<HTMLElement> {
   const el = document.createElement("div");
   el.className = "task-list-view";
   el.style.cssText = "display:flex;flex-direction:column;height:100%;background:#0b1622;color:#e5e9f0;font-family:system-ui,sans-serif;";
 
-  await refreshList(el, workspaceId);
+  await refreshList(el, bayId);
   return el;
 }
 
-async function refreshList(el: HTMLElement, workspaceId: string): Promise<void> {
+async function refreshList(el: HTMLElement, bayId: string): Promise<void> {
   try {
     const [statusResult, cardResult] = await Promise.all([
-      invoke<StatusListResult>("cove://commands/task.status.list", { workspaceId }),
-      invoke<TaskListResult>("cove://commands/task.list", { workspaceId }),
+      invoke<StatusListResult>("cove://commands/task.status.list", { bayId }),
+      invoke<TaskListResult>("cove://commands/task.list", { bayId }),
     ]);
 
     statusMap = {};
@@ -60,14 +60,14 @@ async function refreshList(el: HTMLElement, workspaceId: string): Promise<void> 
     allCards = cardResult.cards || [];
 
     el.innerHTML = "";
-    el.appendChild(buildToolbar(workspaceId, el));
-    el.appendChild(buildTable(workspaceId));
+    el.appendChild(buildToolbar(bayId, el));
+    el.appendChild(buildTable(bayId));
   } catch (e) {
     el.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to load tasks: ${(e as Error).message}</div>`;
   }
 }
 
-function buildToolbar(workspaceId: string, el: HTMLElement): HTMLElement {
+function buildToolbar(bayId: string, el: HTMLElement): HTMLElement {
 
   const toolbar = document.createElement("div");
   toolbar.style.cssText = "padding:8px 12px;display:flex;gap:8px;align-items:center;border-bottom:1px solid #1e2d3f;flex-wrap:wrap;";
@@ -80,7 +80,7 @@ function buildToolbar(workspaceId: string, el: HTMLElement): HTMLElement {
   search.addEventListener("input", () => {
     searchQuery = search.value;
     const table = el.querySelector(".task-table");
-    if (table) table.replaceWith(buildTable(workspaceId));
+    if (table) table.replaceWith(buildTable(bayId));
   });
   toolbar.appendChild(search);
 
@@ -97,7 +97,7 @@ function buildToolbar(workspaceId: string, el: HTMLElement): HTMLElement {
   statusSelect.addEventListener("change", () => {
     statusFilter = statusSelect.value;
     const table = el.querySelector(".task-table");
-    if (table) table.replaceWith(buildTable(workspaceId));
+    if (table) table.replaceWith(buildTable(bayId));
   });
   toolbar.appendChild(statusSelect);
 
@@ -113,14 +113,14 @@ function buildToolbar(workspaceId: string, el: HTMLElement): HTMLElement {
   sortSelect.addEventListener("change", () => {
     currentSort = sortSelect.value;
     const table = el.querySelector(".task-table");
-    if (table) table.replaceWith(buildTable(workspaceId));
+    if (table) table.replaceWith(buildTable(bayId));
   });
   toolbar.appendChild(sortSelect);
 
   return toolbar;
 }
 
-function buildTable(workspaceId: string): HTMLElement {
+function buildTable(bayId: string): HTMLElement {
   const container = document.createElement("div");
   container.className = "task-table";
   container.style.cssText = "flex:1;overflow:auto;";
@@ -157,7 +157,7 @@ function buildTable(workspaceId: string): HTMLElement {
     tr.addEventListener("mouseleave", () => { tr.style.background = i === selectedRow ? "#1e2d3f" : ""; });
     tr.addEventListener("click", () => {
       selectedRow = i;
-      openDetailModal(card, workspaceId);
+      openDetailModal(card, bayId);
     });
 
     const status = statusMap[card.statusId];
@@ -190,7 +190,7 @@ function sortCards(cards: TaskCard[]): TaskCard[] {
   return sorted;
 }
 
-function openDetailModal(card: TaskCard, workspaceId: string): void {
+function openDetailModal(card: TaskCard, bayId: string): void {
   const existing = document.querySelector(".task-detail-modal");
   if (existing) existing.remove();
 

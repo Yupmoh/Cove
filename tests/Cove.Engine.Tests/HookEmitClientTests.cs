@@ -32,22 +32,22 @@ public sealed class HookEmitClientTests
     }
 
     [Fact]
-    public async Task Emit_WithPaneId_SendsHeader()
+    public async Task Emit_WithNookId_SendsHeader()
     {
         var dir = NewDir();
         Directory.CreateDirectory(dir);
         try
         {
             using var server = new HookHttpServer(dir);
-            string? receivedPaneId = null;
-            server.OnEvent += e => receivedPaneId = e.PaneId;
+            string? receivedNookId = null;
+            server.OnEvent += e => receivedNookId = e.NookId;
             await server.StartAsync();
 
             var client = new HookEmitClient(server.Port);
-            var result = await client.EmitAsync("codex", "stop", "{}", paneId: "pane-99");
+            var result = await client.EmitAsync("codex", "stop", "{}", nookId: "nook-99");
 
             Assert.True(result.Ok);
-            Assert.Equal("pane-99", receivedPaneId);
+            Assert.Equal("nook-99", receivedNookId);
         }
         finally { try { Directory.Delete(dir, true); } catch { } }
     }

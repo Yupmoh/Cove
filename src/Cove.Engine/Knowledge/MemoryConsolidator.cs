@@ -17,11 +17,11 @@ public sealed class ProposalStore
         _logger = logger;
     }
 
-    public Proposal Create(string workspaceId, string kind, string content)
+    public Proposal Create(string bayId, string kind, string content)
     {
         var proposal = new Proposal(
             System.Guid.NewGuid().ToString("N"),
-            workspaceId,
+            bayId,
             kind,
             content,
             "proposed",
@@ -32,16 +32,16 @@ public sealed class ProposalStore
         conn.Open();
         EnsureTable(conn);
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = "INSERT INTO proposals (id, workspace_id, kind, content, state, created_at) VALUES (@id, @ws, @kind, @content, @state, @ts)";
+        cmd.CommandText = "INSERT INTO proposals (id, bay_id, kind, content, state, created_at) VALUES (@id, @ws, @kind, @content, @state, @ts)";
         cmd.Parameters.AddWithValue("@id", proposal.Id);
-        cmd.Parameters.AddWithValue("@ws", proposal.WorkspaceId);
+        cmd.Parameters.AddWithValue("@ws", proposal.BayId);
         cmd.Parameters.AddWithValue("@kind", proposal.Kind);
         cmd.Parameters.AddWithValue("@content", proposal.Content);
         cmd.Parameters.AddWithValue("@state", proposal.State);
         cmd.Parameters.AddWithValue("@ts", proposal.CreatedAt.ToString("o"));
         cmd.ExecuteNonQuery();
 
-        _logger.LogWarning("proposals: created {id} ({kind}) in {ws}", proposal.Id, proposal.Kind, proposal.WorkspaceId);
+        _logger.LogWarning("proposals: created {id} ({kind}) in {ws}", proposal.Id, proposal.Kind, proposal.BayId);
         return proposal;
     }
 
@@ -51,14 +51,14 @@ public sealed class ProposalStore
         conn.Open();
         EnsureTable(conn);
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT id, workspace_id, kind, content, state, created_at FROM proposals WHERE id = @id";
+        cmd.CommandText = "SELECT id, bay_id, kind, content, state, created_at FROM proposals WHERE id = @id";
         cmd.Parameters.AddWithValue("@id", id);
         using var reader = cmd.ExecuteReader();
         if (!reader.Read()) return null;
         return ReadProposal(reader);
     }
 
-    public System.Collections.Generic.IReadOnlyList<Proposal> ListByWorkspace(string workspaceId, string? state = null)
+    public System.Collections.Generic.IReadOnlyList<Proposal> ListByBay(string bayId, string? state = null)
     {
         var result = new System.Collections.Generic.List<Proposal>();
         using var conn = new SqliteConnection($"Data Source={_dbPath}");
@@ -67,13 +67,13 @@ public sealed class ProposalStore
         using var cmd = conn.CreateCommand();
         if (state is null)
         {
-            cmd.CommandText = "SELECT id, workspace_id, kind, content, state, created_at FROM proposals WHERE workspace_id = @ws ORDER BY created_at DESC";
-            cmd.Parameters.AddWithValue("@ws", workspaceId);
+            cmd.CommandText = "SELECT id, bay_id, kind, content, state, created_at FROM proposals WHERE bay_id = @ws ORDER BY created_at DESC";
+            cmd.Parameters.AddWithValue("@ws", bayId);
         }
         else
         {
-            cmd.CommandText = "SELECT id, workspace_id, kind, content, state, created_at FROM proposals WHERE workspace_id = @ws AND state = @state ORDER BY created_at DESC";
-            cmd.Parameters.AddWithValue("@ws", workspaceId);
+            cmd.CommandText = "SELECT id, bay_id, kind, content, state, created_at FROM proposals WHERE bay_id = @ws AND state = @state ORDER BY created_at DESC";
+            cmd.Parameters.AddWithValue("@ws", bayId);
             cmd.Parameters.AddWithValue("@state", state);
         }
         using var reader = cmd.ExecuteReader();
@@ -103,7 +103,7 @@ public sealed class ProposalStore
         cmd.CommandText = """
             CREATE TABLE IF NOT EXISTS proposals (
                 id TEXT PRIMARY KEY,
-                workspace_id TEXT NOT NULL,
+                bay_id TEXT NOT NULL,
                 kind TEXT NOT NULL,
                 content TEXT NOT NULL,
                 state TEXT NOT NULL,
@@ -140,13 +140,13 @@ public sealed class MemoryConsolidator
         _logger = logger;
     }
 
-    public async System.Threading.Tasks.Task<int> ConsolidateAsync(string workspaceId, bool dryRun, CancellationToken cancellationToken = default)
+    public async System.Threading.Tasks.Task<int> ConsolidateAsync(string bayId, bool dryRun, CancellationToken cancellationToken = default)
     {
         _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var token = _cts.Token;
 
-        var facts = _store.ListFacts(workspaceId);
-        _logger.LogWarning("consolidator: analyzing {count} facts in {ws} (dryRun={dry})", facts.Count, workspaceId, dryRun);
+        var facts = _store.ListFacts(bayId);
+        _logger.LogWarning("consolidator: analyzing {count} facts in {ws} (dryRun={dry})", facts.Count, bayId, dryRun);
 
         int proposalCount = 0;
         var seen = new System.Collections.Generic.HashSet<string>();
@@ -160,7 +160,7 @@ public sealed class MemoryConsolidator
             {
                 if (!dryRun)
                 {
-                    var proposal = _proposals.Create(workspaceId, "merge", $"Merge duplicate fact: {fact.Content}");
+                    var proposal = _proposals.Create(bayId, "merge", $"Merge duplicate fact: {fact.Content}");
                     _logger.LogWarning("consolidator: proposed merge {id} for fact {factId}", proposal.Id, fact.Id);
                     proposalCount++;
                 }
@@ -173,7 +173,7 @@ public sealed class MemoryConsolidator
         }
 
         await System.Threading.Tasks.Task.CompletedTask;
-        _logger.LogWarning("consolidator: found {count} consolidation candidates in {ws}", proposalCount, workspaceId);
+        _logger.LogWarning("consolidator: found {count} consolidation candidates in {ws}", proposalCount, bayId);
         return proposalCount;
     }
 

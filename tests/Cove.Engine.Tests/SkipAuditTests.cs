@@ -1,4 +1,4 @@
-using Cove.Engine.Panes;
+using Cove.Engine.Nooks;
 using Xunit;
 
 namespace Cove.Engine.Tests;
@@ -6,39 +6,39 @@ namespace Cove.Engine.Tests;
 public sealed class SkipAuditTests
 {
     [Fact]
-    public void NoAchievementsPaneType_Registered()
+    public void NoAchievementsNookType_Registered()
     {
-        var registry = PaneTypeRegistry.CreateWithBuiltins();
+        var registry = NookTypeRegistry.CreateWithBuiltins();
         Assert.False(registry.IsRegistered("achievements"));
     }
 
     [Fact]
-    public void NoStreakCounterPaneType_Registered()
+    public void NoStreakCounterNookType_Registered()
     {
-        var registry = PaneTypeRegistry.CreateWithBuiltins();
+        var registry = NookTypeRegistry.CreateWithBuiltins();
         Assert.False(registry.IsRegistered("streaks"));
         Assert.False(registry.IsRegistered("day-streak"));
     }
 
     [Fact]
-    public void NoCalibrationGatePaneType_Registered()
+    public void NoCalibrationGateNookType_Registered()
     {
-        var registry = PaneTypeRegistry.CreateWithBuiltins();
+        var registry = NookTypeRegistry.CreateWithBuiltins();
         Assert.False(registry.IsRegistered("calibration"));
     }
 
     [Fact]
-    public void NoConfettiOrCelebrationPaneType_Registered()
+    public void NoConfettiOrCelebrationNookType_Registered()
     {
-        var registry = PaneTypeRegistry.CreateWithBuiltins();
+        var registry = NookTypeRegistry.CreateWithBuiltins();
         Assert.False(registry.IsRegistered("celebrations"));
         Assert.False(registry.IsRegistered("confetti"));
     }
 
     [Fact]
-    public void NoRenameNagPaneType_Registered()
+    public void NoRenameNagNookType_Registered()
     {
-        var registry = PaneTypeRegistry.CreateWithBuiltins();
+        var registry = NookTypeRegistry.CreateWithBuiltins();
         Assert.False(registry.IsRegistered("rename-nag"));
     }
 

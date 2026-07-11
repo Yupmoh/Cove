@@ -84,7 +84,7 @@ public sealed class AdapterDtoTests
         {
             Adapter = "claude-code",
             Event = "session-start",
-            PaneId = "pane-123",
+            NookId = "nook-123",
             SessionId = "sess-456",
         };
 
@@ -94,7 +94,7 @@ public sealed class AdapterDtoTests
         Assert.NotNull(deserialized);
         Assert.Equal("claude-code", deserialized!.Adapter);
         Assert.Equal("session-start", deserialized.Event);
-        Assert.Equal("pane-123", deserialized.PaneId);
+        Assert.Equal("nook-123", deserialized.NookId);
     }
 
     [Fact]

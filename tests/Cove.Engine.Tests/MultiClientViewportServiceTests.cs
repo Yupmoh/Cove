@@ -7,16 +7,16 @@ namespace Cove.Engine.Tests;
 public sealed class MultiClientViewportServiceTests
 {
     [Fact]
-    public void AttachClient_AddsToPane()
+    public void AttachClient_AddsToNook()
     {
         var svc = new MultiClientViewportService(NullLogger.Instance);
         svc.AttachClient(new ClientViewport("c1", 24, 80, 1));
         Assert.Equal(1, svc.GetClientCount(1));
-        Assert.Contains("c1", svc.GetClientsForPane(1));
+        Assert.Contains("c1", svc.GetClientsForNook(1));
     }
 
     [Fact]
-    public void DetachClient_RemovesFromPane()
+    public void DetachClient_RemovesFromNook()
     {
         var svc = new MultiClientViewportService(NullLogger.Instance);
         svc.AttachClient(new ClientViewport("c1", 24, 80, 1));
@@ -113,7 +113,7 @@ public sealed class MultiClientViewportServiceTests
     }
 
     [Fact]
-    public void MultiplePanes_TrackedSeparately()
+    public void MultipleNooks_TrackedSeparately()
     {
         var svc = new MultiClientViewportService(NullLogger.Instance);
         svc.AttachClient(new ClientViewport("c1", 24, 80, 1));
@@ -136,7 +136,7 @@ public sealed class MultiClientViewportServiceTests
     }
 
     [Fact]
-    public void ReattachClient_ToDifferentPane_MovesClient()
+    public void ReattachClient_ToDifferentNook_MovesClient()
     {
         var svc = new MultiClientViewportService(NullLogger.Instance);
         svc.AttachClient(new ClientViewport("c1", 24, 80, 1));

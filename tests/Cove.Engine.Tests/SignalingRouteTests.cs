@@ -24,7 +24,7 @@ public sealed class SignalingRouteTests
 
     private static async Task<string> CreateCardAsync(FrameConnection ctl, CancellationToken ct)
     {
-        var resp = await SendAsync(ctl, "c", "cove://commands/task.create", P("""{"title":"sig card","workspaceId":"ws1","source":"user:test"}"""), ct);
+        var resp = await SendAsync(ctl, "c", "cove://commands/task.create", P("""{"title":"sig card","bayId":"ws1","source":"user:test"}"""), ct);
         return resp.Data!.Value.GetProperty("id").GetString()!;
     }
 
@@ -158,13 +158,13 @@ public sealed class SignalingRouteTests
         var getResp = await SendAsync(ctl, "g", "cove://commands/task.get", P($"{{\"id\":\"{cardId}\"}}"), ct);
         var taskNumber = getResp.Data!.Value.GetProperty("taskNumber").GetInt32();
 
-        var reviewResp = await SendAsync(ctl, "r", "cove://commands/task.set-in-review", P($"{{\"runId\":\"COVE-{taskNumber}\",\"workspaceId\":\"ws1\"}}"), ct);
+        var reviewResp = await SendAsync(ctl, "r", "cove://commands/task.set-in-review", P($"{{\"runId\":\"COVE-{taskNumber}\",\"bayId\":\"ws1\"}}"), ct);
         Assert.True(reviewResp.Ok, reviewResp.Error?.Code);
         Assert.Equal("in-review", reviewResp.Data!.Value.GetProperty("statusId").GetString());
     }
 
     [Fact]
-    public async Task SetInReview_CoveN_WithoutWorkspace_RejectsWithClearError()
+    public async Task SetInReview_CoveN_WithoutBay_RejectsWithClearError()
     {
         if (System.OperatingSystem.IsWindows()) return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(60));
@@ -182,6 +182,6 @@ public sealed class SignalingRouteTests
         var reviewResp = await SendAsync(ctl, "r", "cove://commands/task.set-in-review", P($"{{\"runId\":\"COVE-{taskNumber}\"}}"), ct);
         Assert.False(reviewResp.Ok);
         Assert.Equal("not_found", reviewResp.Error!.Code);
-        Assert.Contains("workspace", reviewResp.Error!.Message);
+        Assert.Contains("bay", reviewResp.Error!.Message);
     }
 }

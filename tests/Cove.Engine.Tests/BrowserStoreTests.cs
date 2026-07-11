@@ -132,17 +132,17 @@ public sealed class BrowserStoreTests
         Assert.Contains("?q=1", key);
     }
     [Fact]
-    public void SetPaneState_PersistsAndRetrieves()
+    public void SetNookState_PersistsAndRetrieves()
     {
-        var store = new BrowserPaneStateStore(NewDir(), NullLogger.Instance);
-        var state = new BrowserPaneState(
-            "pane-1", "https://example.com", "Example", "favicon.ico",
+        var store = new BrowserNookStateStore(NewDir(), NullLogger.Instance);
+        var state = new BrowserNookState(
+            "nook-1", "https://example.com", "Example", "favicon.ico",
             new[] { "https://a.com" }, new[] { "https://b.com" },
             new System.Collections.Generic.Dictionary<string, double> { ["example.com"] = 1.5 },
             false, "engine-1", System.DateTimeOffset.UtcNow);
-        store.Save("pane-1", state);
+        store.Save("nook-1", state);
 
-        var loaded = store.Load("pane-1");
+        var loaded = store.Load("nook-1");
         Assert.NotNull(loaded);
         Assert.Equal("https://example.com", loaded!.Url);
         Assert.Equal("Example", loaded.Title);
@@ -155,15 +155,15 @@ public sealed class BrowserStoreTests
     }
 
     [Fact]
-    public void SetPaneState_OverwritesPrevious()
+    public void SetNookState_OverwritesPrevious()
     {
-        var store = new BrowserPaneStateStore(NewDir(), NullLogger.Instance);
-        var state1 = new BrowserPaneState("pane-1", "https://a.com", "A", "", [], [], new(), false, "e1", System.DateTimeOffset.UtcNow);
-        store.Save("pane-1", state1);
-        var state2 = new BrowserPaneState("pane-1", "https://b.com", "B", "", [], [], new(), true, "e2", System.DateTimeOffset.UtcNow);
-        store.Save("pane-1", state2);
+        var store = new BrowserNookStateStore(NewDir(), NullLogger.Instance);
+        var state1 = new BrowserNookState("nook-1", "https://a.com", "A", "", [], [], new(), false, "e1", System.DateTimeOffset.UtcNow);
+        store.Save("nook-1", state1);
+        var state2 = new BrowserNookState("nook-1", "https://b.com", "B", "", [], [], new(), true, "e2", System.DateTimeOffset.UtcNow);
+        store.Save("nook-1", state2);
 
-        var loaded = store.Load("pane-1");
+        var loaded = store.Load("nook-1");
         Assert.NotNull(loaded);
         Assert.Equal("https://b.com", loaded!.Url);
         Assert.Equal("B", loaded.Title);
@@ -171,21 +171,21 @@ public sealed class BrowserStoreTests
     }
 
     [Fact]
-    public void GetPaneState_Nonexistent_ReturnsNull()
+    public void GetNookState_Nonexistent_ReturnsNull()
     {
-        var store = new BrowserPaneStateStore(NewDir(), NullLogger.Instance);
+        var store = new BrowserNookStateStore(NewDir(), NullLogger.Instance);
         Assert.Null(store.Load("nonexistent"));
     }
 
     [Fact]
-    public void DeletePaneState_RemovesState()
+    public void DeleteNookState_RemovesState()
     {
-        var store = new BrowserPaneStateStore(NewDir(), NullLogger.Instance);
-        var state = new BrowserPaneState("pane-1", "https://a.com", "A", "", [], [], new(), false, "e1", System.DateTimeOffset.UtcNow);
-        store.Save("pane-1", state);
+        var store = new BrowserNookStateStore(NewDir(), NullLogger.Instance);
+        var state = new BrowserNookState("nook-1", "https://a.com", "A", "", [], [], new(), false, "e1", System.DateTimeOffset.UtcNow);
+        store.Save("nook-1", state);
 
-        Assert.True(store.Delete("pane-1"));
-        Assert.Null(store.Load("pane-1"));
+        Assert.True(store.Delete("nook-1"));
+        Assert.Null(store.Load("nook-1"));
     }
 
     [Fact]
@@ -240,21 +240,21 @@ public sealed class BrowserStoreTests
         Assert.EndsWith("browser-history.json", exportPath);
     }
     [Fact]
-    public void PaneState_RoundTripsForResumeOnRestart()
+    public void NookState_RoundTripsForResumeOnRestart()
     {
         var dir = NewDir();
-        var store1 = new BrowserPaneStateStore(dir, NullLogger.Instance);
-        var original = new BrowserPaneState(
-            "pane-resume", "https://example.com/page", "Example Page", "fav.ico",
+        var store1 = new BrowserNookStateStore(dir, NullLogger.Instance);
+        var original = new BrowserNookState(
+            "nook-resume", "https://example.com/page", "Example Page", "fav.ico",
             new[] { "https://example.com/prev1", "https://example.com/prev2" },
             new[] { "https://example.com/next1" },
             new System.Collections.Generic.Dictionary<string, double> { ["example.com"] = 1.25 },
             false, "target-1", System.DateTimeOffset.UtcNow);
 
-        store1.Save("pane-resume", original);
+        store1.Save("nook-resume", original);
 
-        var store2 = new BrowserPaneStateStore(dir, NullLogger.Instance);
-        var restored = store2.Load("pane-resume");
+        var store2 = new BrowserNookStateStore(dir, NullLogger.Instance);
+        var restored = store2.Load("nook-resume");
 
         Assert.NotNull(restored);
         Assert.Equal("https://example.com/page", restored!.Url);

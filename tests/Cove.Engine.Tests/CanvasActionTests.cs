@@ -39,7 +39,7 @@ public sealed class CanvasActionTests
     }
 
     [Fact]
-    public async Task SendToAgentAction_DispatchesPayloadToTargetPane()
+    public async Task SendToAgentAction_DispatchesPayloadToTargetNook()
     {
         if (System.OperatingSystem.IsWindows()) return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(60));
@@ -48,18 +48,18 @@ public sealed class CanvasActionTests
         await using var h = await DaemonTestHarness.StartAsync();
         await using FrameConnection ctl = await h.ConnectAsync("cli");
 
-        var spawnResp = await SendAsync(ctl, "sp", "cove://commands/pane.spawn", P("""{"command":"/bin/cat","args":[],"cwd":"/tmp","cols":80,"rows":24}"""), ct);
+        var spawnResp = await SendAsync(ctl, "sp", "cove://commands/nook.spawn", P("""{"command":"/bin/cat","args":[],"cwd":"/tmp","cols":80,"rows":24}"""), ct);
         Assert.True(spawnResp.Ok, spawnResp.Error?.Code);
-        var paneId = spawnResp.Data!.Value.GetProperty("paneId").GetString()!;
+        var nookId = spawnResp.Data!.Value.GetProperty("nookId").GetString()!;
 
-        var resp = await SendAsync(ctl, "a2", "cove://commands/canvas.action", P($"{{\"action\":\"send_to_agent\",\"targetPane\":\"{paneId}\",\"actionId\":\"el-456\",\"payload\":\"hello agent\",\"state\":{{}}}}"), ct);
+        var resp = await SendAsync(ctl, "a2", "cove://commands/canvas.action", P($"{{\"action\":\"send_to_agent\",\"targetNook\":\"{nookId}\",\"actionId\":\"el-456\",\"payload\":\"hello agent\",\"state\":{{}}}}"), ct);
         Assert.True(resp.Ok, resp.Error?.Code);
         Assert.True(resp.Data!.Value.GetProperty("dispatched").GetBoolean());
-        Assert.Equal(paneId, resp.Data!.Value.GetProperty("targetPaneId").GetString());
+        Assert.Equal(nookId, resp.Data!.Value.GetProperty("targetNookId").GetString());
     }
 
     [Fact]
-    public async Task SendToAgentAction_NonexistentPane_ReturnsNotFoundError()
+    public async Task SendToAgentAction_NonexistentNook_ReturnsNotFoundError()
     {
         if (System.OperatingSystem.IsWindows()) return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(60));
@@ -68,7 +68,7 @@ public sealed class CanvasActionTests
         await using var h = await DaemonTestHarness.StartAsync();
         await using FrameConnection ctl = await h.ConnectAsync("cli");
 
-        var resp = await SendAsync(ctl, "a2", "cove://commands/canvas.action", P("""{"action":"send_to_agent","targetPane":"nonexistent-pane","actionId":"el-456","payload":"hello","state":{}}"""), ct);
+        var resp = await SendAsync(ctl, "a2", "cove://commands/canvas.action", P("""{"action":"send_to_agent","targetNook":"nonexistent-nook","actionId":"el-456","payload":"hello","state":{}}"""), ct);
         Assert.False(resp.Ok);
         Assert.Equal("not_found", resp.Error!.Code);
     }

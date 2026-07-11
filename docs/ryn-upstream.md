@@ -9,7 +9,7 @@ Cove is built on the Ryn framework, which is maintained by the same author. Wher
 | RYN-03 | Global shortcuts / hotkeys plugin | M8 chrome | **SHIPPED — Ryn.Plugins.GlobalShortcut 0.11.0** |
 | RYN-04 | Windows Authenticode signing in the bundler | M8 release | No |
 | RYN-05 | Linux GUI verification on real hardware + fixes | All GUI milestones | No |
-| RYN-06 | Multiple webviews per window / native pane embedding | M7 browser | **SHIPPED — Ryn.Plugins.WebViewPane 0.11.0** |
+| RYN-06 | Multiple webviews per window / native nook embedding | M7 browser | **SHIPPED — Ryn.Plugins.WebViewPane 0.11.0** |
 | RYN-07 | HTTP Range + off-thread static serving | M6/M7 media | No |
 
 ## RYN-01 — Lossless event delivery + shell flow control
@@ -34,8 +34,8 @@ Owner: Moh (Ryn maintainer). The Linux GUI is unverified on real hardware and th
 
 ## RYN-06 — Multiple webviews per window
 
-**SHIPPED in Ryn 0.11.0** as `Ryn.Plugins.WebViewPane`: secondary native webviews (WKWebView/WebView2) positioned as rectangles inside the window — open/close/list/navigate/back/forward/reload/setBounds/setZoom/setDevTools/url/eval/execute + navigated/titleChanged/loadStateChanged/domReady/faviconChanged/closed events, per-pane sessions via `StoragePath`. This replaced the CEF plan entirely (M7-P01/P03/P04/P05 obsolete). Still absent at the pane level: screenshot capture, UA override, extensions, CDP, throttle/occlusion/crash events (see post-1.0 backlog §1).
+**SHIPPED in Ryn 0.11.0** as `Ryn.Plugins.WebViewPane`: secondary native webviews (WKWebView/WebView2) positioned as rectangles inside the window — open/close/list/navigate/back/forward/reload/setBounds/setZoom/setDevTools/url/eval/execute + navigated/titleChanged/loadStateChanged/domReady/faviconChanged/closed events, per-nook sessions via `StoragePath`. This replaced the CEF plan entirely (M7-P01/P03/P04/P05 obsolete). Still absent at the nook level: screenshot capture, UA override, extensions, CDP, throttle/occlusion/crash events (see post-1.0 backlog §1).
 
 ## RYN-07 — HTTP Range + off-thread static serving
 
-Owner: Moh (Ryn maintainer). Static serving reads whole files synchronously on the UI thread with no HTTP Range, so media seeking is broken and large assets stutter. Needed if M6/M7 panes embed media.
+Owner: Moh (Ryn maintainer). Static serving reads whole files synchronously on the UI thread with no HTTP Range, so media seeking is broken and large assets stutter. Needed if M6/M7 nooks embed media.

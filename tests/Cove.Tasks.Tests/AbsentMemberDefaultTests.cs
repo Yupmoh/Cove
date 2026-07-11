@@ -7,10 +7,10 @@ namespace Cove.Tasks.Tests;
 public class AbsentMemberDefaultTests
 {
     [Fact]
-    public void LaunchConfigModel_AbsentExecutionMode_KeepsPane()
+    public void LaunchConfigModel_AbsentExecutionMode_KeepsNook()
     {
         var m = JsonSerializer.Deserialize("{\"adapter\":\"claude\"}", TaskJsonContext.Default.LaunchConfigModel)!;
-        Assert.Equal("pane", m.ExecutionMode);
+        Assert.Equal("nook", m.ExecutionMode);
     }
 
     [Fact]

@@ -8,7 +8,7 @@ public sealed record Capture(
     string Id,
     int Number,
     string BundleDir,
-    string WorkspaceId,
+    string BayId,
     string Region,
     bool Audio,
     bool Mic,
@@ -34,7 +34,7 @@ public sealed class CaptureStore
         _nextNumber = GetMaxNumber() + 1;
     }
 
-    public Capture StartCapture(string workspaceId, string region, bool audio, bool mic, bool cursor)
+    public Capture StartCapture(string bayId, string region, bool audio, bool mic, bool cursor)
     {
         var number = System.Threading.Interlocked.Increment(ref _nextNumber) - 1;
         var id = System.Guid.NewGuid().ToString("N");
@@ -42,7 +42,7 @@ public sealed class CaptureStore
         var bundleDir = System.IO.Path.Combine(_capturesDir, $"CAP-{number}");
         System.IO.Directory.CreateDirectory(bundleDir);
 
-        var capture = new Capture(id, number, bundleDir, workspaceId, region, audio, mic, cursor, createdAt, System.TimeSpan.Zero, "recording");
+        var capture = new Capture(id, number, bundleDir, bayId, region, audio, mic, cursor, createdAt, System.TimeSpan.Zero, "recording");
 
         WriteMetaJson(capture);
 
@@ -50,13 +50,13 @@ public sealed class CaptureStore
         conn.Open();
         using var cmd = conn.CreateCommand();
         cmd.CommandText = """
-            INSERT INTO captures (id, number, bundle_dir, workspace_id, region, audio, mic, cursor, created_at, duration_ms, status)
+            INSERT INTO captures (id, number, bundle_dir, bay_id, region, audio, mic, cursor, created_at, duration_ms, status)
             VALUES (@id, @num, @dir, @ws, @region, @audio, @mic, @cursor, @ts, 0, 'recording')
             """;
         cmd.Parameters.AddWithValue("@id", id);
         cmd.Parameters.AddWithValue("@num", number);
         cmd.Parameters.AddWithValue("@dir", bundleDir);
-        cmd.Parameters.AddWithValue("@ws", workspaceId);
+        cmd.Parameters.AddWithValue("@ws", bayId);
         cmd.Parameters.AddWithValue("@region", region);
         cmd.Parameters.AddWithValue("@audio", audio ? 1 : 0);
         cmd.Parameters.AddWithValue("@mic", mic ? 1 : 0);
@@ -92,7 +92,7 @@ public sealed class CaptureStore
         using var conn = new SqliteConnection($"Data Source={_dbPath}");
         conn.Open();
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT id, number, bundle_dir, workspace_id, region, audio, mic, cursor, created_at, duration_ms, status FROM captures WHERE id = @id";
+        cmd.CommandText = "SELECT id, number, bundle_dir, bay_id, region, audio, mic, cursor, created_at, duration_ms, status FROM captures WHERE id = @id";
         cmd.Parameters.AddWithValue("@id", id);
         using var reader = cmd.ExecuteReader();
         if (!reader.Read()) return null;
@@ -105,7 +105,7 @@ public sealed class CaptureStore
         using var conn = new SqliteConnection($"Data Source={_dbPath}");
         conn.Open();
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT id, number, bundle_dir, workspace_id, region, audio, mic, cursor, created_at, duration_ms, status FROM captures ORDER BY number ASC";
+        cmd.CommandText = "SELECT id, number, bundle_dir, bay_id, region, audio, mic, cursor, created_at, duration_ms, status FROM captures ORDER BY number ASC";
         using var reader = cmd.ExecuteReader();
         while (reader.Read())
             result.Add(ReadCapture(reader));
@@ -213,7 +213,7 @@ public sealed class CaptureStore
           "cursor": {{cap.Cursor.ToString().ToLowerInvariant()}},
           "duration": 0,
           "createdAt": "{{cap.CreatedAt:o}}",
-          "workspaceId": "{{cap.WorkspaceId}}",
+          "bayId": "{{cap.BayId}}",
           "taskAttachments": []
         }
         """;
@@ -242,7 +242,7 @@ public sealed class CaptureStore
                 id TEXT PRIMARY KEY,
                 number INTEGER NOT NULL,
                 bundle_dir TEXT NOT NULL,
-                workspace_id TEXT NOT NULL,
+                bay_id TEXT NOT NULL,
                 region TEXT NOT NULL,
                 audio INTEGER NOT NULL DEFAULT 0,
                 mic INTEGER NOT NULL DEFAULT 0,
@@ -251,7 +251,7 @@ public sealed class CaptureStore
                 duration_ms INTEGER NOT NULL DEFAULT 0,
                 status TEXT NOT NULL DEFAULT 'recording'
             );
-            CREATE INDEX IF NOT EXISTS idx_captures_workspace ON captures (workspace_id);
+            CREATE INDEX IF NOT EXISTS idx_captures_bay ON captures (bay_id);
             CREATE TABLE IF NOT EXISTS capture_attachments (
                 capture_id TEXT NOT NULL,
                 task_id TEXT NOT NULL,

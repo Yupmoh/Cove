@@ -44,24 +44,24 @@ A client's first frame must be a `Request` to `cove://commands/hello` with `Hell
 
 ## Request/response
 
-`ControlRequest` is `{ Id, Uri, Params?, Source?, CallerPaneId? }`. `Uri` is the verb (`cove://commands/pane.spawn`). The daemon routes it via the `[CoveCommand]` source generator — each verb is a method attributed `[CoveCommand("cove://commands/<verb>")]`, compiled into `CoveCommandRegistry.Handlers`, so adding a verb needs no hand-wired dispatch table. The response is `ControlResponse` `{ Id, Ok, Data?, Error? }` correlated by `Id`. A 30 s timeout applies to control requests.
+`ControlRequest` is `{ Id, Uri, Params?, Source?, CallerNookId? }`. `Uri` is the verb (`cove://commands/nook.spawn`). The daemon routes it via the `[CoveCommand]` source generator — each verb is a method attributed `[CoveCommand("cove://commands/<verb>")]`, compiled into `CoveCommandRegistry.Handlers`, so adding a verb needs no hand-wired dispatch table. The response is `ControlResponse` `{ Id, Ok, Data?, Error? }` correlated by `Id`. A 30 s timeout applies to control requests.
 
 All JSON is source-generated through `CoveJsonContext` (`JsonSerializerContext`) — no reflection, AOT-safe.
 
 ## PTY streams
 
-A `pane.spawn` response carries a `StreamId > 0`. The daemon then streams that pane's PTY output as `StreamData` frames keyed by `StreamId`, replaying the ring from the subscriber's offset so a reconnect loses no bytes. Backpressure is credit-based:
+A `nook.spawn` response carries a `StreamId > 0`. The daemon then streams that nook's PTY output as `StreamData` frames keyed by `StreamId`, replaying the ring from the subscriber's offset so a reconnect loses no bytes. Backpressure is credit-based:
 
 - Each `StreamData` consumes the client's flow window (`FlowWindow = 256 KiB`).
 - When the client's remaining credit drops to `CreditReplenishThreshold = 128 KiB`, it sends a `Credit` frame toping the daemon back up. A slow client never drops bytes and never forces the daemon to buffer unboundedly.
 - A client may send `Resync` to re-anchor at a different ring offset (e.g. after truncation).
-- When the pane's process exits, the daemon sends `StreamEnd` carrying the exit code after the final data byte. The GUI renders the exit state in that pane only; siblings stay alive.
+- When the nook's process exits, the daemon sends `StreamEnd` carrying the exit code after the final data byte. The GUI renders the exit state in that nook only; siblings stay alive.
 
 The ring (`PtyRingBuffer`, power-of-two byte ring) is the lossless store backing replay; the credit window is the live transport contract. Both are proven by `CreditBackpressureE2ETests` and `PtyStreamSenderTests`.
 
 ## Events
 
-The daemon pushes unsolicited `Event` frames (channel + JSON payload) for state changes the client did not request — layout mutations from another client, cwd changes via OSC 7, pane exits, etc. Clients subscribe to channels they care about; events carry the channel name so a client can filter.
+The daemon pushes unsolicited `Event` frames (channel + JSON payload) for state changes the client did not request — layout mutations from another client, cwd changes via OSC 7, nook exits, etc. Clients subscribe to channels they care about; events carry the channel name so a client can filter.
 
 ## Error model
 
@@ -69,4 +69,4 @@ The daemon pushes unsolicited `Event` frames (channel + JSON payload) for state 
 
 ## CLI parity
 
-The `cove` CLI speaks the same framed protocol over the socket. Verbs surfaced as CLI subcommands (`cove config get/set`, `cove pane list`, ...) map to the same `cove://commands/*` URIs, so the CLI, GUI, and TUI observe identical engine state.
+The `cove` CLI speaks the same framed protocol over the socket. Verbs surfaced as CLI subcommands (`cove config get/set`, `cove nook list`, ...) map to the same `cove://commands/*` URIs, so the CLI, GUI, and TUI observe identical engine state.

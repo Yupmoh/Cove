@@ -20,14 +20,14 @@ internal static partial class HookLog
     [ZLoggerMessage(LogLevel.Warning, "hook request handler error error={error}")]
     public static partial void HookRequestError(this ILogger logger, string error);
 
-    [ZLoggerMessage(LogLevel.Warning, "hook event dropped no pane-id adapter={adapter} event={eventName}")]
-    public static partial void HookEventNoPaneId(this ILogger logger, string adapter, string eventName);
+    [ZLoggerMessage(LogLevel.Warning, "hook event dropped no nook-id adapter={adapter} event={eventName}")]
+    public static partial void HookEventNoNookId(this ILogger logger, string adapter, string eventName);
 
     [ZLoggerMessage(LogLevel.Warning, "hook event unknown adapter={adapter} event={eventName}")]
     public static partial void HookEventUnknown(this ILogger logger, string adapter, string eventName);
 
-    [ZLoggerMessage(LogLevel.Warning, "hook event dropped untracked pane adapter={adapter} event={eventName} pane={paneId}")]
-    public static partial void HookEventUntrackedPane(this ILogger logger, string adapter, string eventName, string paneId);
+    [ZLoggerMessage(LogLevel.Warning, "hook event dropped untracked nook adapter={adapter} event={eventName} nook={nookId}")]
+    public static partial void HookEventUntrackedNook(this ILogger logger, string adapter, string eventName, string nookId);
 
     [ZLoggerMessage(LogLevel.Warning, "hook resolve missing params adapter={adapter} event={eventName}")]
     public static partial void HookResolveMissingParams(this ILogger logger, string adapter, string eventName);

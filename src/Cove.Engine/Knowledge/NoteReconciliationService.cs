@@ -2,7 +2,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Cove.Engine.Knowledge;
 
-public sealed record FileReconcileEvent(string FilePath, string WorkspaceId, FileChangeKind ChangeKind);
+public sealed record FileReconcileEvent(string FilePath, string BayId, FileChangeKind ChangeKind);
 
 public enum FileChangeKind { Created, Changed, Deleted, Renamed }
 
@@ -14,7 +14,7 @@ public sealed class NoteReconciliationService : IDisposable
     private readonly System.Collections.Generic.Dictionary<string, FileReconcileEvent> _pending = new();
     private readonly System.TimeSpan _debounceDelay;
     private FileSystemWatcher? _watcher;
-    private string _workspaceId = "";
+    private string _bayId = "";
 
     public event System.EventHandler<FileReconcileEvent>? ReconcileNeeded;
 
@@ -25,9 +25,9 @@ public sealed class NoteReconciliationService : IDisposable
         _debounceTimer = new System.Threading.Timer(FlushPending, null, System.Threading.Timeout.InfiniteTimeSpan, System.Threading.Timeout.InfiniteTimeSpan);
     }
 
-    public void StartWatching(string notesRoot, string workspaceId)
+    public void StartWatching(string notesRoot, string bayId)
     {
-        _workspaceId = workspaceId;
+        _bayId = bayId;
         if (!System.IO.Directory.Exists(notesRoot))
         {
             _logger.LogWarning("reconcile: notes root {root} does not exist, not watching", notesRoot);
@@ -47,7 +47,7 @@ public sealed class NoteReconciliationService : IDisposable
         _watcher.Renamed += (_, e) => OnFileEvent(e.FullPath, FileChangeKind.Renamed);
         _watcher.Error += (_, e) => _logger.LogWarning("reconcile: file watcher error: {error}", e.GetException().Message);
 
-        _logger.LogWarning("reconcile: watching {root} for workspace {ws}", notesRoot, workspaceId);
+        _logger.LogWarning("reconcile: watching {root} for bay {ws}", notesRoot, bayId);
     }
 
     private void OnFileEvent(string filePath, FileChangeKind kind)
@@ -55,7 +55,7 @@ public sealed class NoteReconciliationService : IDisposable
         if (filePath.Contains(".git") || filePath.EndsWith(".tmp") || filePath.Contains(".cove-tmp"))
             return;
 
-        var evt = new FileReconcileEvent(filePath, _workspaceId, kind);
+        var evt = new FileReconcileEvent(filePath, _bayId, kind);
         lock (_pendingLock)
         {
             _pending[filePath] = evt;
@@ -74,7 +74,7 @@ public sealed class NoteReconciliationService : IDisposable
 
         foreach (var evt in toFire)
         {
-            _logger.LogWarning("reconcile: {kind} {file} in workspace {ws}", evt.ChangeKind, evt.FilePath, evt.WorkspaceId);
+            _logger.LogWarning("reconcile: {kind} {file} in bay {ws}", evt.ChangeKind, evt.FilePath, evt.BayId);
             ReconcileNeeded?.Invoke(this, evt);
         }
     }

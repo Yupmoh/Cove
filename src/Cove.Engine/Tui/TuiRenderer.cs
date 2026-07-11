@@ -2,9 +2,9 @@ namespace Cove.Engine.Tui;
 
 public sealed record TuiState
 {
-    public string? FocusedPaneId { get; init; }
-    public int PaneCount { get; init; }
-    public string? ActiveRoom { get; init; }
+    public string? FocusedNookId { get; init; }
+    public int NookCount { get; init; }
+    public string? ActiveShore { get; init; }
 }
 
 public sealed class TuiRenderer
@@ -15,17 +15,17 @@ public sealed class TuiRenderer
         sb.AppendLine("┌─ Cove ─────────────────────────────────┐");
         sb.AppendLine("│                                        │");
 
-        if (state.PaneCount == 0)
+        if (state.NookCount == 0)
         {
-            sb.AppendLine("│  No panes — press Cmd+T to open one    │");
+            sb.AppendLine("│  No nooks — press Cmd+T to open one    │");
         }
         else
         {
-            sb.AppendLine($"│  Panes: {state.PaneCount,-30}          │");
-            if (state.FocusedPaneId is { } id)
+            sb.AppendLine($"│  Nooks: {state.NookCount,-30}          │");
+            if (state.FocusedNookId is { } id)
                 sb.AppendLine($"│  Focus: {id,-30}          │");
-            if (state.ActiveRoom is { } room)
-                sb.AppendLine($"│  Room:  {room,-30}          │");
+            if (state.ActiveShore is { } shore)
+                sb.AppendLine($"│  Shore:  {shore,-30}          │");
         }
 
         sb.AppendLine("│                                        │");

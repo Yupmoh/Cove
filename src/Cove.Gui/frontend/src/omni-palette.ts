@@ -1,10 +1,10 @@
-export type PaletteCategory = "all" | "commands" | "rooms" | "panes" | "tasks" | "files" | "workspaces";
+export type PaletteCategory = "all" | "commands" | "shores" | "nooks" | "tasks" | "files" | "bays";
 
 export const CategoryPrefix: Record<string, PaletteCategory> = {
   ">": "commands",
-  "~": "workspaces",
-  "@": "rooms",
-  "$": "panes",
+  "~": "bays",
+  "@": "shores",
+  "$": "nooks",
   "#": "tasks",
   "/": "files",
 };
@@ -111,7 +111,7 @@ export class MruTracker {
 }
 
 export function cycleCategory(current: PaletteCategory, direction: 1 | -1): PaletteCategory {
-  const order: PaletteCategory[] = ["all", "commands", "rooms", "panes", "tasks", "files", "workspaces"];
+  const order: PaletteCategory[] = ["all", "commands", "shores", "nooks", "tasks", "files", "bays"];
   const idx = order.indexOf(current);
   const next = (idx + direction + order.length) % order.length;
   return order[next];
@@ -121,11 +121,11 @@ export function categoryLabel(category: PaletteCategory): string {
   const labels: Record<PaletteCategory, string> = {
     all: "All",
     commands: "Commands",
-    rooms: "Rooms",
-    panes: "Panes",
+    shores: "Shores",
+    nooks: "Nooks",
     tasks: "Tasks",
     files: "Files",
-    workspaces: "Workspaces",
+    bays: "Bays",
   };
   return labels[category];
 }

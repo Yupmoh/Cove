@@ -123,15 +123,15 @@ public sealed record HookEvent
 {
     public required string Adapter { get; init; }
     public required string Event { get; init; }
-    public string? PaneId { get; init; }
+    public string? NookId { get; init; }
     public string? SessionId { get; init; }
     public System.Text.Json.JsonElement? Payload { get; init; }
 }
 
-public sealed record PaneSelection(string Slug, DateTimeOffset LastUsedAt);
+public sealed record NookSelection(string Slug, DateTimeOffset LastUsedAt);
 
-public sealed record PaneSelectionStore(
-    IReadOnlyDictionary<string, PaneSelection> PaneSelections,
+public sealed record NookSelectionStore(
+    IReadOnlyDictionary<string, NookSelection> NookSelections,
     string? LastUsed);
 
 public sealed record FooterChipData(string ProfileSlug, bool IsDefault, DateTimeOffset? LastUsedAt);
@@ -155,7 +155,7 @@ public sealed record FooterChipData(string ProfileSlug, bool IsDefault, DateTime
 [JsonSerializable(typeof(RecentSession))]
 [JsonSerializable(typeof(List<RecentSession>))]
 [JsonSerializable(typeof(LaunchProfile))]
-[JsonSerializable(typeof(PaneSelectionStore))]
-[JsonSerializable(typeof(PaneSelection))]
+[JsonSerializable(typeof(NookSelectionStore))]
+[JsonSerializable(typeof(NookSelection))]
 [JsonSerializable(typeof(FooterChipData))]
 public sealed partial class AdaptersJsonContext : JsonSerializerContext { }

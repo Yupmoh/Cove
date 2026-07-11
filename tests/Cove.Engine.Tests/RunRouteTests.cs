@@ -34,7 +34,7 @@ public sealed class RunRouteTests
         await using var h = await DaemonTestHarness.StartAsync();
         await using FrameConnection ctl = await h.ConnectAsync("cli");
 
-        var create = await SendAsync(ctl, "c", "cove://commands/task.create", P("""{"title":"run card","workspaceId":"ws1","source":"user:test"}"""), ct);
+        var create = await SendAsync(ctl, "c", "cove://commands/task.create", P("""{"title":"run card","bayId":"ws1","source":"user:test"}"""), ct);
         var cardId = create.Data!.Value.GetProperty("id").GetString()!;
 
         var runList = await SendAsync(ctl, "rl", "cove://commands/run.list", P($"{{\"taskId\":\"{cardId}\"}}"), ct);
@@ -47,7 +47,7 @@ public sealed class RunRouteTests
     }
 
     [Fact]
-    public async Task RunList_RequiresTaskOrWorkspace()
+    public async Task RunList_RequiresTaskOrBay()
     {
         if (System.OperatingSystem.IsWindows()) return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(60));

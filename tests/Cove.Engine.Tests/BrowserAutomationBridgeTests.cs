@@ -19,12 +19,12 @@ public sealed class BrowserAutomationBridgeTests
             Task.Run(() => bridge!.Complete(e.RequestId, "{\"entries\":[]}"));
         }, NullLogger.Instance, TimeSpan.FromSeconds(5));
 
-        var outcome = await bridge.ExecuteAsync("pane-1", "snapshot", null, null, null, default);
+        var outcome = await bridge.ExecuteAsync("nook-1", "snapshot", null, null, null, default);
 
         Assert.True(outcome.Ok);
         Assert.Equal("{\"entries\":[]}", outcome.ResultJson);
         Assert.NotNull(emitted);
-        Assert.Equal("pane-1", emitted!.PaneId);
+        Assert.Equal("nook-1", emitted!.NookId);
         Assert.Equal("snapshot", emitted.Kind);
         Assert.Equal(0, bridge.PendingCount);
     }
@@ -34,7 +34,7 @@ public sealed class BrowserAutomationBridgeTests
     {
         var bridge = new BrowserAutomationBridge(_ => { }, NullLogger.Instance, TimeSpan.FromMilliseconds(80));
 
-        var outcome = await bridge.ExecuteAsync("pane-1", "click", "e1", null, null, default);
+        var outcome = await bridge.ExecuteAsync("nook-1", "click", "e1", null, null, default);
 
         Assert.False(outcome.Ok);
         Assert.Equal("adrift", outcome.ErrorCode);
@@ -60,7 +60,7 @@ public sealed class BrowserAutomationBridgeTests
             Task.Run(() => bridge!.Complete(e.RequestId, "{\"ok\":true}"));
         }, NullLogger.Instance);
 
-        await bridge.ExecuteAsync("pane-9", "fill", "e3", "hello", null, default);
+        await bridge.ExecuteAsync("nook-9", "fill", "e3", "hello", null, default);
 
         Assert.Equal("fill", emitted!.Kind);
         Assert.Equal("e3", emitted.Ref);
@@ -101,7 +101,7 @@ public sealed class BrowserAutomationCommandsTests
     [Fact]
     public async Task Snapshot_NoBridge_FailsNotReady()
     {
-        var ctx = new EngineDispatchContext(Req("cove://commands/browser.snapshot", "{\"paneId\":\"p1\"}"));
+        var ctx = new EngineDispatchContext(Req("cove://commands/browser.snapshot", "{\"nookId\":\"p1\"}"));
 
         var resp = await BrowserAutomationCommands.Snapshot(ctx);
 
@@ -112,7 +112,7 @@ public sealed class BrowserAutomationCommandsTests
     [Fact]
     public async Task Snapshot_RoundTrip_ReturnsGuiResult()
     {
-        var ctx = new EngineDispatchContext(Req("cove://commands/browser.snapshot", "{\"paneId\":\"p1\"}"), browserAutomation: EchoBridge());
+        var ctx = new EngineDispatchContext(Req("cove://commands/browser.snapshot", "{\"nookId\":\"p1\"}"), browserAutomation: EchoBridge());
 
         var resp = await BrowserAutomationCommands.Snapshot(ctx);
 
@@ -123,7 +123,7 @@ public sealed class BrowserAutomationCommandsTests
     [Fact]
     public async Task Click_MissingParams_FailsInvalid()
     {
-        var ctx = new EngineDispatchContext(Req("cove://commands/browser.click", "{\"paneId\":\"p1\"}"), browserAutomation: EchoBridge());
+        var ctx = new EngineDispatchContext(Req("cove://commands/browser.click", "{\"nookId\":\"p1\"}"), browserAutomation: EchoBridge());
 
         var resp = await BrowserAutomationCommands.Click(ctx);
 
@@ -134,7 +134,7 @@ public sealed class BrowserAutomationCommandsTests
     [Fact]
     public async Task Fill_RoundTrip_Succeeds()
     {
-        var ctx = new EngineDispatchContext(Req("cove://commands/browser.fill", "{\"paneId\":\"p1\",\"ref\":\"e2\",\"value\":\"abc\"}"), browserAutomation: EchoBridge());
+        var ctx = new EngineDispatchContext(Req("cove://commands/browser.fill", "{\"nookId\":\"p1\",\"ref\":\"e2\",\"value\":\"abc\"}"), browserAutomation: EchoBridge());
 
         var resp = await BrowserAutomationCommands.Fill(ctx);
 
@@ -146,7 +146,7 @@ public sealed class BrowserAutomationCommandsTests
     public async Task Eval_NoGui_ReturnsAdrift()
     {
         var adrift = new BrowserAutomationBridge(_ => { }, NullLogger.Instance, TimeSpan.FromMilliseconds(60));
-        var ctx = new EngineDispatchContext(Req("cove://commands/browser.eval", "{\"paneId\":\"p1\",\"js\":\"1+1\"}"), browserAutomation: adrift);
+        var ctx = new EngineDispatchContext(Req("cove://commands/browser.eval", "{\"nookId\":\"p1\",\"js\":\"1+1\"}"), browserAutomation: adrift);
 
         var resp = await BrowserAutomationCommands.Eval(ctx);
 
@@ -157,7 +157,7 @@ public sealed class BrowserAutomationCommandsTests
     [Fact]
     public async Task Screenshot_NoBridge_FailsNotReady()
     {
-        var ctx = new EngineDispatchContext(Req("cove://commands/browser.screenshot", "{\"paneId\":\"p1\"}"));
+        var ctx = new EngineDispatchContext(Req("cove://commands/browser.screenshot", "{\"nookId\":\"p1\"}"));
 
         var resp = await BrowserAutomationCommands.Screenshot(ctx);
 
@@ -166,7 +166,7 @@ public sealed class BrowserAutomationCommandsTests
     }
 
     [Fact]
-    public async Task Screenshot_MissingPaneId_FailsInvalid()
+    public async Task Screenshot_MissingNookId_FailsInvalid()
     {
         var ctx = new EngineDispatchContext(Req("cove://commands/browser.screenshot", "{}"), browserAutomation: EchoBridge());
 
@@ -179,7 +179,7 @@ public sealed class BrowserAutomationCommandsTests
     [Fact]
     public async Task Screenshot_RoundTrip_ReturnsGuiResult()
     {
-        var ctx = new EngineDispatchContext(Req("cove://commands/browser.screenshot", "{\"paneId\":\"p1\"}"), browserAutomation: EchoBridge());
+        var ctx = new EngineDispatchContext(Req("cove://commands/browser.screenshot", "{\"nookId\":\"p1\"}"), browserAutomation: EchoBridge());
 
         var resp = await BrowserAutomationCommands.Screenshot(ctx);
 
@@ -191,7 +191,7 @@ public sealed class BrowserAutomationCommandsTests
     public async Task Screenshot_NoGui_ReturnsAdrift()
     {
         var adrift = new BrowserAutomationBridge(_ => { }, NullLogger.Instance, TimeSpan.FromMilliseconds(60));
-        var ctx = new EngineDispatchContext(Req("cove://commands/browser.screenshot", "{\"paneId\":\"p1\"}"), browserAutomation: adrift);
+        var ctx = new EngineDispatchContext(Req("cove://commands/browser.screenshot", "{\"nookId\":\"p1\"}"), browserAutomation: adrift);
 
         var resp = await BrowserAutomationCommands.Screenshot(ctx);
 
@@ -202,7 +202,7 @@ public sealed class BrowserAutomationCommandsTests
     [Fact]
     public async Task SetUserAgent_NoBridge_FailsNotReady()
     {
-        var ctx = new EngineDispatchContext(Req("cove://commands/browser.setUserAgent", "{\"paneId\":\"p1\",\"userAgent\":\"UA\"}"));
+        var ctx = new EngineDispatchContext(Req("cove://commands/browser.setUserAgent", "{\"nookId\":\"p1\",\"userAgent\":\"UA\"}"));
 
         var resp = await BrowserAutomationCommands.SetUserAgent(ctx);
 
@@ -213,7 +213,7 @@ public sealed class BrowserAutomationCommandsTests
     [Fact]
     public async Task SetUserAgent_MissingUserAgent_FailsInvalid()
     {
-        var ctx = new EngineDispatchContext(Req("cove://commands/browser.setUserAgent", "{\"paneId\":\"p1\"}"), browserAutomation: EchoBridge());
+        var ctx = new EngineDispatchContext(Req("cove://commands/browser.setUserAgent", "{\"nookId\":\"p1\"}"), browserAutomation: EchoBridge());
 
         var resp = await BrowserAutomationCommands.SetUserAgent(ctx);
 
@@ -231,7 +231,7 @@ public sealed class BrowserAutomationCommandsTests
             emitted = e;
             Task.Run(() => bridge!.Complete(e.RequestId, "{\"ok\":true}"));
         }, NullLogger.Instance, TimeSpan.FromSeconds(5));
-        var ctx = new EngineDispatchContext(Req("cove://commands/browser.setUserAgent", "{\"paneId\":\"p1\",\"userAgent\":\"CoveUA/1.0\"}"), browserAutomation: bridge);
+        var ctx = new EngineDispatchContext(Req("cove://commands/browser.setUserAgent", "{\"nookId\":\"p1\",\"userAgent\":\"CoveUA/1.0\"}"), browserAutomation: bridge);
 
         var resp = await BrowserAutomationCommands.SetUserAgent(ctx);
 
@@ -265,7 +265,7 @@ public sealed class BrowserAutomationCommandsTests
     [Fact]
     public async Task Clear_NoBridge_FailsNotReady()
     {
-        var ctx = new EngineDispatchContext(Req("cove://commands/browser.clear", "{\"paneId\":\"p1\",\"ref\":\"e1\"}"));
+        var ctx = new EngineDispatchContext(Req("cove://commands/browser.clear", "{\"nookId\":\"p1\",\"ref\":\"e1\"}"));
 
         var resp = await BrowserAutomationCommands.Clear(ctx);
 
@@ -276,7 +276,7 @@ public sealed class BrowserAutomationCommandsTests
     [Fact]
     public async Task Clear_MissingRef_FailsInvalid()
     {
-        var ctx = new EngineDispatchContext(Req("cove://commands/browser.clear", "{\"paneId\":\"p1\"}"), browserAutomation: EchoBridge());
+        var ctx = new EngineDispatchContext(Req("cove://commands/browser.clear", "{\"nookId\":\"p1\"}"), browserAutomation: EchoBridge());
 
         var resp = await BrowserAutomationCommands.Clear(ctx);
 
@@ -287,7 +287,7 @@ public sealed class BrowserAutomationCommandsTests
     [Fact]
     public async Task Clear_RoundTrip_Succeeds()
     {
-        var ctx = new EngineDispatchContext(Req("cove://commands/browser.clear", "{\"paneId\":\"p1\",\"ref\":\"e1\"}"), browserAutomation: EchoBridge());
+        var ctx = new EngineDispatchContext(Req("cove://commands/browser.clear", "{\"nookId\":\"p1\",\"ref\":\"e1\"}"), browserAutomation: EchoBridge());
 
         var resp = await BrowserAutomationCommands.Clear(ctx);
 
@@ -298,7 +298,7 @@ public sealed class BrowserAutomationCommandsTests
     [Fact]
     public async Task Type_MissingText_FailsInvalid()
     {
-        var ctx = new EngineDispatchContext(Req("cove://commands/browser.type", "{\"paneId\":\"p1\",\"ref\":\"e1\"}"), browserAutomation: EchoBridge());
+        var ctx = new EngineDispatchContext(Req("cove://commands/browser.type", "{\"nookId\":\"p1\",\"ref\":\"e1\"}"), browserAutomation: EchoBridge());
 
         var resp = await BrowserAutomationCommands.Type(ctx);
 
@@ -310,7 +310,7 @@ public sealed class BrowserAutomationCommandsTests
     public async Task Type_CarriesTextAsValue()
     {
         var (bridge, emitted) = CapturingBridge();
-        var ctx = new EngineDispatchContext(Req("cove://commands/browser.type", "{\"paneId\":\"p1\",\"ref\":\"e1\",\"text\":\"hi\"}"), browserAutomation: bridge);
+        var ctx = new EngineDispatchContext(Req("cove://commands/browser.type", "{\"nookId\":\"p1\",\"ref\":\"e1\",\"text\":\"hi\"}"), browserAutomation: bridge);
 
         var resp = await BrowserAutomationCommands.Type(ctx);
 
@@ -323,7 +323,7 @@ public sealed class BrowserAutomationCommandsTests
     [Fact]
     public async Task Press_MissingKey_FailsInvalid()
     {
-        var ctx = new EngineDispatchContext(Req("cove://commands/browser.press", "{\"paneId\":\"p1\",\"ref\":\"e1\"}"), browserAutomation: EchoBridge());
+        var ctx = new EngineDispatchContext(Req("cove://commands/browser.press", "{\"nookId\":\"p1\",\"ref\":\"e1\"}"), browserAutomation: EchoBridge());
 
         var resp = await BrowserAutomationCommands.Press(ctx);
 
@@ -335,7 +335,7 @@ public sealed class BrowserAutomationCommandsTests
     public async Task Press_CarriesKeyAsValue()
     {
         var (bridge, emitted) = CapturingBridge();
-        var ctx = new EngineDispatchContext(Req("cove://commands/browser.press", "{\"paneId\":\"p1\",\"ref\":\"e1\",\"key\":\"Enter\"}"), browserAutomation: bridge);
+        var ctx = new EngineDispatchContext(Req("cove://commands/browser.press", "{\"nookId\":\"p1\",\"ref\":\"e1\",\"key\":\"Enter\"}"), browserAutomation: bridge);
 
         var resp = await BrowserAutomationCommands.Press(ctx);
 
@@ -347,7 +347,7 @@ public sealed class BrowserAutomationCommandsTests
     [Fact]
     public async Task Select_MissingValue_FailsInvalid()
     {
-        var ctx = new EngineDispatchContext(Req("cove://commands/browser.select", "{\"paneId\":\"p1\",\"ref\":\"e1\"}"), browserAutomation: EchoBridge());
+        var ctx = new EngineDispatchContext(Req("cove://commands/browser.select", "{\"nookId\":\"p1\",\"ref\":\"e1\"}"), browserAutomation: EchoBridge());
 
         var resp = await BrowserAutomationCommands.Select(ctx);
 
@@ -358,7 +358,7 @@ public sealed class BrowserAutomationCommandsTests
     [Fact]
     public async Task Select_RoundTrip_Succeeds()
     {
-        var ctx = new EngineDispatchContext(Req("cove://commands/browser.select", "{\"paneId\":\"p1\",\"ref\":\"e1\",\"value\":\"opt2\"}"), browserAutomation: EchoBridge());
+        var ctx = new EngineDispatchContext(Req("cove://commands/browser.select", "{\"nookId\":\"p1\",\"ref\":\"e1\",\"value\":\"opt2\"}"), browserAutomation: EchoBridge());
 
         var resp = await BrowserAutomationCommands.Select(ctx);
 
@@ -369,7 +369,7 @@ public sealed class BrowserAutomationCommandsTests
     [Fact]
     public async Task Scroll_NoBridge_FailsNotReady()
     {
-        var ctx = new EngineDispatchContext(Req("cove://commands/browser.scroll", "{\"paneId\":\"p1\",\"y\":100}"));
+        var ctx = new EngineDispatchContext(Req("cove://commands/browser.scroll", "{\"nookId\":\"p1\",\"y\":100}"));
 
         var resp = await BrowserAutomationCommands.Scroll(ctx);
 
@@ -378,7 +378,7 @@ public sealed class BrowserAutomationCommandsTests
     }
 
     [Fact]
-    public async Task Scroll_MissingPaneId_FailsInvalid()
+    public async Task Scroll_MissingNookId_FailsInvalid()
     {
         var ctx = new EngineDispatchContext(Req("cove://commands/browser.scroll", "{\"y\":100}"), browserAutomation: EchoBridge());
 
@@ -391,7 +391,7 @@ public sealed class BrowserAutomationCommandsTests
     [Fact]
     public async Task Scroll_WithoutRef_RoundTrips()
     {
-        var ctx = new EngineDispatchContext(Req("cove://commands/browser.scroll", "{\"paneId\":\"p1\",\"x\":0,\"y\":250}"), browserAutomation: EchoBridge());
+        var ctx = new EngineDispatchContext(Req("cove://commands/browser.scroll", "{\"nookId\":\"p1\",\"x\":0,\"y\":250}"), browserAutomation: EchoBridge());
 
         var resp = await BrowserAutomationCommands.Scroll(ctx);
 
@@ -403,7 +403,7 @@ public sealed class BrowserAutomationCommandsTests
     public async Task Scroll_CarriesCoordinatesAsValueJson()
     {
         var (bridge, emitted) = CapturingBridge();
-        var ctx = new EngineDispatchContext(Req("cove://commands/browser.scroll", "{\"paneId\":\"p1\",\"ref\":\"e4\",\"x\":10,\"y\":20}"), browserAutomation: bridge);
+        var ctx = new EngineDispatchContext(Req("cove://commands/browser.scroll", "{\"nookId\":\"p1\",\"ref\":\"e4\",\"x\":10,\"y\":20}"), browserAutomation: bridge);
 
         var resp = await BrowserAutomationCommands.Scroll(ctx);
 
@@ -415,7 +415,7 @@ public sealed class BrowserAutomationCommandsTests
     }
 
     [Fact]
-    public async Task Wait_MissingPaneId_FailsInvalid()
+    public async Task Wait_MissingNookId_FailsInvalid()
     {
         var ctx = new EngineDispatchContext(Req("cove://commands/browser.wait", "{\"text\":\"Done\"}"), browserAutomation: EchoBridge());
 
@@ -428,7 +428,7 @@ public sealed class BrowserAutomationCommandsTests
     [Fact]
     public async Task Wait_NeitherRefNorText_FailsInvalid()
     {
-        var ctx = new EngineDispatchContext(Req("cove://commands/browser.wait", "{\"paneId\":\"p1\"}"), browserAutomation: EchoBridge());
+        var ctx = new EngineDispatchContext(Req("cove://commands/browser.wait", "{\"nookId\":\"p1\"}"), browserAutomation: EchoBridge());
 
         var resp = await BrowserAutomationCommands.Wait(ctx);
 
@@ -440,7 +440,7 @@ public sealed class BrowserAutomationCommandsTests
     public async Task Wait_WithText_CarriesTextAndTimeout()
     {
         var (bridge, emitted) = CapturingBridge();
-        var ctx = new EngineDispatchContext(Req("cove://commands/browser.wait", "{\"paneId\":\"p1\",\"text\":\"Loaded\",\"timeoutMs\":3000}"), browserAutomation: bridge);
+        var ctx = new EngineDispatchContext(Req("cove://commands/browser.wait", "{\"nookId\":\"p1\",\"text\":\"Loaded\",\"timeoutMs\":3000}"), browserAutomation: bridge);
 
         var resp = await BrowserAutomationCommands.Wait(ctx);
 
@@ -454,7 +454,7 @@ public sealed class BrowserAutomationCommandsTests
     public async Task Wait_NoGui_ReturnsAdrift()
     {
         var adrift = new BrowserAutomationBridge(_ => { }, NullLogger.Instance, TimeSpan.FromMilliseconds(60));
-        var ctx = new EngineDispatchContext(Req("cove://commands/browser.wait", "{\"paneId\":\"p1\",\"ref\":\"e1\"}"), browserAutomation: adrift);
+        var ctx = new EngineDispatchContext(Req("cove://commands/browser.wait", "{\"nookId\":\"p1\",\"ref\":\"e1\"}"), browserAutomation: adrift);
 
         var resp = await BrowserAutomationCommands.Wait(ctx);
 
@@ -465,7 +465,7 @@ public sealed class BrowserAutomationCommandsTests
     [Fact]
     public async Task Get_MissingProp_FailsInvalid()
     {
-        var ctx = new EngineDispatchContext(Req("cove://commands/browser.get", "{\"paneId\":\"p1\",\"ref\":\"e1\"}"), browserAutomation: EchoBridge());
+        var ctx = new EngineDispatchContext(Req("cove://commands/browser.get", "{\"nookId\":\"p1\",\"ref\":\"e1\"}"), browserAutomation: EchoBridge());
 
         var resp = await BrowserAutomationCommands.Get(ctx);
 
@@ -477,7 +477,7 @@ public sealed class BrowserAutomationCommandsTests
     public async Task Get_CarriesPropAsValue()
     {
         var (bridge, emitted) = CapturingBridge();
-        var ctx = new EngineDispatchContext(Req("cove://commands/browser.get", "{\"paneId\":\"p1\",\"ref\":\"e1\",\"prop\":\"value\"}"), browserAutomation: bridge);
+        var ctx = new EngineDispatchContext(Req("cove://commands/browser.get", "{\"nookId\":\"p1\",\"ref\":\"e1\",\"prop\":\"value\"}"), browserAutomation: bridge);
 
         var resp = await BrowserAutomationCommands.Get(ctx);
 
@@ -489,7 +489,7 @@ public sealed class BrowserAutomationCommandsTests
     [Fact]
     public async Task Is_MissingState_FailsInvalid()
     {
-        var ctx = new EngineDispatchContext(Req("cove://commands/browser.is", "{\"paneId\":\"p1\",\"ref\":\"e1\"}"), browserAutomation: EchoBridge());
+        var ctx = new EngineDispatchContext(Req("cove://commands/browser.is", "{\"nookId\":\"p1\",\"ref\":\"e1\"}"), browserAutomation: EchoBridge());
 
         var resp = await BrowserAutomationCommands.Is(ctx);
 
@@ -501,7 +501,7 @@ public sealed class BrowserAutomationCommandsTests
     public async Task Is_CarriesStateAsValue()
     {
         var (bridge, emitted) = CapturingBridge();
-        var ctx = new EngineDispatchContext(Req("cove://commands/browser.is", "{\"paneId\":\"p1\",\"ref\":\"e1\",\"state\":\"visible\"}"), browserAutomation: bridge);
+        var ctx = new EngineDispatchContext(Req("cove://commands/browser.is", "{\"nookId\":\"p1\",\"ref\":\"e1\",\"state\":\"visible\"}"), browserAutomation: bridge);
 
         var resp = await BrowserAutomationCommands.Is(ctx);
 

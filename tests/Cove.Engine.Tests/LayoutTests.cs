@@ -8,10 +8,10 @@ namespace Cove.Engine.Tests;
 
 public sealed class LayoutTests
 {
-    private static PaneLeaf Leaf(string id) => new()
+    private static NookLeaf Leaf(string id) => new()
     {
-        PaneId = id,
-        Subtabs = new[] { new Subtab(id + "-d", PaneType.Terminal) },
+        NookId = id,
+        Subtabs = new[] { new Subtab(id + "-d", NookType.Terminal) },
     };
 
     [Fact]
@@ -23,8 +23,8 @@ public sealed class LayoutTests
 
         var leaves = MosaicOps.Leaves(root);
         Assert.Equal(2, leaves.Count);
-        Assert.Equal("a", leaves[0].PaneId);
-        Assert.Equal("b", leaves[1].PaneId);
+        Assert.Equal("a", leaves[0].NookId);
+        Assert.Equal("b", leaves[1].NookId);
         Assert.IsType<SplitNode>(root);
     }
 
@@ -46,8 +46,8 @@ public sealed class LayoutTests
 
         var after = MosaicOps.Leaves(closed!);
         Assert.Equal(2, after.Count);
-        Assert.DoesNotContain(after, l => l.PaneId == "b");
-        Assert.True(closed is SplitNode || closed is PaneLeaf);
+        Assert.DoesNotContain(after, l => l.NookId == "b");
+        Assert.True(closed is SplitNode || closed is NookLeaf);
     }
 
     [Fact]
@@ -58,7 +58,7 @@ public sealed class LayoutTests
     }
 
     [Fact]
-    public void NextPane_CyclesInOrderAndWraps()
+    public void NextNook_CyclesInOrderAndWraps()
     {
         var a = Leaf("a");
         var b = Leaf("b");
@@ -67,43 +67,43 @@ public sealed class LayoutTests
         var root = MosaicOps.Split(a, "a", SplitOrientation.Row, b);
         root = MosaicOps.Split(root, "b", SplitOrientation.Column, c);
 
-        Assert.Equal("a", MosaicOps.NextPane(root, "c", 1));
-        Assert.Equal("c", MosaicOps.NextPane(root, "a", -1));
+        Assert.Equal("a", MosaicOps.NextNook(root, "c", 1));
+        Assert.Equal("c", MosaicOps.NextNook(root, "a", -1));
     }
 
     [Fact]
     public void LayoutService_SplitCloseFocus_KeepsValidState()
     {
         var svc = new LayoutService();
-        var roomId = svc.CreateRoom("room", Leaf("a"));
-        svc.SplitPane(roomId, "a", SplitOrientation.Row, Leaf("b"));
-        svc.SplitPane(roomId, "b", SplitOrientation.Column, Leaf("c"));
+        var shoreId = svc.CreateShore("shore", Leaf("a"));
+        svc.SplitNook(shoreId, "a", SplitOrientation.Row, Leaf("b"));
+        svc.SplitNook(shoreId, "b", SplitOrientation.Column, Leaf("c"));
 
-        Assert.Equal("c", svc.GetActive(roomId));
+        Assert.Equal("c", svc.GetActive(shoreId));
 
-        svc.ClosePane(roomId, "c");
+        svc.CloseNook(shoreId, "c");
 
-        var active = svc.GetActive(roomId);
+        var active = svc.GetActive(shoreId);
         Assert.NotNull(active);
-        var leaves = MosaicOps.Leaves(svc.GetRoot(roomId)!);
-        Assert.Contains(leaves, l => l.PaneId == active);
+        var leaves = MosaicOps.Leaves(svc.GetRoot(shoreId)!);
+        Assert.Contains(leaves, l => l.NookId == active);
     }
 
     [Fact]
     public void Snapshot_RoundTrips()
     {
         var svc = new LayoutService();
-        var roomId = svc.CreateRoom("room", Leaf("a"));
-        svc.SplitPane(roomId, "a", SplitOrientation.Row, Leaf("b"));
+        var shoreId = svc.CreateShore("shore", Leaf("a"));
+        svc.SplitNook(shoreId, "a", SplitOrientation.Row, Leaf("b"));
 
-        var snap = svc.ToSnapshot("ws", "workspace", "/proj");
+        var snap = svc.ToSnapshot("ws", "bay", "/proj");
 
         var fresh = new LayoutService();
         fresh.LoadSnapshot(snap);
-        var snap2 = fresh.ToSnapshot("ws", "workspace", "/proj");
+        var snap2 = fresh.ToSnapshot("ws", "bay", "/proj");
 
-        var s1 = JsonSerializer.Serialize(snap, CoveJsonContext.Default.WorkspaceSnapshot);
-        var s2 = JsonSerializer.Serialize(snap2, CoveJsonContext.Default.WorkspaceSnapshot);
+        var s1 = JsonSerializer.Serialize(snap, CoveJsonContext.Default.BaySnapshot);
+        var s2 = JsonSerializer.Serialize(snap2, CoveJsonContext.Default.BaySnapshot);
         Assert.Equal(s1, s2);
     }
 }

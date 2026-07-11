@@ -29,7 +29,7 @@ public sealed class CoveTreeTests
         try
         {
             CoveTree.Ensure(dd);
-            foreach (var name in new[] { "ipc", "logs", "bin", "cache", "workspaces", "themes", "library", "run-commands", "skills" })
+            foreach (var name in new[] { "ipc", "logs", "bin", "cache", "bays", "themes", "library", "run-commands", "skills" })
                 Assert.True(Directory.Exists(Path.Combine(dd.Root, name)), $"missing dir {name}");
         }
         finally { Cleanup(parent, prev); }

@@ -7,7 +7,7 @@ namespace Cove.Tasks.Store;
 public sealed class LabelRow
 {
     public string Id { get; set; } = "";
-    public string WorkspaceId { get; set; } = "";
+    public string BayId { get; set; } = "";
     public string Name { get; set; } = "";
     public string HexColor { get; set; } = "6e6e6e";
     public double Position { get; set; }
@@ -19,7 +19,7 @@ public sealed class LabelRepository
     private readonly SqliteConnectionFactory _factory;
     private readonly TasksWriteChannel? _channel;
 
-    private const string SelectColumns = "id AS Id, workspace_id AS WorkspaceId, name AS Name, hex_color AS HexColor, position AS Position, created_at AS CreatedAt";
+    private const string SelectColumns = "id AS Id, bay_id AS BayId, name AS Name, hex_color AS HexColor, position AS Position, created_at AS CreatedAt";
 
     public LabelRepository(SqliteConnectionFactory factory, TasksWriteChannel? channel = null)
     {
@@ -27,71 +27,71 @@ public sealed class LabelRepository
         _channel = channel;
     }
 
-    public System.Threading.Tasks.Task<LabelRow?> CreateAsync(string workspaceId, string id, string name, string hexColor, double position)
+    public System.Threading.Tasks.Task<LabelRow?> CreateAsync(string bayId, string id, string name, string hexColor, double position)
     {
         if (_channel is null)
-            return System.Threading.Tasks.Task.FromResult(CreateSync(workspaceId, id, name, hexColor, position));
-        return _channel.ExecuteAsync(conn => System.Threading.Tasks.Task.FromResult(CreateInternal(conn, workspaceId, id, name, hexColor, position)));
+            return System.Threading.Tasks.Task.FromResult(CreateSync(bayId, id, name, hexColor, position));
+        return _channel.ExecuteAsync(conn => System.Threading.Tasks.Task.FromResult(CreateInternal(conn, bayId, id, name, hexColor, position)));
     }
 
-    private LabelRow? CreateSync(string workspaceId, string id, string name, string hexColor, double position)
+    private LabelRow? CreateSync(string bayId, string id, string name, string hexColor, double position)
     {
         using var conn = _factory.Open();
-        return CreateInternal(conn, workspaceId, id, name, hexColor, position);
+        return CreateInternal(conn, bayId, id, name, hexColor, position);
     }
 
-    private static LabelRow? CreateInternal(SqliteConnection conn, string workspaceId, string id, string name, string hexColor, double position)
+    private static LabelRow? CreateInternal(SqliteConnection conn, string bayId, string id, string name, string hexColor, double position)
     {
         var now = System.DateTimeOffset.UtcNow.ToString("o");
         try
         {
             conn.Execute(
-                "INSERT INTO labels (id, workspace_id, name, hex_color, position, created_at) VALUES (@Id, @WorkspaceId, @Name, @HexColor, @Position, @Now)",
-                new { Id = id, WorkspaceId = workspaceId, Name = name, HexColor = hexColor, Position = position, Now = now });
+                "INSERT INTO labels (id, bay_id, name, hex_color, position, created_at) VALUES (@Id, @BayId, @Name, @HexColor, @Position, @Now)",
+                new { Id = id, BayId = bayId, Name = name, HexColor = hexColor, Position = position, Now = now });
         }
         catch (SqliteException)
         {
             return null;
         }
-        return new LabelRow { Id = id, WorkspaceId = workspaceId, Name = name, HexColor = hexColor, Position = position, CreatedAt = now };
+        return new LabelRow { Id = id, BayId = bayId, Name = name, HexColor = hexColor, Position = position, CreatedAt = now };
     }
 
-    public LabelRow? GetByWorkspaceAndId(string workspaceId, string id)
+    public LabelRow? GetByBayAndId(string bayId, string id)
     {
         using var conn = _factory.Open();
         return conn.QueryFirstOrDefault<LabelRow>(
-            $"SELECT {SelectColumns} FROM labels WHERE workspace_id = @WorkspaceId AND id = @Id",
-            new { WorkspaceId = workspaceId, Id = id });
+            $"SELECT {SelectColumns} FROM labels WHERE bay_id = @BayId AND id = @Id",
+            new { BayId = bayId, Id = id });
     }
 
-    public IReadOnlyList<LabelRow> ListByWorkspace(string workspaceId)
+    public IReadOnlyList<LabelRow> ListByBay(string bayId)
     {
         using var conn = _factory.Open();
         return conn.Query<LabelRow>(
-            $"SELECT {SelectColumns} FROM labels WHERE workspace_id = @WorkspaceId ORDER BY position",
-            new { WorkspaceId = workspaceId }).AsList();
+            $"SELECT {SelectColumns} FROM labels WHERE bay_id = @BayId ORDER BY position",
+            new { BayId = bayId }).AsList();
     }
 
-    public System.Threading.Tasks.Task DeleteAsync(string workspaceId, string id)
+    public System.Threading.Tasks.Task DeleteAsync(string bayId, string id)
     {
         if (_channel is null)
         {
-            DeleteSync(workspaceId, id);
+            DeleteSync(bayId, id);
             return System.Threading.Tasks.Task.CompletedTask;
         }
-        return _channel.ExecuteAsync(conn => { DeleteInternal(conn, workspaceId, id); return System.Threading.Tasks.Task.CompletedTask; });
+        return _channel.ExecuteAsync(conn => { DeleteInternal(conn, bayId, id); return System.Threading.Tasks.Task.CompletedTask; });
     }
 
-    private void DeleteSync(string workspaceId, string id)
+    private void DeleteSync(string bayId, string id)
     {
         using var conn = _factory.Open();
-        DeleteInternal(conn, workspaceId, id);
+        DeleteInternal(conn, bayId, id);
     }
 
-    private static void DeleteInternal(SqliteConnection conn, string workspaceId, string id)
+    private static void DeleteInternal(SqliteConnection conn, string bayId, string id)
     {
-        conn.Execute("DELETE FROM card_labels WHERE label_id = @Id AND card_id IN (SELECT id FROM cards WHERE workspace_id = @WorkspaceId)", new { Id = id, WorkspaceId = workspaceId });
-        conn.Execute("DELETE FROM labels WHERE workspace_id = @WorkspaceId AND id = @Id", new { WorkspaceId = workspaceId, Id = id });
+        conn.Execute("DELETE FROM card_labels WHERE label_id = @Id AND card_id IN (SELECT id FROM cards WHERE bay_id = @BayId)", new { Id = id, BayId = bayId });
+        conn.Execute("DELETE FROM labels WHERE bay_id = @BayId AND id = @Id", new { BayId = bayId, Id = id });
     }
 
 
@@ -143,41 +143,41 @@ public sealed class LabelRepository
     {
         using var conn = _factory.Open();
         return conn.Query<LabelRow>(
-            $"SELECT l.id AS Id, l.workspace_id AS WorkspaceId, l.name AS Name, l.hex_color AS HexColor, l.position AS Position, l.created_at AS CreatedAt FROM card_labels cl JOIN cards c ON c.id = cl.card_id JOIN labels l ON l.id = cl.label_id AND l.workspace_id = c.workspace_id WHERE cl.card_id = @CardId ORDER BY l.position",
+            $"SELECT l.id AS Id, l.bay_id AS BayId, l.name AS Name, l.hex_color AS HexColor, l.position AS Position, l.created_at AS CreatedAt FROM card_labels cl JOIN cards c ON c.id = cl.card_id JOIN labels l ON l.id = cl.label_id AND l.bay_id = c.bay_id WHERE cl.card_id = @CardId ORDER BY l.position",
             new { CardId = cardId }).AsList();
     }
 
-    public IReadOnlyList<string> FilterCardsByLabel(string workspaceId, string labelId)
+    public IReadOnlyList<string> FilterCardsByLabel(string bayId, string labelId)
     {
         using var conn = _factory.Open();
         return conn.Query<string>(
-            "SELECT cl.card_id FROM card_labels cl JOIN cards c ON c.id = cl.card_id JOIN labels l ON l.id = cl.label_id AND l.workspace_id = c.workspace_id WHERE c.workspace_id = @WorkspaceId AND l.id = @LabelId",
-            new { WorkspaceId = workspaceId, LabelId = labelId }).AsList();
+            "SELECT cl.card_id FROM card_labels cl JOIN cards c ON c.id = cl.card_id JOIN labels l ON l.id = cl.label_id AND l.bay_id = c.bay_id WHERE c.bay_id = @BayId AND l.id = @LabelId",
+            new { BayId = bayId, LabelId = labelId }).AsList();
     }
 
-    public System.Threading.Tasks.Task ReorderAsync(string workspaceId, string[] orderedIds)
+    public System.Threading.Tasks.Task ReorderAsync(string bayId, string[] orderedIds)
     {
         if (_channel is null)
         {
-            ReorderSync(workspaceId, orderedIds);
+            ReorderSync(bayId, orderedIds);
             return System.Threading.Tasks.Task.CompletedTask;
         }
-        return _channel.ExecuteAsync(conn => { ReorderInternal(conn, workspaceId, orderedIds); return System.Threading.Tasks.Task.CompletedTask; });
+        return _channel.ExecuteAsync(conn => { ReorderInternal(conn, bayId, orderedIds); return System.Threading.Tasks.Task.CompletedTask; });
     }
 
-    private void ReorderSync(string workspaceId, string[] orderedIds)
+    private void ReorderSync(string bayId, string[] orderedIds)
     {
         using var conn = _factory.Open();
-        ReorderInternal(conn, workspaceId, orderedIds);
+        ReorderInternal(conn, bayId, orderedIds);
     }
 
-    private static void ReorderInternal(SqliteConnection conn, string workspaceId, string[] orderedIds)
+    private static void ReorderInternal(SqliteConnection conn, string bayId, string[] orderedIds)
     {
         for (int i = 0; i < orderedIds.Length; i++)
         {
             conn.Execute(
-                "UPDATE labels SET position = @Position WHERE workspace_id = @WorkspaceId AND id = @Id",
-                new { Position = (double)i, WorkspaceId = workspaceId, Id = orderedIds[i] });
+                "UPDATE labels SET position = @Position WHERE bay_id = @BayId AND id = @Id",
+                new { Position = (double)i, BayId = bayId, Id = orderedIds[i] });
         }
     }
 }

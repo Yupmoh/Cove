@@ -12,42 +12,42 @@ public sealed class LayoutPersistenceTests
     private static string NewDir() => Path.Combine(Path.GetTempPath(), "cove-persist-" + System.Guid.NewGuid().ToString("N"));
 
     [Fact]
-    public void MosaicMutation_PersistsWorkspaceJson()
+    public void MosaicMutation_PersistsBayJson()
     {
         var dir = NewDir();
         Directory.CreateDirectory(dir);
         try
         {
             var layout = new LayoutService();
-            string roomId = layout.CreateRoom("main", new PaneLeaf { PaneId = "p1", Subtabs = new[] { new Subtab("p1", PaneType.Terminal) } });
-            layout.SplitPane(roomId, "p1", SplitOrientation.Row, new PaneLeaf { PaneId = "p2", Subtabs = new[] { new Subtab("p2", PaneType.Terminal) } });
+            string shoreId = layout.CreateShore("main", new NookLeaf { NookId = "p1", Subtabs = new[] { new Subtab("p1", NookType.Terminal) } });
+            layout.SplitNook(shoreId, "p1", SplitOrientation.Row, new NookLeaf { NookId = "p2", Subtabs = new[] { new Subtab("p2", NookType.Terminal) } });
 
             var snap = layout.ToSnapshot("ws1", "demo", "/proj");
-            WorkspacePersistence.Save(snap, new PaneDescriptor[0], dir);
+            BayPersistence.Save(snap, new NookDescriptor[0], dir);
 
-            Assert.True(File.Exists(Path.Combine(dir, "workspace.json")));
-            var (loaded, _) = WorkspacePersistence.Load(dir, NullLogger.Instance);
+            Assert.True(File.Exists(Path.Combine(dir, "bay.json")));
+            var (loaded, _) = BayPersistence.Load(dir, NullLogger.Instance);
             Assert.NotNull(loaded);
-            Assert.IsType<SplitNode>(loaded!.Rooms[0].LayoutTree);
+            Assert.IsType<SplitNode>(loaded!.Shores[0].LayoutTree);
         }
         finally { try { Directory.Delete(dir, true); } catch { } }
     }
 
     [Fact]
-    public void CorruptedWorkspaceJson_FallsBackToBak()
+    public void CorruptedBayJson_FallsBackToBak()
     {
         var dir = NewDir();
         Directory.CreateDirectory(dir);
         try
         {
             var layout = new LayoutService();
-            string roomId = layout.CreateRoom("main", new PaneLeaf { PaneId = "p1", Subtabs = new[] { new Subtab("p1", PaneType.Terminal) } });
-            WorkspacePersistence.Save(layout.ToSnapshot("ws1", "demo", "/proj"), new PaneDescriptor[0], dir);
-            layout.SplitPane(roomId, "p1", SplitOrientation.Row, new PaneLeaf { PaneId = "p2", Subtabs = new[] { new Subtab("p2", PaneType.Terminal) } });
-            WorkspacePersistence.Save(layout.ToSnapshot("ws1", "demo", "/proj"), new PaneDescriptor[0], dir);
+            string shoreId = layout.CreateShore("main", new NookLeaf { NookId = "p1", Subtabs = new[] { new Subtab("p1", NookType.Terminal) } });
+            BayPersistence.Save(layout.ToSnapshot("ws1", "demo", "/proj"), new NookDescriptor[0], dir);
+            layout.SplitNook(shoreId, "p1", SplitOrientation.Row, new NookLeaf { NookId = "p2", Subtabs = new[] { new Subtab("p2", NookType.Terminal) } });
+            BayPersistence.Save(layout.ToSnapshot("ws1", "demo", "/proj"), new NookDescriptor[0], dir);
 
-            File.WriteAllText(Path.Combine(dir, "workspace.json"), "{CORRUPT");
-            var (loaded, _) = WorkspacePersistence.Load(dir, NullLogger.Instance);
+            File.WriteAllText(Path.Combine(dir, "bay.json"), "{CORRUPT");
+            var (loaded, _) = BayPersistence.Load(dir, NullLogger.Instance);
             Assert.NotNull(loaded);
             Assert.Equal("ws1", loaded!.Id);
         }
@@ -62,36 +62,36 @@ public sealed class LayoutPersistenceTests
         try
         {
             var layout = new LayoutService();
-            layout.CreateRoom("main", new PaneLeaf { PaneId = "p1", Subtabs = new[] { new Subtab("p1", PaneType.Terminal) } });
+            layout.CreateShore("main", new NookLeaf { NookId = "p1", Subtabs = new[] { new Subtab("p1", NookType.Terminal) } });
             var snap = layout.ToSnapshot("ws1", "demo", "/my/project");
-            WorkspacePersistence.Save(snap, new PaneDescriptor[0], dir);
+            BayPersistence.Save(snap, new NookDescriptor[0], dir);
 
-            var (loaded, _) = WorkspacePersistence.Load(dir, NullLogger.Instance);
+            var (loaded, _) = BayPersistence.Load(dir, NullLogger.Instance);
             Assert.Equal("/my/project", loaded!.ProjectDir);
         }
         finally { try { Directory.Delete(dir, true); } catch { } }
     }
 
     [Fact]
-    public void PaneTitle_PersistsInSessionJson()
+    public void NookTitle_PersistsInSessionJson()
     {
         var dir = NewDir();
         Directory.CreateDirectory(dir);
         try
         {
-            var descs = new[] { new PaneDescriptor("p1", "/bin/sh", new[] { "-l" }, "/tmp", "my pane") };
-            var layout = new WorkspaceSnapshot
+            var descs = new[] { new NookDescriptor("p1", "/bin/sh", new[] { "-l" }, "/tmp", "my nook") };
+            var layout = new BaySnapshot
             {
                 Id = "ws1",
                 Name = "demo",
                 ProjectDir = "/proj",
-                Rooms = new[] { new RoomSnapshot { Id = "r1", Name = "main", LayoutTree = new PaneLeaf { PaneId = "p1" } } },
+                Shores = new[] { new ShoreSnapshot { Id = "r1", Name = "main", LayoutTree = new NookLeaf { NookId = "p1" } } },
             };
-            WorkspacePersistence.Save(layout, descs, dir);
+            BayPersistence.Save(layout, descs, dir);
 
-            var (_, sessions) = WorkspacePersistence.Load(dir, NullLogger.Instance);
+            var (_, sessions) = BayPersistence.Load(dir, NullLogger.Instance);
             Assert.True(sessions.ContainsKey("p1"));
-            Assert.Equal("my pane", sessions["p1"].Title);
+            Assert.Equal("my nook", sessions["p1"].Title);
         }
         finally { try { Directory.Delete(dir, true); } catch { } }
     }

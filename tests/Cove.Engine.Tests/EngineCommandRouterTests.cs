@@ -6,13 +6,13 @@ using Xunit;
 public class EngineCommandRouterTests
 {
     [Fact]
-    public async Task PaneList_ReturnsEmptyPanes()
+    public async Task NookList_ReturnsEmptyNooks()
     {
-        var request = new ControlRequest("1", "cove://commands/pane.list");
+        var request = new ControlRequest("1", "cove://commands/nook.list");
         var response = await EngineCommandRouter.RouteAsync(request);
         Assert.NotNull(response);
         Assert.True(response!.Ok);
-        Assert.Equal("{\"panes\":[]}", response.Data!.Value.GetRawText());
+        Assert.Equal("{\"nooks\":[]}", response.Data!.Value.GetRawText());
     }
 
     [Fact]

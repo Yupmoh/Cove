@@ -28,7 +28,7 @@ public sealed class RecentSessionStoreTests
         var row = rows[0];
         Assert.Equal("claude", row.Adapter);
         Assert.Equal("s1", row.SessionId);
-        Assert.Equal("ws-1", row.WorkspaceId);
+        Assert.Equal("ws-1", row.BayId);
         Assert.Equal("/home/moh/proj", row.Cwd);
         Assert.Equal(Base, row.StartedAt);
     }

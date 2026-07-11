@@ -11,12 +11,12 @@ public static partial class EngineLog
     [ZLoggerMessage(LogLevel.Information, "daemon stopping channel={channel}")]
     public static partial void DaemonStopping(this ILogger logger, string channel);
 
-    [ZLoggerMessage(LogLevel.Information, "session opened pane={paneId} command={command}")]
-    public static partial void SessionOpened(this ILogger logger, string paneId, string command);
+    [ZLoggerMessage(LogLevel.Information, "session opened nook={nookId} command={command}")]
+    public static partial void SessionOpened(this ILogger logger, string nookId, string command);
 
-    [ZLoggerMessage(LogLevel.Information, "session closed pane={paneId} exitCode={exitCode}")]
-    public static partial void SessionClosed(this ILogger logger, string paneId, int exitCode);
+    [ZLoggerMessage(LogLevel.Information, "session closed nook={nookId} exitCode={exitCode}")]
+    public static partial void SessionClosed(this ILogger logger, string nookId, int exitCode);
 
-    [ZLoggerMessage(LogLevel.Debug, "session activity pane={paneId} bytes={bytes}")]
-    public static partial void SessionActivity(this ILogger logger, string paneId, int bytes);
+    [ZLoggerMessage(LogLevel.Debug, "session activity nook={nookId} bytes={bytes}")]
+    public static partial void SessionActivity(this ILogger logger, string nookId, int bytes);
 }

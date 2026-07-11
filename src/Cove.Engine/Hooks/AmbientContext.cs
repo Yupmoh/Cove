@@ -6,7 +6,7 @@ namespace Cove.Engine.Hooks;
 
 public interface IAmbientContextProvider
 {
-    JsonElement Build(string? paneId);
+    JsonElement Build(string? nookId);
 }
 
 public sealed class SessionStartContextProvider : IAmbientContextProvider
@@ -22,7 +22,7 @@ public sealed class SessionStartContextProvider : IAmbientContextProvider
         _agentPackaging = agentPackaging;
     }
 
-    public JsonElement Build(string? paneId)
+    public JsonElement Build(string? nookId)
     {
         using var buffer = new MemoryStream();
         using (var writer = new Utf8JsonWriter(buffer))
@@ -46,41 +46,41 @@ public sealed class SessionStartContextProvider : IAmbientContextProvider
 
 public sealed class LocationContextProvider : IAmbientContextProvider
 {
-    private readonly System.Func<string?> _room;
+    private readonly System.Func<string?> _shore;
     private readonly System.Func<string?> _wing;
-    private readonly System.Func<string?> _workspace;
-    private readonly System.Func<IReadOnlyList<string?>> _otherPanes;
+    private readonly System.Func<string?> _bay;
+    private readonly System.Func<IReadOnlyList<string?>> _otherNooks;
 
-    public LocationContextProvider(System.Func<string?> room, System.Func<string?> wing, System.Func<string?> workspace, System.Func<IReadOnlyList<string?>> otherPanes)
+    public LocationContextProvider(System.Func<string?> shore, System.Func<string?> wing, System.Func<string?> bay, System.Func<IReadOnlyList<string?>> otherNooks)
     {
-        _room = room;
+        _shore = shore;
         _wing = wing;
-        _workspace = workspace;
-        _otherPanes = otherPanes;
+        _bay = bay;
+        _otherNooks = otherNooks;
     }
 
-    public JsonElement Build(string? paneId)
+    public JsonElement Build(string? nookId)
     {
         using var buffer = new MemoryStream();
         using (var writer = new Utf8JsonWriter(buffer))
         {
             writer.WriteStartObject();
-            var room = _room();
-            if (room is not null)
-                writer.WriteString("room", room);
+            var shore = _shore();
+            if (shore is not null)
+                writer.WriteString("shore", shore);
             var wing = _wing();
             if (wing is not null)
                 writer.WriteString("wing", wing);
-            var workspace = _workspace();
-            if (workspace is not null)
-                writer.WriteString("workspace", workspace);
-            if (paneId is not null)
-                writer.WriteString("paneId", paneId);
-            writer.WriteStartArray("panes");
-            foreach (var pane in _otherPanes())
+            var bay = _bay();
+            if (bay is not null)
+                writer.WriteString("bay", bay);
+            if (nookId is not null)
+                writer.WriteString("nookId", nookId);
+            writer.WriteStartArray("nooks");
+            foreach (var nook in _otherNooks())
             {
-                if (pane is not null)
-                    writer.WriteStringValue(pane);
+                if (nook is not null)
+                    writer.WriteStringValue(nook);
             }
             writer.WriteEndArray();
             writer.WriteEndObject();
@@ -99,7 +99,7 @@ public sealed class RunCommandContextProvider : IAmbientContextProvider
         _runningCommands = runningCommands;
     }
 
-    public JsonElement Build(string? paneId)
+    public JsonElement Build(string? nookId)
     {
         var commands = _runningCommands();
         if (commands.Count == 0)
@@ -128,8 +128,8 @@ public sealed class AmbientContextAggregator
 
     public void Remove(string key) => _providers.Remove(key);
 
-    public JsonElement? Get(string key, string? paneId = null)
+    public JsonElement? Get(string key, string? nookId = null)
     {
-        return _providers.TryGetValue(key, out var provider) ? provider.Build(paneId) : null;
+        return _providers.TryGetValue(key, out var provider) ? provider.Build(nookId) : null;
     }
 }

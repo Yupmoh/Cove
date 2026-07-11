@@ -18,13 +18,13 @@ public sealed class FramingVariableResolverTests
     public void Resolve_MultipleVariables()
     {
         var resolver = new FramingVariableResolver(NullLogger.Instance);
-        var result = resolver.Resolve("{actionId}-{paneId}-{workspaceId}", new Dictionary<string, string>
+        var result = resolver.Resolve("{actionId}-{nookId}-{bayId}", new Dictionary<string, string>
         {
             ["actionId"] = "act1",
-            ["paneId"] = "pane1",
-            ["workspaceId"] = "ws1",
+            ["nookId"] = "nook1",
+            ["bayId"] = "ws1",
         });
-        Assert.Equal("act1-pane1-ws1", result);
+        Assert.Equal("act1-nook1-ws1", result);
     }
 
     [Fact]
@@ -61,10 +61,10 @@ public sealed class FramingVariableResolverTests
     public void ExtractVariableNames_FindsAll()
     {
         var resolver = new FramingVariableResolver(NullLogger.Instance);
-        var names = resolver.ExtractVariableNames("{actionId}-{paneId}-{actionId}");
+        var names = resolver.ExtractVariableNames("{actionId}-{nookId}-{actionId}");
         Assert.Equal(2, names.Count);
         Assert.Contains("actionId", names);
-        Assert.Contains("paneId", names);
+        Assert.Contains("nookId", names);
     }
 
     [Fact]
@@ -100,10 +100,10 @@ public sealed class FramingVariableResolverTests
     public void Resolve_AdjacentVariables()
     {
         var resolver = new FramingVariableResolver(NullLogger.Instance);
-        var result = resolver.Resolve("{actionId}{paneId}", new Dictionary<string, string>
+        var result = resolver.Resolve("{actionId}{nookId}", new Dictionary<string, string>
         {
             ["actionId"] = "a",
-            ["paneId"] = "p",
+            ["nookId"] = "p",
         });
         Assert.Equal("ap", result);
     }

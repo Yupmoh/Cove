@@ -1,8 +1,8 @@
 namespace Cove.Engine.Agents;
 
-public interface IPaneWriter
+public interface INookWriter
 {
-    bool Write(string paneId, ReadOnlySpan<byte> data);
+    bool Write(string nookId, ReadOnlySpan<byte> data);
 }
 
 public sealed class AgentMessageDelivery
@@ -10,16 +10,16 @@ public sealed class AgentMessageDelivery
     public const int DefaultSubmitPauseMs = 250;
     private const string BracketedPasteStart = "\x1b[200~";
     private const string BracketedPasteEnd = "\x1b[201~";
-    private readonly IPaneWriter _panes;
+    private readonly INookWriter _nooks;
 
-    public AgentMessageDelivery(IPaneWriter panes) => _panes = panes;
+    public AgentMessageDelivery(INookWriter nooks) => _nooks = nooks;
 
-    public async Task<bool> DeliverAsync(string paneId, string body, int? submitPauseMs = null, CancellationToken cancellationToken = default)
+    public async Task<bool> DeliverAsync(string nookId, string body, int? submitPauseMs = null, CancellationToken cancellationToken = default)
     {
         var pause = submitPauseMs ?? DefaultSubmitPauseMs;
         var wrapped = BracketedPasteStart + body + BracketedPasteEnd;
         var wrappedBytes = System.Text.Encoding.UTF8.GetBytes(wrapped);
-        if (!_panes.Write(paneId, wrappedBytes))
+        if (!_nooks.Write(nookId, wrappedBytes))
             return false;
 
         if (pause > 0)
@@ -28,6 +28,6 @@ public sealed class AgentMessageDelivery
             catch (OperationCanceledException) { return false; }
         }
 
-        return _panes.Write(paneId, System.Text.Encoding.UTF8.GetBytes("\r"));
+        return _nooks.Write(nookId, System.Text.Encoding.UTF8.GetBytes("\r"));
     }
 }

@@ -275,7 +275,7 @@ export function buildIsEvalPayload(ref: string, state: string): string {
 
 export interface AutomationExecEvent {
   requestId: string;
-  paneId: string;
+  nookId: string;
   kind: string;
   ref?: string | null;
   value?: string | null;

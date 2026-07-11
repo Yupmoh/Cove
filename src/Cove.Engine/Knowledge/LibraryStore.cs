@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Cove.Engine.Knowledge;
 
-public sealed record LibraryEntry(string Id, string WorkspaceId, string PaneId, string PaneType, string? Title, string? StateJson, string? Scrollback, string Kind, System.DateTimeOffset CapturedAt);
+public sealed record LibraryEntry(string Id, string BayId, string NookId, string NookType, string? Title, string? StateJson, string? Scrollback, string Kind, System.DateTimeOffset CapturedAt);
 
 public sealed class LibraryStore
 {
@@ -40,9 +40,9 @@ public sealed class LibraryStore
         cmd.CommandText = """
             CREATE TABLE IF NOT EXISTS catalog (
                 id TEXT PRIMARY KEY,
-                workspace_id TEXT NOT NULL,
-                pane_id TEXT NOT NULL,
-                pane_type TEXT NOT NULL,
+                bay_id TEXT NOT NULL,
+                nook_id TEXT NOT NULL,
+                nook_type TEXT NOT NULL,
                 title TEXT,
                 state_json TEXT,
                 scrollback TEXT,
@@ -51,13 +51,13 @@ public sealed class LibraryStore
                 pinned INTEGER NOT NULL DEFAULT 0,
                 archived INTEGER NOT NULL DEFAULT 0
             );
-            CREATE INDEX IF NOT EXISTS idx_catalog_workspace ON catalog (workspace_id, captured_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_catalog_bay ON catalog (bay_id, captured_at DESC);
             CREATE INDEX IF NOT EXISTS idx_catalog_kind ON catalog (kind);
             """;
         cmd.ExecuteNonQuery();
     }
 
-    public LibraryEntry SaveEntry(string workspaceId, string paneId, string paneType, string title, string? stateJson, string? scrollback, string kind)
+    public LibraryEntry SaveEntry(string bayId, string nookId, string nookType, string title, string? stateJson, string? scrollback, string kind)
     {
         var id = System.Guid.NewGuid().ToString("N");
         var capturedAt = System.DateTimeOffset.UtcNow;
@@ -65,19 +65,19 @@ public sealed class LibraryStore
         var redactedState = RedactSecrets(stateJson);
         var redactedScrollback = RedactSecrets(scrollback);
 
-        var entry = new LibraryEntry(id, workspaceId, paneId, paneType, title, redactedState, redactedScrollback, kind, capturedAt);
+        var entry = new LibraryEntry(id, bayId, nookId, nookType, title, redactedState, redactedScrollback, kind, capturedAt);
 
         using var conn = new SqliteConnection($"Data Source={_dbPath}");
         conn.Open();
         using var cmd = conn.CreateCommand();
         cmd.CommandText = """
-            INSERT INTO catalog (id, workspace_id, pane_id, pane_type, title, state_json, scrollback, kind, captured_at)
+            INSERT INTO catalog (id, bay_id, nook_id, nook_type, title, state_json, scrollback, kind, captured_at)
             VALUES (@id, @ws, @pid, @ptype, @title, @state, @sb, @kind, @ts);
             """;
         cmd.Parameters.AddWithValue("@id", id);
-        cmd.Parameters.AddWithValue("@ws", workspaceId);
-        cmd.Parameters.AddWithValue("@pid", paneId);
-        cmd.Parameters.AddWithValue("@ptype", paneType);
+        cmd.Parameters.AddWithValue("@ws", bayId);
+        cmd.Parameters.AddWithValue("@pid", nookId);
+        cmd.Parameters.AddWithValue("@ptype", nookType);
         cmd.Parameters.AddWithValue("@title", (object?)title ?? System.DBNull.Value);
         cmd.Parameters.AddWithValue("@state", (object?)redactedState ?? System.DBNull.Value);
         cmd.Parameters.AddWithValue("@sb", (object?)redactedScrollback ?? System.DBNull.Value);
@@ -88,11 +88,11 @@ public sealed class LibraryStore
         var entryPath = System.IO.Path.Combine(_entriesDir, id + ".json");
         System.IO.File.WriteAllText(entryPath, JsonSerializer.Serialize(entry, LibraryJsonContext.Default.LibraryEntry));
 
-        _logger.LogWarning("library: saved entry {id} ({kind}) for pane {pid} in {ws}", id, kind, paneId, workspaceId);
+        _logger.LogWarning("library: saved entry {id} ({kind}) for nook {pid} in {ws}", id, kind, nookId, bayId);
         return entry;
     }
 
-    public System.Collections.Generic.IReadOnlyList<LibraryEntry> ListByWorkspace(string workspaceId, string? kind = null)
+    public System.Collections.Generic.IReadOnlyList<LibraryEntry> ListByBay(string bayId, string? kind = null)
     {
         var result = new System.Collections.Generic.List<LibraryEntry>();
         using var conn = new SqliteConnection($"Data Source={_dbPath}");
@@ -100,13 +100,13 @@ public sealed class LibraryStore
         using var cmd = conn.CreateCommand();
         if (kind is null)
         {
-            cmd.CommandText = "SELECT id, workspace_id, pane_id, pane_type, title, state_json, scrollback, kind, captured_at FROM catalog WHERE workspace_id = @ws AND archived = 0 ORDER BY pinned DESC, captured_at DESC";
-            cmd.Parameters.AddWithValue("@ws", workspaceId);
+            cmd.CommandText = "SELECT id, bay_id, nook_id, nook_type, title, state_json, scrollback, kind, captured_at FROM catalog WHERE bay_id = @ws AND archived = 0 ORDER BY pinned DESC, captured_at DESC";
+            cmd.Parameters.AddWithValue("@ws", bayId);
         }
         else
         {
-            cmd.CommandText = "SELECT id, workspace_id, pane_id, pane_type, title, state_json, scrollback, kind, captured_at FROM catalog WHERE workspace_id = @ws AND kind = @kind AND archived = 0 ORDER BY pinned DESC, captured_at DESC";
-            cmd.Parameters.AddWithValue("@ws", workspaceId);
+            cmd.CommandText = "SELECT id, bay_id, nook_id, nook_type, title, state_json, scrollback, kind, captured_at FROM catalog WHERE bay_id = @ws AND kind = @kind AND archived = 0 ORDER BY pinned DESC, captured_at DESC";
+            cmd.Parameters.AddWithValue("@ws", bayId);
             cmd.Parameters.AddWithValue("@kind", kind);
         }
         using var reader = cmd.ExecuteReader();

@@ -45,8 +45,8 @@ export interface FeedbackReport {
   note: string;
   target: InspectTarget | null;
   regionRect: InspectRect | null;
-  workspace: string;
-  room: string;
+  bay: string;
+  shore: string;
   appVersion: string;
   htmlExcerpt: string;
 }
@@ -55,8 +55,8 @@ export function buildFeedbackReport(input: {
   note: string;
   target: InspectTarget | null;
   regionRect: InspectRect | null;
-  workspace: string;
-  room: string;
+  bay: string;
+  shore: string;
   appVersion: string;
   htmlExcerpt: string;
   nowIso: string;
@@ -67,8 +67,8 @@ export function buildFeedbackReport(input: {
     note: input.note,
     target: input.target,
     regionRect: input.regionRect,
-    workspace: input.workspace,
-    room: input.room,
+    bay: input.bay,
+    shore: input.shore,
     appVersion: input.appVersion,
     htmlExcerpt: input.htmlExcerpt.slice(0, 4000),
   };
@@ -82,7 +82,7 @@ export function feedbackSlug(note: string): string {
 export function harnessPrompt(report: FeedbackReport, reportPath: string): string {
   const where = report.target ? `UI element: ${report.target.selector}.` : "See the region rect in the report.";
   return [
-    "You are working on Cove, the terminal workspace app this session is running inside.",
+    "You are working on Cove, the terminal bay app this session is running inside.",
     `The owner flagged a UI bug from Cove's inspect mode: ${report.note}`,
     where,
     `The full structured report (selector, rect, html excerpt, context) is at: ${reportPath}`,

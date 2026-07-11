@@ -14,7 +14,7 @@ public static class TaskCommands
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.TaskCreateParams) is not { } p)
             return ctx.Fail("invalid_params", "task create params required");
 
-        var row = await svc.CreateCardAsync(p.WorkspaceId, p.Title, p.Source, p.Description, (int)ParsePriority(p.Priority), (int)ParseSize(p.Size), p.Assignee);
+        var row = await svc.CreateCardAsync(p.BayId, p.Title, p.Source, p.Description, (int)ParsePriority(p.Priority), (int)ParseSize(p.Size), p.Assignee);
         return ctx.Ok(ToCard(row), CoveJsonContext.Default.TaskCard);
     }
 
@@ -28,7 +28,7 @@ public static class TaskCommands
 
         Cove.Tasks.Store.CardRow? row;
         if (p.HumanId is not null && TryParseHumanId(p.HumanId, out var number))
-            row = svc.GetCardByHumanId(p.WorkspaceId ?? "", number);
+            row = svc.GetCardByHumanId(p.BayId ?? "", number);
         else
             row = svc.GetCard(p.Id ?? "");
 
@@ -45,7 +45,7 @@ public static class TaskCommands
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.TaskListParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "task list params required"));
 
-        var cards = svc.ListCards(p.WorkspaceId).Select(ToCard).ToList();
+        var cards = svc.ListCards(p.BayId).Select(ToCard).ToList();
         return Task.FromResult(ctx.Ok(new TaskListResult(cards), CoveJsonContext.Default.TaskListResult));
     }
 
@@ -102,7 +102,7 @@ public static class TaskCommands
         Size = (TaskSize)row.Size,
         Assignee = row.Assignee,
         Source = row.Source,
-        WorkspaceId = row.WorkspaceId,
+        BayId = row.BayId,
         TaskNumber = row.TaskNumber,
         CurrentPrimaryRunId = row.CurrentPrimaryRunId,
         CreatedAt = System.DateTimeOffset.Parse(row.CreatedAt),

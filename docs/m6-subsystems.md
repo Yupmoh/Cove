@@ -9,7 +9,7 @@ Multi-DB SQLite split (one writer per corpus, FTS rebuilds independently):
 - `fts/index.db` — session corpus (`sessions_fts` word-level + `sessions_fts_trigram` substring), agent edits
 - `notes/index.db` — note FTS cache (`notes_fts` porter unicode61, external-content + triggers)
 - `attribution/index.db` — line-range authorship attribution
-- `library/catalog.db` — saved/history pane entries with secret redaction
+- `library/catalog.db` — saved/history nook entries with secret redaction
 - `reviews/<commit-sha>/review.db` — one DB per reviewed commit (comments, audit_trail, attribution, session_telemetry)
 - `vault/settings.json` — vault depth/horizon/extractor version
 
@@ -17,9 +17,9 @@ All SQLite: WAL mode, busy_timeout=5000. All FTS5 external-content tables use IN
 
 ## Timeline (KN-30-43)
 
-`TimelineStore` — append-only entries with backfill dedup (`ON CONFLICT(backfill_key) WHERE NOT NULL DO NOTHING`). Tag validation (regex `^[a-z][a-z0-9-]*:[a-zA-Z0-9_-]+$`), scope validation (workspace/room/pane/task/session). FTS5 search via MATCH + rank. `GitCommitIngester` appends git.commit entries. `TimelineSynthesizer` produces typed brief/recap/update entries with backing markdown notes (no app-side LLM).
+`TimelineStore` — append-only entries with backfill dedup (`ON CONFLICT(backfill_key) WHERE NOT NULL DO NOTHING`). Tag validation (regex `^[a-z][a-z0-9-]*:[a-zA-Z0-9_-]+$`), scope validation (bay/shore/nook/task/session). FTS5 search via MATCH + rank. `GitCommitIngester` appends git.commit entries. `TimelineSynthesizer` produces typed brief/recap/update entries with backing markdown notes (no app-side LLM).
 
-GUI: `timeline-feed` pane (day-grouped feed, scope filter, search, kind icons).
+GUI: `timeline-feed` nook (day-grouped feed, scope filter, search, kind icons).
 
 ## Notes (KN-01-29)
 
@@ -41,7 +41,7 @@ BLOCKED: `SemanticEmbedder` (KN-49) is hash-BoW, not Model2Vec. Requires model a
 
 `SessionCorpusIndexer` — sessions FTS (word + trigram), reindex on version change. `EditsIndex` — agent_edits table (FK to sessions), find by file (exact + basename retry). Session picker GUI with search + vault settings (depth/horizon/excludes).
 
-`LibraryStore` — `catalog.db` + entries. Secret redaction: keyword-based (password/token/api_key/bearer/authorization/credential), value-after-redacted-key, known secret formats (sk- OpenAI, AKIA AWS, ghp_ GitHub, xox Slack, eyJ JWT, BEGIN PRIVATE KEY). Library popover with fuzzy search + active-workspace boost.
+`LibraryStore` — `catalog.db` + entries. Secret redaction: keyword-based (password/token/api_key/bearer/authorization/credential), value-after-redacted-key, known secret formats (sk- OpenAI, AKIA AWS, ghp_ GitHub, xox Slack, eyJ JWT, BEGIN PRIVATE KEY). Library popover with fuzzy search + active-bay boost.
 
 `SnapshotService` — git-based snapshot vault. `TakeAsync` (content dict → git commit), `RestoreAsync` (PreRestore undo commit + git checkout), `InspectAsync` (diff snapshot vs current via `git ls-tree` + `git show`, no working-tree mutation). Three change types: changed/added/removed.
 
@@ -51,11 +51,11 @@ BLOCKED: `SemanticEmbedder` (KN-49) is hash-BoW, not Model2Vec. Requires model a
 
 `CommentAnchorEngine` — maps comment line anchors across diffs. DiffHunk model. Handles: insert-above (shift), delete-above (shift), delete-commented-line (orphan), rename (follow), context-hash match (keep), mismatch (orphan conservatively). Core invariant proven by fuzz tests (300 multi-hunk + 200 move + 100 rename iterations): never wrong-anchored — conservatively orphans on uncertainty.
 
-`ReviewScopeResolver` — workspace scope returns all, session scope returns comments only if session has telemetry.
+`ReviewScopeResolver` — bay scope returns all, session scope returns comments only if session has telemetry.
 
 `AttributionIndex` — `attribution/index.db`. Record (session_id, tool_use_id, file_path, start_line, end_line). FindByLine (range overlap, most recent), FindByRange (overlapping), FindByToolUse. Changed line-range resolves to exact authoring tool call.
 
-`ReviewDispatcher` — dispatches rendered review messages to target pane PTY. Links to task run. Diff-review pane with live-update (3s poll, scroll preservation, isConnected self-clear).
+`ReviewDispatcher` — dispatches rendered review messages to target nook PTY. Links to task run. Diff-review nook with live-update (3s poll, scroll preservation, isConnected self-clear).
 
 ## Control plane integration
 

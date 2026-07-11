@@ -6,10 +6,10 @@ namespace Cove.Engine.Tests;
 
 public sealed class SubtabTests
 {
-    private static PaneLeaf Leaf(string id) => new()
+    private static NookLeaf Leaf(string id) => new()
     {
-        PaneId = id,
-        Subtabs = new[] { new Subtab(id, PaneType.Terminal) },
+        NookId = id,
+        Subtabs = new[] { new Subtab(id, NookType.Terminal) },
     };
 
     [Fact]
@@ -40,7 +40,7 @@ public sealed class SubtabTests
     public void AddSubtab_AppendsAndActivates()
     {
         var s = new LayoutService();
-        var rid = s.CreateRoom("m", Leaf("p1"));
+        var rid = s.CreateShore("m", Leaf("p1"));
 
         s.AddSubtab(rid, "p1", "p2");
 
@@ -55,7 +55,7 @@ public sealed class SubtabTests
     public void ActivateSubtab_SetsIndexClamped()
     {
         var s = new LayoutService();
-        var rid = s.CreateRoom("m", Leaf("p1"));
+        var rid = s.CreateShore("m", Leaf("p1"));
         s.AddSubtab(rid, "p1", "p2");
 
         s.ActivateSubtab(rid, "p1", 0);

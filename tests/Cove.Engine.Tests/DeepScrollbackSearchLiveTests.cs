@@ -18,25 +18,25 @@ public sealed class DeepScrollbackSearchLiveTests
         await using var h = await DaemonTestHarness.StartAsync();
         await using FrameConnection ctl = await h.ConnectAsync("cli");
 
-        string paneId = await SpawnAsync(ctl, "/bin/sh",
+        string nookId = await SpawnAsync(ctl, "/bin/sh",
             new[] { "-c", "for i in $(seq 1 6000); do printf 'line %d\\n' \"$i\"; done; printf 'NEEDLE_IN_HAYSTACK\\n'; sleep 30" }, ct);
 
         var readyDeadline = Task.Delay(System.TimeSpan.FromSeconds(10), ct);
         while (!readyDeadline.IsCompleted)
         {
-            ControlResponse rd = await RequestAsync(ctl, "rd", "cove://commands/pane.read",
-                JsonSerializer.SerializeToElement(new PaneReadParams(paneId, 0, 65536), CoveJsonContext.Default.PaneReadParams), ct);
+            ControlResponse rd = await RequestAsync(ctl, "rd", "cove://commands/nook.read",
+                JsonSerializer.SerializeToElement(new NookReadParams(nookId, 0, 65536), CoveJsonContext.Default.NookReadParams), ct);
             if (rd.Ok)
             {
-                var pr = rd.Data!.Value.Deserialize(CoveJsonContext.Default.PaneReadResult)!;
+                var pr = rd.Data!.Value.Deserialize(CoveJsonContext.Default.NookReadResult)!;
                 if (pr.Head > 100000)
                     break;
             }
             await Task.Delay(200, ct);
         }
 
-        ControlResponse searchResp = await RequestAsync(ctl, "search", "cove://commands/pane.search",
-            JsonSerializer.SerializeToElement(new SearchParams(paneId, "NEEDLE_IN_HAYSTACK", false), CoveJsonContext.Default.SearchParams), ct);
+        ControlResponse searchResp = await RequestAsync(ctl, "search", "cove://commands/nook.search",
+            JsonSerializer.SerializeToElement(new SearchParams(nookId, "NEEDLE_IN_HAYSTACK", false), CoveJsonContext.Default.SearchParams), ct);
         Assert.True(searchResp.Ok, searchResp.Error?.Message);
         var result = searchResp.Data!.Value.Deserialize(CoveJsonContext.Default.SearchResult)!;
         Assert.NotEmpty(result.Matches);
@@ -48,9 +48,9 @@ public sealed class DeepScrollbackSearchLiveTests
         JsonElement sp = JsonSerializer.SerializeToElement(
             new SpawnParams(command, args, null, null, 80, 24),
             CoveJsonContext.Default.SpawnParams);
-        ControlResponse r = await RequestAsync(ctl, "spawn", "cove://commands/pane.spawn", sp, ct);
+        ControlResponse r = await RequestAsync(ctl, "spawn", "cove://commands/nook.spawn", sp, ct);
         Assert.True(r.Ok, r.Error?.Message);
-        return r.Data!.Value.Deserialize(CoveJsonContext.Default.PaneInfo)!.PaneId;
+        return r.Data!.Value.Deserialize(CoveJsonContext.Default.NookInfo)!.NookId;
     }
 
     private static async Task<ControlResponse> RequestAsync(FrameConnection ctl, string id, string uri, JsonElement? p, CancellationToken ct)

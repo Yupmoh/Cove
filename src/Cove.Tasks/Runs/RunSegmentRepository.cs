@@ -9,7 +9,7 @@ public sealed class RunSegmentRow
 {
     public string Id { get; set; } = "";
     public string RunId { get; set; } = "";
-    public string? PaneId { get; set; }
+    public string? NookId { get; set; }
     public string? AdapterSessionId { get; set; }
     public string StartedAt { get; set; } = "";
     public string? EndedAt { get; set; }
@@ -21,7 +21,7 @@ public sealed class RunSegmentRepository
     private readonly SqliteConnectionFactory _factory;
     private readonly TasksWriteChannel? _channel;
 
-    private const string SelectColumns = "id AS Id, run_id AS RunId, pane_id AS PaneId, adapter_session_id AS AdapterSessionId, started_at AS StartedAt, ended_at AS EndedAt, created_at AS CreatedAt";
+    private const string SelectColumns = "id AS Id, run_id AS RunId, nook_id AS NookId, adapter_session_id AS AdapterSessionId, started_at AS StartedAt, ended_at AS EndedAt, created_at AS CreatedAt";
 
     public RunSegmentRepository(SqliteConnectionFactory factory, TasksWriteChannel? channel = null)
     {
@@ -29,13 +29,13 @@ public sealed class RunSegmentRepository
         _channel = channel;
     }
 
-    public System.Threading.Tasks.Task<RunSegmentRow?> AddAsync(string runId, string? paneId, string? adapterSessionId)
+    public System.Threading.Tasks.Task<RunSegmentRow?> AddAsync(string runId, string? nookId, string? adapterSessionId)
     {
         var row = new RunSegmentRow
         {
             Id = System.Guid.NewGuid().ToString("N"),
             RunId = runId,
-            PaneId = paneId,
+            NookId = nookId,
             AdapterSessionId = adapterSessionId,
             StartedAt = System.DateTimeOffset.UtcNow.ToString("o"),
             CreatedAt = System.DateTimeOffset.UtcNow.ToString("o"),
@@ -57,7 +57,7 @@ public sealed class RunSegmentRepository
     private static void AddInternal(SqliteConnection conn, RunSegmentRow row)
     {
         conn.Execute(
-            "INSERT INTO task_run_segments (id, run_id, pane_id, adapter_session_id, started_at, ended_at, created_at) VALUES (@Id, @RunId, @PaneId, @AdapterSessionId, @StartedAt, @EndedAt, @CreatedAt)",
+            "INSERT INTO task_run_segments (id, run_id, nook_id, adapter_session_id, started_at, ended_at, created_at) VALUES (@Id, @RunId, @NookId, @AdapterSessionId, @StartedAt, @EndedAt, @CreatedAt)",
             row);
     }
 
@@ -69,12 +69,12 @@ public sealed class RunSegmentRepository
             new { RunId = runId }).AsList();
     }
 
-    public RunSegmentRow? GetByPaneId(string paneId)
+    public RunSegmentRow? GetByNookId(string nookId)
     {
         using var conn = _factory.Open();
         return conn.QuerySingleOrDefault<RunSegmentRow>(
-            $"SELECT {SelectColumns} FROM task_run_segments WHERE pane_id = @PaneId AND ended_at IS NULL ORDER BY started_at DESC LIMIT 1",
-            new { PaneId = paneId });
+            $"SELECT {SelectColumns} FROM task_run_segments WHERE nook_id = @NookId AND ended_at IS NULL ORDER BY started_at DESC LIMIT 1",
+            new { NookId = nookId });
     }
 
     public System.Threading.Tasks.Task EndAsync(string segmentId)

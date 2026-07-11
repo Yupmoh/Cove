@@ -25,24 +25,24 @@ public sealed class KeyboardDispatchLiveTests
         await using FrameConnection ctl = await h.ConnectAsync("cli");
 
         string marker = "KB_" + label.Replace(" ", "_").Replace("/", "_");
-        string paneId = await SpawnAsync(ctl, "/bin/sh", new[] { "-c", $"printf '%s\\n' '{marker}'; sleep 30" }, ct);
+        string nookId = await SpawnAsync(ctl, "/bin/sh", new[] { "-c", $"printf '%s\\n' '{marker}'; sleep 30" }, ct);
         await Task.Delay(500, ct);
 
         JsonElement wp = JsonSerializer.SerializeToElement(
-            new PaneWriteParams(paneId, System.Convert.ToBase64String(Encoding.UTF8.GetBytes(input))),
-            CoveJsonContext.Default.PaneWriteParams);
-        ControlResponse writeResp = await RequestAsync(ctl, "w", "cove://commands/pane.write", wp, ct);
+            new NookWriteParams(nookId, System.Convert.ToBase64String(Encoding.UTF8.GetBytes(input))),
+            CoveJsonContext.Default.NookWriteParams);
+        ControlResponse writeResp = await RequestAsync(ctl, "w", "cove://commands/nook.write", wp, ct);
         Assert.True(writeResp.Ok, writeResp.Error?.Message);
 
-        JsonElement rp = JsonSerializer.SerializeToElement(new PaneReadParams(paneId, 0, 65536), CoveJsonContext.Default.PaneReadParams);
+        JsonElement rp = JsonSerializer.SerializeToElement(new NookReadParams(nookId, 0, 65536), CoveJsonContext.Default.NookReadParams);
         var deadline = Task.Delay(System.TimeSpan.FromSeconds(30), ct);
         string output = "";
         while (!deadline.IsCompleted)
         {
-            ControlResponse r = await RequestAsync(ctl, "rd", "cove://commands/pane.read", rp, ct);
+            ControlResponse r = await RequestAsync(ctl, "rd", "cove://commands/nook.read", rp, ct);
             if (r.Ok)
             {
-                var result = r.Data!.Value.Deserialize(CoveJsonContext.Default.PaneReadResult)!;
+                var result = r.Data!.Value.Deserialize(CoveJsonContext.Default.NookReadResult)!;
                 if (!string.IsNullOrEmpty(result.DataBase64))
                 {
                     output = Encoding.UTF8.GetString(System.Convert.FromBase64String(result.DataBase64));
@@ -59,9 +59,9 @@ public sealed class KeyboardDispatchLiveTests
         JsonElement sp = JsonSerializer.SerializeToElement(
             new SpawnParams(command, args, null, null, 80, 24),
             CoveJsonContext.Default.SpawnParams);
-        ControlResponse r = await RequestAsync(ctl, "spawn", "cove://commands/pane.spawn", sp, ct);
+        ControlResponse r = await RequestAsync(ctl, "spawn", "cove://commands/nook.spawn", sp, ct);
         Assert.True(r.Ok, r.Error?.Message);
-        return r.Data!.Value.Deserialize(CoveJsonContext.Default.PaneInfo)!.PaneId;
+        return r.Data!.Value.Deserialize(CoveJsonContext.Default.NookInfo)!.NookId;
     }
 
     private static async Task<ControlResponse> RequestAsync(FrameConnection ctl, string id, string uri, JsonElement? p, CancellationToken ct)

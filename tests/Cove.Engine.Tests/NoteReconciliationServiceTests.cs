@@ -27,7 +27,7 @@ public sealed class NoteReconciliationServiceTests
         await System.Threading.Tasks.Task.Delay(500);
 
         Assert.True(events.Count >= 1);
-        Assert.Equal("ws1", events[0].WorkspaceId);
+        Assert.Equal("ws1", events[0].BayId);
         Assert.True(events.All(e => e.FilePath == notePath || e.FilePath.Contains("test-note")));
 
         svc.Dispose();

@@ -4,7 +4,7 @@ namespace Cove.Engine.Protocol;
 
 public sealed class ProtocolResolver
 {
-    public (string? Uri, JsonElement? Params) Resolve(string coveUri, string? focusedPaneId, string? activeRoomId)
+    public (string? Uri, JsonElement? Params) Resolve(string coveUri, string? focusedNookId, string? activeShoreId)
     {
         if (!coveUri.StartsWith("cove://", StringComparison.Ordinal))
             return (null, null);
@@ -19,12 +19,12 @@ public sealed class ProtocolResolver
             return (null, null);
 
         var category = segments[0];
-        var queryParams = ParseQuery(queryPart, focusedPaneId, activeRoomId);
+        var queryParams = ParseQuery(queryPart, focusedNookId, activeShoreId);
 
         return category switch
         {
             "commands" => ResolveCommands(segments, queryParams),
-            "panes" => ResolvePanes(segments, queryParams),
+            "nooks" => ResolveNooks(segments, queryParams),
             "agents" => ResolveAgents(segments, queryParams),
             "skills" => ResolveSkills(segments, queryParams),
             _ => (null, null),
@@ -36,34 +36,34 @@ public sealed class ProtocolResolver
         var action = segments.Length > 1 ? string.Join('.', segments[1..]) : "";
         var uri = action switch
         {
-            "pane.split.horizontal" or "pane.split.vertical" => "cove://commands/layout.mutate",
-            "pane.close" => "cove://commands/pane.kill",
-            "room.new" => "cove://commands/room.create",
+            "nook.split.horizontal" or "nook.split.vertical" => "cove://commands/layout.mutate",
+            "nook.close" => "cove://commands/nook.kill",
+            "shore.new" => "cove://commands/shore.create",
             "launcher.open" => "cove://commands/launcher.open",
             _ => $"cove://commands/{action}",
         };
         return (uri, ToJson(queryParams));
     }
 
-    private static (string?, JsonElement?) ResolvePanes(string[] segments, Dictionary<string, string> queryParams)
+    private static (string?, JsonElement?) ResolveNooks(string[] segments, Dictionary<string, string> queryParams)
     {
         if (segments.Length == 1)
-            return ("cove://commands/pane.list", null);
+            return ("cove://commands/nook.list", null);
 
-        var paneId = segments[1];
+        var nookId = segments[1];
         if (segments.Length == 2)
         {
-            queryParams["paneId"] = paneId;
-            return ("cove://commands/pane.list", ToJson(queryParams));
+            queryParams["nookId"] = nookId;
+            return ("cove://commands/nook.list", ToJson(queryParams));
         }
 
         var action = segments[2];
-        queryParams["paneId"] = paneId;
+        queryParams["nookId"] = nookId;
         return action switch
         {
-            "write" => ("cove://commands/pane.write", ToJson(queryParams)),
-            "scrollback" => ("cove://commands/pane.scrollback", ToJson(queryParams)),
-            _ => ($"cove://commands/pane.{action}", ToJson(queryParams)),
+            "write" => ("cove://commands/nook.write", ToJson(queryParams)),
+            "scrollback" => ("cove://commands/nook.scrollback", ToJson(queryParams)),
+            _ => ($"cove://commands/nook.{action}", ToJson(queryParams)),
         };
     }
 
@@ -94,7 +94,7 @@ public sealed class ProtocolResolver
         return (null, null);
     }
 
-    private static Dictionary<string, string> ParseQuery(string query, string? focusedPaneId, string? activeRoomId)
+    private static Dictionary<string, string> ParseQuery(string query, string? focusedNookId, string? activeShoreId)
     {
         var result = new Dictionary<string, string>();
         if (string.IsNullOrEmpty(query))
@@ -108,8 +108,8 @@ public sealed class ProtocolResolver
             var value = pair[(eq + 1)..];
             value = value switch
             {
-                "$FOCUS" when focusedPaneId is not null => focusedPaneId,
-                "$ACTIVE" when activeRoomId is not null => activeRoomId,
+                "$FOCUS" when focusedNookId is not null => focusedNookId,
+                "$ACTIVE" when activeShoreId is not null => activeShoreId,
                 _ => value,
             };
             result[key] = value;

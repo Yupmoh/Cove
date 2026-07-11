@@ -57,8 +57,8 @@ public sealed class RestorationTests
             var svc = new RestorationService(dir, new NoOpLogger());
             var state = svc.LoadState();
             Assert.Equal(1, state.SchemaVersion);
-            Assert.Empty(state.OpenWorkspaces);
-            Assert.Null(state.FocusedWorkspace);
+            Assert.Empty(state.OpenBays);
+            Assert.Null(state.FocusedBay);
             Assert.False(state.CleanShutdown);
         }
         finally
@@ -77,15 +77,15 @@ public sealed class RestorationTests
             var svc = new RestorationService(dir, new NoOpLogger());
             svc.SaveState(new Cove.Persistence.CoveState
             {
-                OpenWorkspaces = ["ws-1", "ws-2"],
-                FocusedWorkspace = "ws-2",
+                OpenBays = ["ws-1", "ws-2"],
+                FocusedBay = "ws-2",
                 CleanShutdown = true,
                 ShutdownAtUtc = DateTimeOffset.UtcNow,
             });
 
             var loaded = svc.LoadState();
-            Assert.Equal(2, loaded.OpenWorkspaces.Count);
-            Assert.Equal("ws-2", loaded.FocusedWorkspace);
+            Assert.Equal(2, loaded.OpenBays.Count);
+            Assert.Equal("ws-2", loaded.FocusedBay);
             Assert.True(loaded.CleanShutdown);
         }
         finally
@@ -118,7 +118,7 @@ public sealed class RestorationTests
     }
 
     [Fact]
-    public async Task DaemonRestart_RestoresPanesAndScrollback_IdenticalState()
+    public async Task DaemonRestart_RestoresNooksAndScrollback_IdenticalState()
     {
         if (System.OperatingSystem.IsWindows())
             return;
@@ -133,13 +133,13 @@ public sealed class RestorationTests
             new SpawnParams("/bin/sh", new[] { "-c", "echo " + marker + "; sleep 30" }, null, null, 80, 24),
             CoveJsonContext.Default.SpawnParams);
         await ctl.WriteFrameAsync(FrameType.Request, 0,
-            ControlCodec.Encode(new ControlRequest("1", "cove://commands/pane.spawn", sp)), ct);
+            ControlCodec.Encode(new ControlRequest("1", "cove://commands/nook.spawn", sp)), ct);
         ControlResponse spawnResp = await ReadResponseAsync(ctl, "1", ct);
         Assert.True(spawnResp.Ok, spawnResp.Error?.Message);
-        string paneId = spawnResp.Data!.Value.Deserialize(CoveJsonContext.Default.PaneInfo)!.PaneId;
+        string nookId = spawnResp.Data!.Value.Deserialize(CoveJsonContext.Default.NookInfo)!.NookId;
 
         JsonElement mp = JsonSerializer.SerializeToElement(
-            new LayoutMutateParams("createRoom", NewPaneId: paneId, Name: "main"),
+            new LayoutMutateParams("createShore", NewNookId: nookId, Name: "main"),
             Cove.Protocol.CoveJsonContext.Default.LayoutMutateParams);
         await ctl.WriteFrameAsync(FrameType.Request, 0,
             ControlCodec.Encode(new ControlRequest("2", "cove://commands/layout.mutate", mp)), ct);
@@ -152,9 +152,9 @@ public sealed class RestorationTests
         await using FrameConnection ctl2 = await h.ConnectAsync("cli");
 
         JsonElement lp = JsonSerializer.SerializeToElement(
-            new SubscribeParams(paneId, 0), CoveJsonContext.Default.SubscribeParams);
+            new SubscribeParams(nookId, 0), CoveJsonContext.Default.SubscribeParams);
         await ctl2.WriteFrameAsync(FrameType.Request, 0,
-            ControlCodec.Encode(new ControlRequest("3", "cove://commands/pane.subscribe", lp)), ct);
+            ControlCodec.Encode(new ControlRequest("3", "cove://commands/nook.subscribe", lp)), ct);
         ControlResponse subResp = await ReadResponseAsync(ctl2, "3", ct);
         Assert.True(subResp.Ok, subResp.Error?.Message);
 
@@ -177,7 +177,7 @@ public sealed class RestorationTests
     }
 
     [Fact]
-    public async Task DaemonRestart_CapturesHookSessionId_PersistsOntoPaneRecord_AndRespawnsSamePane()
+    public async Task DaemonRestart_CapturesHookSessionId_PersistsOntoNookRecord_AndRespawnsSameNook()
     {
         if (System.OperatingSystem.IsWindows())
             return;
@@ -192,13 +192,13 @@ public sealed class RestorationTests
             new SpawnParams("/bin/sh", new[] { "-c", "echo " + marker + "; sleep 30" }, null, null, 80, 24, null, "test-v2", "claude"),
             CoveJsonContext.Default.SpawnParams);
         await ctl.WriteFrameAsync(FrameType.Request, 0,
-            ControlCodec.Encode(new ControlRequest("1", "cove://commands/pane.spawn", sp)), ct);
+            ControlCodec.Encode(new ControlRequest("1", "cove://commands/nook.spawn", sp)), ct);
         ControlResponse spawnResp = await ReadResponseAsync(ctl, "1", ct);
         Assert.True(spawnResp.Ok, spawnResp.Error?.Message);
-        string paneId = spawnResp.Data!.Value.Deserialize(CoveJsonContext.Default.PaneInfo)!.PaneId;
+        string nookId = spawnResp.Data!.Value.Deserialize(CoveJsonContext.Default.NookInfo)!.NookId;
 
         JsonElement mp = JsonSerializer.SerializeToElement(
-            new LayoutMutateParams("createRoom", NewPaneId: paneId, Name: "main"),
+            new LayoutMutateParams("createShore", NewNookId: nookId, Name: "main"),
             Cove.Protocol.CoveJsonContext.Default.LayoutMutateParams);
         await ctl.WriteFrameAsync(FrameType.Request, 0,
             ControlCodec.Encode(new ControlRequest("2", "cove://commands/layout.mutate", mp)), ct);
@@ -216,12 +216,12 @@ public sealed class RestorationTests
                 $"http://127.0.0.1:{port}/api/adapter/test-v2/session-start");
             msg.Content = new System.Net.Http.StringContent(
                 "{\"session_id\":\"" + adapterSessionId + "\"}", Encoding.UTF8, "application/json");
-            msg.Headers.Add("X-Cove-Pane-Id", paneId);
+            msg.Headers.Add("X-Cove-Nook-Id", nookId);
             var resp = await http.SendAsync(msg, ct);
             Assert.True(resp.IsSuccessStatusCode);
         }
 
-        var sessionFile = Path.Combine(h.DataDir, "workspaces");
+        var sessionFile = Path.Combine(h.DataDir, "bays");
         string? found = null;
         var persistDeadline = DateTimeOffset.UtcNow.AddSeconds(8);
         while (DateTimeOffset.UtcNow < persistDeadline)
@@ -229,7 +229,7 @@ public sealed class RestorationTests
             if (Directory.Exists(sessionFile))
             {
                 var candidate = Directory.EnumerateFiles(sessionFile, "session.json", SearchOption.AllDirectories)
-                    .FirstOrDefault(f => f.Contains(paneId, StringComparison.Ordinal));
+                    .FirstOrDefault(f => f.Contains(nookId, StringComparison.Ordinal));
                 if (candidate is not null && File.ReadAllText(candidate).Contains(adapterSessionId, StringComparison.Ordinal))
                 {
                     found = candidate;
@@ -249,9 +249,9 @@ public sealed class RestorationTests
         await using FrameConnection ctl2 = await h.ConnectAsync("cli");
 
         JsonElement lp = JsonSerializer.SerializeToElement(
-            new SubscribeParams(paneId, 0), CoveJsonContext.Default.SubscribeParams);
+            new SubscribeParams(nookId, 0), CoveJsonContext.Default.SubscribeParams);
         await ctl2.WriteFrameAsync(FrameType.Request, 0,
-            ControlCodec.Encode(new ControlRequest("3", "cove://commands/pane.subscribe", lp)), ct);
+            ControlCodec.Encode(new ControlRequest("3", "cove://commands/nook.subscribe", lp)), ct);
         ControlResponse subResp = await ReadResponseAsync(ctl2, "3", ct);
         Assert.True(subResp.Ok, subResp.Error?.Message);
 

@@ -1,5 +1,5 @@
 using System.Security.Cryptography;
-using Cove.Engine.Workspaces;
+using Cove.Engine.Bays;
 using Microsoft.Extensions.Logging;
 
 namespace Cove.Engine.Snapshots;

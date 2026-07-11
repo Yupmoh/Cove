@@ -22,14 +22,14 @@ public sealed class MemoryRanker
         _logger = logger;
     }
 
-    public System.Collections.Generic.IReadOnlyList<RankedFact> SearchRanked(string workspaceId, string query, int limit = 20)
+    public System.Collections.Generic.IReadOnlyList<RankedFact> SearchRanked(string bayId, string query, int limit = 20)
     {
-        var ftsResults = _store.SearchFacts(workspaceId, query, limit * 2);
+        var ftsResults = _store.SearchFacts(bayId, query, limit * 2);
         var result = new System.Collections.Generic.List<RankedFact>();
 
         foreach (var fact in ftsResults)
         {
-            var bm25Score = ComputeBm25(workspaceId, query, fact);
+            var bm25Score = ComputeBm25(bayId, query, fact);
             var hotness = ComputeHotness(fact);
             var fused = bm25Score * 0.6 + hotness * 0.4;
             var snippet = ExtractSnippet(fact.Content, query);
@@ -40,13 +40,13 @@ public sealed class MemoryRanker
         if (result.Count > limit)
             result.RemoveRange(limit, result.Count - limit);
 
-        _logger.LogWarning("memory-ranker: ranked {count} facts for query '{query}' in {ws}", result.Count, query, workspaceId);
+        _logger.LogWarning("memory-ranker: ranked {count} facts for query '{query}' in {ws}", result.Count, query, bayId);
         return result;
     }
 
-    public System.Collections.Generic.IReadOnlyList<RecallPreview> Recall(string workspaceId, string query, int limit = 10)
+    public System.Collections.Generic.IReadOnlyList<RecallPreview> Recall(string bayId, string query, int limit = 10)
     {
-        var ranked = SearchRanked(workspaceId, query, limit);
+        var ranked = SearchRanked(bayId, query, limit);
         var result = new System.Collections.Generic.List<RecallPreview>();
 
         foreach (var r in ranked)
@@ -54,14 +54,14 @@ public sealed class MemoryRanker
             var preview = r.Snippet ?? (r.Fact.Content.Length > 120 ? r.Fact.Content[..120] + "..." : r.Fact.Content);
             var howLong = FormatHowLongAgo(r.Fact.UpdatedAt);
             result.Add(new RecallPreview(r.Fact.Id, r.Fact.Kind, preview, r.Score, howLong));
-            _store.IncrementAccessCount(workspaceId, r.Fact.Id);
-            LogFeedback(workspaceId, r.Fact.Id, query);
+            _store.IncrementAccessCount(bayId, r.Fact.Id);
+            LogFeedback(bayId, r.Fact.Id, query);
         }
 
         return result;
     }
 
-    private double ComputeBm25(string workspaceId, string query, Fact fact)
+    private double ComputeBm25(string bayId, string query, Fact fact)
     {
         using var conn = new SqliteConnection($"Data Source={_dbPath}");
         conn.Open();
@@ -106,7 +106,7 @@ public sealed class MemoryRanker
         return timestamp.ToString("yyyy-MM-dd");
     }
 
-    private void LogFeedback(string workspaceId, string factId, string query)
+    private void LogFeedback(string bayId, string factId, string query)
     {
         try
         {
@@ -116,16 +116,16 @@ public sealed class MemoryRanker
             cmd.CommandText = """
                 CREATE TABLE IF NOT EXISTS feedback (
                     id TEXT PRIMARY KEY,
-                    workspace_id TEXT NOT NULL,
+                    bay_id TEXT NOT NULL,
                     fact_id TEXT NOT NULL,
                     query TEXT NOT NULL,
                     recalled_at TEXT NOT NULL
                 );
                 """;
             cmd.ExecuteNonQuery();
-            cmd.CommandText = "INSERT INTO feedback (id, workspace_id, fact_id, query, recalled_at) VALUES (@id, @ws, @fid, @q, @ts)";
+            cmd.CommandText = "INSERT INTO feedback (id, bay_id, fact_id, query, recalled_at) VALUES (@id, @ws, @fid, @q, @ts)";
             cmd.Parameters.AddWithValue("@id", System.Guid.NewGuid().ToString("N"));
-            cmd.Parameters.AddWithValue("@ws", workspaceId);
+            cmd.Parameters.AddWithValue("@ws", bayId);
             cmd.Parameters.AddWithValue("@fid", factId);
             cmd.Parameters.AddWithValue("@q", query);
             cmd.Parameters.AddWithValue("@ts", System.DateTimeOffset.UtcNow.ToString("o"));

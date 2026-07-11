@@ -21,34 +21,34 @@ public sealed class FakeWorktreeService : IWorktreeService
     public bool RemoveAsync(string ws, string branchName) { RemoveCalls++; return true; }
 }
 
-public sealed class FakePaneHost : IPaneHost
+public sealed class FakeNookHost : INookHost
 {
     public bool ShouldFailCreate { get; set; }
     public bool ShouldFailEnv { get; set; }
     public int CreateCalls { get; private set; }
     public Dictionary<string, Dictionary<string, string>> InjectedEnvs { get; } = new();
     public Dictionary<string, string> BoundCards { get; } = new();
-    public PaneCreationResult? CreatePane(string? adapter, int cols, int rows)
+    public NookCreationResult? CreateNook(string? adapter, int cols, int rows)
     {
         CreateCalls++;
-        return ShouldFailCreate ? null : new PaneCreationResult($"pane-{CreateCalls}");
+        return ShouldFailCreate ? null : new NookCreationResult($"nook-{CreateCalls}");
     }
-    public bool InjectEnv(string paneId, IReadOnlyDictionary<string, string> env)
+    public bool InjectEnv(string nookId, IReadOnlyDictionary<string, string> env)
     {
         if (ShouldFailEnv) return false;
-        InjectedEnvs[paneId] = new Dictionary<string, string>(env);
+        InjectedEnvs[nookId] = new Dictionary<string, string>(env);
         return true;
     }
-    public bool BindTaskCard(string paneId, string cardId) { BoundCards[paneId] = cardId; return true; }
+    public bool BindTaskCard(string nookId, string cardId) { BoundCards[nookId] = cardId; return true; }
 }
 
-public sealed class FakeRoomService : IRoomService
+public sealed class FakeShoreService : IShoreService
 {
-    public List<string> CreatedRoomNames { get; } = new();
-    public RoomCreationResult? CreateRoom(string ws, string name, string? parent)
+    public List<string> CreatedShoreNames { get; } = new();
+    public ShoreCreationResult? CreateShore(string ws, string name, string? parent)
     {
-        CreatedRoomNames.Add(name);
-        return new RoomCreationResult($"room-{CreatedRoomNames.Count}");
+        CreatedShoreNames.Add(name);
+        return new ShoreCreationResult($"shore-{CreatedShoreNames.Count}");
     }
 }
 
@@ -58,7 +58,7 @@ public sealed class FakeAgentLauncher : IAgentLauncher
     public string? Error { get; set; }
     public int LaunchCalls { get; private set; }
     public string? LastPrompt { get; private set; }
-    public AdapterLaunchResult Launch(string paneId, string adapter, string cmd, IReadOnlyDictionary<string, string> env, string prompt)
+    public AdapterLaunchResult Launch(string nookId, string adapter, string cmd, IReadOnlyDictionary<string, string> env, string prompt)
     {
         LaunchCalls++;
         LastPrompt = prompt;
@@ -73,7 +73,7 @@ public sealed class FakeAdapterResumeLauncher : IAdapterResumeLauncher
     public int ResumeCalls { get; private set; }
     public string? LastPriorSessionId { get; private set; }
     public string? LastAdapter { get; set; }
-    public AdapterResumeResult Resume(string paneId, string adapter, string resolvedCommand, string priorAdapterSessionId, IReadOnlyDictionary<string, string> env)
+    public AdapterResumeResult Resume(string nookId, string adapter, string resolvedCommand, string priorAdapterSessionId, IReadOnlyDictionary<string, string> env)
     {
         ResumeCalls++;
         LastPriorSessionId = priorAdapterSessionId;

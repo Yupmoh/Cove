@@ -28,7 +28,7 @@ public sealed class RunRestorationService
 
             if (lastSegment is not null && lastSegment.EndedAt is null)
             {
-                _logger.LogWarning("restore: ending dead segment {segmentId} for run {runId} (pane no longer exists)", lastSegment.Id, run.Id);
+                _logger.LogWarning("restore: ending dead segment {segmentId} for run {runId} (nook no longer exists)", lastSegment.Id, run.Id);
                 try { _tasks.EndRunSegmentAsync(lastSegment.Id).Wait(); }
                 catch (System.Exception ex) { _logger.LogWarning("restore: failed to end segment {segmentId}: {error}", lastSegment.Id, ex.Message); }
             }
@@ -36,13 +36,13 @@ public sealed class RunRestorationService
             try
             {
                 _tasks.TransitionRunAsync(run.Id, RunState.Interrupted).Wait();
-                restored.Add(new RestoredRun(run.Id, run.CardId, run.WorkspaceId, lastSegment?.PaneId, lastSegment?.AdapterSessionId, RestoredRunOutcome.Interrupted));
+                restored.Add(new RestoredRun(run.Id, run.CardId, run.BayId, lastSegment?.NookId, lastSegment?.AdapterSessionId, RestoredRunOutcome.Interrupted));
                 _logger.LogWarning("restore: run {runId} flipped to interrupted (was {prevState})", run.Id, run.State);
             }
             catch (System.InvalidOperationException ex)
             {
                 _logger.LogWarning("restore: could not flip run {runId} to interrupted: {error}", run.Id, ex.Message);
-                restored.Add(new RestoredRun(run.Id, run.CardId, run.WorkspaceId, lastSegment?.PaneId, lastSegment?.AdapterSessionId, RestoredRunOutcome.Skipped));
+                restored.Add(new RestoredRun(run.Id, run.CardId, run.BayId, lastSegment?.NookId, lastSegment?.AdapterSessionId, RestoredRunOutcome.Skipped));
             }
         }
 
@@ -82,7 +82,7 @@ public sealed class RunRestorationService
             return new ResumeOnRestartResult(run.RunId, ResumeOnRestartOutcome.FailedTransition);
         }
 
-        await _tasks.AddRunSegmentAsync(run.RunId, run.PaneId, run.AdapterSessionId);
+        await _tasks.AddRunSegmentAsync(run.RunId, run.NookId, run.AdapterSessionId);
 
         try
         {
@@ -103,6 +103,6 @@ public sealed class RunRestorationService
 public enum RestoredRunOutcome { Interrupted, Skipped }
 public enum ResumeOnRestartOutcome { Succeeded, FailedNoSession, AdapterNotReady, FailedTransition }
 
-public sealed record RestoredRun(string RunId, string CardId, string WorkspaceId, string? PaneId, string? AdapterSessionId, RestoredRunOutcome Outcome);
+public sealed record RestoredRun(string RunId, string CardId, string BayId, string? NookId, string? AdapterSessionId, RestoredRunOutcome Outcome);
 public sealed record RestoredRunSummary(System.Collections.Generic.IReadOnlyList<RestoredRun> RestoredRuns);
 public sealed record ResumeOnRestartResult(string RunId, ResumeOnRestartOutcome Outcome);

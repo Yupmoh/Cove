@@ -126,8 +126,8 @@ public sealed class TelemetryService
     private static readonly System.Collections.Generic.HashSet<string> AllowedFields = new(System.StringComparer.Ordinal)
     {
         "version", "channel", "command", "count", "duration", "exitCode",
-        "adapter", "paneType", "action", "result", "error", "reason",
-        "workspaceCount", "paneCount", "roomCount", "agentCount",
+        "adapter", "nookType", "action", "result", "error", "reason",
+        "bayCount", "nookCount", "shoreCount", "agentCount",
         "themeName", "fontSize", "timestamp", "sessionDuration"
     };
 

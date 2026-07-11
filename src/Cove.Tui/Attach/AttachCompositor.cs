@@ -10,11 +10,11 @@ namespace Cove.Tui.Attach;
 
 public static class AttachCompositor
 {
-    public static async Task<int> RunAsync(DaemonPaths paths, IControlEndpoint endpoint, string paneId, string source)
+    public static async Task<int> RunAsync(DaemonPaths paths, IControlEndpoint endpoint, string nookId, string source)
     {
-        if (string.IsNullOrEmpty(paneId))
+        if (string.IsNullOrEmpty(nookId))
         {
-            Console.Error.WriteLine("usage: cove attach <paneId>");
+            Console.Error.WriteLine("usage: cove attach <nookId>");
             Console.Error.WriteLine("       cove attach --raw <session>");
             return 1;
         }
@@ -33,7 +33,7 @@ public static class AttachCompositor
             var height = Console.IsOutputRedirected ? 24 : Console.WindowHeight;
             var vt = new VtEmulator(width, height);
             var emitter = new AnsiDiffEmitter();
-            var session = new AttachSession(conn, paneId);
+            var session = new AttachSession(conn, nookId);
 
             SubscribeResult subResult;
             try

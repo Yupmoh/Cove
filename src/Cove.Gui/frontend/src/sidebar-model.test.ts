@@ -14,21 +14,21 @@ import {
 } from "./sidebar-model";
 
 describe("initialSidebarModel", () => {
-  it("defaults workspaces on the left, both sides expanded", () => {
+  it("defaults bays on the left, both sides expanded", () => {
     const m = initialSidebarModel();
-    expect(m.leftMode).toBe("workspaces");
+    expect(m.leftMode).toBe("bays");
     expect(m.leftCollapsed).toBe(false);
     expect(m.rightCollapsed).toBe(false);
   });
 });
 
 describe("SIDEBAR_MODES", () => {
-  it("lists the six left-rail modes with workspaces and notepad functional and no agents mode", () => {
+  it("lists the six left-rail modes with bays and notepad functional and no agents mode", () => {
     const names = SIDEBAR_MODES.map((m) => m.mode);
-    expect(names).toEqual(["workspaces", "overview", "skills", "activity", "timeline", "notepad"]);
+    expect(names).toEqual(["bays", "overview", "skills", "activity", "timeline", "notepad"]);
     expect(names).not.toContain("agents");
     const functional = SIDEBAR_MODES.filter((m) => m.functional).map((m) => m.mode);
-    expect(functional).toEqual(["workspaces", "notepad"]);
+    expect(functional).toEqual(["bays", "notepad"]);
   });
 });
 

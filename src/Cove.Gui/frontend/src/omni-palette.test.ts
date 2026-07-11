@@ -18,14 +18,14 @@ describe("parseQuery", () => {
   it("parses > prefix as commands", () => {
     expect(parseQuery(">split")).toEqual({ category: "commands", text: "split" });
   });
-  it("parses ~ prefix as workspaces", () => {
-    expect(parseQuery("~myws")).toEqual({ category: "workspaces", text: "myws" });
+  it("parses ~ prefix as bays", () => {
+    expect(parseQuery("~myws")).toEqual({ category: "bays", text: "myws" });
   });
-  it("parses @ prefix as rooms", () => {
-    expect(parseQuery("@room1")).toEqual({ category: "rooms", text: "room1" });
+  it("parses @ prefix as shores", () => {
+    expect(parseQuery("@shore1")).toEqual({ category: "shores", text: "shore1" });
   });
-  it("parses $ prefix as panes", () => {
-    expect(parseQuery("$pane")).toEqual({ category: "panes", text: "pane" });
+  it("parses $ prefix as nooks", () => {
+    expect(parseQuery("$nook")).toEqual({ category: "nooks", text: "nook" });
   });
   it("parses # prefix as tasks", () => {
     expect(parseQuery("#task")).toEqual({ category: "tasks", text: "task" });
@@ -81,7 +81,7 @@ describe("filterAndSort", () => {
   const items: PaletteItem[] = [
     { id: "1", label: "Split right", category: "commands", icon: "|", run: () => {} },
     { id: "2", label: "Split down", category: "commands", icon: "-", run: () => {} },
-    { id: "3", label: "Room 1", category: "rooms", icon: ">", run: () => {} },
+    { id: "3", label: "Shore 1", category: "shores", icon: ">", run: () => {} },
     { id: "4", label: "Task A", category: "tasks", icon: "#", run: () => {} },
   ];
 
@@ -91,7 +91,7 @@ describe("filterAndSort", () => {
     expect(r.map((i) => i.id)).toEqual(["1", "2"]);
   });
   it("filters by category", () => {
-    const r = filterAndSort(items, { category: "rooms", text: "" });
+    const r = filterAndSort(items, { category: "shores", text: "" });
     expect(r).toHaveLength(1);
     expect(r[0].id).toBe("3");
   });
@@ -146,15 +146,15 @@ describe("MruTracker", () => {
 describe("cycleCategory", () => {
   it("cycles forward", () => {
     expect(cycleCategory("all", 1)).toBe("commands");
-    expect(cycleCategory("commands", 1)).toBe("rooms");
+    expect(cycleCategory("commands", 1)).toBe("shores");
   });
   it("cycles backward", () => {
     expect(cycleCategory("commands", -1)).toBe("all");
-    expect(cycleCategory("all", -1)).toBe("workspaces");
+    expect(cycleCategory("all", -1)).toBe("bays");
   });
   it("wraps around", () => {
-    expect(cycleCategory("workspaces", 1)).toBe("all");
-    expect(cycleCategory("all", -1)).toBe("workspaces");
+    expect(cycleCategory("bays", 1)).toBe("all");
+    expect(cycleCategory("all", -1)).toBe("bays");
   });
 });
 
@@ -162,6 +162,6 @@ describe("categoryLabel", () => {
   it("returns label for each category", () => {
     expect(categoryLabel("all")).toBe("All");
     expect(categoryLabel("commands")).toBe("Commands");
-    expect(categoryLabel("rooms")).toBe("Rooms");
+    expect(categoryLabel("shores")).toBe("Shores");
   });
 });

@@ -40,7 +40,7 @@ public sealed class TaskService
 
     public System.Threading.Tasks.Task StartAsync() => _channel.StartAsync();
 
-    public void SeedDefaultStatuses(string workspaceId)
+    public void SeedDefaultStatuses(string bayId)
     {
         var now = System.DateTimeOffset.UtcNow.ToString("o");
         var defaults = new[]
@@ -55,8 +55,8 @@ public sealed class TaskService
         foreach (var (id, name, color, pos, isProg, isLoop, isReview, isDone) in defaults)
         {
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = "INSERT OR IGNORE INTO statuses (workspace_id, id, name, hex_color, position, is_in_progress, is_looping, is_review, is_completion, created_at, updated_at) VALUES (@WorkspaceId, @Id, @Name, @Color, @Pos, @IsProg, @IsLoop, @IsReview, @IsDone, @Now, @Now)";
-            cmd.Parameters.AddWithValue("@WorkspaceId", workspaceId);
+            cmd.CommandText = "INSERT OR IGNORE INTO statuses (bay_id, id, name, hex_color, position, is_in_progress, is_looping, is_review, is_completion, created_at, updated_at) VALUES (@BayId, @Id, @Name, @Color, @Pos, @IsProg, @IsLoop, @IsReview, @IsDone, @Now, @Now)";
+            cmd.Parameters.AddWithValue("@BayId", bayId);
             cmd.Parameters.AddWithValue("@Id", id);
             cmd.Parameters.AddWithValue("@Name", name);
             cmd.Parameters.AddWithValue("@Color", color);
@@ -70,16 +70,16 @@ public sealed class TaskService
         }
     }
 
-    public async System.Threading.Tasks.Task<CardRow> CreateCardAsync(string workspaceId, string title, string source, string? description, int priority, int size, string? assignee, string statusId = "todo")
+    public async System.Threading.Tasks.Task<CardRow> CreateCardAsync(string bayId, string title, string source, string? description, int priority, int size, string? assignee, string statusId = "todo")
     {
-        SeedDefaultStatuses(workspaceId);
-        var number = await _counter.NextNumberAsync(workspaceId);
-        var orderKey = await _cards.NextOrderKeyAsync(workspaceId, statusId);
+        SeedDefaultStatuses(bayId);
+        var number = await _counter.NextNumberAsync(bayId);
+        var orderKey = await _cards.NextOrderKeyAsync(bayId, statusId);
         var now = System.DateTimeOffset.UtcNow.ToString("o");
         var row = new CardRow
         {
             Id = System.Guid.NewGuid().ToString("N"),
-            WorkspaceId = workspaceId,
+            BayId = bayId,
             TaskNumber = number,
             Title = title,
             Description = description ?? "",
@@ -97,9 +97,9 @@ public sealed class TaskService
     }
 
     public CardRow? GetCard(string id) => _cards.GetById(id);
-    public CardRow? GetCardByHumanId(string workspaceId, int number) => _cards.GetByWorkspaceAndNumber(workspaceId, number);
-    public IReadOnlyList<CardRow> ListCards(string workspaceId) => _cards.ListByWorkspace(workspaceId);
-    public IReadOnlyList<CardRow> ListCardsByStatus(string workspaceId, string statusId) => _cards.ListByStatus(workspaceId, statusId);
+    public CardRow? GetCardByHumanId(string bayId, int number) => _cards.GetByBayAndNumber(bayId, number);
+    public IReadOnlyList<CardRow> ListCards(string bayId) => _cards.ListByBay(bayId);
+    public IReadOnlyList<CardRow> ListCardsByStatus(string bayId, string statusId) => _cards.ListByStatus(bayId, statusId);
 
     public async System.Threading.Tasks.Task<int> UpdateCardAsync(CardRow row)
     {
@@ -109,31 +109,31 @@ public sealed class TaskService
 
     public async System.Threading.Tasks.Task<int> DeleteCardAsync(string id) => await _cards.DeleteAsync(id);
 
-    public System.Threading.Tasks.Task<Cove.Tasks.Store.StatusRow?> CreateStatusAsync(string workspaceId, string id, string name, string hexColor, double position)
+    public System.Threading.Tasks.Task<Cove.Tasks.Store.StatusRow?> CreateStatusAsync(string bayId, string id, string name, string hexColor, double position)
     {
-        SeedDefaultStatuses(workspaceId);
-        return _statuses.CreateAsync(workspaceId, id, name, hexColor, position);
+        SeedDefaultStatuses(bayId);
+        return _statuses.CreateAsync(bayId, id, name, hexColor, position);
     }
 
-    public System.Collections.Generic.IReadOnlyList<Cove.Tasks.Store.StatusRow> ListStatuses(string workspaceId, bool includeHidden = false)
-        => _statuses.ListByWorkspace(workspaceId, includeHidden);
+    public System.Collections.Generic.IReadOnlyList<Cove.Tasks.Store.StatusRow> ListStatuses(string bayId, bool includeHidden = false)
+        => _statuses.ListByBay(bayId, includeHidden);
 
-    public System.Threading.Tasks.Task DeleteStatusAsync(string workspaceId, string id, string? rehomeToStatusId)
-        => _statuses.DeleteAsync(workspaceId, id, rehomeToStatusId);
+    public System.Threading.Tasks.Task DeleteStatusAsync(string bayId, string id, string? rehomeToStatusId)
+        => _statuses.DeleteAsync(bayId, id, rehomeToStatusId);
 
-    public System.Threading.Tasks.Task ReorderStatusesAsync(string workspaceId, string[] orderedIds)
-        => _statuses.ReorderAsync(workspaceId, orderedIds);
+    public System.Threading.Tasks.Task ReorderStatusesAsync(string bayId, string[] orderedIds)
+        => _statuses.ReorderAsync(bayId, orderedIds);
 
-    public System.Threading.Tasks.Task SetStatusHiddenAsync(string workspaceId, string id, bool hidden)
-        => _statuses.SetHiddenAsync(workspaceId, id, hidden);
-    public System.Threading.Tasks.Task<Cove.Tasks.Store.LabelRow?> CreateLabelAsync(string workspaceId, string id, string name, string hexColor, double position)
-        => _labels.CreateAsync(workspaceId, id, name, hexColor, position);
+    public System.Threading.Tasks.Task SetStatusHiddenAsync(string bayId, string id, bool hidden)
+        => _statuses.SetHiddenAsync(bayId, id, hidden);
+    public System.Threading.Tasks.Task<Cove.Tasks.Store.LabelRow?> CreateLabelAsync(string bayId, string id, string name, string hexColor, double position)
+        => _labels.CreateAsync(bayId, id, name, hexColor, position);
 
-    public System.Collections.Generic.IReadOnlyList<Cove.Tasks.Store.LabelRow> ListLabels(string workspaceId)
-        => _labels.ListByWorkspace(workspaceId);
+    public System.Collections.Generic.IReadOnlyList<Cove.Tasks.Store.LabelRow> ListLabels(string bayId)
+        => _labels.ListByBay(bayId);
 
-    public System.Threading.Tasks.Task DeleteLabelAsync(string workspaceId, string id)
-        => _labels.DeleteAsync(workspaceId, id);
+    public System.Threading.Tasks.Task DeleteLabelAsync(string bayId, string id)
+        => _labels.DeleteAsync(bayId, id);
 
     public System.Threading.Tasks.Task AssignLabelAsync(string cardId, string labelId)
         => _labels.AssignToCardAsync(cardId, labelId);
@@ -144,11 +144,11 @@ public sealed class TaskService
     public System.Collections.Generic.IReadOnlyList<Cove.Tasks.Store.LabelRow> GetLabelsForCard(string cardId)
         => _labels.GetLabelsForCard(cardId);
 
-    public System.Collections.Generic.IReadOnlyList<string> FilterCardsByLabel(string workspaceId, string labelId)
-        => _labels.FilterCardsByLabel(workspaceId, labelId);
+    public System.Collections.Generic.IReadOnlyList<string> FilterCardsByLabel(string bayId, string labelId)
+        => _labels.FilterCardsByLabel(bayId, labelId);
 
-    public System.Threading.Tasks.Task ReorderLabelsAsync(string workspaceId, string[] orderedIds)
-        => _labels.ReorderAsync(workspaceId, orderedIds);
+    public System.Threading.Tasks.Task ReorderLabelsAsync(string bayId, string[] orderedIds)
+        => _labels.ReorderAsync(bayId, orderedIds);
 
     public System.Threading.Tasks.Task<Cove.Tasks.Store.CommentRow?> AddCommentAsync(string cardId, string kind, string body, string source)
         => _comments.AddAsync(cardId, kind, body, source);
@@ -197,9 +197,9 @@ public sealed class TaskService
 
     public Runs.RunRow? GetRun(string id) => _runs.GetById(id);
     public Runs.RunRow? FindRunByPrefix(string prefix) => _runs.FindByPrefix(prefix);
-    public Runs.RunRow? GetRunByPane(string paneId)
+    public Runs.RunRow? GetRunByNook(string nookId)
     {
-        var segment = _segments.GetByPaneId(paneId);
+        var segment = _segments.GetByNookId(nookId);
         return segment is not null ? _runs.GetById(segment.RunId) : null;
     }
     public Runs.RunRow? GetActiveRunForCard(string cardId)
@@ -211,19 +211,19 @@ public sealed class TaskService
     }
     public System.Threading.Tasks.Task TransitionRunAsync(string runId, Runs.RunState newState) => _runs.TransitionAsync(runId, newState);
     public System.Threading.Tasks.Task SetPendingPromptAsync(string runId, string? prompt) => _runs.SetPendingPromptAsync(runId, prompt);
-    public System.Collections.Generic.IReadOnlyList<Runs.RunRow> ListRuns(string? taskId, string? workspaceId, string? state)
+    public System.Collections.Generic.IReadOnlyList<Runs.RunRow> ListRuns(string? taskId, string? bayId, string? state)
     {
         if (taskId is not null && state is not null) return _runs.ListByCardAndState(taskId, state);
         if (taskId is not null) return _runs.ListByCard(taskId);
-        if (workspaceId is not null && state is not null) return _runs.ListByWorkspaceAndState(workspaceId, state);
-        if (workspaceId is not null) return _runs.ListByWorkspace(workspaceId);
+        if (bayId is not null && state is not null) return _runs.ListByBayAndState(bayId, state);
+        if (bayId is not null) return _runs.ListByBay(bayId);
         if (state is not null) return _runs.ListByState(state);
         return [];
     }
     public System.Collections.Generic.IReadOnlyList<Runs.RunSegmentRow> ListRunSegments(string runId) => _segments.ListByRun(runId);
     public bool HasActiveRun(string cardId) => _runs.HasActiveRun(cardId);
-    public System.Threading.Tasks.Task<Runs.RunRow?> CreateRunAsync(string cardId, string workspaceId, string? launchProfileJson, string? runFamilyId = null, bool backgrounded = false, string? reviewStatusId = null, string? completionStatusId = null) => _runs.CreateAsync(cardId, workspaceId, launchProfileJson, runFamilyId, backgrounded, reviewStatusId, completionStatusId);
-    public System.Threading.Tasks.Task<Runs.RunSegmentRow?> AddRunSegmentAsync(string runId, string? paneId, string? adapterSessionId) => _segments.AddAsync(runId, paneId, adapterSessionId);
+    public System.Threading.Tasks.Task<Runs.RunRow?> CreateRunAsync(string cardId, string bayId, string? launchProfileJson, string? runFamilyId = null, bool backgrounded = false, string? reviewStatusId = null, string? completionStatusId = null) => _runs.CreateAsync(cardId, bayId, launchProfileJson, runFamilyId, backgrounded, reviewStatusId, completionStatusId);
+    public System.Threading.Tasks.Task<Runs.RunSegmentRow?> AddRunSegmentAsync(string runId, string? nookId, string? adapterSessionId) => _segments.AddAsync(runId, nookId, adapterSessionId);
     public System.Threading.Tasks.Task EndRunSegmentAsync(string segmentId) => _segments.EndAsync(segmentId);
 
     public Schedules.ScheduleRow? GetSchedule(string cardId) => _schedules.GetByCard(cardId);

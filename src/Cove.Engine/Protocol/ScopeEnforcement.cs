@@ -1,38 +1,38 @@
 using System.Text.Json;
 using Cove.Engine.Layout;
-using Cove.Engine.Workspaces;
+using Cove.Engine.Bays;
 using Cove.Protocol;
 
 namespace Cove.Engine.Protocol;
 
 internal static class ScopeEnforcement
 {
-    public static bool IsPaneTargetingVerb(string uri)
+    public static bool IsNookTargetingVerb(string uri)
     {
-        return uri.StartsWith("cove://commands/pane.write", System.StringComparison.Ordinal)
-            || uri.StartsWith("cove://commands/pane.resize", System.StringComparison.Ordinal)
-            || uri.StartsWith("cove://commands/pane.kill", System.StringComparison.Ordinal)
-            || uri.StartsWith("cove://commands/pane.rename", System.StringComparison.Ordinal);
+        return uri.StartsWith("cove://commands/nook.write", System.StringComparison.Ordinal)
+            || uri.StartsWith("cove://commands/nook.resize", System.StringComparison.Ordinal)
+            || uri.StartsWith("cove://commands/nook.kill", System.StringComparison.Ordinal)
+            || uri.StartsWith("cove://commands/nook.rename", System.StringComparison.Ordinal);
     }
 
-    public static ControlResponse? Check(ControlRequest request, PaneScopeStore scopeStore, WorkspaceManager? workspaces, LayoutService? layout)
+    public static ControlResponse? Check(ControlRequest request, NookScopeStore scopeStore, BayManager? bays, LayoutService? layout)
     {
         if (request.Params is not JsonElement el)
             return null;
-        string? targetPaneId = null;
-        if (el.TryGetProperty("paneId", out var pid) && pid.ValueKind == JsonValueKind.String)
-            targetPaneId = pid.GetString();
-        if (targetPaneId is null)
+        string? targetNookId = null;
+        if (el.TryGetProperty("nookId", out var pid) && pid.ValueKind == JsonValueKind.String)
+            targetNookId = pid.GetString();
+        if (targetNookId is null)
             return null;
-        var callerPaneId = request.CallerPaneId;
-        if (string.IsNullOrEmpty(callerPaneId))
+        var callerNookId = request.CallerNookId;
+        if (string.IsNullOrEmpty(callerNookId))
             return null;
-        var callerScope = scopeStore.GetScope(callerPaneId!);
-        var resolver = new ScopeResolver(workspaces);
-        var (callerWs, callerRoom) = resolver.ResolvePaneLocation(callerPaneId);
-        var (targetWs, targetRoom) = resolver.ResolvePaneLocation(targetPaneId);
+        var callerScope = scopeStore.GetScope(callerNookId!);
+        var resolver = new ScopeResolver(bays);
+        var (callerWs, callerShore) = resolver.ResolveNookLocation(callerNookId);
+        var (targetWs, targetShore) = resolver.ResolveNookLocation(targetNookId);
         var gate = new ScopeGate();
-        var result = gate.CheckAccess(callerPaneId, callerWs, callerRoom, targetPaneId, targetWs, targetRoom, callerScope);
+        var result = gate.CheckAccess(callerNookId, callerWs, callerShore, targetNookId, targetWs, targetShore, callerScope);
         if (!result.Allowed)
             return new ControlResponse(request.Id, false, null, new ControlError(result.ErrorCode ?? "access_denied", result.Message ?? "access denied"));
         return null;

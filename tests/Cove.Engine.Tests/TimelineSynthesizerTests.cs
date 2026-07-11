@@ -42,7 +42,7 @@ public sealed class TimelineSynthesizerTests
         Assert.Contains("Full prose", backingNote!.Content);
         Assert.Equal("markdown", backingNote.Kind);
 
-        var list = timeline.ListByWorkspace("ws1");
+        var list = timeline.ListByBay("ws1");
         Assert.Single(list);
     }
 

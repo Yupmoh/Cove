@@ -27,7 +27,7 @@ public static class StateBusCommands
             return Task.FromResult(ctx.Fail("invalid_params", "state write params required"));
 
         if (!StateBus.IsValidScope(p.Scope))
-            return Task.FromResult(ctx.Fail("invalid_params", "scope must be app, workspace, tab, or pane"));
+            return Task.FromResult(ctx.Fail("invalid_params", "scope must be app, bay, tab, or nook"));
 
         bus.Write(p.Scope, p.Namespace, p.Id, p.Value);
         return Task.FromResult(ctx.Ok());

@@ -1,14 +1,14 @@
 export interface NoteListItem {
   id: string;
   title: string;
-  workspaceId: string;
+  bayId: string;
   kind: string;
   updatedAt: string;
 }
 
-export interface WorkspaceGroup {
-  workspaceId: string;
-  workspaceName: string;
+export interface BayGroup {
+  bayId: string;
+  bayName: string;
   notes: NoteListItem[];
 }
 
@@ -36,22 +36,22 @@ export function kindColor(kind: string): string {
   return NoteKindColor[kind] ?? "#6b7280";
 }
 
-export function groupByWorkspace(notes: NoteListItem[], workspaceNames: Record<string, string>): WorkspaceGroup[] {
+export function groupByBay(notes: NoteListItem[], bayNames: Record<string, string>): BayGroup[] {
   const map = new Map<string, NoteListItem[]>();
   for (const note of notes) {
-    const list = map.get(note.workspaceId);
+    const list = map.get(note.bayId);
     if (list) list.push(note);
-    else map.set(note.workspaceId, [note]);
+    else map.set(note.bayId, [note]);
   }
-  const groups: WorkspaceGroup[] = [];
+  const groups: BayGroup[] = [];
   for (const [wsId, wsNotes] of map) {
     groups.push({
-      workspaceId: wsId,
-      workspaceName: workspaceNames[wsId] ?? wsId,
+      bayId: wsId,
+      bayName: bayNames[wsId] ?? wsId,
       notes: [...wsNotes].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
     });
   }
-  return groups.sort((a, b) => a.workspaceName.localeCompare(b.workspaceName));
+  return groups.sort((a, b) => a.bayName.localeCompare(b.bayName));
 }
 
 export interface NavState {
@@ -59,7 +59,7 @@ export interface NavState {
   noteIdx: number;
 }
 
-export function moveSelection(groups: WorkspaceGroup[], state: NavState, direction: "up" | "down"): NavState {
+export function moveSelection(groups: BayGroup[], state: NavState, direction: "up" | "down"): NavState {
   if (groups.length === 0) return { groupIdx: -1, noteIdx: -1 };
   let { groupIdx, noteIdx } = state;
   if (groupIdx < 0) { groupIdx = 0; noteIdx = 0; return { groupIdx, noteIdx }; }
@@ -83,11 +83,11 @@ export function moveSelection(groups: WorkspaceGroup[], state: NavState, directi
   return { groupIdx, noteIdx };
 }
 
-export function flattenNotes(groups: WorkspaceGroup[]): NoteListItem[] {
+export function flattenNotes(groups: BayGroup[]): NoteListItem[] {
   return groups.flatMap((g) => g.notes);
 }
 
-export function selectedNote(groups: WorkspaceGroup[], state: NavState): NoteListItem | null {
+export function selectedNote(groups: BayGroup[], state: NavState): NoteListItem | null {
   if (state.groupIdx < 0 || state.groupIdx >= groups.length) return null;
   const group = groups[state.groupIdx];
   if (state.noteIdx < 0 || state.noteIdx >= group.notes.length) return null;

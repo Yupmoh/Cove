@@ -159,7 +159,7 @@ public sealed class LaunchProfileTests
     }
 
     [Fact]
-    public void SetProfileForPane_PersistsAndLoads()
+    public void SetProfileForNook_PersistsAndLoads()
     {
         var dir = NewDir();
         try
@@ -168,15 +168,15 @@ public sealed class LaunchProfileTests
             store.Save(MakeProfile("Default", "default", "claude-code", isDefault: true));
             store.Save(MakeProfile("Fast", "fast", "claude-code"));
 
-            store.SetProfileForPane("claude-code", "fast", "pane-1");
+            store.SetProfileForNook("claude-code", "fast", "nook-1");
 
-            Assert.Equal("fast", store.GetProfileForPane("claude-code", "pane-1"));
+            Assert.Equal("fast", store.GetProfileForNook("claude-code", "nook-1"));
         }
         finally { try { Directory.Delete(dir, true); } catch { } }
     }
 
     [Fact]
-    public void GetProfileForPane_UnknownPane_ReturnsNull()
+    public void GetProfileForNook_UnknownNook_ReturnsNull()
     {
         var dir = NewDir();
         try
@@ -184,13 +184,13 @@ public sealed class LaunchProfileTests
             var store = new LaunchProfileStore(dir);
             store.Save(MakeProfile("Default", "default", "claude-code", isDefault: true));
 
-            Assert.Null(store.GetProfileForPane("claude-code", "never-seen"));
+            Assert.Null(store.GetProfileForNook("claude-code", "never-seen"));
         }
         finally { try { Directory.Delete(dir, true); } catch { } }
     }
 
     [Fact]
-    public void SetProfileForPane_OverwritesPrevious()
+    public void SetProfileForNook_OverwritesPrevious()
     {
         var dir = NewDir();
         try
@@ -199,10 +199,10 @@ public sealed class LaunchProfileTests
             store.Save(MakeProfile("Default", "default", "claude-code", isDefault: true));
             store.Save(MakeProfile("Fast", "fast", "claude-code"));
 
-            store.SetProfileForPane("claude-code", "default", "pane-1");
-            store.SetProfileForPane("claude-code", "fast", "pane-1");
+            store.SetProfileForNook("claude-code", "default", "nook-1");
+            store.SetProfileForNook("claude-code", "fast", "nook-1");
 
-            Assert.Equal("fast", store.GetProfileForPane("claude-code", "pane-1"));
+            Assert.Equal("fast", store.GetProfileForNook("claude-code", "nook-1"));
         }
         finally { try { Directory.Delete(dir, true); } catch { } }
     }
@@ -248,8 +248,8 @@ public sealed class LaunchProfileTests
             store.Save(MakeProfile("Default", "default", "claude-code", isDefault: true));
             store.Save(MakeProfile("Fast", "fast", "claude-code"));
 
-            store.SetProfileForPane("claude-code", "fast", "pane-1");
-            var chip = store.GetFooterChipData("claude-code", "pane-1");
+            store.SetProfileForNook("claude-code", "fast", "nook-1");
+            var chip = store.GetFooterChipData("claude-code", "nook-1");
 
             Assert.NotNull(chip);
             Assert.Equal("fast", chip!.ProfileSlug);
@@ -260,7 +260,7 @@ public sealed class LaunchProfileTests
     }
 
     [Fact]
-    public void GetFooterChipData_UnknownPane_FallsBackToDefault()
+    public void GetFooterChipData_UnknownNook_FallsBackToDefault()
     {
         var dir = NewDir();
         try
@@ -268,7 +268,7 @@ public sealed class LaunchProfileTests
             var store = new LaunchProfileStore(dir);
             store.Save(MakeProfile("Default", "default", "claude-code", isDefault: true));
 
-            var chip = store.GetFooterChipData("claude-code", "unknown-pane");
+            var chip = store.GetFooterChipData("claude-code", "unknown-nook");
 
             Assert.NotNull(chip);
             Assert.Equal("default", chip!.ProfileSlug);
@@ -278,14 +278,14 @@ public sealed class LaunchProfileTests
     }
 
     [Fact]
-    public void List_SkipsPanesFile()
+    public void List_SkipsNooksFile()
     {
         var dir = NewDir();
         try
         {
             var store = new LaunchProfileStore(dir);
             store.Save(MakeProfile("Default", "default", "claude-code", isDefault: true));
-            store.SetProfileForPane("claude-code", "default", "pane-1");
+            store.SetProfileForNook("claude-code", "default", "nook-1");
 
             var profiles = store.List("claude-code");
             Assert.Single(profiles);

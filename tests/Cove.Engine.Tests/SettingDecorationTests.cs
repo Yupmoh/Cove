@@ -103,7 +103,7 @@ public sealed class SettingDecorationTests
         Assert.Contains("terminal", tabs);
         Assert.Contains("updates", tabs);
         Assert.Contains("diagnostics", tabs);
-        Assert.Contains("workspace", tabs);
+        Assert.Contains("bay", tabs);
         Assert.Contains("privacy", tabs);
         Assert.Contains("keyboard", tabs);
         Assert.Contains("audio", tabs);

@@ -46,7 +46,7 @@ public static class LaunchCommands
             return Task.FromResult(ctx.Fail("invalid_params", "override save params required"));
 
         var overrides = ToOverrides(p.Yolo, p.WorkingDir, p.ExtraFlags, p.Env);
-        orch.PersistOverrides(p.PaneId, overrides);
+        orch.PersistOverrides(p.NookId, overrides);
         return Task.FromResult(ctx.Ok());
     }
 
@@ -58,9 +58,9 @@ public static class LaunchCommands
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.LaunchOverrideGetParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "override get params required"));
 
-        var overrides = orch.GetOverrides(p.PaneId);
+        var overrides = orch.GetOverrides(p.NookId);
         if (overrides is null)
-            return Task.FromResult(ctx.Fail("not_found", $"no overrides for pane {p.PaneId}"));
+            return Task.FromResult(ctx.Fail("not_found", $"no overrides for nook {p.NookId}"));
         return Task.FromResult(ctx.Ok(ToDto(overrides), CoveJsonContext.Default.LauncherOverridesDto));
     }
 
@@ -72,7 +72,7 @@ public static class LaunchCommands
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.LaunchOverrideGetParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "override get params required"));
 
-        orch.ClearOverrides(p.PaneId);
+        orch.ClearOverrides(p.NookId);
         return Task.FromResult(ctx.Ok());
     }
 

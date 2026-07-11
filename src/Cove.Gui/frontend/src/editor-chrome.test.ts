@@ -36,7 +36,7 @@ describe("word-wrap", () => {
     expect(toggleWordWrap("off")).toBe("on");
   });
 
-  it("builds stable per-pane storage keys", () => {
+  it("builds stable per-nook storage keys", () => {
     expect(wordWrapStorageKey("p1")).toBe("cove.editor.wordWrap.p1");
     expect(minimapStorageKey("p1")).toBe("cove.editor.minimap.p1");
   });

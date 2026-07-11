@@ -4,38 +4,38 @@ public static class DefaultKeymap
 {
     public static void RegisterAll(KeybindingEngine engine)
     {
-        RegisterRoomShortcuts(engine);
-        RegisterWorkspaceShortcuts(engine);
+        RegisterShoreShortcuts(engine);
+        RegisterBayShortcuts(engine);
         RegisterViewShortcuts(engine);
-        RegisterToolPaneShortcuts(engine);
-        RegisterPaneShortcuts(engine);
+        RegisterToolNookShortcuts(engine);
+        RegisterNookShortcuts(engine);
         RegisterTerminalShortcuts(engine);
-        RegisterPaneMosaicShortcuts(engine);
+        RegisterNookMosaicShortcuts(engine);
     }
 
-    private static void RegisterRoomShortcuts(KeybindingEngine engine)
+    private static void RegisterShoreShortcuts(KeybindingEngine engine)
     {
-        engine.RegisterDefault("cmd+t", "app-command", "room.new", "New room");
-        engine.RegisterDefault("cmd+w", "app-command", "pane.close", "Close pane/room");
-        engine.RegisterDefault("cmd+shift+w", "app-command", "room.close", "Close room");
-        engine.RegisterDefault("ctrl+tab", "app-command", "room.next", "Next room");
-        engine.RegisterDefault("ctrl+shift+tab", "app-command", "room.prev", "Previous room");
-        engine.RegisterDefault("cmd+shift+t", "app-command", "room.omni-jump", "Omni jump to room");
-        engine.RegisterDefault("cmd+shift+p", "app-command", "room.pin", "Pin room");
+        engine.RegisterDefault("cmd+t", "app-command", "shore.new", "New shore");
+        engine.RegisterDefault("cmd+w", "app-command", "nook.close", "Close nook/shore");
+        engine.RegisterDefault("cmd+shift+w", "app-command", "shore.close", "Close shore");
+        engine.RegisterDefault("ctrl+tab", "app-command", "shore.next", "Next shore");
+        engine.RegisterDefault("ctrl+shift+tab", "app-command", "shore.prev", "Previous shore");
+        engine.RegisterDefault("cmd+shift+t", "app-command", "shore.omni-jump", "Omni jump to shore");
+        engine.RegisterDefault("cmd+shift+p", "app-command", "shore.pin", "Pin shore");
     }
 
-    private static void RegisterWorkspaceShortcuts(KeybindingEngine engine)
+    private static void RegisterBayShortcuts(KeybindingEngine engine)
     {
-        engine.RegisterDefault("cmd+shift+n", "app-command", "workspace.create", "Create workspace");
-        engine.RegisterDefault("cmd+1", "app-command", "workspace.switch-1", "Switch to workspace 1");
-        engine.RegisterDefault("cmd+2", "app-command", "workspace.switch-2", "Switch to workspace 2");
-        engine.RegisterDefault("cmd+3", "app-command", "workspace.switch-3", "Switch to workspace 3");
-        engine.RegisterDefault("cmd+4", "app-command", "workspace.switch-4", "Switch to workspace 4");
-        engine.RegisterDefault("cmd+5", "app-command", "workspace.switch-5", "Switch to workspace 5");
-        engine.RegisterDefault("cmd+6", "app-command", "workspace.switch-6", "Switch to workspace 6");
-        engine.RegisterDefault("cmd+7", "app-command", "workspace.switch-7", "Switch to workspace 7");
-        engine.RegisterDefault("cmd+8", "app-command", "workspace.switch-8", "Switch to workspace 8");
-        engine.RegisterDefault("cmd+9", "app-command", "workspace.switch-9", "Switch to workspace 9");
+        engine.RegisterDefault("cmd+shift+n", "app-command", "bay.create", "Create bay");
+        engine.RegisterDefault("cmd+1", "app-command", "bay.switch-1", "Switch to bay 1");
+        engine.RegisterDefault("cmd+2", "app-command", "bay.switch-2", "Switch to bay 2");
+        engine.RegisterDefault("cmd+3", "app-command", "bay.switch-3", "Switch to bay 3");
+        engine.RegisterDefault("cmd+4", "app-command", "bay.switch-4", "Switch to bay 4");
+        engine.RegisterDefault("cmd+5", "app-command", "bay.switch-5", "Switch to bay 5");
+        engine.RegisterDefault("cmd+6", "app-command", "bay.switch-6", "Switch to bay 6");
+        engine.RegisterDefault("cmd+7", "app-command", "bay.switch-7", "Switch to bay 7");
+        engine.RegisterDefault("cmd+8", "app-command", "bay.switch-8", "Switch to bay 8");
+        engine.RegisterDefault("cmd+9", "app-command", "bay.switch-9", "Switch to bay 9");
     }
 
     private static void RegisterViewShortcuts(KeybindingEngine engine)
@@ -48,26 +48,26 @@ public static class DefaultKeymap
         engine.RegisterDefault("cmd+0", "app-command", "view.zoom-reset", "Reset zoom");
     }
 
-    private static void RegisterToolPaneShortcuts(KeybindingEngine engine)
+    private static void RegisterToolNookShortcuts(KeybindingEngine engine)
     {
-        engine.RegisterDefault("cmd+shift+g", "app-command", "tool.git", "Open git pane");
-        engine.RegisterDefault("cmd+shift+f", "app-command", "tool.search", "Open search pane");
-        engine.RegisterDefault("cmd+shift+b", "app-command", "tool.browser", "Open browser pane");
-        engine.RegisterDefault("cmd+shift+k", "app-command", "tool.tasks", "Open tasks pane");
+        engine.RegisterDefault("cmd+shift+g", "app-command", "tool.git", "Open git nook");
+        engine.RegisterDefault("cmd+shift+f", "app-command", "tool.search", "Open search nook");
+        engine.RegisterDefault("cmd+shift+b", "app-command", "tool.browser", "Open browser nook");
+        engine.RegisterDefault("cmd+shift+k", "app-command", "tool.tasks", "Open tasks nook");
         engine.RegisterDefault("cmd+shift+l", "app-command", "tool.library", "Open library");
         engine.RegisterDefault("cmd+shift+p", "app-command", "tool.palette", "Open command palette");
         engine.RegisterDefault("cmd+l", "app-command", "tool.launcher", "Open launcher");
     }
 
-    private static void RegisterPaneShortcuts(KeybindingEngine engine)
+    private static void RegisterNookShortcuts(KeybindingEngine engine)
     {
-        engine.RegisterDefault("cmd+d", "app-command", "pane.split-right", "Split right");
-        engine.RegisterDefault("cmd+shift+d", "app-command", "pane.split-down", "Split down");
-        engine.RegisterDefault("cmd+[", "app-command", "pane.focus-prev", "Focus previous pane");
-        engine.RegisterDefault("cmd+]", "app-command", "pane.focus-next", "Focus next pane");
-        engine.RegisterDefault("cmd+f", "app-command", "pane.find", "Find in pane");
-        engine.RegisterDefault("cmd+shift+up", "app-command", "pane.scroll-top", "Scroll to top");
-        engine.RegisterDefault("cmd+shift+down", "app-command", "pane.scroll-bottom", "Scroll to bottom");
+        engine.RegisterDefault("cmd+d", "app-command", "nook.split-right", "Split right");
+        engine.RegisterDefault("cmd+shift+d", "app-command", "nook.split-down", "Split down");
+        engine.RegisterDefault("cmd+[", "app-command", "nook.focus-prev", "Focus previous nook");
+        engine.RegisterDefault("cmd+]", "app-command", "nook.focus-next", "Focus next nook");
+        engine.RegisterDefault("cmd+f", "app-command", "nook.find", "Find in nook");
+        engine.RegisterDefault("cmd+shift+up", "app-command", "nook.scroll-top", "Scroll to top");
+        engine.RegisterDefault("cmd+shift+down", "app-command", "nook.scroll-bottom", "Scroll to bottom");
     }
 
     private static void RegisterTerminalShortcuts(KeybindingEngine engine)
@@ -78,9 +78,9 @@ public static class DefaultKeymap
         engine.RegisterDefault("shift+enter", "send-text", "\n", "Shift+Enter newline");
     }
 
-    private static void RegisterPaneMosaicShortcuts(KeybindingEngine engine)
+    private static void RegisterNookMosaicShortcuts(KeybindingEngine engine)
     {
-        engine.RegisterDefault("cmd+enter", "app-command", "pane.maximize", "Maximize/zoom pane");
-        engine.RegisterDefault("cmd+shift+enter", "app-command", "pane.popout", "Popout pane");
+        engine.RegisterDefault("cmd+enter", "app-command", "nook.maximize", "Maximize/zoom nook");
+        engine.RegisterDefault("cmd+shift+enter", "app-command", "nook.popout", "Popout nook");
     }
 }

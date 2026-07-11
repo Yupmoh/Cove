@@ -2,7 +2,7 @@ export interface NotificationDeliverPayload {
   id: string;
   title: string;
   body: string;
-  paneId: string;
+  nookId: string;
 }
 
 export type PermissionState = "unknown" | "granted" | "denied";
@@ -11,7 +11,7 @@ export interface NotificationBridgeDeps {
   isPermissionGranted: () => Promise<boolean>;
   requestPermission: () => Promise<boolean>;
   send: (payload: NotificationDeliverPayload) => Promise<void>;
-  reveal: (paneId: string) => void;
+  reveal: (nookId: string) => void;
   toast: (payload: NotificationDeliverPayload) => void;
   warn: (message: string) => void;
 }
@@ -25,8 +25,8 @@ export function shouldSend(state: PermissionState): boolean {
 }
 
 export function resolveActivated(active: ReadonlyMap<string, string>, id: string): string | null {
-  const paneId = active.get(id);
-  return paneId ?? null;
+  const nookId = active.get(id);
+  return nookId ?? null;
 }
 
 export class NotificationBridge {
@@ -41,7 +41,7 @@ export class NotificationBridge {
     return this.permission;
   }
 
-  trackedPaneFor(id: string): string | null {
+  trackedNookFor(id: string): string | null {
     return resolveActivated(this.active, id);
   }
 
@@ -67,23 +67,23 @@ export class NotificationBridge {
         this.degradedWarned = true;
         this.deps.warn("notification permission denied; degrading to in-app signals only");
       }
-      this.active.set(payload.id, payload.paneId);
+      this.active.set(payload.id, payload.nookId);
       this.deps.toast(payload);
       return false;
     }
 
-    this.active.set(payload.id, payload.paneId);
+    this.active.set(payload.id, payload.nookId);
     await this.deps.send(payload);
     return true;
   }
 
   onActivated(id: string): void {
-    const paneId = resolveActivated(this.active, id);
-    if (!paneId) {
-      this.deps.warn(`notification.activated: no tracked pane for id ${id}`);
+    const nookId = resolveActivated(this.active, id);
+    if (!nookId) {
+      this.deps.warn(`notification.activated: no tracked nook for id ${id}`);
       return;
     }
-    this.deps.reveal(paneId);
+    this.deps.reveal(nookId);
   }
 
   onDismissed(id: string): void {

@@ -40,12 +40,12 @@ public sealed class SessionCorpusIndexerTests
     }
 
     [Fact]
-    public void ListSessions_ReturnsAllForWorkspace()
+    public void ListSessions_ReturnsAllForBay()
     {
         var (_, indexer) = NewIndexer();
         indexer.IndexSession("ws1", "claude", "2026-07-08T10:00:00Z", "session one", "v1.0");
         indexer.IndexSession("ws1", "claude", "2026-07-08T11:00:00Z", "session two", "v1.0");
-        indexer.IndexSession("ws2", "claude", "2026-07-08T12:00:00Z", "other workspace", "v1.0");
+        indexer.IndexSession("ws2", "claude", "2026-07-08T12:00:00Z", "other bay", "v1.0");
 
         var ws1 = indexer.ListSessions("ws1");
         var ws2 = indexer.ListSessions("ws2");
@@ -90,7 +90,7 @@ public sealed class SessionCorpusIndexerTests
     }
 
     [Fact]
-    public void SearchSessions_FiltersByWorkspace()
+    public void SearchSessions_FiltersByBay()
     {
         var (_, indexer) = NewIndexer();
         indexer.IndexSession("ws1", "claude", "2026-07-08T10:00:00Z", "shared content about routing", "v1.0");

@@ -15,12 +15,12 @@ public sealed class BlackboardStore
         _logger = logger;
     }
 
-    public BlackboardPost Post(string workspaceId, string kind, string audience, string content, string? refId = null, System.TimeSpan? ttl = null)
+    public BlackboardPost Post(string bayId, string kind, string audience, string content, string? refId = null, System.TimeSpan? ttl = null)
     {
         var post = new BlackboardPost
         {
             Id = System.Guid.NewGuid().ToString("N"),
-            WorkspaceId = workspaceId,
+            BayId = bayId,
             Kind = kind,
             Audience = audience,
             Content = content,
@@ -33,11 +33,11 @@ public sealed class BlackboardStore
         conn.Open();
         using var cmd = conn.CreateCommand();
         cmd.CommandText = """
-            INSERT INTO blackboard (id, workspace_id, kind, audience, content, ref_id, ttl_at, created_at)
+            INSERT INTO blackboard (id, bay_id, kind, audience, content, ref_id, ttl_at, created_at)
             VALUES (@id, @ws, @kind, @aud, @content, @ref, @ttl, @created);
             """;
         cmd.Parameters.AddWithValue("@id", post.Id);
-        cmd.Parameters.AddWithValue("@ws", post.WorkspaceId);
+        cmd.Parameters.AddWithValue("@ws", post.BayId);
         cmd.Parameters.AddWithValue("@kind", post.Kind);
         cmd.Parameters.AddWithValue("@aud", post.Audience);
         cmd.Parameters.AddWithValue("@content", post.Content);
@@ -46,13 +46,13 @@ public sealed class BlackboardStore
         cmd.Parameters.AddWithValue("@created", post.CreatedAt.ToString("o"));
         cmd.ExecuteNonQuery();
 
-        _logger.LogWarning("blackboard: posted {kind} for {ws} → {aud}", post.Kind, post.WorkspaceId, post.Audience);
+        _logger.LogWarning("blackboard: posted {kind} for {ws} → {aud}", post.Kind, post.BayId, post.Audience);
         return post;
     }
 
-    public System.Collections.Generic.IReadOnlyList<BlackboardPost> Show(string workspaceId, string? audience = null)
+    public System.Collections.Generic.IReadOnlyList<BlackboardPost> Show(string bayId, string? audience = null)
     {
-        SweepExpired(workspaceId);
+        SweepExpired(bayId);
 
         var result = new System.Collections.Generic.List<BlackboardPost>();
         using var conn = new SqliteConnection($"Data Source={_dbPath}");
@@ -60,13 +60,13 @@ public sealed class BlackboardStore
         using var cmd = conn.CreateCommand();
         if (audience is null)
         {
-            cmd.CommandText = "SELECT id, workspace_id, kind, audience, content, ref_id, ttl_at, created_at FROM blackboard WHERE workspace_id = @ws ORDER BY created_at DESC";
-            cmd.Parameters.AddWithValue("@ws", workspaceId);
+            cmd.CommandText = "SELECT id, bay_id, kind, audience, content, ref_id, ttl_at, created_at FROM blackboard WHERE bay_id = @ws ORDER BY created_at DESC";
+            cmd.Parameters.AddWithValue("@ws", bayId);
         }
         else
         {
-            cmd.CommandText = "SELECT id, workspace_id, kind, audience, content, ref_id, ttl_at, created_at FROM blackboard WHERE workspace_id = @ws AND audience = @aud ORDER BY created_at DESC";
-            cmd.Parameters.AddWithValue("@ws", workspaceId);
+            cmd.CommandText = "SELECT id, bay_id, kind, audience, content, ref_id, ttl_at, created_at FROM blackboard WHERE bay_id = @ws AND audience = @aud ORDER BY created_at DESC";
+            cmd.Parameters.AddWithValue("@ws", bayId);
             cmd.Parameters.AddWithValue("@aud", audience);
         }
         using var reader = cmd.ExecuteReader();
@@ -77,17 +77,17 @@ public sealed class BlackboardStore
         return result;
     }
 
-    private void SweepExpired(string workspaceId)
+    private void SweepExpired(string bayId)
     {
         using var conn = new SqliteConnection($"Data Source={_dbPath}");
         conn.Open();
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = "DELETE FROM blackboard WHERE workspace_id = @ws AND ttl_at IS NOT NULL AND ttl_at < @now";
-        cmd.Parameters.AddWithValue("@ws", workspaceId);
+        cmd.CommandText = "DELETE FROM blackboard WHERE bay_id = @ws AND ttl_at IS NOT NULL AND ttl_at < @now";
+        cmd.Parameters.AddWithValue("@ws", bayId);
         cmd.Parameters.AddWithValue("@now", System.DateTimeOffset.UtcNow.ToString("o"));
         var deleted = cmd.ExecuteNonQuery();
         if (deleted > 0)
-            _logger.LogWarning("blackboard: swept {count} expired posts for {ws}", deleted, workspaceId);
+            _logger.LogWarning("blackboard: swept {count} expired posts for {ws}", deleted, bayId);
     }
 
     private static BlackboardPost ReadPost(SqliteDataReader reader)
@@ -95,7 +95,7 @@ public sealed class BlackboardStore
         return new BlackboardPost
         {
             Id = reader.GetString(0),
-            WorkspaceId = reader.GetString(1),
+            BayId = reader.GetString(1),
             Kind = reader.GetString(2),
             Audience = reader.GetString(3),
             Content = reader.GetString(4),

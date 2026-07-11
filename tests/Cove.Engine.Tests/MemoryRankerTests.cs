@@ -24,8 +24,8 @@ public sealed class MemoryRankerTests
     public void SearchRanked_ReturnsResultsSortedByFusedScore()
     {
         var (_, store, ranker) = NewStack();
-        store.AddFact(new Fact { WorkspaceId = "ws1", Kind = "decision", Content = "The routing module handles request dispatch", Confidence = 0.3 });
-        store.AddFact(new Fact { WorkspaceId = "ws1", Kind = "decision", Content = "The routing module was refactored for performance", Confidence = 0.9 });
+        store.AddFact(new Fact { BayId = "ws1", Kind = "decision", Content = "The routing module handles request dispatch", Confidence = 0.3 });
+        store.AddFact(new Fact { BayId = "ws1", Kind = "decision", Content = "The routing module was refactored for performance", Confidence = 0.9 });
 
         var results = ranker.SearchRanked("ws1", "routing");
         Assert.Equal(2, results.Count);
@@ -36,7 +36,7 @@ public sealed class MemoryRankerTests
     public void SearchRanked_IncludesSnippetAroundQuery()
     {
         var (_, store, ranker) = NewStack();
-        store.AddFact(new Fact { WorkspaceId = "ws1", Kind = "gotcha", Content = "The flibbertigibbet module has a race condition that manifests under load", Confidence = 0.8 });
+        store.AddFact(new Fact { BayId = "ws1", Kind = "gotcha", Content = "The flibbertigibbet module has a race condition that manifests under load", Confidence = 0.8 });
 
         var results = ranker.SearchRanked("ws1", "flibbertigibbet");
         Assert.Single(results);
@@ -48,7 +48,7 @@ public sealed class MemoryRankerTests
     public void Recall_ReturnsPreviewsWithHowLongAgo()
     {
         var (_, store, ranker) = NewStack();
-        var fact = store.AddFact(new Fact { WorkspaceId = "ws1", Kind = "preference", Content = "Use dark theme for all editors", Confidence = 0.7 });
+        var fact = store.AddFact(new Fact { BayId = "ws1", Kind = "preference", Content = "Use dark theme for all editors", Confidence = 0.7 });
 
         var previews = ranker.Recall("ws1", "theme");
         Assert.NotEmpty(previews);
@@ -61,7 +61,7 @@ public sealed class MemoryRankerTests
     public void Recall_IncrementsAccessCount()
     {
         var (_, store, ranker) = NewStack();
-        var fact = store.AddFact(new Fact { WorkspaceId = "ws1", Kind = "decision", Content = "Use SQLite for knowledge stores", Confidence = 0.8 });
+        var fact = store.AddFact(new Fact { BayId = "ws1", Kind = "decision", Content = "Use SQLite for knowledge stores", Confidence = 0.8 });
 
         ranker.Recall("ws1", "SQLite");
         ranker.Recall("ws1", "SQLite");
@@ -74,7 +74,7 @@ public sealed class MemoryRankerTests
     public void Recall_LogsFeedbackRow()
     {
         var (dir, store, ranker) = NewStack();
-        store.AddFact(new Fact { WorkspaceId = "ws1", Kind = "decision", Content = "Use SQLite for persistence", Confidence = 0.8 });
+        store.AddFact(new Fact { BayId = "ws1", Kind = "decision", Content = "Use SQLite for persistence", Confidence = 0.8 });
 
         ranker.Recall("ws1", "SQLite");
 
@@ -87,11 +87,11 @@ public sealed class MemoryRankerTests
     }
 
     [Fact]
-    public void SearchRanked_FiltersByWorkspace()
+    public void SearchRanked_FiltersByBay()
     {
         var (_, store, ranker) = NewStack();
-        store.AddFact(new Fact { WorkspaceId = "ws1", Kind = "decision", Content = "shared decision about routing", Confidence = 0.8 });
-        store.AddFact(new Fact { WorkspaceId = "ws2", Kind = "decision", Content = "shared decision about routing", Confidence = 0.8 });
+        store.AddFact(new Fact { BayId = "ws1", Kind = "decision", Content = "shared decision about routing", Confidence = 0.8 });
+        store.AddFact(new Fact { BayId = "ws2", Kind = "decision", Content = "shared decision about routing", Confidence = 0.8 });
 
         var ws1 = ranker.SearchRanked("ws1", "routing");
         var ws2 = ranker.SearchRanked("ws2", "routing");

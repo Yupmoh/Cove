@@ -4,7 +4,7 @@ import { groupRecentsByAdapter, type AdapterLabel, type AdapterSessionGroup } fr
 
 interface SessionCorpusEntry {
   id: string;
-  workspaceId: string;
+  bayId: string;
   adapter: string;
   startedAt: string;
   endedAt: string | null;
@@ -17,7 +17,7 @@ interface RecentResults { sessions: RecentSessionRow[] }
 export type ResumeHandler = (adapter: string, sessionId: string, cwd: string, displayName: string) => void;
 
 export async function renderSessionPicker(
-  workspaceId: string,
+  bayId: string,
   projectDir: string,
   adapters: AdapterLabel[],
   onResume: ResumeHandler,
@@ -28,8 +28,8 @@ export async function renderSessionPicker(
 
   el.appendChild(buildHeader());
   el.appendChild(await buildRecentsArea(projectDir, adapters, onResume));
-  el.appendChild(buildSearchArea(workspaceId));
-  el.appendChild(buildSettingsPanel(workspaceId));
+  el.appendChild(buildSearchArea(bayId));
+  el.appendChild(buildSettingsPanel(bayId));
 
   return el;
 }
@@ -43,7 +43,7 @@ function buildHeader(): HTMLElement {
   header.appendChild(title);
   const subtitle = document.createElement("p");
   subtitle.style.cssText = "font-size:12px;color:var(--muted);margin:4px 0 0;";
-  subtitle.textContent = "Resume a past session in this workspace directory";
+  subtitle.textContent = "Resume a past session in this bay directory";
   header.appendChild(subtitle);
   return header;
 }
@@ -131,7 +131,7 @@ function buildAdapterDropdown(group: AdapterSessionGroup, onResume: ResumeHandle
   return wrap;
 }
 
-function buildSearchArea(workspaceId: string): HTMLElement {
+function buildSearchArea(bayId: string): HTMLElement {
   const container = document.createElement("div");
   container.style.cssText = "flex:1;display:flex;flex-direction:column;overflow:hidden;";
 
@@ -167,7 +167,7 @@ function buildSearchArea(workspaceId: string): HTMLElement {
       return;
     }
     try {
-      const result = await invoke<SearchResults>("cove://commands/vault.search", { workspaceId, query });
+      const result = await invoke<SearchResults>("cove://commands/vault.search", { bayId, query });
       const entries = result.entries || [];
       if (entries.length === 0) {
         const empty = document.createElement("div");
@@ -223,7 +223,7 @@ function buildSearchRow(entry: SessionCorpusEntry): HTMLElement {
   return row;
 }
 
-function buildSettingsPanel(workspaceId: string): HTMLElement {
+function buildSettingsPanel(bayId: string): HTMLElement {
   const panel = document.createElement("div");
   panel.style.cssText = "border-top:1px solid var(--border);padding:12px;";
 
@@ -249,7 +249,7 @@ function buildSettingsPanel(workspaceId: string): HTMLElement {
     depthSelect.appendChild(opt);
   }
   depthSelect.value = "standard";
-  depthSelect.addEventListener("change", () => updateVaultSetting(workspaceId, "depth", depthSelect.value));
+  depthSelect.addEventListener("change", () => updateVaultSetting(bayId, "depth", depthSelect.value));
   depthRow.appendChild(depthSelect);
 
   panel.appendChild(depthRow);
@@ -268,7 +268,7 @@ function buildSettingsPanel(workspaceId: string): HTMLElement {
   horizonInput.min = "1";
   horizonInput.max = "365";
   horizonInput.style.cssText = "flex:1;padding:4px 8px;background:var(--panel);border:1px solid var(--border);border-radius:4px;color:var(--fg);font-size:12px;";
-  horizonInput.addEventListener("change", () => updateVaultSetting(workspaceId, "horizon", horizonInput.value));
+  horizonInput.addEventListener("change", () => updateVaultSetting(bayId, "horizon", horizonInput.value));
   horizonRow.appendChild(horizonInput);
 
   panel.appendChild(horizonRow);
@@ -276,23 +276,23 @@ function buildSettingsPanel(workspaceId: string): HTMLElement {
   const reindexBtn = document.createElement("button");
   reindexBtn.textContent = "Reindex All";
   reindexBtn.style.cssText = "padding:4px 12px;background:var(--border);border:1px solid var(--border);border-radius:4px;color:var(--fg);cursor:pointer;font-size:12px;";
-  reindexBtn.addEventListener("click", () => reindexVault(workspaceId));
+  reindexBtn.addEventListener("click", () => reindexVault(bayId));
   panel.appendChild(reindexBtn);
 
   return panel;
 }
 
-async function updateVaultSetting(workspaceId: string, key: string, value: string): Promise<void> {
+async function updateVaultSetting(bayId: string, key: string, value: string): Promise<void> {
   try {
-    await invoke("cove://commands/vault.set-setting", { workspaceId, key, value });
+    await invoke("cove://commands/vault.set-setting", { bayId, key, value });
   } catch (e) {
     console.error("Setting update failed:", e);
   }
 }
 
-async function reindexVault(workspaceId: string): Promise<void> {
+async function reindexVault(bayId: string): Promise<void> {
   try {
-    await invoke("cove://commands/vault.reindex", { workspaceId });
+    await invoke("cove://commands/vault.reindex", { bayId });
   } catch (e) {
     console.error("Reindex failed:", e);
   }

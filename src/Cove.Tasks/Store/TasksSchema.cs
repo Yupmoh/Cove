@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS migrations (
 );
 
 CREATE TABLE IF NOT EXISTS statuses (
-    workspace_id TEXT NOT NULL,
+    bay_id TEXT NOT NULL,
     id TEXT NOT NULL,
     name TEXT NOT NULL,
     hex_color TEXT NOT NULL DEFAULT '808080',
@@ -23,13 +23,13 @@ CREATE TABLE IF NOT EXISTS statuses (
     is_completion INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
-    PRIMARY KEY (workspace_id, id),
-    UNIQUE (workspace_id, name)
+    PRIMARY KEY (bay_id, id),
+    UNIQUE (bay_id, name)
 );
 
 CREATE TABLE IF NOT EXISTS cards (
     id TEXT PRIMARY KEY,
-    workspace_id TEXT NOT NULL,
+    bay_id TEXT NOT NULL,
     task_number INTEGER NOT NULL,
     title TEXT NOT NULL,
     description TEXT NOT NULL DEFAULT '',
@@ -49,8 +49,8 @@ CREATE TABLE IF NOT EXISTS cards (
     comment_ids_json TEXT NOT NULL DEFAULT '[]',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
-    UNIQUE (workspace_id, task_number),
-    FOREIGN KEY (workspace_id, status_id) REFERENCES statuses (workspace_id, id) ON DELETE RESTRICT
+    UNIQUE (bay_id, task_number),
+    FOREIGN KEY (bay_id, status_id) REFERENCES statuses (bay_id, id) ON DELETE RESTRICT
 );
 
 CREATE TABLE IF NOT EXISTS comments (
@@ -65,14 +65,14 @@ CREATE TABLE IF NOT EXISTS comments (
 );
 
 CREATE TABLE IF NOT EXISTS labels (
-    workspace_id TEXT NOT NULL,
+    bay_id TEXT NOT NULL,
     id TEXT NOT NULL,
     name TEXT NOT NULL,
     hex_color TEXT NOT NULL DEFAULT '6e6e6e',
     position REAL NOT NULL,
     created_at TEXT NOT NULL,
-    PRIMARY KEY (workspace_id, id),
-    UNIQUE (workspace_id, name)
+    PRIMARY KEY (bay_id, id),
+    UNIQUE (bay_id, name)
 );
 
 CREATE TABLE IF NOT EXISTS card_labels (
@@ -83,14 +83,14 @@ CREATE TABLE IF NOT EXISTS card_labels (
 );
 
 CREATE TABLE IF NOT EXISTS task_counter (
-    workspace_id TEXT PRIMARY KEY,
+    bay_id TEXT PRIMARY KEY,
     next_number INTEGER NOT NULL DEFAULT 1
 );
 
 CREATE TABLE IF NOT EXISTS task_runs (
     id TEXT PRIMARY KEY,
     card_id TEXT NOT NULL,
-    workspace_id TEXT NOT NULL,
+    bay_id TEXT NOT NULL,
     run_family_id TEXT NOT NULL,
     state TEXT NOT NULL DEFAULT 'active',
     backgrounded INTEGER NOT NULL DEFAULT 0,
@@ -109,7 +109,7 @@ CREATE TABLE IF NOT EXISTS task_runs (
 CREATE TABLE IF NOT EXISTS task_run_segments (
     id TEXT PRIMARY KEY,
     run_id TEXT NOT NULL,
-    pane_id TEXT,
+    nook_id TEXT,
     adapter_session_id TEXT,
     started_at TEXT NOT NULL,
     ended_at TEXT,
@@ -140,11 +140,11 @@ CREATE TABLE IF NOT EXISTS card_schedules (
     CHECK (mark_done_by IN ('agent', 'review'))
 );
 
-CREATE INDEX IF NOT EXISTS idx_cards_workspace_status ON cards (workspace_id, status_id);
-CREATE INDEX IF NOT EXISTS idx_cards_workspace_number ON cards (workspace_id, task_number);
+CREATE INDEX IF NOT EXISTS idx_cards_bay_status ON cards (bay_id, status_id);
+CREATE INDEX IF NOT EXISTS idx_cards_bay_number ON cards (bay_id, task_number);
 CREATE INDEX IF NOT EXISTS idx_cards_status_order ON cards (status_id, order_key);
 CREATE INDEX IF NOT EXISTS idx_comments_card ON comments (card_id, created_at);
-CREATE INDEX IF NOT EXISTS idx_labels_workspace ON labels (workspace_id, position);
+CREATE INDEX IF NOT EXISTS idx_labels_bay ON labels (bay_id, position);
 CREATE INDEX IF NOT EXISTS idx_runs_card ON task_runs (card_id);
 CREATE INDEX IF NOT EXISTS idx_runs_family ON task_runs (run_family_id);
 CREATE INDEX IF NOT EXISTS idx_runs_state ON task_runs (state);

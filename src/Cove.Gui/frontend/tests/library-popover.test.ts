@@ -14,18 +14,18 @@ describe("fuzzyScore", () => {
     expect(_testFuzzyScore("deployment-log", "terminal", "deploy", false)).toBe(60);
   });
 
-  it("falls through to paneType when title incomplete", () => {
+  it("falls through to nookType when title incomplete", () => {
     expect(_testFuzzyScore("d", "deploy", "deploy", false)).toBe(20);
   });
 
-  it("active workspace boost dominates", () => {
+  it("active bay boost dominates", () => {
     const passive = _testFuzzyScore("deploy", "terminal", "deploy", false);
     const active = _testFuzzyScore("deploy", "terminal", "deploy", true);
     expect(active - passive).toBe(50);
     expect(active).toBe(110);
   });
 
-  it("active workspace outranks non-active with better title match", () => {
+  it("active bay outranks non-active with better title match", () => {
     const betterTitlePassive = _testFuzzyScore("deploy-script", "terminal", "deploy", false);
     const worseTitleActive = _testFuzzyScore("d", "deploy", "deploy", true);
     expect(worseTitleActive).toBeGreaterThan(betterTitlePassive);

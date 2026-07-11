@@ -24,12 +24,12 @@ public sealed class TimelineSynthesizer
         _logger = logger;
     }
 
-    public SynthesisResult CreateBrief(string workspaceId, string window, string summary, string fullProse, string? author = null)
+    public SynthesisResult CreateBrief(string bayId, string window, string summary, string fullProse, string? author = null)
     {
         var backingNote = _notes.Create(new Note
         {
             Title = $"Brief: {window}",
-            WorkspaceId = workspaceId,
+            BayId = bayId,
             Content = fullProse,
             Source = "synthesizer",
             Kind = "markdown",
@@ -38,25 +38,25 @@ public sealed class TimelineSynthesizer
         var meta = new BriefMeta(window, backingNote.Id, author);
         var entry = _timeline.Append(new TimelineEntry
         {
-            WorkspaceId = workspaceId,
+            BayId = bayId,
             Kind = "synthesis.brief",
             Source = "synthesizer",
-            Scope = "workspace",
+            Scope = "bay",
             Summary = summary,
             JsonPayload = JsonSerializer.Serialize(meta, CoveJsonContext.Default.BriefMeta),
             Tags = ["type:synthesis", "subtype:brief"],
         });
 
-        _logger.LogWarning("synthesis: created brief for {ws}, backing note {noteId}", workspaceId, backingNote.Id);
+        _logger.LogWarning("synthesis: created brief for {ws}, backing note {noteId}", bayId, backingNote.Id);
         return new SynthesisResult(entry, backingNote.Id, backingNote.Id);
     }
 
-    public SynthesisResult CreateRecap(string workspaceId, System.DateTimeOffset windowStart, System.DateTimeOffset windowEnd, string summary, string fullProse, string? author = null)
+    public SynthesisResult CreateRecap(string bayId, System.DateTimeOffset windowStart, System.DateTimeOffset windowEnd, string summary, string fullProse, string? author = null)
     {
         var backingNote = _notes.Create(new Note
         {
             Title = $"Recap: {windowStart:yyyy-MM-dd} to {windowEnd:yyyy-MM-dd}",
-            WorkspaceId = workspaceId,
+            BayId = bayId,
             Content = fullProse,
             Source = "synthesizer",
             Kind = "markdown",
@@ -65,25 +65,25 @@ public sealed class TimelineSynthesizer
         var meta = new RecapMeta(windowStart.ToString("o"), windowEnd.ToString("o"), backingNote.Id, author);
         var entry = _timeline.Append(new TimelineEntry
         {
-            WorkspaceId = workspaceId,
+            BayId = bayId,
             Kind = "synthesis.recap",
             Source = "synthesizer",
-            Scope = "workspace",
+            Scope = "bay",
             Summary = summary,
             JsonPayload = JsonSerializer.Serialize(meta, CoveJsonContext.Default.RecapMeta),
             Tags = ["type:synthesis", "subtype:recap"],
         });
 
-        _logger.LogWarning("synthesis: created recap for {ws}, backing note {noteId}", workspaceId, backingNote.Id);
+        _logger.LogWarning("synthesis: created recap for {ws}, backing note {noteId}", bayId, backingNote.Id);
         return new SynthesisResult(entry, backingNote.Id, backingNote.Id);
     }
 
-    public SynthesisResult CreateUpdate(string workspaceId, string audience, string summary, string fullProse, string? author = null)
+    public SynthesisResult CreateUpdate(string bayId, string audience, string summary, string fullProse, string? author = null)
     {
         var backingNote = _notes.Create(new Note
         {
             Title = $"Update for {audience}",
-            WorkspaceId = workspaceId,
+            BayId = bayId,
             Content = fullProse,
             Source = "synthesizer",
             Kind = "markdown",
@@ -92,16 +92,16 @@ public sealed class TimelineSynthesizer
         var meta = new UpdateMeta(audience, backingNote.Id, author);
         var entry = _timeline.Append(new TimelineEntry
         {
-            WorkspaceId = workspaceId,
+            BayId = bayId,
             Kind = "synthesis.update",
             Source = "synthesizer",
-            Scope = "workspace",
+            Scope = "bay",
             Summary = summary,
             JsonPayload = JsonSerializer.Serialize(meta, CoveJsonContext.Default.UpdateMeta),
             Tags = ["type:synthesis", "subtype:update"],
         });
 
-        _logger.LogWarning("synthesis: created update for {ws} → {audience}, backing note {noteId}", workspaceId, audience, backingNote.Id);
+        _logger.LogWarning("synthesis: created update for {ws} → {audience}, backing note {noteId}", bayId, audience, backingNote.Id);
         return new SynthesisResult(entry, backingNote.Id, backingNote.Id);
     }
 }

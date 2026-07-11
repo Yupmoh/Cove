@@ -23,7 +23,7 @@ public sealed class NoteFileStoreTests
     public void Create_PersistsAsFilesWithMetaAndBody()
     {
         var (dir, store) = NewStore();
-        var note = store.Create(new Note { Title = "My Note", WorkspaceId = "ws1", Content = "Hello world", Source = "manual", Kind = "markdown" });
+        var note = store.Create(new Note { Title = "My Note", BayId = "ws1", Content = "Hello world", Source = "manual", Kind = "markdown" });
 
         var noteDir = System.IO.Path.Combine(dir, "notes", "ws1", note.Id);
         Assert.True(System.IO.File.Exists(System.IO.Path.Combine(noteDir, "meta.json")));
@@ -36,7 +36,7 @@ public sealed class NoteFileStoreTests
     public void Get_ReadsFromFiles()
     {
         var (_, store) = NewStore();
-        var created = store.Create(new Note { Title = "Test", WorkspaceId = "ws1", Content = "Body content", Source = "manual", Kind = "markdown" });
+        var created = store.Create(new Note { Title = "Test", BayId = "ws1", Content = "Body content", Source = "manual", Kind = "markdown" });
 
         var retrieved = store.Get("ws1", created.Id);
         Assert.NotNull(retrieved);
@@ -49,8 +49,8 @@ public sealed class NoteFileStoreTests
     public void Search_FindsViaFts()
     {
         var (_, store) = NewStore();
-        store.Create(new Note { Title = "Architecture", WorkspaceId = "ws1", Content = "The flibbertigibbet module handles routing", Source = "manual", Kind = "markdown" });
-        store.Create(new Note { Title = "Other", WorkspaceId = "ws1", Content = "unrelated content", Source = "manual", Kind = "markdown" });
+        store.Create(new Note { Title = "Architecture", BayId = "ws1", Content = "The flibbertigibbet module handles routing", Source = "manual", Kind = "markdown" });
+        store.Create(new Note { Title = "Other", BayId = "ws1", Content = "unrelated content", Source = "manual", Kind = "markdown" });
 
         var results = store.Search("ws1", "flibbertigibbet");
         Assert.Single(results);
@@ -61,7 +61,7 @@ public sealed class NoteFileStoreTests
     public void RebuildIndexFromDisk_RestoresFtsAfterWipe()
     {
         var (dir, store) = NewStore();
-        store.Create(new Note { Title = "Rebuildable", WorkspaceId = "ws1", Content = "unique searchable term", Source = "manual", Kind = "markdown" });
+        store.Create(new Note { Title = "Rebuildable", BayId = "ws1", Content = "unique searchable term", Source = "manual", Kind = "markdown" });
 
         using (var conn = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={System.IO.Path.Combine(dir, "notes", "index.db")}"))
         {
@@ -84,7 +84,7 @@ public sealed class NoteFileStoreTests
     public void Update_ModifiesBodyAndFts()
     {
         var (_, store) = NewStore();
-        var note = store.Create(new Note { Title = "Original", WorkspaceId = "ws1", Content = "old content", Source = "manual", Kind = "markdown" });
+        var note = store.Create(new Note { Title = "Original", BayId = "ws1", Content = "old content", Source = "manual", Kind = "markdown" });
 
         store.Update("ws1", note.Id, n => n with { Title = "Updated", Content = "new searchable content" });
 
@@ -100,7 +100,7 @@ public sealed class NoteFileStoreTests
     public void Delete_RemovesFilesAndFts()
     {
         var (dir, store) = NewStore();
-        var note = store.Create(new Note { Title = "ToDelete", WorkspaceId = "ws1", Content = "content", Source = "manual", Kind = "markdown" });
+        var note = store.Create(new Note { Title = "ToDelete", BayId = "ws1", Content = "content", Source = "manual", Kind = "markdown" });
 
         store.Delete("ws1", note.Id);
 
@@ -113,7 +113,7 @@ public sealed class NoteFileStoreTests
     public void Viewport_PersistsAndLoads()
     {
         var (_, store) = NewStore();
-        var note = store.Create(new Note { Title = "Vp", WorkspaceId = "ws1", Content = "c", Source = "manual", Kind = "markdown" });
+        var note = store.Create(new Note { Title = "Vp", BayId = "ws1", Content = "c", Source = "manual", Kind = "markdown" });
 
         store.SaveViewport("ws1", note.Id, """{"scrollX":0,"scrollY":42,"zoom":1.5}""");
         var vp = store.LoadViewport("ws1", note.Id);
@@ -125,7 +125,7 @@ public sealed class NoteFileStoreTests
     public void State_PersistsAndLoads()
     {
         var (_, store) = NewStore();
-        var note = store.Create(new Note { Title = "St", WorkspaceId = "ws1", Content = "c", Source = "manual", Kind = "canvas" });
+        var note = store.Create(new Note { Title = "St", BayId = "ws1", Content = "c", Source = "manual", Kind = "canvas" });
 
         store.SaveState("ws1", note.Id, """{"formState":{"name":"test"}}""");
         var state = store.LoadState("ws1", note.Id);
@@ -134,15 +134,15 @@ public sealed class NoteFileStoreTests
     }
 
     [Fact]
-    public void ListByWorkspace_ReturnsAllNotes()
+    public void ListByBay_ReturnsAllNotes()
     {
         var (_, store) = NewStore();
-        store.Create(new Note { Title = "A", WorkspaceId = "ws1", Content = "a", Source = "manual", Kind = "markdown" });
-        store.Create(new Note { Title = "B", WorkspaceId = "ws1", Content = "b", Source = "manual", Kind = "markdown" });
-        store.Create(new Note { Title = "C", WorkspaceId = "ws2", Content = "c", Source = "manual", Kind = "markdown" });
+        store.Create(new Note { Title = "A", BayId = "ws1", Content = "a", Source = "manual", Kind = "markdown" });
+        store.Create(new Note { Title = "B", BayId = "ws1", Content = "b", Source = "manual", Kind = "markdown" });
+        store.Create(new Note { Title = "C", BayId = "ws2", Content = "c", Source = "manual", Kind = "markdown" });
 
-        var ws1 = store.ListByWorkspace("ws1");
-        var ws2 = store.ListByWorkspace("ws2");
+        var ws1 = store.ListByBay("ws1");
+        var ws2 = store.ListByBay("ws2");
         Assert.Equal(2, ws1.Count);
         Assert.Single(ws2);
     }
@@ -151,7 +151,7 @@ public sealed class NoteFileStoreTests
     public void GetHistory_ShowsSnapshotHistoryAfterCreateAndUpdate()
     {
         var (_, store) = NewStore();
-        var note = store.Create(new Note { Title = "Original", WorkspaceId = "ws1", Content = "v1", Source = "manual", Kind = "markdown" });
+        var note = store.Create(new Note { Title = "Original", BayId = "ws1", Content = "v1", Source = "manual", Kind = "markdown" });
 
         store.Update("ws1", note.Id, n => n with { Title = "Updated", Content = "v2" });
         store.Update("ws1", note.Id, n => n with { Title = "Final", Content = "v3" });

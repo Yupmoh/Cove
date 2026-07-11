@@ -4,15 +4,15 @@ import {
   buildAdapterTiles,
   buildBuiltinTiles,
   buildLauncherTiles,
-  isEmptyRoomTree,
+  isEmptyShoreTree,
   launcherPlacement,
-  placeablePaneForAction,
+  placeableNookForAction,
   type LauncherAdapter,
   type LauncherBuiltin,
 } from "./box-launcher";
 
 describe("shouldShowLauncher", () => {
-  it("shows only when the active workspace has no rooms", () => {
+  it("shows only when the active bay has no shores", () => {
     expect(shouldShowLauncher(0)).toBe(true);
     expect(shouldShowLauncher(1)).toBe(false);
     expect(shouldShowLauncher(3)).toBe(false);
@@ -52,56 +52,56 @@ describe("buildAdapterTiles", () => {
 
 describe("buildBuiltinTiles", () => {
   const builtins: LauncherBuiltin[] = [
-    { id: "terminal", label: "Terminal", icon: "▌", action: "room.new" },
+    { id: "terminal", label: "Terminal", icon: "▌", action: "shore.new" },
     { id: "browser", label: "Browser", icon: "◑", action: "tool.browser" },
   ];
   it("maps builtins to enabled tiles carrying their action", () => {
     const tiles = buildBuiltinTiles(builtins);
     expect(tiles.map((t) => t.id)).toEqual(["builtin:terminal", "builtin:browser"]);
     expect(tiles.every((t) => !t.disabled)).toBe(true);
-    expect(tiles[0].action).toBe("room.new");
+    expect(tiles[0].action).toBe("shore.new");
     expect(tiles[0].kind).toBe("builtin");
     expect(tiles[0].version).toBe("");
   });
 });
 
 describe("buildLauncherTiles", () => {
-  it("lists detected harnesses first, then built-in pane types, order preserved", () => {
+  it("lists detected harnesses first, then built-in nook types, order preserved", () => {
     const adapters: LauncherAdapter[] = [{ name: "claude", displayName: "Claude Code", accent: "", binary: "/x" }];
-    const builtins: LauncherBuiltin[] = [{ id: "terminal", label: "Terminal", icon: "▌", action: "room.new" }];
+    const builtins: LauncherBuiltin[] = [{ id: "terminal", label: "Terminal", icon: "▌", action: "shore.new" }];
     const tiles = buildLauncherTiles(adapters, builtins);
     expect(tiles.map((t) => t.id)).toEqual(["adapter:claude", "builtin:terminal"]);
   });
 });
 
-describe("isEmptyRoomTree", () => {
+describe("isEmptyShoreTree", () => {
   it("treats a lone empty-typed leaf as empty", () => {
-    expect(isEmptyRoomTree({ kind: "leaf", subtabs: [{ paneType: "empty" }] })).toBe(true);
-    expect(isEmptyRoomTree({ kind: "leaf", subtabs: [] })).toBe(true);
+    expect(isEmptyShoreTree({ kind: "leaf", subtabs: [{ nookType: "empty" }] })).toBe(true);
+    expect(isEmptyShoreTree({ kind: "leaf", subtabs: [] })).toBe(true);
   });
-  it("treats a leaf with a real pane as non-empty", () => {
-    expect(isEmptyRoomTree({ kind: "leaf", subtabs: [{ paneType: "terminal" }] })).toBe(false);
+  it("treats a leaf with a real nook as non-empty", () => {
+    expect(isEmptyShoreTree({ kind: "leaf", subtabs: [{ nookType: "terminal" }] })).toBe(false);
   });
   it("treats a split as non-empty", () => {
-    expect(isEmptyRoomTree({ kind: "split" })).toBe(false);
-    expect(isEmptyRoomTree(null)).toBe(false);
+    expect(isEmptyShoreTree({ kind: "split" })).toBe(false);
+    expect(isEmptyShoreTree(null)).toBe(false);
   });
 });
 
 describe("launcherPlacement", () => {
-  it("replaces into an empty room, otherwise creates a room", () => {
+  it("replaces into an empty shore, otherwise creates a shore", () => {
     expect(launcherPlacement(true)).toBe("replace");
     expect(launcherPlacement(false)).toBe("create");
   });
 });
 
-describe("placeablePaneForAction", () => {
-  it("maps terminal and browser and tool tiles to pane types and room names", () => {
-    expect(placeablePaneForAction("room.new")).toEqual({ paneType: "terminal", kind: "terminal", roomName: "Room" });
-    expect(placeablePaneForAction("tool.browser")).toEqual({ paneType: "browser", kind: "browser", roomName: "Browser" });
-    expect(placeablePaneForAction("tool.git")).toEqual({ paneType: "git", kind: "tool", roomName: "Source Control" });
-    expect(placeablePaneForAction("tool.search")).toEqual({ paneType: "search", kind: "tool", roomName: "Search" });
-    expect(placeablePaneForAction("tool.tasks")).toEqual({ paneType: "tasks-list", kind: "tool", roomName: "Tasks" });
-    expect(placeablePaneForAction("tool.notepad")).toBeNull();
+describe("placeableNookForAction", () => {
+  it("maps terminal and browser and tool tiles to nook types and shore names", () => {
+    expect(placeableNookForAction("shore.new")).toEqual({ nookType: "terminal", kind: "terminal", shoreName: "Shore" });
+    expect(placeableNookForAction("tool.browser")).toEqual({ nookType: "browser", kind: "browser", shoreName: "Browser" });
+    expect(placeableNookForAction("tool.git")).toEqual({ nookType: "git", kind: "tool", shoreName: "Source Control" });
+    expect(placeableNookForAction("tool.search")).toEqual({ nookType: "search", kind: "tool", shoreName: "Search" });
+    expect(placeableNookForAction("tool.tasks")).toEqual({ nookType: "tasks-list", kind: "tool", shoreName: "Tasks" });
+    expect(placeableNookForAction("tool.notepad")).toBeNull();
   });
 });

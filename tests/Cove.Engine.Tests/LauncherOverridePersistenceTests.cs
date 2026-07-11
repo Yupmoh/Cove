@@ -18,10 +18,10 @@ public sealed class LauncherOverridePersistenceTests
             var orch = new LaunchOrchestrator(overrideStore: store);
             var overrides = new LauncherOverrides { Yolo = true, ExtraFlags = new[] { "--verbose" }, WorkingDir = "/tmp" };
 
-            orch.PersistOverrides("pane-1", overrides);
+            orch.PersistOverrides("nook-1", overrides);
 
             var fresh = new LauncherOverrideStore(dir);
-            Assert.True(fresh.TryLoad("pane-1", out var loaded));
+            Assert.True(fresh.TryLoad("nook-1", out var loaded));
             Assert.True(loaded!.Yolo);
             Assert.Contains("--verbose", loaded.ExtraFlags);
             Assert.Equal("/tmp", loaded.WorkingDir);
@@ -36,10 +36,10 @@ public sealed class LauncherOverridePersistenceTests
         try
         {
             var store = new LauncherOverrideStore(dir);
-            store.Save("pane-2", new LauncherOverrides { Yolo = false, ExtraFlags = new[] { "--model", "x" } });
+            store.Save("nook-2", new LauncherOverrides { Yolo = false, ExtraFlags = new[] { "--model", "x" } });
 
             var orch = new LaunchOrchestrator(overrideStore: store);
-            var retrieved = orch.GetOverrides("pane-2");
+            var retrieved = orch.GetOverrides("nook-2");
 
             Assert.NotNull(retrieved);
             Assert.False(retrieved!.Yolo);
@@ -56,12 +56,12 @@ public sealed class LauncherOverridePersistenceTests
         {
             var store = new LauncherOverrideStore(dir);
             var orch = new LaunchOrchestrator(overrideStore: store);
-            orch.PersistOverrides("pane-3", new LauncherOverrides { Yolo = true });
+            orch.PersistOverrides("nook-3", new LauncherOverrides { Yolo = true });
 
-            orch.ClearOverrides("pane-3");
+            orch.ClearOverrides("nook-3");
 
             var fresh = new LauncherOverrideStore(dir);
-            Assert.False(fresh.TryLoad("pane-3", out _));
+            Assert.False(fresh.TryLoad("nook-3", out _));
         }
         finally { try { Directory.Delete(dir, true); } catch { } }
     }
@@ -73,20 +73,20 @@ public sealed class LauncherOverridePersistenceTests
         try
         {
             var store = new LauncherOverrideStore(dir);
-            store.Save("pane-a", new LauncherOverrides { Yolo = true });
-            store.Save("pane-b", new LauncherOverrides { Yolo = false });
+            store.Save("nook-a", new LauncherOverrides { Yolo = true });
+            store.Save("nook-b", new LauncherOverrides { Yolo = false });
 
             var all = store.LoadAll();
 
             Assert.Equal(2, all.Count);
-            Assert.Contains(all, kv => kv.Key == "pane-a" && kv.Value.Yolo);
-            Assert.Contains(all, kv => kv.Key == "pane-b" && !kv.Value.Yolo);
+            Assert.Contains(all, kv => kv.Key == "nook-a" && kv.Value.Yolo);
+            Assert.Contains(all, kv => kv.Key == "nook-b" && !kv.Value.Yolo);
         }
         finally { try { Directory.Delete(dir, true); } catch { } }
     }
 
     [Fact]
-    public void TryLoad_UnknownPane_ReturnsFalse()
+    public void TryLoad_UnknownNook_ReturnsFalse()
     {
         var dir = NewDir();
         try
@@ -98,7 +98,7 @@ public sealed class LauncherOverridePersistenceTests
     }
 
     [Fact]
-    public void Save_RejectsPathTraversalPaneId()
+    public void Save_RejectsPathTraversalNookId()
     {
         var dir = NewDir();
         try

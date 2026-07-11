@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { NotificationBridge, resolveActivated, shouldRequestPermission, shouldSend, type NotificationBridgeDeps, type NotificationDeliverPayload } from "./notifications";
 
-function payload(id: string, paneId: string): NotificationDeliverPayload {
-  return { id, title: "t", body: "b", paneId };
+function payload(id: string, nookId: string): NotificationDeliverPayload {
+  return { id, title: "t", body: "b", nookId };
 }
 
 function makeDeps(over: Partial<NotificationBridgeDeps> = {}): NotificationBridgeDeps {
@@ -33,9 +33,9 @@ describe("permission gate helpers", () => {
 });
 
 describe("resolveActivated", () => {
-  it("returns the tracked pane or null", () => {
-    const m = new Map([["n1", "pane-1"]]);
-    expect(resolveActivated(m, "n1")).toBe("pane-1");
+  it("returns the tracked nook or null", () => {
+    const m = new Map([["n1", "nook-1"]]);
+    expect(resolveActivated(m, "n1")).toBe("nook-1");
     expect(resolveActivated(m, "missing")).toBeNull();
   });
 });
@@ -44,17 +44,17 @@ describe("NotificationBridge delivery gate", () => {
   it("sends immediately when already granted", async () => {
     const deps = makeDeps({ isPermissionGranted: vi.fn(async () => true) });
     const b = new NotificationBridge(deps);
-    const sent = await b.deliver(payload("n1", "pane-1"));
+    const sent = await b.deliver(payload("n1", "nook-1"));
     expect(sent).toBe(true);
     expect(deps.send).toHaveBeenCalledTimes(1);
     expect(deps.requestPermission).not.toHaveBeenCalled();
-    expect(b.trackedPaneFor("n1")).toBe("pane-1");
+    expect(b.trackedNookFor("n1")).toBe("nook-1");
   });
 
   it("requests once when not granted and sends on grant", async () => {
     const deps = makeDeps({ isPermissionGranted: vi.fn(async () => false), requestPermission: vi.fn(async () => true) });
     const b = new NotificationBridge(deps);
-    expect(await b.deliver(payload("n1", "pane-1"))).toBe(true);
+    expect(await b.deliver(payload("n1", "nook-1"))).toBe(true);
     expect(deps.requestPermission).toHaveBeenCalledTimes(1);
     expect(deps.send).toHaveBeenCalledTimes(1);
   });
@@ -62,8 +62,8 @@ describe("NotificationBridge delivery gate", () => {
   it("degrades and warns once when permission denied, never re-requesting", async () => {
     const deps = makeDeps({ isPermissionGranted: vi.fn(async () => false), requestPermission: vi.fn(async () => false) });
     const b = new NotificationBridge(deps);
-    expect(await b.deliver(payload("n1", "pane-1"))).toBe(false);
-    expect(await b.deliver(payload("n2", "pane-2"))).toBe(false);
+    expect(await b.deliver(payload("n1", "nook-1"))).toBe(false);
+    expect(await b.deliver(payload("n2", "nook-2"))).toBe(false);
     expect(deps.requestPermission).toHaveBeenCalledTimes(1);
     expect(deps.send).not.toHaveBeenCalled();
     expect(deps.warn).toHaveBeenCalledTimes(1);
@@ -74,10 +74,10 @@ describe("NotificationBridge delivery gate", () => {
     const toast = vi.fn();
     const deps = makeDeps({ isPermissionGranted: vi.fn(async () => false), requestPermission: vi.fn(async () => false), toast });
     const b = new NotificationBridge(deps);
-    expect(await b.deliver(payload("n1", "pane-1"))).toBe(false);
-    expect(await b.deliver(payload("n2", "pane-2"))).toBe(false);
+    expect(await b.deliver(payload("n1", "nook-1"))).toBe(false);
+    expect(await b.deliver(payload("n2", "nook-2"))).toBe(false);
     expect(toast).toHaveBeenCalledTimes(2);
-    expect(toast).toHaveBeenLastCalledWith(payload("n2", "pane-2"));
+    expect(toast).toHaveBeenLastCalledWith(payload("n2", "nook-2"));
     expect(deps.send).not.toHaveBeenCalled();
     expect(deps.warn).toHaveBeenCalledTimes(1);
   });
@@ -86,7 +86,7 @@ describe("NotificationBridge delivery gate", () => {
     const toast = vi.fn();
     const deps = makeDeps({ isPermissionGranted: vi.fn(async () => true), toast });
     const b = new NotificationBridge(deps);
-    expect(await b.deliver(payload("n1", "pane-1"))).toBe(true);
+    expect(await b.deliver(payload("n1", "nook-1"))).toBe(true);
     expect(deps.send).toHaveBeenCalledTimes(1);
     expect(toast).not.toHaveBeenCalled();
   });
@@ -94,19 +94,19 @@ describe("NotificationBridge delivery gate", () => {
   it("drops a payload with no id", async () => {
     const deps = makeDeps({ isPermissionGranted: vi.fn(async () => true) });
     const b = new NotificationBridge(deps);
-    expect(await b.deliver(payload("", "pane-1"))).toBe(false);
+    expect(await b.deliver(payload("", "nook-1"))).toBe(false);
     expect(deps.send).not.toHaveBeenCalled();
     expect(deps.warn).toHaveBeenCalledTimes(1);
   });
 });
 
 describe("NotificationBridge activation and dismissal", () => {
-  it("reveals the tracked pane on activation", async () => {
+  it("reveals the tracked nook on activation", async () => {
     const deps = makeDeps({ isPermissionGranted: vi.fn(async () => true) });
     const b = new NotificationBridge(deps);
-    await b.deliver(payload("n1", "pane-1"));
+    await b.deliver(payload("n1", "nook-1"));
     b.onActivated("n1");
-    expect(deps.reveal).toHaveBeenCalledWith("pane-1");
+    expect(deps.reveal).toHaveBeenCalledWith("nook-1");
   });
 
   it("no-ops and warns when activation id is unknown", () => {
@@ -120,7 +120,7 @@ describe("NotificationBridge activation and dismissal", () => {
   it("clears tracking on dismissal so activation no longer reveals", async () => {
     const deps = makeDeps({ isPermissionGranted: vi.fn(async () => true) });
     const b = new NotificationBridge(deps);
-    await b.deliver(payload("n1", "pane-1"));
+    await b.deliver(payload("n1", "nook-1"));
     b.onDismissed("n1");
     b.onActivated("n1");
     expect(deps.reveal).not.toHaveBeenCalled();

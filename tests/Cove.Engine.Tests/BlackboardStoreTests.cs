@@ -22,7 +22,7 @@ public sealed class BlackboardStoreTests
     public void Post_ThenShow_ReturnsPost()
     {
         var (_, store) = NewStore();
-        var post = store.Post("ws1", "observation", "workspace", "The build is failing on CI");
+        var post = store.Post("ws1", "observation", "bay", "The build is failing on CI");
 
         var shown = store.Show("ws1");
         Assert.Single(shown);
@@ -35,7 +35,7 @@ public sealed class BlackboardStoreTests
     public void TtlExpiredPost_IsSweptOnShow()
     {
         var (_, store) = NewStore();
-        store.Post("ws1", "claim", "workspace", "temporary claim", ttl: System.TimeSpan.FromMilliseconds(1));
+        store.Post("ws1", "claim", "bay", "temporary claim", ttl: System.TimeSpan.FromMilliseconds(1));
         System.Threading.Thread.Sleep(50);
 
         var shown = store.Show("ws1");
@@ -46,7 +46,7 @@ public sealed class BlackboardStoreTests
     public void NonExpiringPost_SurvivesShow()
     {
         var (_, store) = NewStore();
-        store.Post("ws1", "claim", "workspace", "permanent claim");
+        store.Post("ws1", "claim", "bay", "permanent claim");
 
         System.Threading.Thread.Sleep(50);
         var shown = store.Show("ws1");
@@ -57,8 +57,8 @@ public sealed class BlackboardStoreTests
     public void CorrectionWithRef_ShowsAlongsideOriginal()
     {
         var (_, store) = NewStore();
-        var original = store.Post("ws1", "claim", "workspace", "The API returns JSON");
-        var correction = store.Post("ws1", "correction", "workspace", "Actually the API returns XML", refId: original.Id);
+        var original = store.Post("ws1", "claim", "bay", "The API returns JSON");
+        var correction = store.Post("ws1", "correction", "bay", "Actually the API returns XML", refId: original.Id);
 
         var shown = store.Show("ws1");
         Assert.Equal(2, shown.Count);
@@ -76,12 +76,12 @@ public sealed class BlackboardStoreTests
     public void Show_FiltersByAudience()
     {
         var (_, store) = NewStore();
-        store.Post("ws1", "observation", "workspace", "for workspace");
-        store.Post("ws1", "observation", "room:abc", "for room");
+        store.Post("ws1", "observation", "bay", "for bay");
+        store.Post("ws1", "observation", "shore:abc", "for shore");
 
-        var wsPosts = store.Show("ws1", "workspace");
-        var roomPosts = store.Show("ws1", "room:abc");
+        var wsPosts = store.Show("ws1", "bay");
+        var shorePosts = store.Show("ws1", "shore:abc");
         Assert.Single(wsPosts);
-        Assert.Single(roomPosts);
+        Assert.Single(shorePosts);
     }
 }

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  groupByWorkspace,
+  groupByBay,
   moveSelection,
   flattenNotes,
   selectedNote,
@@ -10,47 +10,47 @@ import {
 } from "./notepad-sidebar";
 
 const mkNote = (id: string, ws: string, kind = "markdown", updatedAt = "2026-01-01"): NoteListItem => ({
-  id, title: id, workspaceId: ws, kind, updatedAt,
+  id, title: id, bayId: ws, kind, updatedAt,
 });
 
-describe("groupByWorkspace", () => {
-  it("groups notes by workspace", () => {
+describe("groupByBay", () => {
+  it("groups notes by bay", () => {
     const notes = [mkNote("a", "ws1"), mkNote("b", "ws2"), mkNote("c", "ws1")];
-    const groups = groupByWorkspace(notes, { ws1: "Project 1", ws2: "Project 2" });
+    const groups = groupByBay(notes, { ws1: "Project 1", ws2: "Project 2" });
     expect(groups).toHaveLength(2);
-    expect(groups[0].workspaceName).toBe("Project 1");
+    expect(groups[0].bayName).toBe("Project 1");
     expect(groups[0].notes).toHaveLength(2);
     expect(groups[1].notes).toHaveLength(1);
   });
 
-  it("sorts groups by workspace name", () => {
+  it("sorts groups by bay name", () => {
     const notes = [mkNote("a", "zeta"), mkNote("b", "alpha")];
-    const groups = groupByWorkspace(notes, { zeta: "Zeta", alpha: "Alpha" });
-    expect(groups[0].workspaceName).toBe("Alpha");
-    expect(groups[1].workspaceName).toBe("Zeta");
+    const groups = groupByBay(notes, { zeta: "Zeta", alpha: "Alpha" });
+    expect(groups[0].bayName).toBe("Alpha");
+    expect(groups[1].bayName).toBe("Zeta");
   });
 
   it("sorts notes by updatedAt descending", () => {
     const notes = [mkNote("old", "ws", "markdown", "2026-01-01"), mkNote("new", "ws", "markdown", "2026-06-01")];
-    const groups = groupByWorkspace(notes, { ws: "WS" });
+    const groups = groupByBay(notes, { ws: "WS" });
     expect(groups[0].notes[0].id).toBe("new");
     expect(groups[0].notes[1].id).toBe("old");
   });
 
-  it("uses workspaceId as name when name missing", () => {
-    const groups = groupByWorkspace([mkNote("a", "unknown")], {});
-    expect(groups[0].workspaceName).toBe("unknown");
+  it("uses bayId as name when name missing", () => {
+    const groups = groupByBay([mkNote("a", "unknown")], {});
+    expect(groups[0].bayName).toBe("unknown");
   });
 
   it("handles empty notes", () => {
-    expect(groupByWorkspace([], {})).toEqual([]);
+    expect(groupByBay([], {})).toEqual([]);
   });
 });
 
 describe("moveSelection", () => {
   const groups = [
-    { workspaceId: "ws1", workspaceName: "WS1", notes: [mkNote("a", "ws1"), mkNote("b", "ws1")] },
-    { workspaceId: "ws2", workspaceName: "WS2", notes: [mkNote("c", "ws2")] },
+    { bayId: "ws1", bayName: "WS1", notes: [mkNote("a", "ws1"), mkNote("b", "ws1")] },
+    { bayId: "ws2", bayName: "WS2", notes: [mkNote("c", "ws2")] },
   ];
 
   it("moves down within a group", () => {
@@ -96,8 +96,8 @@ describe("moveSelection", () => {
 describe("flattenNotes", () => {
   it("flattens all notes from groups", () => {
     const groups = [
-      { workspaceId: "ws1", workspaceName: "WS1", notes: [mkNote("a", "ws1"), mkNote("b", "ws1")] },
-      { workspaceId: "ws2", workspaceName: "WS2", notes: [mkNote("c", "ws2")] },
+      { bayId: "ws1", bayName: "WS1", notes: [mkNote("a", "ws1"), mkNote("b", "ws1")] },
+      { bayId: "ws2", bayName: "WS2", notes: [mkNote("c", "ws2")] },
     ];
     expect(flattenNotes(groups).map((n) => n.id)).toEqual(["a", "b", "c"]);
   });
@@ -105,7 +105,7 @@ describe("flattenNotes", () => {
 
 describe("selectedNote", () => {
   const groups = [
-    { workspaceId: "ws1", workspaceName: "WS1", notes: [mkNote("a", "ws1"), mkNote("b", "ws1")] },
+    { bayId: "ws1", bayName: "WS1", notes: [mkNote("a", "ws1"), mkNote("b", "ws1")] },
   ];
 
   it("returns the selected note", () => {

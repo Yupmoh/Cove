@@ -1,7 +1,7 @@
 using System.Text.Json;
 using Cove.Engine.Knowledge;
 using Cove.Engine.Restart;
-using Cove.Engine.Workspaces;
+using Cove.Engine.Bays;
 using Xunit;
 
 namespace Cove.Engine.Tests;
@@ -9,44 +9,44 @@ namespace Cove.Engine.Tests;
 public class AbsentMemberDefaultTests
 {
     [Fact]
-    public void WorkspaceModel_AbsentMembers_KeepDefaults()
+    public void BayModel_AbsentMembers_KeepDefaults()
     {
         var json = "{\"id\":\"w\",\"name\":\"n\",\"projectDir\":\"/p\"}";
-        var m = JsonSerializer.Deserialize(json, WorkspacesJsonContext.Default.WorkspaceModel)!;
+        var m = JsonSerializer.Deserialize(json, BaysJsonContext.Default.BayModel)!;
         Assert.Equal(1, m.SchemaVersion);
         Assert.Equal("default", m.CollectionId);
         Assert.NotNull(m.Wings);
         Assert.Empty(m.Wings);
-        Assert.NotNull(m.Rooms);
-        Assert.Empty(m.Rooms);
-        Assert.NotNull(m.Panes);
-        Assert.Empty(m.Panes);
+        Assert.NotNull(m.Shores);
+        Assert.Empty(m.Shores);
+        Assert.NotNull(m.Nooks);
+        Assert.Empty(m.Nooks);
     }
 
     [Fact]
     public void RegistryModel_AbsentMembers_KeepDefaults()
     {
-        var m = JsonSerializer.Deserialize("{}", WorkspacesJsonContext.Default.RegistryModel)!;
+        var m = JsonSerializer.Deserialize("{}", BaysJsonContext.Default.RegistryModel)!;
         Assert.Equal(1, m.SchemaVersion);
-        Assert.NotNull(m.OpenWorkspaces);
-        Assert.Empty(m.OpenWorkspaces);
+        Assert.NotNull(m.OpenBays);
+        Assert.Empty(m.OpenBays);
         Assert.NotNull(m.Collections);
         Assert.Empty(m.Collections);
         Assert.Equal("default", m.ActiveCollectionId);
     }
 
     [Fact]
-    public void Room_AbsentWingId_KeepsMain()
+    public void Shore_AbsentWingId_KeepsMain()
     {
-        var json = "{\"id\":\"r\",\"name\":\"n\",\"layoutTree\":{\"kind\":\"leaf\",\"paneId\":\"p1\"}}";
-        var r = JsonSerializer.Deserialize(json, WorkspacesJsonContext.Default.Room)!;
-        Assert.Equal(WorkspaceModel.MainWingId, r.WingId);
+        var json = "{\"id\":\"r\",\"name\":\"n\",\"layoutTree\":{\"kind\":\"leaf\",\"nookId\":\"p1\"}}";
+        var r = JsonSerializer.Deserialize(json, BaysJsonContext.Default.Shore)!;
+        Assert.Equal(BayModel.MainWingId, r.WingId);
     }
 
     [Fact]
-    public void PaneRecord_AbsentMembers_KeepDefaults()
+    public void NookRecord_AbsentMembers_KeepDefaults()
     {
-        var r = JsonSerializer.Deserialize("{\"paneId\":\"p\"}", WorkspacesJsonContext.Default.PaneRecord)!;
+        var r = JsonSerializer.Deserialize("{\"nookId\":\"p\"}", BaysJsonContext.Default.NookRecord)!;
         Assert.Equal("none", r.ResidentScope);
     }
 
@@ -61,7 +61,7 @@ public class AbsentMemberDefaultTests
     [Fact]
     public void NoteMeta_AbsentKind_KeepsMarkdown()
     {
-        var json = "{\"title\":\"t\",\"workspaceId\":\"w\",\"source\":\"s\"}";
+        var json = "{\"title\":\"t\",\"bayId\":\"w\",\"source\":\"s\"}";
         var meta = JsonSerializer.Deserialize(json, NoteFileJsonContext.Default.NoteMeta)!;
         Assert.Equal("markdown", meta.Kind);
     }

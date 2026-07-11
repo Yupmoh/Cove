@@ -19,7 +19,7 @@ public static class ScheduleCommands
         var card = svc.GetCard(p.CardId);
         if (card is null)
             return ctx.Fail("not_found", "card not found");
-        var knownStatuses = svc.ListStatuses(card.WorkspaceId, includeHidden: true).Select(s => s.Id).ToHashSet();
+        var knownStatuses = svc.ListStatuses(card.BayId, includeHidden: true).Select(s => s.Id).ToHashSet();
         var setParams = new Cove.Tasks.Schedules.ScheduleSetParams(p.CardId, p.TriggerKind, p.Cron, p.Tz, p.At, p.CompletionRule, p.MarkDoneBy, p.BlockOverlap, p.HomeStatusId);
         var result = Cove.Tasks.Schedules.ScheduleValidator.Validate(setParams, knownStatuses, CronExpander);
         if (!result.IsValid)

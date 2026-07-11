@@ -8,15 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Headless-first daemon engine owning PTYs, sessions, workspaces, and SQLite state
+- Headless-first daemon engine owning PTYs, sessions, bays, and SQLite state
 - `cove://` control plane with framed protocol and source-generated JSON serialization
 - Lossless flow-controlled PTY transport (credit/ack backpressure, ring buffer, replay-since-offset)
-- Pane mosaic model (binary-tree splits, subtabs, resize, focus cycling, dock slots)
-- Workspace model (workspaces, rooms, wings, collections, worktrees, run-commands)
+- Nook mosaic model (binary-tree splits, subtabs, resize, focus cycling, dock slots)
+- Bay model (bays, shores, wings, collections, worktrees, run-commands)
 - Agent & adapter system (manifest, install, launch-profiles, agent-definitions, skills, sigils)
 - Task cards, kanban, dispatch sages, signaling, scheduling, loops, exports
 - Knowledge domain (timeline, memory, notes, reviews, canvas, vault, library, captures)
-- Browser pane chrome (open/navigate/back/forward/reload/close) + BrowserStore (history, annotations)
+- Browser nook chrome (open/navigate/back/forward/reload/close) + BrowserStore (history, annotations)
 - CDP client library + browser automation verb logic (eval, navigate, click, fill, type, screenshot, snapshot, refs, cookies, console)
 - Capture bundle format (CAP-N/ bundle dir + meta.json + captures.db)
 - Config system (typed CoveConfig, [Setting] decoration, source-gen schema, hot-reload)

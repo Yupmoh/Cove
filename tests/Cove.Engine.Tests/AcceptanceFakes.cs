@@ -14,26 +14,26 @@ public sealed class AcceptanceFakeWorktreeService : IWorktreeService
     public bool RemoveAsync(string ws, string branchName) => true;
 }
 
-public sealed class AcceptanceFakePaneHost : IPaneHost
+public sealed class AcceptanceFakeNookHost : INookHost
 {
     public Dictionary<string, Dictionary<string, string>> InjectedEnvs { get; } = new();
     public Dictionary<string, string> BoundCards { get; } = new();
-    public PaneCreationResult? CreatePane(string? adapter, int cols, int rows) => new("pane-1");
-    public bool InjectEnv(string paneId, IReadOnlyDictionary<string, string> env) { InjectedEnvs[paneId] = new Dictionary<string, string>(env); return true; }
-    public bool BindTaskCard(string paneId, string cardId) { BoundCards[paneId] = cardId; return true; }
+    public NookCreationResult? CreateNook(string? adapter, int cols, int rows) => new("nook-1");
+    public bool InjectEnv(string nookId, IReadOnlyDictionary<string, string> env) { InjectedEnvs[nookId] = new Dictionary<string, string>(env); return true; }
+    public bool BindTaskCard(string nookId, string cardId) { BoundCards[nookId] = cardId; return true; }
 }
 
-public sealed class AcceptanceFakeRoomService : IRoomService
+public sealed class AcceptanceFakeShoreService : IShoreService
 {
-    public RoomCreationResult? CreateRoom(string ws, string name, string? parent) => new("room-1");
+    public ShoreCreationResult? CreateShore(string ws, string name, string? parent) => new("shore-1");
 }
 
 public sealed class AcceptanceFakeAgentLauncher : IAgentLauncher
 {
-    public AdapterLaunchResult Launch(string paneId, string adapter, string cmd, IReadOnlyDictionary<string, string> env, string prompt) => new("session-1", true, null);
+    public AdapterLaunchResult Launch(string nookId, string adapter, string cmd, IReadOnlyDictionary<string, string> env, string prompt) => new("session-1", true, null);
 }
 
 public sealed class AcceptanceFakeResumeLauncher : IAdapterResumeLauncher
 {
-    public AdapterResumeResult Resume(string paneId, string adapter, string cmd, string priorSessionId, IReadOnlyDictionary<string, string> env) => new("resumed-1", true, null);
+    public AdapterResumeResult Resume(string nookId, string adapter, string cmd, string priorSessionId, IReadOnlyDictionary<string, string> env) => new("resumed-1", true, null);
 }

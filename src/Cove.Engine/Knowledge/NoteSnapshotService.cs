@@ -31,26 +31,26 @@ public sealed class NoteSnapshotService
         _initialized = true;
     }
 
-    public void Snapshot(string workspaceId, string noteId, string message)
+    public void Snapshot(string bayId, string noteId, string message)
     {
         EnsureRepo();
-        var notePath = System.IO.Path.Combine(workspaceId, noteId);
+        var notePath = System.IO.Path.Combine(bayId, noteId);
         RunGit(["add", "--", notePath]);
         var result = RunGit(["commit", "--quiet", "-m", message]);
         if (!result.Ok)
-            _logger.LogWarning("notes-snapshot: commit failed for {ws}/{id}: {err}", workspaceId, noteId, result.Stderr);
+            _logger.LogWarning("notes-snapshot: commit failed for {ws}/{id}: {err}", bayId, noteId, result.Stderr);
         else
-            _logger.LogWarning("notes-snapshot: committed {ws}/{id}: {msg}", workspaceId, noteId, message);
+            _logger.LogWarning("notes-snapshot: committed {ws}/{id}: {msg}", bayId, noteId, message);
     }
 
-    public System.Collections.Generic.IReadOnlyList<NoteHistoryEntry> GetHistory(string workspaceId, string noteId)
+    public System.Collections.Generic.IReadOnlyList<NoteHistoryEntry> GetHistory(string bayId, string noteId)
     {
         EnsureRepo();
-        var notePath = System.IO.Path.Combine(workspaceId, noteId);
+        var notePath = System.IO.Path.Combine(bayId, noteId);
         var result = RunGit(["log", "--format=%H%x1f%s%x1f%aI", "--", notePath]);
         if (!result.Ok)
         {
-            _logger.LogWarning("notes-snapshot: git log failed for {ws}/{id}: {err}", workspaceId, noteId, result.Stderr);
+            _logger.LogWarning("notes-snapshot: git log failed for {ws}/{id}: {err}", bayId, noteId, result.Stderr);
             return [];
         }
 

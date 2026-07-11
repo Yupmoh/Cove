@@ -4,7 +4,7 @@ interface Note {
   id: string;
   title: string;
   content: string;
-  workspaceId: string;
+  bayId: string;
   source: string;
   kind: string;
   createdAt: string;
@@ -32,29 +32,29 @@ let currentNote: Note | null = null;
 let comments: InlineComment[] = [];
 let selectedRange: { start: number; end: number } | null = null;
 
-export async function renderMarkdownNote(workspaceId: string, noteId: string): Promise<HTMLElement> {
+export async function renderMarkdownNote(bayId: string, noteId: string): Promise<HTMLElement> {
   const el = document.createElement("div");
   el.className = "markdown-note-editor";
   el.style.cssText = "display:flex;flex-direction:column;height:100%;background:#0b1622;color:#e5e9f0;font-family:system-ui,sans-serif;";
 
   try {
     const result = await invoke<NoteReadResult>("cove://commands/note.read", {
-      workspaceId,
+      bayId,
       id: noteId,
     });
     currentNote = {
       id: result.id,
       title: result.title,
       content: result.content,
-      workspaceId,
+      bayId,
       source: "gui",
       kind: "markdown",
       createdAt: "",
       updatedAt: "",
     };
     comments = loadCommentsFromContent(result.content);
-    el.appendChild(buildToolbar(workspaceId, el));
-    el.appendChild(buildEditor(workspaceId));
+    el.appendChild(buildToolbar(bayId, el));
+    el.appendChild(buildEditor(bayId));
     el.appendChild(buildCommentsPanel());
   } catch (e) {
     el.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to load note: ${(e as Error).message}</div>`;
@@ -63,7 +63,7 @@ export async function renderMarkdownNote(workspaceId: string, noteId: string): P
   return el;
 }
 
-function buildToolbar(workspaceId: string, el: HTMLElement): HTMLElement {
+function buildToolbar(bayId: string, el: HTMLElement): HTMLElement {
   const toolbar = document.createElement("div");
   toolbar.style.cssText = "padding:8px 12px;display:flex;gap:8px;align-items:center;border-bottom:1px solid #1e2d3f;flex-wrap:wrap;";
 
@@ -80,7 +80,7 @@ function buildToolbar(workspaceId: string, el: HTMLElement): HTMLElement {
   const save = document.createElement("button");
   save.textContent = "Save";
   save.style.cssText = "padding:4px 12px;background:#2563eb;border:1px solid #3b82f6;border-radius:4px;color:#fff;cursor:pointer;font-size:12px;";
-  save.addEventListener("click", () => saveNote(workspaceId, el));
+  save.addEventListener("click", () => saveNote(bayId, el));
   toolbar.appendChild(save);
 
   const commentBtn = document.createElement("button");
@@ -92,7 +92,7 @@ function buildToolbar(workspaceId: string, el: HTMLElement): HTMLElement {
   return toolbar;
 }
 
-function buildEditor(workspaceId: string): HTMLElement {
+function buildEditor(bayId: string): HTMLElement {
   const container = document.createElement("div");
   container.style.cssText = "flex:1;display:flex;overflow:hidden;";
 
@@ -123,7 +123,7 @@ function buildEditor(workspaceId: string): HTMLElement {
       if (item.type.startsWith("image/")) {
         e.preventDefault();
         const file = item.getAsFile();
-        if (file) handleImagePaste(file, workspaceId, editor);
+        if (file) handleImagePaste(file, bayId, editor);
         return;
       }
     }
@@ -205,7 +205,7 @@ function refreshCommentsPanel(): void {
   panel.replaceWith(newList);
 }
 
-async function handleImagePaste(file: File, workspaceId: string, editor: HTMLTextAreaElement): Promise<void> {
+async function handleImagePaste(file: File, bayId: string, editor: HTMLTextAreaElement): Promise<void> {
   const reader = new FileReader();
   reader.onload = async () => {
     const dataUrl = reader.result as string;
@@ -214,7 +214,7 @@ async function handleImagePaste(file: File, workspaceId: string, editor: HTMLTex
 
     try {
       const result = await invoke<{ mediaPath: string }>("cove://commands/note.media.save", {
-        workspaceId,
+        bayId,
         id: currentNote.id,
         fileName: file.name,
         base64Data: base64,
@@ -226,7 +226,7 @@ async function handleImagePaste(file: File, workspaceId: string, editor: HTMLTex
       currentNote.content = editor.value;
 
       await invoke("cove://commands/note.write", {
-        workspaceId,
+        bayId,
         id: currentNote.id,
         content: currentNote.content,
       });
@@ -237,12 +237,12 @@ async function handleImagePaste(file: File, workspaceId: string, editor: HTMLTex
   reader.readAsDataURL(file);
 }
 
-async function saveNote(workspaceId: string, el: HTMLElement): Promise<void> {
+async function saveNote(bayId: string, el: HTMLElement): Promise<void> {
   if (!currentNote) return;
   try {
     const contentWithComments = serializeContentWithComments(currentNote.content);
     await invoke("cove://commands/note.write", {
-      workspaceId,
+      bayId,
       id: currentNote.id,
       title: currentNote.title,
       content: contentWithComments,

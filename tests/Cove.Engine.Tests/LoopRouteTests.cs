@@ -24,7 +24,7 @@ public sealed class LoopRouteTests
 
     private static async Task<string> CreateCardWithScheduleAsync(FrameConnection ctl, CancellationToken ct)
     {
-        var resp = await SendAsync(ctl, "c", "cove://commands/task.create", P("""{"title":"loop card","workspaceId":"ws1","source":"user:test"}"""), ct);
+        var resp = await SendAsync(ctl, "c", "cove://commands/task.create", P("""{"title":"loop card","bayId":"ws1","source":"user:test"}"""), ct);
         var cardId = resp.Data!.Value.GetProperty("id").GetString()!;
         await SendAsync(ctl, "s", "cove://commands/task.repeat.set", P($"{{\"cardId\":\"{cardId}\",\"triggerKind\":\"immediate\"}}"), ct);
         return cardId;
@@ -96,7 +96,7 @@ public sealed class LoopRouteTests
         await using var h = await DaemonTestHarness.StartAsync();
         await using FrameConnection ctl = await h.ConnectAsync("cli");
 
-        var cardId = (await SendAsync(ctl, "c", "cove://commands/task.create", P("""{"title":"no-sched","workspaceId":"ws1","source":"user:test"}"""), ct)).Data!.Value.GetProperty("id").GetString()!;
+        var cardId = (await SendAsync(ctl, "c", "cove://commands/task.create", P("""{"title":"no-sched","bayId":"ws1","source":"user:test"}"""), ct)).Data!.Value.GetProperty("id").GetString()!;
 
         var continueResp = await SendAsync(ctl, "cnt", "cove://commands/task.repeat.continue", P($"{{\"cardId\":\"{cardId}\"}}"), ct);
         Assert.False(continueResp.Ok);

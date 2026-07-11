@@ -8,7 +8,7 @@ export interface ToolbarTile {
 
 export function toolbarTiles(): ToolbarTile[] {
   return [
-    { id: "terminal", label: "Terminal", letter: "T", action: "room.new", icon: "▌" },
+    { id: "terminal", label: "Terminal", letter: "T", action: "shore.new", icon: "▌" },
     { id: "browser", label: "Browser", letter: "B", action: "tool.browser", icon: "◑" },
     { id: "search", label: "Search", letter: "F", action: "tool.search", icon: "⌕" },
     { id: "git", label: "Source Control", letter: "G", action: "tool.git", icon: "⎇" },

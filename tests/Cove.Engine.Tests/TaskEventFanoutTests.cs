@@ -50,7 +50,7 @@ public sealed class TaskEventFanoutTests
         await using FrameConnection gui = await h.ConnectAsync("gui");
         await using FrameConnection cli = await h.ConnectAsync("cli");
 
-        await SendAsync(cli, "c", "cove://commands/task.create", P("""{"title":"event card","workspaceId":"ws1","source":"user:test"}"""), ct);
+        await SendAsync(cli, "c", "cove://commands/task.create", P("""{"title":"event card","bayId":"ws1","source":"user:test"}"""), ct);
 
         var evt = await ReadEventAsync(gui, ct);
         Assert.NotNull(evt);
@@ -68,7 +68,7 @@ public sealed class TaskEventFanoutTests
         await using FrameConnection gui = await h.ConnectAsync("gui");
         await using FrameConnection cli = await h.ConnectAsync("cli");
 
-        var createResp = await SendAsync(cli, "c", "cove://commands/task.create", P("""{"title":"run-event card","workspaceId":"ws1","source":"user:test"}"""), ct);
+        var createResp = await SendAsync(cli, "c", "cove://commands/task.create", P("""{"title":"run-event card","bayId":"ws1","source":"user:test"}"""), ct);
         var cardId = createResp.Data!.Value.GetProperty("id").GetString()!;
 
         await SendAsync(cli, "cl", "cove://commands/task.claim", P($"{{\"cardId\":\"{cardId}\"}}"), ct);
@@ -89,7 +89,7 @@ public sealed class TaskEventFanoutTests
         await using FrameConnection gui = await h.ConnectAsync("gui");
         await using FrameConnection cli = await h.ConnectAsync("cli");
 
-        await SendAsync(cli, "s", "cove://commands/task.status.create", P("""{"workspaceId":"ws1","id":"blocked","name":"Blocked","hexColor":"#ff0000","position":6.0}"""), ct);
+        await SendAsync(cli, "s", "cove://commands/task.status.create", P("""{"bayId":"ws1","id":"blocked","name":"Blocked","hexColor":"#ff0000","position":6.0}"""), ct);
 
         var evt = await ReadEventAsync(gui, ct);
         Assert.NotNull(evt);

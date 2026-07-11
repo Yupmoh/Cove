@@ -120,7 +120,7 @@ public sealed class LaunchOrchestratorTests
     }
 
     [Fact]
-    public void PersistOverrides_UnknownPane_ReturnsNull()
+    public void PersistOverrides_UnknownNook_ReturnsNull()
     {
         var orch = new LaunchOrchestrator();
         Assert.Null(orch.GetOverrides("nonexistent"));

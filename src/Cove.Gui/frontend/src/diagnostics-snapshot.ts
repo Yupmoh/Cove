@@ -6,11 +6,11 @@ export interface DiagnosticsSnapshot {
   gcGen0Collections: number;
   gcGen1Collections: number;
   gcGen2Collections: number;
-  activePanes: number;
-  activeWorkspaces: number;
+  activeNooks: number;
+  activeBays: number;
   activeAgents: number;
   cpuUsagePercent: number;
-  paneScrollbackBytes: Record<string, number>;
+  nookScrollbackBytes: Record<string, number>;
 }
 
 export interface SnapshotParseResult {
@@ -54,7 +54,7 @@ export function parseSnapshotExport(text: string): SnapshotParseResult {
 
 export function totalScrollbackBytes(snapshot: DiagnosticsSnapshot): number {
   let total = 0;
-  for (const value of Object.values(snapshot.paneScrollbackBytes)) total += value;
+  for (const value of Object.values(snapshot.nookScrollbackBytes)) total += value;
   return total;
 }
 
@@ -66,10 +66,10 @@ export function snapshotRows(snapshot: DiagnosticsSnapshot): SnapshotRow[] {
     { label: "Threads", value: String(snapshot.threadCount) },
     { label: "GC gen0 / gen1 / gen2", value: `${snapshot.gcGen0Collections} / ${snapshot.gcGen1Collections} / ${snapshot.gcGen2Collections}` },
     { label: "CPU", value: `${snapshot.cpuUsagePercent.toFixed(1)}%` },
-    { label: "Active panes", value: String(snapshot.activePanes) },
-    { label: "Active workspaces", value: String(snapshot.activeWorkspaces) },
+    { label: "Active nooks", value: String(snapshot.activeNooks) },
+    { label: "Active bays", value: String(snapshot.activeBays) },
     { label: "Active agents", value: String(snapshot.activeAgents) },
-    { label: "Pane scrollback", value: formatBytes(totalScrollbackBytes(snapshot)) },
+    { label: "Nook scrollback", value: formatBytes(totalScrollbackBytes(snapshot)) },
   ];
 }
 
@@ -114,11 +114,11 @@ function normalizeSnapshot(record: Record<string, unknown>): DiagnosticsSnapshot
     gcGen0Collections: asNumber(record.gcGen0Collections),
     gcGen1Collections: asNumber(record.gcGen1Collections),
     gcGen2Collections: asNumber(record.gcGen2Collections),
-    activePanes: asNumber(record.activePanes),
-    activeWorkspaces: asNumber(record.activeWorkspaces),
+    activeNooks: asNumber(record.activeNooks),
+    activeBays: asNumber(record.activeBays),
     activeAgents: asNumber(record.activeAgents),
     cpuUsagePercent: asNumber(record.cpuUsagePercent),
-    paneScrollbackBytes: asByteMap(record.paneScrollbackBytes),
+    nookScrollbackBytes: asByteMap(record.nookScrollbackBytes),
   };
 }
 

@@ -6,17 +6,17 @@ namespace Cove.Engine.Knowledge;
 public sealed class GitCommitIngester
 {
     private readonly TimelineStore _timeline;
-    private readonly Workspaces.IGitRunner _git;
+    private readonly Bays.IGitRunner _git;
     private readonly ILogger _logger;
 
-    public GitCommitIngester(TimelineStore timeline, Workspaces.IGitRunner git, ILogger logger)
+    public GitCommitIngester(TimelineStore timeline, Bays.IGitRunner git, ILogger logger)
     {
         _timeline = timeline;
         _git = git;
         _logger = logger;
     }
 
-    public async System.Threading.Tasks.Task<int> IngestAsync(string repoDir, string workspaceId, System.Threading.CancellationToken ct = default)
+    public async System.Threading.Tasks.Task<int> IngestAsync(string repoDir, string bayId, System.Threading.CancellationToken ct = default)
     {
         if (!System.IO.Directory.Exists(System.IO.Path.Combine(repoDir, ".git")))
         {
@@ -43,10 +43,10 @@ public sealed class GitCommitIngester
 
             _timeline.Append(new TimelineEntry
             {
-                WorkspaceId = workspaceId,
+                BayId = bayId,
                 Kind = "git.commit",
                 Source = "git-ingester",
-                Scope = "workspace",
+                Scope = "bay",
                 Summary = subject,
                 JsonPayload = "{\"sha\":\"" + sha + "\"}",
                 Id = "git-" + sha[..12],

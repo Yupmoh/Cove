@@ -40,12 +40,12 @@ public class GeneratorTests
             internal static class CliCommands
             {
                 [CoveCommand("version")] public static int Version(string c) => 0;
-                [CoveCommand("pane list")] public static int PaneList(string c) => 0;
+                [CoveCommand("nook list")] public static int NookList(string c) => 0;
             }
             """;
         var g = RunGenerator(src);
         Assert.Contains("[\"version\"] = (System.Func<string, int>)global::Cove.Cli.CliCommands.Version", g);
-        Assert.Contains("[\"pane list\"] = (System.Func<string, int>)global::Cove.Cli.CliCommands.PaneList", g);
+        Assert.Contains("[\"nook list\"] = (System.Func<string, int>)global::Cove.Cli.CliCommands.NookList", g);
     }
 
     [Fact]
@@ -57,7 +57,7 @@ public class GeneratorTests
             internal static class CliCommands
             {
                 [CoveCommand("version")] public static int Version(string c) => 0;
-                [CoveCommand("pane list")] public static int PaneList(string c) => 0;
+                [CoveCommand("nook list")] public static int NookList(string c) => 0;
                 [CoveCommand("theme list")] public static int ThemeList(string c) => 0;
             }
             """;

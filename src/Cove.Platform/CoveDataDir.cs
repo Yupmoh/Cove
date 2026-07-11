@@ -67,7 +67,7 @@ public sealed class CoveDataDir
     public string LogsDir => Path.Combine(Root, "logs");
     public string BinDir => Path.Combine(Root, "bin");
     public string CacheDir => Path.Combine(Root, "cache");
-    public string WorkspacesDir => Path.Combine(Root, "workspaces");
+    public string BaysDir => Path.Combine(Root, "bays");
     public string ThemesDir => Path.Combine(Root, "themes");
     public string LibraryDir => Path.Combine(Root, "library");
     public string RunCommandsDir => Path.Combine(Root, "run-commands");

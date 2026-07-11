@@ -55,7 +55,7 @@ describe("adapterAccent", () => {
 });
 
 describe("toolAccent", () => {
-  it("maps each pane type to its own accent and defaults to mauve", () => {
+  it("maps each nook type to its own accent and defaults to mauve", () => {
     expect(toolAccent("browser")).toBe("#89b4fa");
     expect(toolAccent("git")).toBe("#fab387");
     expect(toolAccent("unknown")).toBe("#cba6f7");
@@ -141,14 +141,14 @@ describe("hotkeyTarget", () => {
 
 describe("session resolution", () => {
   const sessions: LauncherSession[] = [
-    { paneId: "p1", adapter: "claude", sessionId: "s1", lifecycle: "background", resumable: true },
-    { paneId: "p2", adapter: "claude", sessionId: null, lifecycle: "dismissed", resumable: true },
-    { paneId: "p3", adapter: "claude", sessionId: "s3", lifecycle: "dismissed", resumable: false },
-    { paneId: "p4", adapter: "codex", sessionId: "s4", lifecycle: "background", resumable: true },
+    { nookId: "p1", adapter: "claude", sessionId: "s1", lifecycle: "background", resumable: true },
+    { nookId: "p2", adapter: "claude", sessionId: null, lifecycle: "dismissed", resumable: true },
+    { nookId: "p3", adapter: "claude", sessionId: "s3", lifecycle: "dismissed", resumable: false },
+    { nookId: "p4", adapter: "codex", sessionId: "s4", lifecycle: "background", resumable: true },
   ];
   it("keeps only resumable sessions with a session id for the adapter", () => {
-    expect(resumableSessionsFor("claude", sessions).map((s) => s.paneId)).toEqual(["p1"]);
-    expect(resumableSessionsFor("codex", sessions).map((s) => s.paneId)).toEqual(["p4"]);
+    expect(resumableSessionsFor("claude", sessions).map((s) => s.nookId)).toEqual(["p1"]);
+    expect(resumableSessionsFor("codex", sessions).map((s) => s.nookId)).toEqual(["p4"]);
   });
   it("returns the first session as most-recent, or null when empty", () => {
     expect(mostRecentSession(resumableSessionsFor("claude", sessions))?.sessionId).toBe("s1");
@@ -185,10 +185,10 @@ describe("recent session shaping", () => {
   it("shapes and caps recent rows preserving order", () => {
     const now = Date.parse("2026-07-10T12:00:00Z");
     const rows: RecentSessionRow[] = [
-      { adapter: "claude", sessionId: "s1", workspaceId: "w", cwd: "/home/moh/alpha", startedAt: "2026-07-10T11:55:00Z" },
-      { adapter: "claude", sessionId: "s2", workspaceId: "w", cwd: "/home/moh/beta", startedAt: "2026-07-10T11:00:00Z" },
-      { adapter: "claude", sessionId: "s3", workspaceId: "w", cwd: "/home/moh/gamma", startedAt: "2026-07-09T12:00:00Z" },
-      { adapter: "claude", sessionId: "s4", workspaceId: "w", cwd: "/home/moh/delta", startedAt: "2026-07-08T12:00:00Z" },
+      { adapter: "claude", sessionId: "s1", bayId: "w", cwd: "/home/moh/alpha", startedAt: "2026-07-10T11:55:00Z" },
+      { adapter: "claude", sessionId: "s2", bayId: "w", cwd: "/home/moh/beta", startedAt: "2026-07-10T11:00:00Z" },
+      { adapter: "claude", sessionId: "s3", bayId: "w", cwd: "/home/moh/gamma", startedAt: "2026-07-09T12:00:00Z" },
+      { adapter: "claude", sessionId: "s4", bayId: "w", cwd: "/home/moh/delta", startedAt: "2026-07-08T12:00:00Z" },
     ];
     const shaped = shapeRecentSessions(rows, now, 3);
     expect(shaped.map((s) => s.sessionId)).toEqual(["s1", "s2", "s3"]);

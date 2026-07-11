@@ -8,51 +8,51 @@ namespace Cove.Engine.Tests;
 public sealed class HookEventRouterTests
 {
     [Fact]
-    public void Route_SessionStart_CreatesPaneState()
+    public void Route_SessionStart_CreatesNookState()
     {
         var router = new HookEventRouter();
-        var ev = new HookEvent { Adapter = "claude-code", Event = "session-start", PaneId = "p1" };
+        var ev = new HookEvent { Adapter = "claude-code", Event = "session-start", NookId = "p1" };
         router.Route(ev);
 
-        var state = router.GetPaneState("p1");
+        var state = router.GetNookState("p1");
         Assert.NotNull(state);
         Assert.Equal("claude-code", state!.Adapter);
         Assert.Equal("active", state.Status);
     }
 
     [Fact]
-    public void Route_SessionEnd_MarksPaneIdle()
+    public void Route_SessionEnd_MarksNookIdle()
     {
         var router = new HookEventRouter();
-        router.Route(new HookEvent { Adapter = "claude-code", Event = "session-start", PaneId = "p1" });
-        router.Route(new HookEvent { Adapter = "claude-code", Event = "session-end", PaneId = "p1" });
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "session-start", NookId = "p1" });
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "session-end", NookId = "p1" });
 
-        var state = router.GetPaneState("p1");
+        var state = router.GetNookState("p1");
         Assert.NotNull(state);
         Assert.Equal("idle", state!.Status);
     }
 
     [Fact]
-    public void Route_Stop_MarksPaneNeedsInput()
+    public void Route_Stop_MarksNookNeedsInput()
     {
         var router = new HookEventRouter();
-        router.Route(new HookEvent { Adapter = "claude-code", Event = "session-start", PaneId = "p1" });
-        router.Route(new HookEvent { Adapter = "claude-code", Event = "stop", PaneId = "p1" });
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "session-start", NookId = "p1" });
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "stop", NookId = "p1" });
 
-        var state = router.GetPaneState("p1");
+        var state = router.GetNookState("p1");
         Assert.NotNull(state);
         Assert.Equal("needs-input", state!.Status);
     }
 
     [Fact]
-    public void Route_UserPromptSubmit_MarksPaneActive()
+    public void Route_UserPromptSubmit_MarksNookActive()
     {
         var router = new HookEventRouter();
-        router.Route(new HookEvent { Adapter = "claude-code", Event = "session-start", PaneId = "p1" });
-        router.Route(new HookEvent { Adapter = "claude-code", Event = "stop", PaneId = "p1" });
-        router.Route(new HookEvent { Adapter = "claude-code", Event = "user-prompt-submit", PaneId = "p1" });
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "session-start", NookId = "p1" });
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "stop", NookId = "p1" });
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "user-prompt-submit", NookId = "p1" });
 
-        var state = router.GetPaneState("p1");
+        var state = router.GetNookState("p1");
         Assert.Equal("active", state!.Status);
     }
 
@@ -60,10 +60,10 @@ public sealed class HookEventRouterTests
     public void Route_PreToolUse_RecordsToolUse()
     {
         var router = new HookEventRouter();
-        router.Route(new HookEvent { Adapter = "claude-code", Event = "session-start", PaneId = "p1" });
-        router.Route(new HookEvent { Adapter = "claude-code", Event = "pre-tool-use", PaneId = "p1" });
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "session-start", NookId = "p1" });
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "pre-tool-use", NookId = "p1" });
 
-        var state = router.GetPaneState("p1");
+        var state = router.GetNookState("p1");
         Assert.Equal("tool-running", state!.Status);
     }
 
@@ -71,22 +71,22 @@ public sealed class HookEventRouterTests
     public void Route_PostToolUse_RevertsToActive()
     {
         var router = new HookEventRouter();
-        router.Route(new HookEvent { Adapter = "claude-code", Event = "session-start", PaneId = "p1" });
-        router.Route(new HookEvent { Adapter = "claude-code", Event = "pre-tool-use", PaneId = "p1" });
-        router.Route(new HookEvent { Adapter = "claude-code", Event = "post-tool-use", PaneId = "p1" });
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "session-start", NookId = "p1" });
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "pre-tool-use", NookId = "p1" });
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "post-tool-use", NookId = "p1" });
 
-        var state = router.GetPaneState("p1");
+        var state = router.GetNookState("p1");
         Assert.Equal("active", state!.Status);
     }
 
     [Fact]
-    public void Route_StopFailure_MarksPaneError()
+    public void Route_StopFailure_MarksNookError()
     {
         var router = new HookEventRouter();
-        router.Route(new HookEvent { Adapter = "claude-code", Event = "session-start", PaneId = "p1" });
-        router.Route(new HookEvent { Adapter = "claude-code", Event = "stop-failure", PaneId = "p1" });
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "session-start", NookId = "p1" });
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "stop-failure", NookId = "p1" });
 
-        var state = router.GetPaneState("p1");
+        var state = router.GetNookState("p1");
         Assert.Equal("error", state!.Status);
     }
 
@@ -94,10 +94,10 @@ public sealed class HookEventRouterTests
     public void Route_SubagentStart_RecordsSubagent()
     {
         var router = new HookEventRouter();
-        router.Route(new HookEvent { Adapter = "claude-code", Event = "session-start", PaneId = "p1" });
-        router.Route(new HookEvent { Adapter = "claude-code", Event = "subagent-start", PaneId = "p1" });
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "session-start", NookId = "p1" });
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "subagent-start", NookId = "p1" });
 
-        var state = router.GetPaneState("p1");
+        var state = router.GetNookState("p1");
         Assert.Equal(1, state!.ActiveSubagents);
     }
 
@@ -105,21 +105,21 @@ public sealed class HookEventRouterTests
     public void Route_SubagentStop_DecrementsSubagent()
     {
         var router = new HookEventRouter();
-        router.Route(new HookEvent { Adapter = "claude-code", Event = "session-start", PaneId = "p1" });
-        router.Route(new HookEvent { Adapter = "claude-code", Event = "subagent-start", PaneId = "p1" });
-        router.Route(new HookEvent { Adapter = "claude-code", Event = "subagent-start", PaneId = "p1" });
-        router.Route(new HookEvent { Adapter = "claude-code", Event = "subagent-stop", PaneId = "p1" });
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "session-start", NookId = "p1" });
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "subagent-start", NookId = "p1" });
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "subagent-start", NookId = "p1" });
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "subagent-stop", NookId = "p1" });
 
-        var state = router.GetPaneState("p1");
+        var state = router.GetNookState("p1");
         Assert.Equal(1, state!.ActiveSubagents);
     }
 
     [Fact]
-    public void Route_EventWithoutSessionStart_CreatesNoPaneState()
+    public void Route_EventWithoutSessionStart_CreatesNoNookState()
     {
         var router = new HookEventRouter();
-        router.Route(new HookEvent { Adapter = "claude-code", Event = "pre-tool-use", PaneId = "p1" });
-        Assert.Empty(router.GetAllPaneStates());
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "pre-tool-use", NookId = "p1" });
+        Assert.Empty(router.GetAllNookStates());
     }
 
     [Fact]
@@ -128,30 +128,30 @@ public sealed class HookEventRouterTests
         var router = new HookEventRouter();
         var fired = false;
         router.NeedsInputTransition += (_, _) => fired = true;
-        router.Route(new HookEvent { Adapter = "claude-code", Event = "stop", PaneId = "p1" });
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "stop", NookId = "p1" });
         Assert.False(fired);
-        Assert.Empty(router.GetAllPaneStates());
+        Assert.Empty(router.GetAllNookStates());
     }
 
     [Fact]
-    public void Route_EventAfterSessionEnd_UpdatesExistingPaneState()
+    public void Route_EventAfterSessionEnd_UpdatesExistingNookState()
     {
         var router = new HookEventRouter();
-        router.Route(new HookEvent { Adapter = "claude-code", Event = "session-start", PaneId = "p1" });
-        router.Route(new HookEvent { Adapter = "claude-code", Event = "session-end", PaneId = "p1" });
-        router.Route(new HookEvent { Adapter = "claude-code", Event = "pre-tool-use", PaneId = "p1" });
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "session-start", NookId = "p1" });
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "session-end", NookId = "p1" });
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "pre-tool-use", NookId = "p1" });
 
-        var state = router.GetPaneState("p1");
+        var state = router.GetNookState("p1");
         Assert.Equal("tool-running", state!.Status);
         Assert.Equal("claude-code", state.Adapter);
     }
 
     [Fact]
-    public void Route_WithoutPaneId_NoStateChange()
+    public void Route_WithoutNookId_NoStateChange()
     {
         var router = new HookEventRouter();
         router.Route(new HookEvent { Adapter = "claude-code", Event = "session-start" });
-        Assert.Empty(router.GetAllPaneStates());
+        Assert.Empty(router.GetAllNookStates());
     }
 
     [Fact]
@@ -171,20 +171,20 @@ public sealed class HookEventRouterTests
     }
 
     [Fact]
-    public void GetPaneState_UnknownPane_ReturnsNull()
+    public void GetNookState_UnknownNook_ReturnsNull()
     {
         var router = new HookEventRouter();
-        Assert.Null(router.GetPaneState("nonexistent"));
+        Assert.Null(router.GetNookState("nonexistent"));
     }
 
     [Fact]
     public void Route_Notification_DoesNotChangeStatus()
     {
         var router = new HookEventRouter();
-        router.Route(new HookEvent { Adapter = "claude-code", Event = "session-start", PaneId = "p1" });
-        router.Route(new HookEvent { Adapter = "claude-code", Event = "notification", PaneId = "p1" });
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "session-start", NookId = "p1" });
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "notification", NookId = "p1" });
 
-        var state = router.GetPaneState("p1");
+        var state = router.GetNookState("p1");
         Assert.Equal("active", state!.Status);
     }
 }

@@ -13,11 +13,11 @@ public sealed class OmniChatStoreTests
         try
         {
             var store = new OmniChatStore(dir);
-            store.Append("pane-1", new OmniChatMessage("user", "hello", DateTimeOffset.UtcNow));
-            store.Append("pane-1", new OmniChatMessage("assistant", "hi there", DateTimeOffset.UtcNow));
+            store.Append("nook-1", new OmniChatMessage("user", "hello", DateTimeOffset.UtcNow));
+            store.Append("nook-1", new OmniChatMessage("assistant", "hi there", DateTimeOffset.UtcNow));
 
             var fresh = new OmniChatStore(dir);
-            var history = fresh.LoadHistory("pane-1");
+            var history = fresh.LoadHistory("nook-1");
 
             Assert.Equal(2, history.Count);
             Assert.Equal("hello", history[0].Body);
@@ -27,7 +27,7 @@ public sealed class OmniChatStoreTests
     }
 
     [Fact]
-    public void LoadHistory_UnknownPane_ReturnsEmpty()
+    public void LoadHistory_UnknownNook_ReturnsEmpty()
     {
         var dir = NewDir();
         try
@@ -39,22 +39,22 @@ public sealed class OmniChatStoreTests
     }
 
     [Fact]
-    public void Clear_RemovesConversationForPane()
+    public void Clear_RemovesConversationForNook()
     {
         var dir = NewDir();
         try
         {
             var store = new OmniChatStore(dir);
-            store.Append("pane-1", new OmniChatMessage("user", "msg", DateTimeOffset.UtcNow));
-            store.Clear("pane-1");
+            store.Append("nook-1", new OmniChatMessage("user", "msg", DateTimeOffset.UtcNow));
+            store.Clear("nook-1");
 
-            Assert.Empty(store.LoadHistory("pane-1"));
+            Assert.Empty(store.LoadHistory("nook-1"));
         }
         finally { try { Directory.Delete(dir, true); } catch { } }
     }
 
     [Fact]
-    public void Append_RejectsInvalidPaneId()
+    public void Append_RejectsInvalidNookId()
     {
         var dir = NewDir();
         try
@@ -77,10 +77,10 @@ public sealed class OmniChatStoreTests
             var store = new OmniChatStore(dir);
             var t1 = DateTimeOffset.UtcNow;
             var t2 = t1.AddSeconds(1);
-            store.Append("pane-1", new OmniChatMessage("user", "second", t2));
-            store.Append("pane-1", new OmniChatMessage("user", "first", t1));
+            store.Append("nook-1", new OmniChatMessage("user", "second", t2));
+            store.Append("nook-1", new OmniChatMessage("user", "first", t1));
 
-            var history = store.LoadHistory("pane-1");
+            var history = store.LoadHistory("nook-1");
 
             Assert.Equal("first", history[0].Body);
             Assert.Equal("second", history[1].Body);

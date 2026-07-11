@@ -18,23 +18,23 @@ interface SketchState {
 }
 
 let currentNoteId: string | null = null;
-let currentWorkspaceId: string | null = null;
+let currentBayId: string | null = null;
 
-export async function renderSketchNote(workspaceId: string, noteId: string): Promise<HTMLElement> {
+export async function renderSketchNote(bayId: string, noteId: string): Promise<HTMLElement> {
   const el = document.createElement("div");
   el.className = "sketch-note-editor";
   el.style.cssText = "display:flex;flex-direction:column;height:100%;background:#0b1622;color:#e5e9f0;font-family:system-ui,sans-serif;";
 
   currentNoteId = noteId;
-  currentWorkspaceId = workspaceId;
+  currentBayId = bayId;
 
   try {
     const result = await invoke<NoteReadResult>("cove://commands/note.read", {
-      workspaceId,
+      bayId,
       id: noteId,
     });
 
-    el.appendChild(buildToolbar(workspaceId));
+    el.appendChild(buildToolbar(bayId));
     el.appendChild(buildCanvas(result.content));
   } catch (e) {
     el.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to load sketch: ${(e as Error).message}</div>`;
@@ -43,7 +43,7 @@ export async function renderSketchNote(workspaceId: string, noteId: string): Pro
   return el;
 }
 
-function buildToolbar(workspaceId: string): HTMLElement {
+function buildToolbar(bayId: string): HTMLElement {
   const toolbar = document.createElement("div");
   toolbar.style.cssText = "padding:8px 12px;display:flex;gap:8px;align-items:center;border-bottom:1px solid #1e2d3f;flex-wrap:wrap;";
 
@@ -201,10 +201,10 @@ function adjustZoom(delta: number): void {
 }
 
 async function saveViewportState(state: SketchState): Promise<void> {
-  if (!currentWorkspaceId || !currentNoteId) return;
+  if (!currentBayId || !currentNoteId) return;
   try {
     await invoke("cove://commands/note.write", {
-      workspaceId: currentWorkspaceId,
+      bayId: currentBayId,
       id: currentNoteId,
       content: JSON.stringify(state),
     });
@@ -214,14 +214,14 @@ async function saveViewportState(state: SketchState): Promise<void> {
 }
 
 async function saveSketch(): Promise<void> {
-  if (!currentWorkspaceId || !currentNoteId) return;
+  if (!currentBayId || !currentNoteId) return;
   const canvas = document.querySelector(".sketch-canvas") as HTMLCanvasElement;
   if (!canvas) return;
   const stateStr = canvas.getAttribute("data-state");
   if (!stateStr) return;
   try {
     await invoke("cove://commands/note.write", {
-      workspaceId: currentWorkspaceId,
+      bayId: currentBayId,
       id: currentNoteId,
       content: stateStr,
     });
@@ -231,10 +231,10 @@ async function saveSketch(): Promise<void> {
 }
 
 async function exportFormat(format: string): Promise<void> {
-  if (!currentWorkspaceId || !currentNoteId) return;
+  if (!currentBayId || !currentNoteId) return;
   try {
     const result = await invoke<NoteReadResult>("cove://commands/note.read", {
-      workspaceId: currentWorkspaceId,
+      bayId: currentBayId,
       id: currentNoteId,
       format,
     });

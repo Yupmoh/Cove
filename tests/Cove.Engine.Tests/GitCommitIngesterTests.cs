@@ -1,5 +1,5 @@
 using Cove.Engine.Knowledge;
-using Cove.Engine.Workspaces;
+using Cove.Engine.Bays;
 using Cove.Protocol;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
@@ -55,7 +55,7 @@ public sealed class GitCommitIngesterTests
             var ingester = new GitCommitIngester(store, new ProcessGitRunner(), NullLogger.Instance);
             await ingester.IngestAsync(dir, "ws1");
 
-            var list = store.ListByWorkspace("ws1");
+            var list = store.ListByBay("ws1");
             Assert.Single(list);
             Assert.Equal("git.commit", list[0].Kind);
             Assert.Contains("resolve race", list[0].Summary);
@@ -77,7 +77,7 @@ public sealed class GitCommitIngesterTests
             await ingester.IngestAsync(dir, "ws1");
             await ingester.IngestAsync(dir, "ws1");
 
-            var list = store.ListByWorkspace("ws1");
+            var list = store.ListByBay("ws1");
             Assert.Single(list);
         }
         finally { try { System.IO.Directory.Delete(dir, true); } catch { } }

@@ -13,7 +13,7 @@ public static class LabelCommands
             return Task.FromResult(ctx.Fail("not_ready", "task store not available"));
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.LabelListParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "label list params required"));
-        var labels = svc.ListLabels(p.WorkspaceId).Select(ToInfo).ToList();
+        var labels = svc.ListLabels(p.BayId).Select(ToInfo).ToList();
         return Task.FromResult(ctx.Ok(new LabelListResult(labels), CoveJsonContext.Default.LabelListResult));
     }
 
@@ -24,7 +24,7 @@ public static class LabelCommands
             return ctx.Fail("not_ready", "task store not available");
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.LabelCreateParams) is not { } p)
             return ctx.Fail("invalid_params", "label create params required");
-        var row = await svc.CreateLabelAsync(p.WorkspaceId, p.Id, p.Name, p.HexColor, p.Position);
+        var row = await svc.CreateLabelAsync(p.BayId, p.Id, p.Name, p.HexColor, p.Position);
         if (row is null)
             return ctx.Fail("conflict", "label with that id or name already exists");
         return ctx.Ok(ToInfo(row), CoveJsonContext.Default.LabelInfo);
@@ -37,7 +37,7 @@ public static class LabelCommands
             return ctx.Fail("not_ready", "task store not available");
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.LabelRefParams) is not { } p)
             return ctx.Fail("invalid_params", "label ref params required");
-        await svc.DeleteLabelAsync(p.WorkspaceId, p.Id);
+        await svc.DeleteLabelAsync(p.BayId, p.Id);
         return ctx.Ok();
     }
 
@@ -70,7 +70,7 @@ public static class LabelCommands
             return ctx.Fail("not_ready", "task store not available");
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.LabelReorderParams) is not { } p)
             return ctx.Fail("invalid_params", "label reorder params required");
-        await svc.ReorderLabelsAsync(p.WorkspaceId, p.OrderedIds);
+        await svc.ReorderLabelsAsync(p.BayId, p.OrderedIds);
         return ctx.Ok();
     }
 
@@ -81,10 +81,10 @@ public static class LabelCommands
             return Task.FromResult(ctx.Fail("not_ready", "task store not available"));
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.LabelFilterParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "label filter params required"));
-        var cardIds = svc.FilterCardsByLabel(p.WorkspaceId, p.LabelId);
+        var cardIds = svc.FilterCardsByLabel(p.BayId, p.LabelId);
         return Task.FromResult(ctx.Ok(new LabelFilterResult(cardIds), CoveJsonContext.Default.LabelFilterResult));
     }
 
     private static LabelInfo ToInfo(Cove.Tasks.Store.LabelRow row) =>
-        new(row.WorkspaceId, row.Id, row.Name, row.HexColor, row.Position);
+        new(row.BayId, row.Id, row.Name, row.HexColor, row.Position);
 }

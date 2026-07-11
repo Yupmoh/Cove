@@ -27,7 +27,7 @@ public sealed class LabelRepositoryTests
     {
         using var conn = factory.Open();
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = "INSERT OR IGNORE INTO statuses (workspace_id, id, name, hex_color, position, created_at, updated_at) VALUES (@Ws, @Id, @Id, '808080', 0, @Now, @Now)";
+        cmd.CommandText = "INSERT OR IGNORE INTO statuses (bay_id, id, name, hex_color, position, created_at, updated_at) VALUES (@Ws, @Id, @Id, '808080', 0, @Now, @Now)";
         cmd.Parameters.AddWithValue("@Ws", ws);
         cmd.Parameters.AddWithValue("@Id", id);
         cmd.Parameters.AddWithValue("@Now", System.DateTimeOffset.UtcNow.ToString("o"));
@@ -39,7 +39,7 @@ public sealed class LabelRepositoryTests
         var row = new CardRow
         {
             Id = System.Guid.NewGuid().ToString("N"),
-            WorkspaceId = ws,
+            BayId = ws,
             TaskNumber = num,
             Title = "card-" + num,
             StatusId = "todo",
@@ -64,14 +64,14 @@ public sealed class LabelRepositoryTests
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task ListByWorkspace_ReturnsOrderedByPosition()
+    public async System.Threading.Tasks.Task ListByBay_ReturnsOrderedByPosition()
     {
         var (_, _, labels, _, _) = await NewAsync();
         await labels.CreateAsync("ws1", "c", "C", "808080", position: 2);
         await labels.CreateAsync("ws1", "a", "A", "808080", position: 0);
         await labels.CreateAsync("ws1", "b", "B", "808080", position: 1);
 
-        var list = labels.ListByWorkspace("ws1");
+        var list = labels.ListByBay("ws1");
         Assert.Equal(new[] { "a", "b", "c" }, list.Select(l => l.Id).ToArray());
     }
 
@@ -85,7 +85,7 @@ public sealed class LabelRepositoryTests
 
         await labels.DeleteAsync("ws1", "bug");
 
-        Assert.Null(labels.GetByWorkspaceAndId("ws1", "bug"));
+        Assert.Null(labels.GetByBayAndId("ws1", "bug"));
         Assert.Empty(labels.GetLabelsForCard(cardId));
     }
 
@@ -151,12 +151,12 @@ public sealed class LabelRepositoryTests
 
         await labels.ReorderAsync("ws1", new[] { "c", "a", "b" });
 
-        var list = labels.ListByWorkspace("ws1");
+        var list = labels.ListByBay("ws1");
         Assert.Equal(new[] { "c", "a", "b" }, list.Select(l => l.Id).ToArray());
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task GetLabelsForCard_DoesNotMatchLabelsFromOtherWorkspace()
+    public async System.Threading.Tasks.Task GetLabelsForCard_DoesNotMatchLabelsFromOtherBay()
     {
         var (factory, _, labels, cards, _) = await NewAsync();
         SeedStatus(factory, "ws2", "todo");
@@ -168,12 +168,12 @@ public sealed class LabelRepositoryTests
 
         var card1Labels = labels.GetLabelsForCard(card1);
         Assert.Single(card1Labels);
-        Assert.Equal("ws1", card1Labels[0].WorkspaceId);
+        Assert.Equal("ws1", card1Labels[0].BayId);
         Assert.Equal("ff0000", card1Labels[0].HexColor);
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task Delete_DoesNotRemoveCardLabelsFromOtherWorkspace()
+    public async System.Threading.Tasks.Task Delete_DoesNotRemoveCardLabelsFromOtherBay()
     {
         var (factory, _, labels, cards, _) = await NewAsync();
         SeedStatus(factory, "ws2", "todo");
@@ -189,18 +189,18 @@ public sealed class LabelRepositoryTests
         Assert.Empty(labels.GetLabelsForCard(card1));
         var ws2Labels = labels.GetLabelsForCard(card2);
         Assert.Single(ws2Labels);
-        Assert.Equal("ws2", ws2Labels[0].WorkspaceId);
+        Assert.Equal("ws2", ws2Labels[0].BayId);
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task WorkspaceIsolation_LabelsScopedPerWorkspace()
+    public async System.Threading.Tasks.Task BayIsolation_LabelsScopedPerBay()
     {
         var (_, _, labels, _, _) = await NewAsync();
         await labels.CreateAsync("ws1", "bug", "Bug", "ff0000", position: 0);
         await labels.CreateAsync("ws2", "bug", "Bug", "ff0000", position: 0);
 
-        var ws1 = labels.ListByWorkspace("ws1");
-        var ws2 = labels.ListByWorkspace("ws2");
+        var ws1 = labels.ListByBay("ws1");
+        var ws2 = labels.ListByBay("ws2");
         Assert.Single(ws1);
         Assert.Single(ws2);
     }

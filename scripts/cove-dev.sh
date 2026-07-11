@@ -40,7 +40,7 @@ fi
 
 if [ "$MODE" = "restart-all" ]; then
   if pid="$(daemon_pid)"; then
-    echo "stopping daemon (pid $pid) — panes respawn, harness sessions need --resume"
+    echo "stopping daemon (pid $pid) — nooks respawn, harness sessions need --resume"
     kill "$pid" 2>/dev/null || true
     wait_gone "$pid"
   fi

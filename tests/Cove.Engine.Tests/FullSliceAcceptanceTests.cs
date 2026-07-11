@@ -26,13 +26,13 @@ public sealed class FullSliceAcceptanceTests
     {
         var resolver = new AcceptanceFakeProfileResolver();
         var worktree = new AcceptanceFakeWorktreeService();
-        var paneHost = new AcceptanceFakePaneHost();
-        var rooms = new AcceptanceFakeRoomService();
+        var nookHost = new AcceptanceFakeNookHost();
+        var shores = new AcceptanceFakeShoreService();
         var launcher = new AcceptanceFakeAgentLauncher();
         var resumeLauncher = new AcceptanceFakeResumeLauncher();
         var logger = Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance;
-        var dispatch = new Cove.Tasks.Dispatch.DispatchSaga(svc, resolver, worktree, paneHost, rooms, launcher, logger);
-        var resume = new Cove.Tasks.Dispatch.ResumeSaga(svc, resolver, paneHost, resumeLauncher, logger);
+        var dispatch = new Cove.Tasks.Dispatch.DispatchSaga(svc, resolver, worktree, nookHost, shores, launcher, logger);
+        var resume = new Cove.Tasks.Dispatch.ResumeSaga(svc, resolver, nookHost, resumeLauncher, logger);
         return (dispatch, resume);
     }
 
@@ -50,7 +50,7 @@ public sealed class FullSliceAcceptanceTests
         h.SetSagas(dispatchSaga, resumeSaga);
         await using FrameConnection ctl = await h.ConnectAsync("cli");
 
-        var createResp = await SendAsync(ctl, "c", "cove://commands/task.create", P("""{"title":"acceptance card","workspaceId":"ws1","source":"user:test","description":"full slice test"}"""), ct);
+        var createResp = await SendAsync(ctl, "c", "cove://commands/task.create", P("""{"title":"acceptance card","bayId":"ws1","source":"user:test","description":"full slice test"}"""), ct);
         Assert.True(createResp.Ok, createResp.Error?.Code);
         var cardId = createResp.Data!.Value.GetProperty("id").GetString()!;
         Assert.True(createResp.Data!.Value.GetProperty("taskNumber").GetInt32() > 0);
@@ -76,12 +76,12 @@ public sealed class FullSliceAcceptanceTests
         var runAfterDone = await SendAsync(ctl, "rs", "cove://commands/run.show", P($"{{\"id\":\"{runId}\"}}"), ct);
         Assert.Equal("completed", runAfterDone.Data!.Value.GetProperty("state").GetString());
 
-        var listResp = await SendAsync(ctl, "li", "cove://commands/task.list", P("""{"workspaceId":"ws1"}"""), ct);
+        var listResp = await SendAsync(ctl, "li", "cove://commands/task.list", P("""{"bayId":"ws1"}"""), ct);
         Assert.True(listResp.Ok);
         Assert.True(listResp.Data!.Value.GetProperty("cards").GetArrayLength() >= 1);
 
         var exportPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "cove-acceptance-" + System.Guid.NewGuid().ToString("N") + ".db");
-        var exportResp = await SendAsync(ctl, "e", "cove://commands/task-board.export", P($"{{\"exportPath\":\"{exportPath}\",\"workspaceCount\":1}}"), ct);
+        var exportResp = await SendAsync(ctl, "e", "cove://commands/task-board.export", P($"{{\"exportPath\":\"{exportPath}\",\"bayCount\":1}}"), ct);
         Assert.True(exportResp.Ok, exportResp.Error?.Code);
         Assert.True(System.IO.File.Exists(exportPath));
         try { System.IO.File.Delete(exportPath); } catch { }
@@ -97,7 +97,7 @@ public sealed class FullSliceAcceptanceTests
         await using var h = await DaemonTestHarness.StartAsync();
         await using FrameConnection ctl = await h.ConnectAsync("cli");
 
-        var createResp = await SendAsync(ctl, "c", "cove://commands/task.create", P("""{"title":"sched lifecycle","workspaceId":"ws1","source":"user:test"}"""), ct);
+        var createResp = await SendAsync(ctl, "c", "cove://commands/task.create", P("""{"title":"sched lifecycle","bayId":"ws1","source":"user:test"}"""), ct);
         var cardId = createResp.Data!.Value.GetProperty("id").GetString()!;
 
         var setResp = await SendAsync(ctl, "s", "cove://commands/task.repeat.set", P($"{{\"cardId\":\"{cardId}\",\"triggerKind\":\"cron\",\"cron\":\"0 9 * * *\"}}"), ct);

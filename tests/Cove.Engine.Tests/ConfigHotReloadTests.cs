@@ -175,7 +175,7 @@ public sealed class ConfigHotReloadTests
             cfg1.Set("appearance.iconSet", "outline");
             cfg1.Set("appearance.wallpaper", "/path/to/wp.png");
             cfg1.Set("appearance.accent", "#ff5500");
-            cfg1.Set("appearance.paneLight", "true");
+            cfg1.Set("appearance.nookLight", "true");
 
             var cfg2 = new ConfigService(dir, NullLogger.Instance);
             Assert.Equal("1.25", cfg2.Get("appearance.uiScale"));
@@ -183,7 +183,7 @@ public sealed class ConfigHotReloadTests
             Assert.Equal("outline", cfg2.Get("appearance.iconSet"));
             Assert.Equal("/path/to/wp.png", cfg2.Get("appearance.wallpaper"));
             Assert.Equal("#ff5500", cfg2.Get("appearance.accent"));
-            Assert.Equal("true", cfg2.Get("appearance.paneLight"));
+            Assert.Equal("true", cfg2.Get("appearance.nookLight"));
         }
         finally { try { Directory.Delete(dir, true); } catch { } }
     }
@@ -200,7 +200,7 @@ public sealed class ConfigHotReloadTests
             Assert.Equal("default", cfg.Get("appearance.iconSet"));
             Assert.Equal("", cfg.Get("appearance.wallpaper"));
             Assert.Equal("", cfg.Get("appearance.accent"));
-            Assert.Equal("false", cfg.Get("appearance.paneLight"));
+            Assert.Equal("false", cfg.Get("appearance.nookLight"));
         }
         finally { try { Directory.Delete(dir, true); } catch { } }
     }

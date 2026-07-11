@@ -89,8 +89,8 @@ public sealed class PtyStreamSender
 
             if (_sentOffset < head)
             {
-                long room = ProtocolConstants.FlowWindow - inflight;
-                int want = (int)Math.Min(Math.Min(room, ProtocolConstants.StreamDataMaxRawBytes), head - _sentOffset);
+                long shore = ProtocolConstants.FlowWindow - inflight;
+                int want = (int)Math.Min(Math.Min(shore, ProtocolConstants.StreamDataMaxRawBytes), head - _sentOffset);
                 RingReadResult result = _ring.ReadInto(_sentOffset, _scratch.AsSpan(0, want));
                 if (result.Underrun)
                 {

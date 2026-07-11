@@ -16,7 +16,7 @@ public static class LoopCommands
         var card = svc.GetCard(p.CardId);
         if (card is null)
             return ctx.Fail("not_found", "card not found");
-        var run = await svc.CreateRunAsync(p.CardId, card.WorkspaceId, card.LaunchConfigJson, backgrounded: true);
+        var run = await svc.CreateRunAsync(p.CardId, card.BayId, card.LaunchConfigJson, backgrounded: true);
         return ctx.Ok(new RunNowResult(true, run?.Id, null), CoveJsonContext.Default.RunNowResult);
     }
 

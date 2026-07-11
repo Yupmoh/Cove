@@ -6,10 +6,10 @@ namespace Cove.Engine.Tests;
 
 public sealed class MosaicPropertyTests
 {
-    private static PaneLeaf Leaf(string id) => new()
+    private static NookLeaf Leaf(string id) => new()
     {
-        PaneId = id,
-        Subtabs = new[] { new Subtab(id + "-d", PaneType.Terminal) },
+        NookId = id,
+        Subtabs = new[] { new Subtab(id + "-d", NookType.Terminal) },
     };
 
     private static MosaicNode SplitChain(params string[] ids)
@@ -32,7 +32,7 @@ public sealed class MosaicPropertyTests
 
         var leaves = MosaicOps.Leaves(root);
         Assert.Equal(n, leaves.Count);
-        Assert.Equal(ids.Length, leaves.Select(l => l.PaneId).Distinct().Count());
+        Assert.Equal(ids.Length, leaves.Select(l => l.NookId).Distinct().Count());
         foreach (var id in ids)
             Assert.NotNull(MosaicOps.Find(root, id));
     }
@@ -75,7 +75,7 @@ public sealed class MosaicPropertyTests
         string cur = start;
         for (int i = 0; i < n - 1; i++)
         {
-            string? next = MosaicOps.NextPane(root, cur, dir);
+            string? next = MosaicOps.NextNook(root, cur, dir);
             Assert.NotNull(next);
             cur = next!;
             Assert.DoesNotContain(cur, visited);
@@ -91,9 +91,9 @@ public sealed class MosaicPropertyTests
     {
         var ids = Enumerable.Range(0, n).Select(i => $"p{i}").ToArray();
         MosaicNode root = SplitChain(ids);
-        var before = MosaicOps.Leaves(root).Select(l => l.PaneId).ToList();
+        var before = MosaicOps.Leaves(root).Select(l => l.NookId).ToList();
 
-        MosaicNode after = MosaicOps.ReplaceLeaf(root, ids[1], leaf => leaf with { PaneId = "renamed" });
+        MosaicNode after = MosaicOps.ReplaceLeaf(root, ids[1], leaf => leaf with { NookId = "renamed" });
 
         var afterLeaves = MosaicOps.Leaves(after);
         Assert.Equal(n, afterLeaves.Count);
@@ -101,7 +101,7 @@ public sealed class MosaicPropertyTests
         Assert.NotNull(MosaicOps.Find(after, "renamed"));
         foreach (var id in ids.Where(id => id != ids[1]))
             Assert.NotNull(MosaicOps.Find(after, id));
-        var untouched = afterLeaves.Where(l => l.PaneId != "renamed").Select(l => l.PaneId).ToList();
+        var untouched = afterLeaves.Where(l => l.NookId != "renamed").Select(l => l.NookId).ToList();
         Assert.Equal(before.Where(id => id != ids[1]), untouched);
     }
 

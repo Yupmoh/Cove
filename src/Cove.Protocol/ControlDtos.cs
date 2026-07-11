@@ -8,7 +8,7 @@ public sealed record ControlRequest(
     string Uri,
     JsonElement? Params = null,
     string? Source = null,
-    string? CallerPaneId = null);
+    string? CallerNookId = null);
 
 public sealed record ControlResponse(
     string Id,
@@ -29,9 +29,9 @@ public sealed record HelloResult(int ProtocolVersion, string EngineVersion, int 
 
 public sealed record DaemonStatusResult(int Pid, string Channel, string EngineVersion, int Connections, int Sessions, long UptimeSeconds);
 
-public sealed record PaneInfo(string PaneId, string Command, int Cols, int Rows, bool Alive, string? Cwd = null, string? Title = null);
+public sealed record NookInfo(string NookId, string Command, int Cols, int Rows, bool Alive, string? Cwd = null, string? Title = null);
 
-public sealed record PaneListResult(PaneInfo[] Panes);
+public sealed record NookListResult(NookInfo[] Nooks);
 
 public sealed record SpawnParams(
     string Command,
@@ -43,22 +43,22 @@ public sealed record SpawnParams(
     string? InheritCwdFrom = null,
     string? Adapter = null,
     string? AgentName = null,
-    string? Workspace = null,
-    string? Room = null,
+    string? Bay = null,
+    string? Shore = null,
     string McpAccessScope = "same-tab",
     bool McpVisible = true);
 
-public sealed record SubscribeParams(string PaneId, ulong SinceOffset = 0);
+public sealed record SubscribeParams(string NookId, ulong SinceOffset = 0);
 public sealed record SubscribeResult(ulong StreamId, ulong BaseOffset, int Window);
 
 public sealed record WriteParams(ulong StreamId, string DataBase64);
-public sealed record ResizeParams(string PaneId, int Cols, int Rows);
+public sealed record ResizeParams(string NookId, int Cols, int Rows);
 
-public sealed record PaneWriteParams(string PaneId, string DataBase64);
-public sealed record PaneRefParams(string PaneId);
-public sealed record PaneRenameParams(string PaneId, string Title);
-public sealed record PaneReadParams(string PaneId, long Offset = 0, int MaxBytes = 65536);
-public sealed record PaneReadResult(string DataBase64, long NextOffset, long Head);
+public sealed record NookWriteParams(string NookId, string DataBase64);
+public sealed record NookRefParams(string NookId);
+public sealed record NookRenameParams(string NookId, string Title);
+public sealed record NookReadParams(string NookId, long Offset = 0, int MaxBytes = 65536);
+public sealed record NookReadResult(string DataBase64, long NextOffset, long Head);
 public sealed record ConfigGetParams(string Key);
 public sealed record ConfigGetResult(string Value);
 public sealed record ConfigSetParams(string Key, string Value);
@@ -88,11 +88,11 @@ public sealed record EmitEventParams(string Event, System.Text.Json.JsonElement?
 public sealed record IpcEventEntry(string Event, long TimestampMs, System.Text.Json.JsonElement? Payload = null);
 public sealed record IpcEventLog(IpcEventEntry[] Events);
 
-public sealed record LayoutGetParams(string? WorkspaceId = null);
-public sealed record LayoutMutateParams(string Op, string? RoomId = null, string? TargetPaneId = null, string? NewPaneId = null, string? Orientation = null, string? Name = null, string? PaneId = null, int Dir = 1, string? PaneType = null, System.Collections.Generic.IReadOnlyList<string>? RoomIds = null);
-public sealed record LayoutMutateResult(string? RoomId = null);
-public sealed record SessionStateResult(string PaneId, string Command, int Cols, int Rows, bool Alive, string? Cwd = null);
-public sealed record SearchParams(string PaneId, string Query, bool CaseSensitive = false);
+public sealed record LayoutGetParams(string? BayId = null);
+public sealed record LayoutMutateParams(string Op, string? ShoreId = null, string? TargetNookId = null, string? NewNookId = null, string? Orientation = null, string? Name = null, string? NookId = null, int Dir = 1, string? NookType = null, System.Collections.Generic.IReadOnlyList<string>? ShoreIds = null);
+public sealed record LayoutMutateResult(string? ShoreId = null);
+public sealed record SessionStateResult(string NookId, string Command, int Cols, int Rows, bool Alive, string? Cwd = null);
+public sealed record SearchParams(string NookId, string Query, bool CaseSensitive = false);
 public sealed record SearchMatch(int Line, string Text);
 public sealed record SearchResult(SearchMatch[] Matches);
 public sealed record SkillIndexItem(string Name, string Description, string Source, string Provenance, string? Adapter);
@@ -115,26 +115,26 @@ public sealed record ResolvedEnvVar(string Key, string Value);
 public sealed record AdapterEnvResolveResult(ResolvedEnvVar[] Vars);
 public sealed record AdapterEnvVar(string Key, string Value, bool Enabled = true, string? Id = null);
 public sealed record HookStateResult(int Port, bool Running);
-public sealed record PaneStateItem(string PaneId, string Adapter, string Status, int ActiveSubagents, System.DateTimeOffset LastEventAt);
-public sealed record PaneStatesResult(PaneStateItem[] Panes);
+public sealed record NookStateItem(string NookId, string Adapter, string Status, int ActiveSubagents, System.DateTimeOffset LastEventAt);
+public sealed record NookStatesResult(NookStateItem[] Nooks);
 
-public sealed record AgentMessageParams(string Target, string Body, string? FromPaneId, string? FromAdapter, string? FromName, bool NoFrame, int? SubmitPauseMs);
-public sealed record AgentListDto(string PaneId, string Adapter, string? Name, string? Workspace, string? Room, string Status, string McpAccessScope);
+public sealed record AgentMessageParams(string Target, string Body, string? FromNookId, string? FromAdapter, string? FromName, bool NoFrame, int? SubmitPauseMs);
+public sealed record AgentListDto(string NookId, string Adapter, string? Name, string? Bay, string? Shore, string Status, string McpAccessScope);
 public sealed record AgentListResult(System.Collections.Generic.IReadOnlyList<AgentListDto> Agents);
 
-public sealed record ActivityCardDto(string PaneId, string Adapter, string? Name, string? Workspace, string? Room, string Status, string? StopReason, int ActiveSubagents, string? LastEvent, System.DateTimeOffset LastEventAt);
+public sealed record ActivityCardDto(string NookId, string Adapter, string? Name, string? Bay, string? Shore, string Status, string? StopReason, int ActiveSubagents, string? LastEvent, System.DateTimeOffset LastEventAt);
 public sealed record ActivityListResult(System.Collections.Generic.IReadOnlyList<ActivityCardDto> Cards);
 
-public sealed record SessionStateDto(string PaneId, string Adapter, string? SessionId, string Lifecycle, bool Resumable);
+public sealed record SessionStateDto(string NookId, string Adapter, string? SessionId, string Lifecycle, bool Resumable);
 public sealed record SessionListResult(System.Collections.Generic.IReadOnlyList<SessionStateDto> Sessions);
 
 public sealed record ReplayInfoDto(string Command, int? ExitCode, int? Signal);
-public sealed record SpawnedPanesResult(System.Collections.Generic.IReadOnlyList<string> PaneIds);
+public sealed record SpawnedNooksResult(System.Collections.Generic.IReadOnlyList<string> NookIds);
 
 public sealed record LaunchBuildParams(string Adapter, string ProfileSlug, bool Yolo, string? WorkingDir, string[] ExtraFlags, Dictionary<string, string> Env);
 public sealed record LaunchResumeParams(string Adapter, string ProfileSlug, string SessionId, bool Yolo, string? WorkingDir, string[] ExtraFlags, Dictionary<string, string> Env);
-public sealed record LaunchOverrideSaveParams(string PaneId, bool Yolo, string? WorkingDir, string[] ExtraFlags, Dictionary<string, string> Env);
-public sealed record LaunchOverrideGetParams(string PaneId);
+public sealed record LaunchOverrideSaveParams(string NookId, bool Yolo, string? WorkingDir, string[] ExtraFlags, Dictionary<string, string> Env);
+public sealed record LaunchOverrideGetParams(string NookId);
 public sealed record ResumeCommandDto(string Command, string[] Args, string Cwd);
 public sealed record LauncherOverridesDto(bool Yolo, string? WorkingDir, string[] ExtraFlags, Dictionary<string, string> Env);
 
@@ -142,22 +142,22 @@ public sealed record AdapterListItemDto(string Name, string DisplayName, string 
 public sealed record AdapterListResult(System.Collections.Generic.IReadOnlyList<AdapterListItemDto> Adapters);
 public sealed record RegistryEntryDto(string Name, string DisplayName, string Version, bool Official);
 public sealed record RegistryFetchResult(RegistryEntryDto[] Adapters);
-public sealed record NeedsInputSignalDto(string PaneId, string Adapter);
-public sealed record NotificationDeliverDto(string Id, string Title, string Body, string PaneId);
-public sealed record OmniChatAppendParams(string PaneId, string Role, string Body);
-public sealed record OmniChatHistoryParams(string PaneId);
+public sealed record NeedsInputSignalDto(string NookId, string Adapter);
+public sealed record NotificationDeliverDto(string Id, string Title, string Body, string NookId);
+public sealed record OmniChatAppendParams(string NookId, string Role, string Body);
+public sealed record OmniChatHistoryParams(string NookId);
 public sealed record OmniChatHistoryResult(OmniChatMessageDto[] Messages);
 public sealed record OmniChatMessageDto(string Role, string Body, System.DateTimeOffset SentAt);
-public sealed record OmniChatClearParams(string PaneId);
-public sealed record PaneScopeGetParams(string PaneId);
-public sealed record PaneScopeSetParams(string PaneId, string Scope);
-public sealed record PaneScopeResult(string PaneId, string Scope);
+public sealed record OmniChatClearParams(string NookId);
+public sealed record NookScopeGetParams(string NookId);
+public sealed record NookScopeSetParams(string NookId, string Scope);
+public sealed record NookScopeResult(string NookId, string Scope);
 public sealed record LauncherOptionsParams(string Adapter);
 public sealed record LauncherOptionsResponse(LauncherOptionDto[] Options);
 public sealed record LauncherOptionDto(string Key, string Label, string Type, string? DefaultValueRaw, LauncherOptionChoiceDto[]? Choices);
 public sealed record LauncherOptionChoiceDto(string Value, string? Label);
 
-public sealed record ProtocolResolveParams(string Uri, string? FocusedPaneId, string? ActiveRoomId);
+public sealed record ProtocolResolveParams(string Uri, string? FocusedNookId, string? ActiveShoreId);
 public sealed record ProtocolResolveResult(string Uri, System.Text.Json.JsonElement? Params);
 
 public enum TaskPriority { Low, Medium, High, Critical }
@@ -172,35 +172,35 @@ public sealed record TaskCard
     public TaskSize Size { get; init; } = TaskSize.M;
     public string? Assignee { get; init; }
     public required string Source { get; init; }
-    public required string WorkspaceId { get; init; }
+    public required string BayId { get; init; }
     public int TaskNumber { get; init; }
     public string? CurrentPrimaryRunId { get; init; }
     public System.DateTimeOffset CreatedAt { get; init; }
     public System.DateTimeOffset UpdatedAt { get; init; }
     public string HumanId => $"COVE-{TaskNumber}";
 }
-public sealed record TaskCreateParams(string Title, string WorkspaceId, string Source, string? Description, string? Priority, string? Size, string? Assignee);
-public sealed record TaskRefParams(string? Id, string? HumanId, string? WorkspaceId);
-public sealed record TaskListParams(string WorkspaceId);
+public sealed record TaskCreateParams(string Title, string BayId, string Source, string? Description, string? Priority, string? Size, string? Assignee);
+public sealed record TaskRefParams(string? Id, string? HumanId, string? BayId);
+public sealed record TaskListParams(string BayId);
 public sealed record TaskUpdateParams(string Id, string? Title, string? StatusId, string? Description, string? Assignee, string? Source);
 public sealed record TaskListResult(System.Collections.Generic.IReadOnlyList<TaskCard> Cards);
 public sealed record TaskPingParams(string Echo, string? Kind);
 public sealed record TaskPingResult(string Echo, string? Kind, string Status);
-public sealed record StatusInfo(string WorkspaceId, string Id, string Name, string HexColor, double Position, bool Hidden, bool IsLooping, bool IsInProgress, bool IsReview, bool IsCompletion);
+public sealed record StatusInfo(string BayId, string Id, string Name, string HexColor, double Position, bool Hidden, bool IsLooping, bool IsInProgress, bool IsReview, bool IsCompletion);
 public sealed record StatusListResult(System.Collections.Generic.IReadOnlyList<StatusInfo> Statuses);
-public sealed record StatusListParams(string WorkspaceId);
-public sealed record StatusCreateParams(string WorkspaceId, string Id, string Name, string HexColor, double Position);
-public sealed record StatusRefParams(string WorkspaceId, string Id);
-public sealed record StatusDeleteParams(string WorkspaceId, string Id, string? RehomeToStatusId);
-public sealed record StatusReorderParams(string WorkspaceId, string[] OrderedIds);
-public sealed record LabelInfo(string WorkspaceId, string Id, string Name, string HexColor, double Position);
+public sealed record StatusListParams(string BayId);
+public sealed record StatusCreateParams(string BayId, string Id, string Name, string HexColor, double Position);
+public sealed record StatusRefParams(string BayId, string Id);
+public sealed record StatusDeleteParams(string BayId, string Id, string? RehomeToStatusId);
+public sealed record StatusReorderParams(string BayId, string[] OrderedIds);
+public sealed record LabelInfo(string BayId, string Id, string Name, string HexColor, double Position);
 public sealed record LabelListResult(System.Collections.Generic.IReadOnlyList<LabelInfo> Labels);
-public sealed record LabelListParams(string WorkspaceId);
-public sealed record LabelCreateParams(string WorkspaceId, string Id, string Name, string HexColor, double Position);
-public sealed record LabelRefParams(string WorkspaceId, string Id);
+public sealed record LabelListParams(string BayId);
+public sealed record LabelCreateParams(string BayId, string Id, string Name, string HexColor, double Position);
+public sealed record LabelRefParams(string BayId, string Id);
 public sealed record LabelAssignParams(string CardId, string LabelId);
-public sealed record LabelReorderParams(string WorkspaceId, string[] OrderedIds);
-public sealed record LabelFilterParams(string WorkspaceId, string LabelId);
+public sealed record LabelReorderParams(string BayId, string[] OrderedIds);
+public sealed record LabelFilterParams(string BayId, string LabelId);
 public sealed record LabelFilterResult(System.Collections.Generic.IReadOnlyList<string> CardIds);
 public sealed record CommentInfo(string Id, string CardId, string Kind, string Body, string Source, string CreatedAt);
 public sealed record CommentListResult(System.Collections.Generic.IReadOnlyList<CommentInfo> Comments);
@@ -218,20 +218,20 @@ public sealed record TaskBindingSetParams(string CardId, string? AgentRef, strin
 public sealed record TaskBindingGetParams(string CardId);
 public sealed record TaskProfileResolveParams(string CardId);
 public sealed record TaskProfilePayloadDto(string? AgentRef, string? ProfileSlug, SkillSelectionDto[] Skills);
-public sealed record RunInfo(string Id, string CardId, string WorkspaceId, string RunFamilyId, string State, bool Backgrounded, string? LaunchProfileJson, string? PendingPrompt, string StartedAt, string? EndedAt, string CreatedAt);
+public sealed record RunInfo(string Id, string CardId, string BayId, string RunFamilyId, string State, bool Backgrounded, string? LaunchProfileJson, string? PendingPrompt, string StartedAt, string? EndedAt, string CreatedAt);
 public sealed record RunListResult(System.Collections.Generic.IReadOnlyList<RunInfo> Runs);
-public sealed record RunListParams(string? TaskId, string? WorkspaceId, string? State);
+public sealed record RunListParams(string? TaskId, string? BayId, string? State);
 public sealed record RunRefParams(string Id);
 public sealed record RunCompleteParams(string Id, string? Source);
-public sealed record RunSegmentInfo(string Id, string RunId, string? PaneId, string? AdapterSessionId, string StartedAt, string? EndedAt);
+public sealed record RunSegmentInfo(string Id, string RunId, string? NookId, string? AdapterSessionId, string StartedAt, string? EndedAt);
 public sealed record RunSegmentListResult(System.Collections.Generic.IReadOnlyList<RunSegmentInfo> Segments);
 public sealed record TaskLaunchParams(string CardId, string? ExecutionModeOverride);
 public sealed record TaskLaunchResult(bool Success, string? RunId, string? Error, string ReachedStep);
-public sealed record TaskSetInReviewParams(string? RunId, string? PaneId, string? WorkspaceId);
-public sealed record TaskSetDoneParams(string? RunId, string? PaneId, string? WorkspaceId);
-public sealed record TaskClaimParams(string CardId, string? PaneId);
+public sealed record TaskSetInReviewParams(string? RunId, string? NookId, string? BayId);
+public sealed record TaskSetDoneParams(string? RunId, string? NookId, string? BayId);
+public sealed record TaskClaimParams(string CardId, string? NookId);
 public sealed record TaskClaimResult(bool Success, string? RunId, string? Error);
-public sealed record RunResumeParams(string Id, string? PaneId, string? AdapterOverride);
+public sealed record RunResumeParams(string Id, string? NookId, string? AdapterOverride);
 public sealed record RunResumeResult(bool Success, string? NewSegmentId, string? Error, string Outcome);
 public sealed record RunSetPendingPromptParams(string Id, string? Prompt);
 public sealed record ScheduleSetRouteParams(string CardId, string TriggerKind, string? Cron, string? Tz, string? At, string? CompletionRule, string? MarkDoneBy, bool? BlockOverlap, string? HomeStatusId);
@@ -243,18 +243,18 @@ public sealed record RunNowParams(string CardId);
 public sealed record RunNowResult(bool Success, string? RunId, string? Error);
 public sealed record RepeatContinueParams(string CardId);
 public sealed record RepeatFinishParams(string CardId);
-public sealed record TaskBoardExportParams(string ExportPath, int WorkspaceCount);
-public sealed record TaskBoardExportResultDto(bool Success, string? ExportPath, string? ExportedAt, int SchemaVersion, int WorkspaceCount, string? Error);
+public sealed record TaskBoardExportParams(string ExportPath, int BayCount);
+public sealed record TaskBoardExportResultDto(bool Success, string? ExportPath, string? ExportedAt, int SchemaVersion, int BayCount, string? Error);
 public sealed record TaskBoardDiffParams(string ImportPath);
 public sealed record TaskBoardDiffResultDto(bool Success, string[] Diffs, string? Error);
-public sealed record StatusSetHiddenParams(string WorkspaceId, string Id, bool Hidden);
+public sealed record StatusSetHiddenParams(string BayId, string Id, bool Hidden);
 
 public sealed record Note
 {
     public string Id { get; set; } = "";
     public required string Title { get; init; }
     public string Content { get; init; } = "";
-    public required string WorkspaceId { get; init; }
+    public required string BayId { get; init; }
     public required string Source { get; init; }
     public string Kind { get; init; } = "markdown";
     public System.DateTimeOffset CreatedAt { get; init; }
@@ -263,7 +263,7 @@ public sealed record Note
 public sealed record TimelineEntry
 {
     public string Id { get; init; } = "";
-    public required string WorkspaceId { get; init; }
+    public required string BayId { get; init; }
     public required string Kind { get; init; }
     public required string Source { get; init; }
     public string? Scope { get; init; }
@@ -272,59 +272,59 @@ public sealed record TimelineEntry
     public System.Collections.Generic.IReadOnlyList<string>? Tags { get; init; }
     public System.DateTimeOffset Timestamp { get; init; }
 }
-public sealed record NoteCreateParams(string Title, string WorkspaceId, string Source, string? Content, string? Kind);
-public sealed record TimelineAppendParams(string WorkspaceId, string Kind, string Source, string? Scope, string? Summary, System.Collections.Generic.IReadOnlyList<string>? Tags);
+public sealed record NoteCreateParams(string Title, string BayId, string Source, string? Content, string? Kind);
+public sealed record TimelineAppendParams(string BayId, string Kind, string Source, string? Scope, string? Summary, System.Collections.Generic.IReadOnlyList<string>? Tags);
 public sealed record NoteRefParams(string Id);
-public sealed record NoteListParams(string WorkspaceId);
+public sealed record NoteListParams(string BayId);
 public sealed record NoteUpdateParams(string Id, string? Title, string? Content);
 public sealed record NoteListResult(System.Collections.Generic.IReadOnlyList<Note> Notes);
-public sealed record NoteSearchParams(string WorkspaceId, string Query, int? Limit);
+public sealed record NoteSearchParams(string BayId, string Query, int? Limit);
 public sealed record NoteSearchResult(System.Collections.Generic.IReadOnlyList<Note> Notes);
-public sealed record NoteReadParams(string WorkspaceId, string Id, string? Format);
+public sealed record NoteReadParams(string BayId, string Id, string? Format);
 public sealed record NoteReadResult(string Id, string Title, string Content, string Kind, string? Format);
-public sealed record NoteWriteParams(string WorkspaceId, string Id, string? Title, string? Content, string? Kind);
-public sealed record NoteHistoryParams(string WorkspaceId, string Id);
+public sealed record NoteWriteParams(string BayId, string Id, string? Title, string? Content, string? Kind);
+public sealed record NoteHistoryParams(string BayId, string Id);
 public sealed record NoteHistoryEntry(string Sha, string Message, System.DateTimeOffset Timestamp);
 public sealed record NoteHistoryResult(System.Collections.Generic.IReadOnlyList<NoteHistoryEntry> Entries);
-public sealed record NoteMediaSaveParams(string WorkspaceId, string Id, string FileName, string Base64Data);
+public sealed record NoteMediaSaveParams(string BayId, string Id, string FileName, string Base64Data);
 public sealed record NoteMediaSaveResult(string MediaPath);
-public sealed record NoteGetStateParams(string WorkspaceId, string Id);
+public sealed record NoteGetStateParams(string BayId, string Id);
 public sealed record NoteGetStateResult(string? State);
-public sealed record NoteSaveStateParams(string WorkspaceId, string Id, string StateJson);
-public sealed record CanvasActionParams(string Action, string? TargetPane, string? Uri, string ActionId, string? Payload, System.Text.Json.JsonElement? State);
-public sealed record CanvasActionResult(bool Dispatched, string? TargetPaneId, string? ResolvedUri);
-public sealed record MemoryAddParams(string WorkspaceId, string Kind, string Content, double? Confidence, string? Audience);
-public sealed record MemorySearchParams(string WorkspaceId, string Query, int? Limit);
+public sealed record NoteSaveStateParams(string BayId, string Id, string StateJson);
+public sealed record CanvasActionParams(string Action, string? TargetNook, string? Uri, string ActionId, string? Payload, System.Text.Json.JsonElement? State);
+public sealed record CanvasActionResult(bool Dispatched, string? TargetNookId, string? ResolvedUri);
+public sealed record MemoryAddParams(string BayId, string Kind, string Content, double? Confidence, string? Audience);
+public sealed record MemorySearchParams(string BayId, string Query, int? Limit);
 public sealed record MemorySearchResult(System.Collections.Generic.IReadOnlyList<RankedFactDto> Facts);
 public sealed record RankedFactDto(string Id, string Kind, string Content, double Score, string? Snippet);
-public sealed record MemoryRecallParams(string WorkspaceId, string Query, int? Limit);
+public sealed record MemoryRecallParams(string BayId, string Query, int? Limit);
 public sealed record MemoryRecallResult(System.Collections.Generic.IReadOnlyList<RecallPreviewDto> Previews);
 public sealed record RecallPreviewDto(string Id, string Kind, string Preview, double Score, string HowLongAgo);
-public sealed record MemoryShowParams(string WorkspaceId, string Id);
-public sealed record MemorySupersedeParams(string WorkspaceId, string OldFactId, string Kind, string Content, double? Confidence);
-public sealed record MemoryReindexParams(string WorkspaceId);
-public sealed record MemoryConsolidateParams(string WorkspaceId, bool DryRun);
+public sealed record MemoryShowParams(string BayId, string Id);
+public sealed record MemorySupersedeParams(string BayId, string OldFactId, string Kind, string Content, double? Confidence);
+public sealed record MemoryReindexParams(string BayId);
+public sealed record MemoryConsolidateParams(string BayId, bool DryRun);
 public sealed record MemoryConsolidateResult(int Candidates);
-public sealed record MemoryProposeParams(string WorkspaceId, string Kind, string Content);
+public sealed record MemoryProposeParams(string BayId, string Kind, string Content);
 public sealed record MemoryProposalTransitionParams(string ProposalId, string State);
 public sealed record EditsFindParams(string FilePath, int? Limit);
 public sealed record EditsFindResult(System.Collections.Generic.IReadOnlyList<EditRecordDto> Edits);
 public sealed record EditRecordDto(string SessionId, string FilePath, string? Tool, string? Op, string OccurredAt, string? EditSummary);
-public sealed record VaultSearchParams(string WorkspaceId, string Query, int? Limit);
+public sealed record VaultSearchParams(string BayId, string Query, int? Limit);
 public sealed record VaultSearchResult(System.Collections.Generic.IReadOnlyList<SessionCorpusEntryDto> Entries);
-public sealed record SessionCorpusEntryDto(string Id, string WorkspaceId, string Adapter, string StartedAt, string? EndedAt, string? ExtractorVersion);
+public sealed record SessionCorpusEntryDto(string Id, string BayId, string Adapter, string StartedAt, string? EndedAt, string? ExtractorVersion);
 public sealed record VaultResumeParams(string Adapter, string SessionId, string Cwd, bool Yolo = false);
 public sealed record VaultResumeResult(bool Ok, string Adapter, string[] Command, string Cwd, string Fallback, string? Error);
-public sealed record VaultSetSettingParams(string WorkspaceId, string Key, string Value);
-public sealed record VaultReindexParams(string WorkspaceId);
-public sealed record LibraryListParams(string WorkspaceId, string? Kind);
+public sealed record VaultSetSettingParams(string BayId, string Key, string Value);
+public sealed record VaultReindexParams(string BayId);
+public sealed record LibraryListParams(string BayId, string? Kind);
 public sealed record LibraryListResult(System.Collections.Generic.IReadOnlyList<LibraryEntryDto> Entries);
-public sealed record LibraryEntryDto(string Id, string WorkspaceId, string PaneId, string PaneType, string? Title, string? StateJson, string? Scrollback, string Kind, string CapturedAt);
-public sealed record LibraryMaterializeParams(string WorkspaceId, string EntryId);
+public sealed record LibraryEntryDto(string Id, string BayId, string NookId, string NookType, string? Title, string? StateJson, string? Scrollback, string Kind, string CapturedAt);
+public sealed record LibraryMaterializeParams(string BayId, string EntryId);
 public sealed record Fact
 {
     public string Id { get; init; } = "";
-    public required string WorkspaceId { get; init; }
+    public required string BayId { get; init; }
     public required string Kind { get; init; }
     public required string Content { get; init; }
     public double Confidence { get; init; } = 0.5;
@@ -336,18 +336,18 @@ public sealed record Fact
     public System.DateTimeOffset CreatedAt { get; init; }
     public System.DateTimeOffset UpdatedAt { get; init; }
 }
-public sealed record Proposal(string Id, string WorkspaceId, string Kind, string Content, string State, System.DateTimeOffset CreatedAt);
-public sealed record TimelineListParams(string WorkspaceId);
+public sealed record Proposal(string Id, string BayId, string Kind, string Content, string State, System.DateTimeOffset CreatedAt);
+public sealed record TimelineListParams(string BayId);
 public sealed record TimelineListResult(System.Collections.Generic.IReadOnlyList<TimelineEntry> Entries);
 public sealed record KnowledgePingParams(string? Echo);
 public sealed record KnowledgePingResult(string Pong, string? Echo);
-public sealed record BlackboardPostParams(string WorkspaceId, string Kind, string Audience, string Content, string? RefId, int? TtlSeconds);
-public sealed record BlackboardShowParams(string WorkspaceId, string? Audience);
+public sealed record BlackboardPostParams(string BayId, string Kind, string Audience, string Content, string? RefId, int? TtlSeconds);
+public sealed record BlackboardShowParams(string BayId, string? Audience);
 public sealed record BlackboardShowResult(System.Collections.Generic.IReadOnlyList<BlackboardPost> Posts);
 public sealed record BlackboardPost
 {
     public string Id { get; init; } = "";
-    public required string WorkspaceId { get; init; }
+    public required string BayId { get; init; }
     public required string Kind { get; init; }
     public required string Audience { get; init; }
     public required string Content { get; init; }
@@ -356,30 +356,30 @@ public sealed record BlackboardPost
     public System.DateTimeOffset CreatedAt { get; init; }
 }
 
-public sealed record PaneTypeDto(string Name, string DisplayName, string ContentSource, bool IsDockable);
-public sealed record PaneTypeListResult(System.Collections.Generic.IReadOnlyList<PaneTypeDto> PaneTypes);
+public sealed record NookTypeDto(string Name, string DisplayName, string ContentSource, bool IsDockable);
+public sealed record NookTypeListResult(System.Collections.Generic.IReadOnlyList<NookTypeDto> NookTypes);
 
-public sealed record BrowserOpenParams(string PaneId, string Url);
-public sealed record BrowserNavigateParams(string PaneId, string Url);
-public sealed record BrowserPaneRefParams(string PaneId);
-public sealed record BrowserPaneDto(string PaneId, string CurrentUrl, System.Collections.Generic.IReadOnlyList<string> History, int HistoryIndex, bool CanGoBack, bool CanGoForward);
-public sealed record BrowserCreateParams(string Url, string? Title = null, string? WorkspaceId = null);
-public sealed record BrowserAutomationExecEvent(string RequestId, string PaneId, string Kind, string? Ref = null, string? Value = null, string? Js = null);
+public sealed record BrowserOpenParams(string NookId, string Url);
+public sealed record BrowserNavigateParams(string NookId, string Url);
+public sealed record BrowserNookRefParams(string NookId);
+public sealed record BrowserNookDto(string NookId, string CurrentUrl, System.Collections.Generic.IReadOnlyList<string> History, int HistoryIndex, bool CanGoBack, bool CanGoForward);
+public sealed record BrowserCreateParams(string Url, string? Title = null, string? BayId = null);
+public sealed record BrowserAutomationExecEvent(string RequestId, string NookId, string Kind, string? Ref = null, string? Value = null, string? Js = null);
 public sealed record BrowserAutomationResultParams(string RequestId, string ResultJson);
-public sealed record BrowserAutomationSnapshotParams(string PaneId);
-public sealed record BrowserAutomationClickParams(string PaneId, string Ref);
-public sealed record BrowserAutomationFillParams(string PaneId, string Ref, string Value);
-public sealed record BrowserAutomationEvalParams(string PaneId, string Js);
-public sealed record BrowserScreenshotParams(string PaneId);
-public sealed record BrowserSetUserAgentParams(string PaneId, string UserAgent);
-public sealed record BrowserAutomationClearParams(string PaneId, string Ref);
-public sealed record BrowserAutomationTypeParams(string PaneId, string Ref, string Text);
-public sealed record BrowserAutomationPressParams(string PaneId, string Ref, string Key);
-public sealed record BrowserAutomationSelectParams(string PaneId, string Ref, string Value);
-public sealed record BrowserAutomationScrollParams(string PaneId, string? Ref = null, int? X = null, int? Y = null);
-public sealed record BrowserAutomationWaitParams(string PaneId, string? Ref = null, string? Text = null, int? TimeoutMs = null);
-public sealed record BrowserAutomationGetParams(string PaneId, string Ref, string Prop);
-public sealed record BrowserAutomationIsParams(string PaneId, string Ref, string State);
+public sealed record BrowserAutomationSnapshotParams(string NookId);
+public sealed record BrowserAutomationClickParams(string NookId, string Ref);
+public sealed record BrowserAutomationFillParams(string NookId, string Ref, string Value);
+public sealed record BrowserAutomationEvalParams(string NookId, string Js);
+public sealed record BrowserScreenshotParams(string NookId);
+public sealed record BrowserSetUserAgentParams(string NookId, string UserAgent);
+public sealed record BrowserAutomationClearParams(string NookId, string Ref);
+public sealed record BrowserAutomationTypeParams(string NookId, string Ref, string Text);
+public sealed record BrowserAutomationPressParams(string NookId, string Ref, string Key);
+public sealed record BrowserAutomationSelectParams(string NookId, string Ref, string Value);
+public sealed record BrowserAutomationScrollParams(string NookId, string? Ref = null, int? X = null, int? Y = null);
+public sealed record BrowserAutomationWaitParams(string NookId, string? Ref = null, string? Text = null, int? TimeoutMs = null);
+public sealed record BrowserAutomationGetParams(string NookId, string Ref, string Prop);
+public sealed record BrowserAutomationIsParams(string NookId, string Ref, string State);
 public sealed record BrowserScrollValue(int? X, int? Y);
 public sealed record BrowserWaitValue(string? Text, int? TimeoutMs);
 public sealed record ReviewAddCommentParams(string CommitSha, string FilePath, int Line, string Author, string Body, string? ParentId);
@@ -399,10 +399,10 @@ public sealed record AttributionFindByRangeParams(string FilePath, int StartLine
 public sealed record AttributionFindByToolUseParams(string ToolUseId);
 public sealed record AttributionEntryDto(string Id, string SessionId, string ToolUseId, string FilePath, int StartLine, int EndLine, string At);
 public sealed record AttributionListResult(System.Collections.Generic.IReadOnlyList<AttributionEntryDto> Entries);
-public sealed record ReviewDispatchParams(string TargetPaneId, string WorkspaceId, string SessionId, string? TaskRunId, string Message, string? CommitSha);
-public sealed record ReviewDispatchResultDto(string DispatchId, string TargetPaneId, string SessionId, string? TaskRunId, string DispatchedAt);
+public sealed record ReviewDispatchParams(string TargetNookId, string BayId, string SessionId, string? TaskRunId, string Message, string? CommitSha);
+public sealed record ReviewDispatchResultDto(string DispatchId, string TargetNookId, string SessionId, string? TaskRunId, string DispatchedAt);
 public sealed record DiagnosticsStatusResult(bool Enabled, bool WebInspectorOptIn, int MaxSnapshots, double SnapshotIntervalSeconds, int SnapshotCount);
-public sealed record DiagnosticsSnapshotTakeParams(int? ActivePanes = null, int? ActiveWorkspaces = null, int? ActiveAgents = null);
+public sealed record DiagnosticsSnapshotTakeParams(int? ActiveNooks = null, int? ActiveBays = null, int? ActiveAgents = null);
 public sealed record DiagnosticsExportParams(string? Path = null);
 public sealed record DiagnosticsExportResult(string Path);
 public sealed record PerfBundleCreateParams(string? TracePath = null);
@@ -423,15 +423,15 @@ public sealed record PerfBundleListResult(System.Collections.Generic.IReadOnlyLi
 [JsonSerializable(typeof(DaemonStatusResult))]
 [JsonSerializable(typeof(HelloParams))]
 [JsonSerializable(typeof(HelloResult))]
-[JsonSerializable(typeof(PaneInfo[]))]
-[JsonSerializable(typeof(PaneListResult))]
+[JsonSerializable(typeof(NookInfo[]))]
+[JsonSerializable(typeof(NookListResult))]
 [JsonSerializable(typeof(SpawnParams))]
 [JsonSerializable(typeof(SubscribeParams))]
 [JsonSerializable(typeof(SubscribeResult))]
 [JsonSerializable(typeof(WriteParams))]
 [JsonSerializable(typeof(ResizeParams))]
-[JsonSerializable(typeof(PaneInfo))]
-[JsonSerializable(typeof(PaneWriteParams))]
+[JsonSerializable(typeof(NookInfo))]
+[JsonSerializable(typeof(NookWriteParams))]
 [JsonSerializable(typeof(KeybindDto))]
 [JsonSerializable(typeof(KeybindListResult))]
 [JsonSerializable(typeof(KeybindSetParams))]
@@ -441,16 +441,16 @@ public sealed record PerfBundleListResult(System.Collections.Generic.IReadOnlyLi
 [JsonSerializable(typeof(KeybindSetResult))]
 [JsonSerializable(typeof(KeybindConflictsResult))]
 [JsonSerializable(typeof(KeybindReservedResult))]
-[JsonSerializable(typeof(PaneRefParams))]
-[JsonSerializable(typeof(PaneRenameParams))]
-[JsonSerializable(typeof(PaneReadParams))]
+[JsonSerializable(typeof(NookRefParams))]
+[JsonSerializable(typeof(NookRenameParams))]
+[JsonSerializable(typeof(NookReadParams))]
 [JsonSerializable(typeof(ThemeDto))]
 [JsonSerializable(typeof(ThemeListResult))]
 [JsonSerializable(typeof(ThemeRefParams))]
 [JsonSerializable(typeof(ThemeSaveParams))]
 [JsonSerializable(typeof(ThemeActiveResult))]
 [JsonSerializable(typeof(ThemeBuiltinResult))]
-[JsonSerializable(typeof(PaneReadResult))]
+[JsonSerializable(typeof(NookReadResult))]
 [JsonSerializable(typeof(ConfigGetParams))]
 [JsonSerializable(typeof(ConfigSchemaEntryDto))]
 [JsonSerializable(typeof(ConfigSchemaResult))]
@@ -494,8 +494,8 @@ public sealed record PerfBundleListResult(System.Collections.Generic.IReadOnlyLi
 [JsonSerializable(typeof(ResolvedEnvVar))]
 [JsonSerializable(typeof(AdapterEnvResolveResult))]
 [JsonSerializable(typeof(HookStateResult))]
-[JsonSerializable(typeof(PaneStateItem))]
-[JsonSerializable(typeof(PaneStatesResult))]
+[JsonSerializable(typeof(NookStateItem))]
+[JsonSerializable(typeof(NookStatesResult))]
 [JsonSerializable(typeof(AgentMessageParams))]
 [JsonSerializable(typeof(AgentListDto))]
 [JsonSerializable(typeof(AgentListResult))]
@@ -504,7 +504,7 @@ public sealed record PerfBundleListResult(System.Collections.Generic.IReadOnlyLi
 [JsonSerializable(typeof(SessionStateDto))]
 [JsonSerializable(typeof(SessionListResult))]
 [JsonSerializable(typeof(ReplayInfoDto))]
-[JsonSerializable(typeof(SpawnedPanesResult))]
+[JsonSerializable(typeof(SpawnedNooksResult))]
 [JsonSerializable(typeof(LaunchBuildParams))]
 [JsonSerializable(typeof(LaunchResumeParams))]
 [JsonSerializable(typeof(LaunchOverrideSaveParams))]
@@ -521,9 +521,9 @@ public sealed record PerfBundleListResult(System.Collections.Generic.IReadOnlyLi
 [JsonSerializable(typeof(OmniChatHistoryParams))]
 [JsonSerializable(typeof(OmniChatHistoryResult))]
 [JsonSerializable(typeof(OmniChatClearParams))]
-[JsonSerializable(typeof(PaneScopeGetParams))]
-[JsonSerializable(typeof(PaneScopeSetParams))]
-[JsonSerializable(typeof(PaneScopeResult))]
+[JsonSerializable(typeof(NookScopeGetParams))]
+[JsonSerializable(typeof(NookScopeSetParams))]
+[JsonSerializable(typeof(NookScopeResult))]
 [JsonSerializable(typeof(ProtocolResolveParams))]
 [JsonSerializable(typeof(ProtocolResolveResult))]
 [JsonSerializable(typeof(TaskCard))]
@@ -660,12 +660,12 @@ public sealed record PerfBundleListResult(System.Collections.Generic.IReadOnlyLi
 [JsonSerializable(typeof(BlackboardPostParams))]
 [JsonSerializable(typeof(BlackboardShowParams))]
 [JsonSerializable(typeof(BlackboardShowResult))]
-[JsonSerializable(typeof(PaneTypeDto))]
-[JsonSerializable(typeof(PaneTypeListResult))]
+[JsonSerializable(typeof(NookTypeDto))]
+[JsonSerializable(typeof(NookTypeListResult))]
 [JsonSerializable(typeof(BrowserOpenParams))]
 [JsonSerializable(typeof(BrowserNavigateParams))]
-[JsonSerializable(typeof(BrowserPaneRefParams))]
-[JsonSerializable(typeof(BrowserPaneDto))]
+[JsonSerializable(typeof(BrowserNookRefParams))]
+[JsonSerializable(typeof(BrowserNookDto))]
 [JsonSerializable(typeof(BrowserCreateParams))]
 [JsonSerializable(typeof(BrowserAutomationExecEvent))]
 [JsonSerializable(typeof(BrowserAutomationResultParams))]

@@ -10,7 +10,7 @@ All configuration keys for Cove, grouped by settings tab.
 | `appearance.accent` | Accent Override | string | text |  |
 | `appearance.iconSet` | Icon Set | string | select |  |
 | `appearance.layoutGap` | Layout Gap | int | number |  |
-| `appearance.paneLight` | Pane Light | bool | toggle |  |
+| `appearance.nookLight` | Nook Light | bool | toggle |  |
 | `appearance.uiScale` | UI Scale | double | number |  |
 | `appearance.wallpaper` | Wallpaper | string | text |  |
 | `theme` | Theme | string | select |  |
@@ -108,7 +108,7 @@ All configuration keys for Cove, grouped by settings tab.
 | `updates.checkIntervalHours` | Check Interval | int | number |  |
 | `updates.checkOnLaunch` | Check On Launch | bool | toggle |  |
 
-## workspace
+## bay
 
 | Key | Label | Type | Control | Description |
 |-----|-------|------|---------|-------------|

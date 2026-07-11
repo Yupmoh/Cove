@@ -23,12 +23,12 @@ public sealed class ScrollbackRestoreLiveTests
         JsonElement sp = JsonSerializer.SerializeToElement(
             new SpawnParams("/bin/sh", new[] { "-c", "printf '%s\\n' '" + marker + "'; sleep 30" }, null, null, 80, 24),
             CoveJsonContext.Default.SpawnParams);
-        ControlResponse spawnResp = await RequestAsync(ctl, "sp", "cove://commands/pane.spawn", sp, ct);
+        ControlResponse spawnResp = await RequestAsync(ctl, "sp", "cove://commands/nook.spawn", sp, ct);
         Assert.True(spawnResp.Ok, spawnResp.Error?.Message);
-        string paneId = spawnResp.Data!.Value.Deserialize(CoveJsonContext.Default.PaneInfo)!.PaneId;
+        string nookId = spawnResp.Data!.Value.Deserialize(CoveJsonContext.Default.NookInfo)!.NookId;
 
         JsonElement mp = JsonSerializer.SerializeToElement(
-            new LayoutMutateParams("createRoom", NewPaneId: paneId, Name: "main"),
+            new LayoutMutateParams("createShore", NewNookId: nookId, Name: "main"),
             CoveJsonContext.Default.LayoutMutateParams);
         await RequestAsync(ctl, "cr", "cove://commands/layout.mutate", mp, ct);
 
@@ -36,15 +36,15 @@ public sealed class ScrollbackRestoreLiveTests
         await h.RestartAsync();
         await using FrameConnection ctl2 = await h.ConnectAsync("cli");
 
-        JsonElement rp = JsonSerializer.SerializeToElement(new PaneReadParams(paneId, 0, 65536), CoveJsonContext.Default.PaneReadParams);
+        JsonElement rp = JsonSerializer.SerializeToElement(new NookReadParams(nookId, 0, 65536), CoveJsonContext.Default.NookReadParams);
         var deadline = Task.Delay(System.TimeSpan.FromSeconds(30), ct);
         string output = "";
         while (!deadline.IsCompleted)
         {
-            ControlResponse r = await RequestAsync(ctl2, "rd", "cove://commands/pane.read", rp, ct);
+            ControlResponse r = await RequestAsync(ctl2, "rd", "cove://commands/nook.read", rp, ct);
             if (r.Ok)
             {
-                var result = r.Data!.Value.Deserialize(CoveJsonContext.Default.PaneReadResult)!;
+                var result = r.Data!.Value.Deserialize(CoveJsonContext.Default.NookReadResult)!;
                 if (!string.IsNullOrEmpty(result.DataBase64))
                 {
                     output = Encoding.UTF8.GetString(System.Convert.FromBase64String(result.DataBase64));

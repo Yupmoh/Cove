@@ -21,7 +21,7 @@ public static class DispatchCommands
         var saga = ctx.DispatchSaga;
         if (saga is null)
             return ctx.Fail("not_ready", "dispatch saga not configured (requires M1/M2/M3 services)");
-        var result = await saga.LaunchAsync(p.CardId, card.WorkspaceId, p.ExecutionModeOverride);
+        var result = await saga.LaunchAsync(p.CardId, card.BayId, p.ExecutionModeOverride);
         return ctx.Ok(new TaskLaunchResult(result.Success, result.RunId, result.Error, result.ReachedStep.ToString()), CoveJsonContext.Default.TaskLaunchResult);
     }
 }

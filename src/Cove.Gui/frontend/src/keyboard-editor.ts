@@ -20,11 +20,11 @@ export interface KeybindCategory {
 }
 
 const CATEGORY_PREFIXES: ReadonlyArray<{ prefix: string; name: string }> = [
-  { prefix: "room.", name: "Rooms" },
-  { prefix: "workspace.", name: "Workspaces" },
+  { prefix: "shore.", name: "Shores" },
+  { prefix: "bay.", name: "Bays" },
   { prefix: "view.", name: "View" },
   { prefix: "tool.", name: "Tools" },
-  { prefix: "pane.", name: "Panes" },
+  { prefix: "nook.", name: "Nooks" },
   { prefix: "terminal.", name: "Terminal" },
 ];
 

@@ -24,7 +24,7 @@ public static class KnowledgeCommands
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.NoteCreateParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "note create params required"));
 
-        var note = store.Create(new Note { Title = p.Title, Content = p.Content ?? "", WorkspaceId = p.WorkspaceId, Source = p.Source, Kind = p.Kind ?? "markdown" });
+        var note = store.Create(new Note { Title = p.Title, Content = p.Content ?? "", BayId = p.BayId, Source = p.Source, Kind = p.Kind ?? "markdown" });
         return Task.FromResult(ctx.Ok(note, CoveJsonContext.Default.Note));
     }
 
@@ -36,7 +36,7 @@ public static class KnowledgeCommands
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.NoteReadParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "note read params required"));
 
-        var note = store.Get(p.WorkspaceId, p.Id);
+        var note = store.Get(p.BayId, p.Id);
         if (note is null)
             return Task.FromResult(ctx.Fail("not_found", "note not found"));
         return Task.FromResult(ctx.Ok(note, CoveJsonContext.Default.Note));
@@ -50,11 +50,11 @@ public static class KnowledgeCommands
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.NoteListParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "note list params required"));
 
-        var metas = store.ListByWorkspace(p.WorkspaceId);
+        var metas = store.ListByBay(p.BayId);
         var notes = new System.Collections.Generic.List<Note>(metas.Count);
         foreach (var m in metas)
         {
-            var full = store.Get(m.WorkspaceId, m.Id);
+            var full = store.Get(m.BayId, m.Id);
             if (full is not null)
                 notes.Add(full);
         }
@@ -69,7 +69,7 @@ public static class KnowledgeCommands
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.NoteWriteParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "note write params required"));
 
-        store.Update(p.WorkspaceId, p.Id, n => n with { Title = p.Title ?? n.Title, Content = p.Content ?? n.Content, Kind = p.Kind ?? n.Kind });
+        store.Update(p.BayId, p.Id, n => n with { Title = p.Title ?? n.Title, Content = p.Content ?? n.Content, Kind = p.Kind ?? n.Kind });
         return Task.FromResult(ctx.Ok());
     }
 
@@ -81,7 +81,7 @@ public static class KnowledgeCommands
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.NoteReadParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "note read params required"));
 
-        store.Delete(p.WorkspaceId, p.Id);
+        store.Delete(p.BayId, p.Id);
         return Task.FromResult(ctx.Ok());
     }
 
@@ -93,7 +93,7 @@ public static class KnowledgeCommands
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.NoteSearchParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "note search params required"));
 
-        var results = store.Search(p.WorkspaceId, p.Query, p.Limit ?? 20);
+        var results = store.Search(p.BayId, p.Query, p.Limit ?? 20);
         return Task.FromResult(ctx.Ok(new NoteSearchResult(results), CoveJsonContext.Default.NoteSearchResult));
     }
 
@@ -105,7 +105,7 @@ public static class KnowledgeCommands
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.NoteReadParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "note read params required"));
 
-        var note = store.Get(p.WorkspaceId, p.Id);
+        var note = store.Get(p.BayId, p.Id);
         if (note is null)
             return Task.FromResult(ctx.Fail("not_found", "note not found"));
 
@@ -138,7 +138,7 @@ public static class KnowledgeCommands
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.NoteWriteParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "note write params required"));
 
-        store.Update(p.WorkspaceId, p.Id, n => n with { Title = p.Title ?? n.Title, Content = p.Content ?? n.Content, Kind = p.Kind ?? n.Kind });
+        store.Update(p.BayId, p.Id, n => n with { Title = p.Title ?? n.Title, Content = p.Content ?? n.Content, Kind = p.Kind ?? n.Kind });
         return Task.FromResult(ctx.Ok());
     }
 
@@ -150,7 +150,7 @@ public static class KnowledgeCommands
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.NoteHistoryParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "note history params required"));
 
-        var history = store.GetHistory(p.WorkspaceId, p.Id);
+        var history = store.GetHistory(p.BayId, p.Id);
         return Task.FromResult(ctx.Ok(new NoteHistoryResult(history), CoveJsonContext.Default.NoteHistoryResult));
     }
 
@@ -171,7 +171,7 @@ public static class KnowledgeCommands
         {
             return Task.FromResult(ctx.Fail("invalid_data", "base64 data is malformed or contains a data-URL prefix"));
         }
-        var mediaPath = store.SaveMedia(p.WorkspaceId, p.Id, p.FileName, bytes);
+        var mediaPath = store.SaveMedia(p.BayId, p.Id, p.FileName, bytes);
         return Task.FromResult(ctx.Ok(new NoteMediaSaveResult(mediaPath), CoveJsonContext.Default.NoteMediaSaveResult));
     }
 
@@ -183,7 +183,7 @@ public static class KnowledgeCommands
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.NoteGetStateParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "note get-state params required"));
 
-        var state = store.LoadState(p.WorkspaceId, p.Id);
+        var state = store.LoadState(p.BayId, p.Id);
         return Task.FromResult(ctx.Ok(new NoteGetStateResult(state), CoveJsonContext.Default.NoteGetStateResult));
     }
 
@@ -195,7 +195,7 @@ public static class KnowledgeCommands
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.NoteSaveStateParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "note save-state params required"));
 
-        store.SaveState(p.WorkspaceId, p.Id, p.StateJson);
+        store.SaveState(p.BayId, p.Id, p.StateJson);
         return Task.FromResult(ctx.Ok());
     }
 
@@ -220,15 +220,15 @@ public static class KnowledgeCommands
 
         if (p.Action == "send_to_agent")
         {
-            if (string.IsNullOrEmpty(p.TargetPane))
-                return ctx.Fail("invalid_params", "targetPane required for send_to_agent action");
-            if (ctx.Panes is not { } panes)
-                return ctx.Fail("not_ready", "pane registry not available");
+            if (string.IsNullOrEmpty(p.TargetNook))
+                return ctx.Fail("invalid_params", "targetNook required for send_to_agent action");
+            if (ctx.Nooks is not { } nooks)
+                return ctx.Fail("not_ready", "nook registry not available");
             var message = p.Payload ?? "";
             var bytes = System.Text.Encoding.UTF8.GetBytes(message + "\r");
-            if (!panes.Write(p.TargetPane, bytes))
-                return ctx.Fail("not_found", $"target pane {p.TargetPane} not found or write failed");
-            return ctx.Ok(new CanvasActionResult(true, p.TargetPane, null), CoveJsonContext.Default.CanvasActionResult);
+            if (!nooks.Write(p.TargetNook, bytes))
+                return ctx.Fail("not_found", $"target nook {p.TargetNook} not found or write failed");
+            return ctx.Ok(new CanvasActionResult(true, p.TargetNook, null), CoveJsonContext.Default.CanvasActionResult);
         }
 
         return ctx.Fail("invalid_action", $"unknown action: {p.Action}");
@@ -244,7 +244,7 @@ public static class KnowledgeCommands
 
         try
         {
-            var entry = store.Append(new TimelineEntry { WorkspaceId = p.WorkspaceId, Kind = p.Kind, Source = p.Source, Scope = p.Scope, Summary = p.Summary, Tags = p.Tags });
+            var entry = store.Append(new TimelineEntry { BayId = p.BayId, Kind = p.Kind, Source = p.Source, Scope = p.Scope, Summary = p.Summary, Tags = p.Tags });
             return Task.FromResult(ctx.Ok(entry, CoveJsonContext.Default.TimelineEntry));
         }
         catch (TimelineValidationException ex)
@@ -261,7 +261,7 @@ public static class KnowledgeCommands
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.TimelineListParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "timeline list params required"));
 
-        var entries = store.ListByWorkspace(p.WorkspaceId);
+        var entries = store.ListByBay(p.BayId);
         return Task.FromResult(ctx.Ok(new TimelineListResult(entries), CoveJsonContext.Default.TimelineListResult));
     }
 
@@ -274,7 +274,7 @@ public static class KnowledgeCommands
             return Task.FromResult(ctx.Fail("invalid_params", "blackboard post params required"));
 
         System.TimeSpan? ttl = p.TtlSeconds.HasValue ? System.TimeSpan.FromSeconds(p.TtlSeconds.Value) : null;
-        var post = store.Post(p.WorkspaceId, p.Kind, p.Audience, p.Content, p.RefId, ttl);
+        var post = store.Post(p.BayId, p.Kind, p.Audience, p.Content, p.RefId, ttl);
         return Task.FromResult(ctx.Ok(post, CoveJsonContext.Default.BlackboardPost));
     }
 
@@ -286,7 +286,7 @@ public static class KnowledgeCommands
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.BlackboardShowParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "blackboard show params required"));
 
-        var posts = store.Show(p.WorkspaceId, p.Audience);
+        var posts = store.Show(p.BayId, p.Audience);
         return Task.FromResult(ctx.Ok(new BlackboardShowResult(posts), CoveJsonContext.Default.BlackboardShowResult));
     }
     [CoveCommand("cove://commands/memory.add")]
@@ -297,7 +297,7 @@ public static class KnowledgeCommands
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.MemoryAddParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "memory add params required"));
 
-        var fact = store.AddFact(new Fact { WorkspaceId = p.WorkspaceId, Kind = p.Kind, Content = p.Content, Confidence = p.Confidence ?? 0.5, Audience = p.Audience });
+        var fact = store.AddFact(new Fact { BayId = p.BayId, Kind = p.Kind, Content = p.Content, Confidence = p.Confidence ?? 0.5, Audience = p.Audience });
         return Task.FromResult(ctx.Ok(fact, CoveJsonContext.Default.Fact));
     }
 
@@ -309,7 +309,7 @@ public static class KnowledgeCommands
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.MemorySearchParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "memory search params required"));
 
-        var results = ranker.SearchRanked(p.WorkspaceId, p.Query, p.Limit ?? 20);
+        var results = ranker.SearchRanked(p.BayId, p.Query, p.Limit ?? 20);
         var dtos = results.Select(r => new RankedFactDto(r.Fact.Id, r.Fact.Kind, r.Fact.Content, r.Score, r.Snippet)).ToList();
         return Task.FromResult(ctx.Ok(new MemorySearchResult(dtos), CoveJsonContext.Default.MemorySearchResult));
     }
@@ -322,7 +322,7 @@ public static class KnowledgeCommands
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.MemoryRecallParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "memory recall params required"));
 
-        var previews = ranker.Recall(p.WorkspaceId, p.Query, p.Limit ?? 10);
+        var previews = ranker.Recall(p.BayId, p.Query, p.Limit ?? 10);
         var dtos = previews.Select(p => new RecallPreviewDto(p.Id, p.Kind, p.Preview, p.Score, p.HowLongAgo)).ToList();
         return Task.FromResult(ctx.Ok(new MemoryRecallResult(dtos), CoveJsonContext.Default.MemoryRecallResult));
     }
@@ -335,7 +335,7 @@ public static class KnowledgeCommands
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.MemoryShowParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "memory show params required"));
 
-        var fact = store.GetFact(p.WorkspaceId, p.Id);
+        var fact = store.GetFact(p.BayId, p.Id);
         if (fact is null)
             return Task.FromResult(ctx.Fail("not_found", "fact not found"));
         return Task.FromResult(ctx.Ok(fact, CoveJsonContext.Default.Fact));
@@ -349,7 +349,7 @@ public static class KnowledgeCommands
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.MemorySupersedeParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "memory supersede params required"));
 
-        var newFact = store.Supersede(p.WorkspaceId, p.OldFactId, new Fact { WorkspaceId = p.WorkspaceId, Kind = p.Kind, Content = p.Content, Confidence = p.Confidence ?? 0.5 });
+        var newFact = store.Supersede(p.BayId, p.OldFactId, new Fact { BayId = p.BayId, Kind = p.Kind, Content = p.Content, Confidence = p.Confidence ?? 0.5 });
         if (newFact is null)
             return Task.FromResult(ctx.Fail("not_found", "old fact not found"));
         return Task.FromResult(ctx.Ok(newFact, CoveJsonContext.Default.Fact));
@@ -363,7 +363,7 @@ public static class KnowledgeCommands
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.MemoryReindexParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "memory reindex params required"));
 
-        store.ReindexFromDisk(p.WorkspaceId);
+        store.ReindexFromDisk(p.BayId);
         return Task.FromResult(ctx.Ok());
     }
 
@@ -375,7 +375,7 @@ public static class KnowledgeCommands
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.MemoryConsolidateParams) is not { } p)
             return ctx.Fail("invalid_params", "memory consolidate params required");
 
-        var count = await consolidator.ConsolidateAsync(p.WorkspaceId, p.DryRun);
+        var count = await consolidator.ConsolidateAsync(p.BayId, p.DryRun);
         return ctx.Ok(new MemoryConsolidateResult(count), CoveJsonContext.Default.MemoryConsolidateResult);
     }
 
@@ -387,7 +387,7 @@ public static class KnowledgeCommands
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.MemoryProposeParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "memory propose params required"));
 
-        var proposal = proposals.Create(p.WorkspaceId, p.Kind, p.Content);
+        var proposal = proposals.Create(p.BayId, p.Kind, p.Content);
         return Task.FromResult(ctx.Ok(proposal, CoveJsonContext.Default.Proposal));
     }
 
@@ -423,8 +423,8 @@ public static class KnowledgeCommands
             return Task.FromResult(ctx.Fail("not_ready", "session corpus not available"));
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.VaultSearchParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "vault search params required"));
-        var entries = corpus.SearchSessions(p.WorkspaceId, p.Query, p.Limit ?? 20);
-        var dtos = entries.Select(e => new SessionCorpusEntryDto(e.Id, e.WorkspaceId, e.Adapter, e.StartedAt, e.EndedAt, e.ExtractorVersion)).ToList();
+        var entries = corpus.SearchSessions(p.BayId, p.Query, p.Limit ?? 20);
+        var dtos = entries.Select(e => new SessionCorpusEntryDto(e.Id, e.BayId, e.Adapter, e.StartedAt, e.EndedAt, e.ExtractorVersion)).ToList();
         return Task.FromResult(ctx.Ok(new VaultSearchResult(dtos), CoveJsonContext.Default.VaultSearchResult));
     }
 
@@ -502,7 +502,7 @@ public static class KnowledgeCommands
             return Task.FromResult(ctx.Fail("invalid_params", "vault reindex params required"));
 
         var version = ctx.VaultSettings?.Get()?.ExtractorVersion ?? "latest";
-        corpus.ReindexIfVersionChanged(p.WorkspaceId, version);
+        corpus.ReindexIfVersionChanged(p.BayId, version);
         return Task.FromResult(ctx.Ok());
     }
 
@@ -513,8 +513,8 @@ public static class KnowledgeCommands
             return Task.FromResult(ctx.Fail("not_ready", "library store not available"));
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.LibraryListParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "library list params required"));
-        var entries = store.ListByWorkspace(p.WorkspaceId, p.Kind);
-        var dtos = entries.Select(e => new LibraryEntryDto(e.Id, e.WorkspaceId, e.PaneId, e.PaneType, e.Title, e.StateJson, e.Scrollback, e.Kind, e.CapturedAt.ToString("o"))).ToList();
+        var entries = store.ListByBay(p.BayId, p.Kind);
+        var dtos = entries.Select(e => new LibraryEntryDto(e.Id, e.BayId, e.NookId, e.NookType, e.Title, e.StateJson, e.Scrollback, e.Kind, e.CapturedAt.ToString("o"))).ToList();
         return Task.FromResult(ctx.Ok(new LibraryListResult(dtos), CoveJsonContext.Default.LibraryListResult));
     }
 
@@ -665,18 +665,18 @@ public static class KnowledgeCommands
     {
         if (ctx.ReviewDispatcher is not { } dispatcher)
             return ctx.Fail("not_ready", "review dispatcher not available");
-        if (ctx.Panes is not { } panes)
-            return ctx.Fail("not_ready", "pane registry not available");
+        if (ctx.Nooks is not { } nooks)
+            return ctx.Fail("not_ready", "nook registry not available");
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.ReviewDispatchParams) is not { } p)
             return ctx.Fail("invalid_params", "review dispatch params required");
 
-        var request = new ReviewDispatchRequest(p.TargetPaneId, p.WorkspaceId, p.SessionId, p.TaskRunId, p.Message, p.CommitSha);
-        var result = await dispatcher.DispatchAsync(request, (paneId, bytes) =>
+        var request = new ReviewDispatchRequest(p.TargetNookId, p.BayId, p.SessionId, p.TaskRunId, p.Message, p.CommitSha);
+        var result = await dispatcher.DispatchAsync(request, (nookId, bytes) =>
         {
-            panes.Write(paneId, bytes);
+            nooks.Write(nookId, bytes);
             return Task.CompletedTask;
         });
-        var dto = new ReviewDispatchResultDto(result.DispatchId, result.TargetPaneId, result.SessionId, result.TaskRunId, result.DispatchedAt.ToString("o"));
+        var dto = new ReviewDispatchResultDto(result.DispatchId, result.TargetNookId, result.SessionId, result.TaskRunId, result.DispatchedAt.ToString("o"));
         return ctx.Ok(dto, CoveJsonContext.Default.ReviewDispatchResultDto);
     }
 }

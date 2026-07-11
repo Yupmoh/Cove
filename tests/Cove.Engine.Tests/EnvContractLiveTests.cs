@@ -9,7 +9,7 @@ namespace Cove.Engine.Tests;
 public sealed class EnvContractLiveTests
 {
     [Fact]
-    public async Task SpawnedPane_EnvContains_AllCoveVars_OverSocket()
+    public async Task SpawnedNook_EnvContains_AllCoveVars_OverSocket()
     {
         if (System.OperatingSystem.IsWindows())
             return;
@@ -22,21 +22,21 @@ public sealed class EnvContractLiveTests
         JsonElement sp = JsonSerializer.SerializeToElement(
             new SpawnParams("/bin/sh", new[] { "-c", "env; sleep 5" }, null, null, 80, 24),
             CoveJsonContext.Default.SpawnParams);
-        ControlResponse spawnResp = await RequestAsync(ctl, "spawn", "cove://commands/pane.spawn", sp, ct);
+        ControlResponse spawnResp = await RequestAsync(ctl, "spawn", "cove://commands/nook.spawn", sp, ct);
         Assert.True(spawnResp.Ok, spawnResp.Error?.Message);
-        string paneId = spawnResp.Data!.Value.Deserialize(CoveJsonContext.Default.PaneInfo)!.PaneId;
+        string nookId = spawnResp.Data!.Value.Deserialize(CoveJsonContext.Default.NookInfo)!.NookId;
 
         JsonElement rp = JsonSerializer.SerializeToElement(
-            new PaneReadParams(paneId, 0, 65536),
-            CoveJsonContext.Default.PaneReadParams);
+            new NookReadParams(nookId, 0, 65536),
+            CoveJsonContext.Default.NookReadParams);
 
         string output = "";
         var deadline = Task.Delay(System.TimeSpan.FromSeconds(60), ct);
         while (!deadline.IsCompleted)
         {
-            ControlResponse readResp = await RequestAsync(ctl, "read", "cove://commands/pane.read", rp, ct);
+            ControlResponse readResp = await RequestAsync(ctl, "read", "cove://commands/nook.read", rp, ct);
             Assert.True(readResp.Ok, readResp.Error?.Message);
-            var result = readResp.Data!.Value.Deserialize(CoveJsonContext.Default.PaneReadResult)!;
+            var result = readResp.Data!.Value.Deserialize(CoveJsonContext.Default.NookReadResult)!;
             if (!string.IsNullOrEmpty(result.DataBase64))
             {
                 output = Encoding.UTF8.GetString(System.Convert.FromBase64String(result.DataBase64));
@@ -49,8 +49,8 @@ public sealed class EnvContractLiveTests
         Assert.Contains("COVE=1", output);
         Assert.Contains("COVE_CLI_PATH=", output);
         Assert.Contains("COVE_DATA_DIR=", output);
-        Assert.Contains("COVE_PANE_ID=" + paneId, output);
-        Assert.Contains("COVE_WORKSPACE_ID=", output);
+        Assert.Contains("COVE_NOOK_ID=" + nookId, output);
+        Assert.Contains("COVE_BAY_ID=", output);
         Assert.Contains("COVE_TASK_ID=", output);
         Assert.Contains("COVE_TASK_RUN_ID=", output);
         Assert.Contains("COVE_HOOK_PORT=", output);

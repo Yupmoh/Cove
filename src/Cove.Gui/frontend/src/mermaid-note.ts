@@ -9,18 +9,18 @@ interface NoteReadResult {
 }
 
 let currentNoteId: string | null = null;
-let currentWorkspaceId: string | null = null;
+let currentBayId: string | null = null;
 
-export async function renderMermaidNote(workspaceId: string, noteId: string): Promise<HTMLElement> {
+export async function renderMermaidNote(bayId: string, noteId: string): Promise<HTMLElement> {
   const el = document.createElement("div");
   el.className = "mermaid-note-editor";
   el.style.cssText = "display:flex;flex-direction:column;height:100%;background:#0b1622;color:#e5e9f0;font-family:system-ui,sans-serif;";
 
   currentNoteId = noteId;
-  currentWorkspaceId = workspaceId;
+  currentBayId = bayId;
 
   try {
-    const result = await invoke<NoteReadResult>("cove://commands/note.read", { workspaceId, id: noteId });
+    const result = await invoke<NoteReadResult>("cove://commands/note.read", { bayId, id: noteId });
     el.appendChild(buildToolbar());
     el.appendChild(buildEditor(result.content));
   } catch (e) {
@@ -185,12 +185,12 @@ function renderMermaidSvg(lines: string[]): string {
 }
 
 async function saveMermaid(): Promise<void> {
-  if (!currentWorkspaceId || !currentNoteId) return;
+  if (!currentBayId || !currentNoteId) return;
   const textarea = document.querySelector(".mermaid-source") as HTMLTextAreaElement;
   if (!textarea) return;
   try {
     await invoke("cove://commands/note.write", {
-      workspaceId: currentWorkspaceId,
+      bayId: currentBayId,
       id: currentNoteId,
       content: textarea.value,
     });

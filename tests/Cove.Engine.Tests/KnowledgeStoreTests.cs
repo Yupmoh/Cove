@@ -23,7 +23,7 @@ public sealed class NoteStoreTests
         var (dir, store) = NewStore();
         try
         {
-            var note = store.Create(new Note { Title = "Test", WorkspaceId = "ws1", Content = "hello", Source = "user:moh" });
+            var note = store.Create(new Note { Title = "Test", BayId = "ws1", Content = "hello", Source = "user:moh" });
             Assert.False(string.IsNullOrEmpty(note.Id));
             Assert.Equal("Test", note.Title);
         }
@@ -36,7 +36,7 @@ public sealed class NoteStoreTests
         var (dir, store) = NewStore();
         try
         {
-            var created = store.Create(new Note { Title = "Test", WorkspaceId = "ws1", Content = "hello", Source = "user:moh" });
+            var created = store.Create(new Note { Title = "Test", BayId = "ws1", Content = "hello", Source = "user:moh" });
             var fetched = store.Get("ws1", created.Id);
             Assert.NotNull(fetched);
             Assert.Equal("hello", fetched!.Content);
@@ -45,15 +45,15 @@ public sealed class NoteStoreTests
     }
 
     [Fact]
-    public void ListByWorkspace_ReturnsWorkspaceNotes()
+    public void ListByBay_ReturnsBayNotes()
     {
         var (dir, store) = NewStore();
         try
         {
-            store.Create(new Note { Title = "n1", WorkspaceId = "ws1", Content = "", Source = "u" });
-            store.Create(new Note { Title = "n2", WorkspaceId = "ws1", Content = "", Source = "u" });
-            store.Create(new Note { Title = "n3", WorkspaceId = "ws2", Content = "", Source = "u" });
-            Assert.Equal(2, store.ListByWorkspace("ws1").Count);
+            store.Create(new Note { Title = "n1", BayId = "ws1", Content = "", Source = "u" });
+            store.Create(new Note { Title = "n2", BayId = "ws1", Content = "", Source = "u" });
+            store.Create(new Note { Title = "n3", BayId = "ws2", Content = "", Source = "u" });
+            Assert.Equal(2, store.ListByBay("ws1").Count);
         }
         finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
     }
@@ -64,7 +64,7 @@ public sealed class NoteStoreTests
         var (dir, store) = NewStore();
         try
         {
-            var note = store.Create(new Note { Title = "t", WorkspaceId = "ws1", Content = "old", Source = "u" });
+            var note = store.Create(new Note { Title = "t", BayId = "ws1", Content = "old", Source = "u" });
             store.Update("ws1", note.Id, n => n with { Content = "new" });
             Assert.Equal("new", store.Get("ws1", note.Id)!.Content);
         }
@@ -77,7 +77,7 @@ public sealed class NoteStoreTests
         var (dir, store) = NewStore();
         try
         {
-            var note = store.Create(new Note { Title = "t", WorkspaceId = "ws1", Content = "", Source = "u" });
+            var note = store.Create(new Note { Title = "t", BayId = "ws1", Content = "", Source = "u" });
             store.Delete("ws1", note.Id);
             Assert.Null(store.Get("ws1", note.Id));
         }

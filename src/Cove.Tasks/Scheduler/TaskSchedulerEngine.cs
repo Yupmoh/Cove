@@ -174,7 +174,7 @@ public sealed class TaskSchedulerEngine
         }
 
         var launchProfileJson = card.LaunchConfigJson;
-        var run = await _tasks.CreateRunAsync(card.Id, card.WorkspaceId, launchProfileJson, backgrounded: true);
+        var run = await _tasks.CreateRunAsync(card.Id, card.BayId, launchProfileJson, backgrounded: true);
         _logger.LogWarning("scheduler: minted background run {runId} for card {cardId}", run?.Id, card.Id);
 
         var nextFire = ComputeNextFire(schedule, now);

@@ -5,7 +5,7 @@ interface TaskCard {
   title: string;
   description: string;
   taskNumber: number;
-  workspaceId: string;
+  bayId: string;
   statusId: string;
   priority: number;
   size: number;
@@ -18,7 +18,7 @@ interface TaskCard {
 
 interface StatusRow {
   id: string;
-  workspaceId: string;
+  bayId: string;
   name: string;
   color: string;
   position: number;
@@ -32,25 +32,25 @@ const PRIORITY_COLORS = ["#ef4444", "#f97316", "#eab308", "#6b7280"];
 const PRIORITY_LABELS = ["critical", "high", "medium", "low"];
 const SIZE_LABELS = ["xs", "s", "m", "l", "xl"];
 
-export async function renderKanbanBoard(workspaceId: string): Promise<HTMLElement> {
+export async function renderKanbanBoard(bayId: string): Promise<HTMLElement> {
   const el = document.createElement("div");
   el.className = "kanban-board";
   el.style.cssText = "display:flex;gap:12px;padding:12px;overflow-x:auto;height:100%;background:#0b1622;color:#e5e9f0;font-family:system-ui,sans-serif;";
 
-  await refreshBoard(el, workspaceId);
+  await refreshBoard(el, bayId);
 
-  const refreshFn = () => refreshBoard(el, workspaceId);
+  const refreshFn = () => refreshBoard(el, bayId);
   el.dataset.refreshFn = "kanban-refresh";
   (window as unknown as Record<string, unknown>).__coveTaskRefresh = refreshFn;
 
   return el;
 }
 
-async function refreshBoard(el: HTMLElement, workspaceId: string): Promise<void> {
+async function refreshBoard(el: HTMLElement, bayId: string): Promise<void> {
   try {
     const [statusResult, cardResult] = await Promise.all([
-      invoke<StatusListResult>("cove://commands/task.status.list", { workspaceId }),
-      invoke<TaskListResult>("cove://commands/task.list", { workspaceId }),
+      invoke<StatusListResult>("cove://commands/task.status.list", { bayId }),
+      invoke<TaskListResult>("cove://commands/task.list", { bayId }),
     ]);
 
     const statuses = statusResult.statuses.filter(s => !s.hidden).sort((a, b) => a.position - b.position);
@@ -58,7 +58,7 @@ async function refreshBoard(el: HTMLElement, workspaceId: string): Promise<void>
 
     el.innerHTML = "";
     for (const status of statuses) {
-      const column = createColumn(status, cards.filter(c => c.statusId === status.id), workspaceId);
+      const column = createColumn(status, cards.filter(c => c.statusId === status.id), bayId);
       el.appendChild(column);
     }
   } catch (e) {
@@ -66,7 +66,7 @@ async function refreshBoard(el: HTMLElement, workspaceId: string): Promise<void>
   }
 }
 
-function createColumn(status: StatusRow, cards: TaskCard[], workspaceId: string): HTMLElement {
+function createColumn(status: StatusRow, cards: TaskCard[], bayId: string): HTMLElement {
   const col = document.createElement("div");
   col.className = "kanban-column";
   col.style.cssText = "min-width:220px;flex:1;display:flex;flex-direction:column;background:#14202e;border-radius:8px;overflow:hidden;";
@@ -96,20 +96,20 @@ function createColumn(status: StatusRow, cards: TaskCard[], workspaceId: string)
     cardList.style.background = "";
     const cardId = e.dataTransfer?.getData("text/plain");
     if (cardId) {
-      await invoke("cove://commands/task.update", { id: cardId, workspaceId, statusId: status.id, source: "user:gui" });
-      await refreshBoard(col.parentElement as HTMLElement, workspaceId);
+      await invoke("cove://commands/task.update", { id: cardId, bayId, statusId: status.id, source: "user:gui" });
+      await refreshBoard(col.parentElement as HTMLElement, bayId);
     }
   });
 
   for (const card of cards) {
-    cardList.appendChild(createCard(card, workspaceId));
+    cardList.appendChild(createCard(card, bayId));
   }
 
   col.appendChild(cardList);
   return col;
 }
 
-function createCard(card: TaskCard, workspaceId: string): HTMLElement {
+function createCard(card: TaskCard, bayId: string): HTMLElement {
   const el = document.createElement("div");
   el.className = "kanban-card";
   el.draggable = true;
@@ -152,13 +152,13 @@ function createCard(card: TaskCard, workspaceId: string): HTMLElement {
 
   el.addEventListener("contextmenu", (e) => {
     e.preventDefault();
-    showQuickActions(card, workspaceId, e.clientX, e.clientY);
+    showQuickActions(card, bayId, e.clientX, e.clientY);
   });
 
   return el;
 }
 
-function showQuickActions(card: TaskCard, workspaceId: string, x: number, y: number): void {
+function showQuickActions(card: TaskCard, bayId: string, x: number, y: number): void {
   const existing = document.querySelector(".quick-actions-menu");
   if (existing) existing.remove();
 
@@ -182,7 +182,7 @@ function showQuickActions(card: TaskCard, workspaceId: string, x: number, y: num
     btn.addEventListener("click", async () => {
       menu.remove();
       await a.action();
-      await refreshBoard(document.querySelector(".kanban-board") as HTMLElement, workspaceId);
+      await refreshBoard(document.querySelector(".kanban-board") as HTMLElement, bayId);
     });
     menu.appendChild(btn);
   }

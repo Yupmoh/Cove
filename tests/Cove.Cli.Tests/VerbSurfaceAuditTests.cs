@@ -12,11 +12,11 @@ public sealed class VerbSurfaceAuditTests
 {
     private static readonly string[] M4Namespaces =
     {
-        "pane", "workspace", "worktree", "room", "wing", "collection", "hook", "config",
+        "nook", "bay", "worktree", "shore", "wing", "collection", "hook", "config",
         "note", "extension", "exec", "theme", "launcher", "task", "run", "adapter",
         "browser", "agent", "review", "context", "commands", "version", "skills",
         "launch", "launch-profile", "migrate", "edits", "capture", "timeline",
-        "workspace-command", "memory", "blackboard",
+        "bay-command", "memory", "blackboard",
     };
 
     private static string GoldenDir

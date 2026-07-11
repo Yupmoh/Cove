@@ -129,7 +129,7 @@ export function hotkeyTarget(letter: string, harnessLetters: string[], toolLette
 }
 
 export interface LauncherSession {
-  paneId: string;
+  nookId: string;
   adapter: string;
   sessionId: string | null;
   lifecycle: string;
@@ -147,7 +147,7 @@ export function mostRecentSession(sessions: LauncherSession[]): LauncherSession 
 export interface RecentSessionRow {
   adapter: string;
   sessionId: string;
-  workspaceId: string;
+  bayId: string;
   cwd: string;
   startedAt: string;
   label?: string;
@@ -203,7 +203,7 @@ export const LAUNCHER_TIPS = [
   "press a letter to launch — hold shift to reveal them",
   "⌘↵ starts a new session in the selected harness",
   "arrow keys move between cards and tools",
-  "⌘l recalls the launcher in any empty pane",
+  "⌘l recalls the launcher in any empty nook",
   "detected harnesses launch straight away — no prompts",
 ];
 

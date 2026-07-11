@@ -10,53 +10,53 @@ public sealed class ControlClientTests
     [Fact]
     public void SerializeEnvelope_Req_RoundTrips()
     {
-        var envelope = new ControlEnvelope("req", 1, "pane.split", null, null, null, null, null, null, null);
+        var envelope = new ControlEnvelope("req", 1, "nook.split", null, null, null, null, null, null, null);
         var json = JsonSerializer.SerializeToUtf8Bytes(envelope, ControlJsonContext.Default.ControlEnvelope);
         var decoded = JsonSerializer.Deserialize(json, ControlJsonContext.Default.ControlEnvelope);
 
         Assert.NotNull(decoded);
         Assert.Equal("req", decoded!.Kind);
         Assert.Equal(1, decoded.Id);
-        Assert.Equal("pane.split", decoded.Method);
+        Assert.Equal("nook.split", decoded.Method);
     }
 
     [Fact]
     public void SerializeEnvelope_Res_WithResult_RoundTrips()
     {
-        using var doc = JsonDocument.Parse("""{"paneId":"p-42"}""");
+        using var doc = JsonDocument.Parse("""{"nookId":"p-42"}""");
         var envelope = new ControlEnvelope("res", 1, null, null, doc.RootElement.Clone(), null, null, null, null, null);
         var json = JsonSerializer.SerializeToUtf8Bytes(envelope, ControlJsonContext.Default.ControlEnvelope);
         var decoded = JsonSerializer.Deserialize(json, ControlJsonContext.Default.ControlEnvelope);
 
         Assert.NotNull(decoded);
         Assert.Equal("res", decoded!.Kind);
-        Assert.Equal("p-42", decoded.Result!.Value.GetProperty("paneId").GetString());
+        Assert.Equal("p-42", decoded.Result!.Value.GetProperty("nookId").GetString());
     }
 
     [Fact]
     public void SerializeEnvelope_Evt_RoundTrips()
     {
-        using var doc = JsonDocument.Parse("""{"room":"dev"}""");
-        var envelope = new ControlEnvelope("evt", null, "room.changed", doc.RootElement.Clone(), null, null, null, null, null, null);
+        using var doc = JsonDocument.Parse("""{"shore":"dev"}""");
+        var envelope = new ControlEnvelope("evt", null, "shore.changed", doc.RootElement.Clone(), null, null, null, null, null, null);
         var json = JsonSerializer.SerializeToUtf8Bytes(envelope, ControlJsonContext.Default.ControlEnvelope);
         var decoded = JsonSerializer.Deserialize(json, ControlJsonContext.Default.ControlEnvelope);
 
         Assert.NotNull(decoded);
         Assert.Equal("evt", decoded!.Kind);
-        Assert.Equal("room.changed", decoded.Method);
-        Assert.Equal("dev", decoded.Params!.Value.GetProperty("room").GetString());
+        Assert.Equal("shore.changed", decoded.Method);
+        Assert.Equal("dev", decoded.Params!.Value.GetProperty("shore").GetString());
     }
 
     [Fact]
     public void SerializeEnvelope_Pty_RoundTrips()
     {
-        var envelope = new ControlEnvelope("pty", null, null, null, null, null, null, "pane-1", 1024L, 0);
+        var envelope = new ControlEnvelope("pty", null, null, null, null, null, null, "nook-1", 1024L, 0);
         var json = JsonSerializer.SerializeToUtf8Bytes(envelope, ControlJsonContext.Default.ControlEnvelope);
         var decoded = JsonSerializer.Deserialize(json, ControlJsonContext.Default.ControlEnvelope);
 
         Assert.NotNull(decoded);
         Assert.Equal("pty", decoded!.Kind);
-        Assert.Equal("pane-1", decoded.PaneId);
+        Assert.Equal("nook-1", decoded.NookId);
         Assert.Equal(1024L, decoded.Offset);
     }
 
@@ -68,7 +68,7 @@ public sealed class ControlClientTests
         await using var client = new ControlClient(stub.Port.ToString());
 
         await client.ConnectAsync();
-        var result = await client.SendAsync("room.list", null);
+        var result = await client.SendAsync("shore.list", null);
 
         Assert.Equal("ok", result.GetProperty("status").GetString());
     }
@@ -81,8 +81,8 @@ public sealed class ControlClientTests
         await using var client = new ControlClient(stub.Port.ToString());
 
         await client.ConnectAsync();
-        var events = client.SubscribeAsync("room.changed");
-        await stub.SendEventAsync("room.changed", """{"room":"dev"}""");
+        var events = client.SubscribeAsync("shore.changed");
+        await stub.SendEventAsync("shore.changed", """{"shore":"dev"}""");
 
         var evt = await events.GetAsyncEnumerator().MoveNextAsync();
         Assert.True(evt);
@@ -96,15 +96,15 @@ public sealed class ControlClientTests
         await using var client = new ControlClient(stub.Port.ToString());
 
         await client.ConnectAsync();
-        var ptyStream = client.StreamPtyAsync("pane-1", 0);
+        var ptyStream = client.StreamPtyAsync("nook-1", 0);
         var expectedBytes = System.Text.Encoding.UTF8.GetBytes("hello pty world");
 
-        await stub.SendPtyDataAsync("pane-1", 0, expectedBytes);
+        await stub.SendPtyDataAsync("nook-1", 0, expectedBytes);
 
         var enumerator = ptyStream.GetAsyncEnumerator();
         Assert.True(await enumerator.MoveNextAsync());
         Assert.Equal(expectedBytes, enumerator.Current.Data);
-        Assert.Equal("pane-1", enumerator.Current.PaneId);
+        Assert.Equal("nook-1", enumerator.Current.NookId);
     }
 
     [Fact]
@@ -116,7 +116,7 @@ public sealed class ControlClientTests
 
         await client.ConnectAsync();
         var inputBytes = System.Text.Encoding.UTF8.GetBytes("ls -la\r");
-        await client.SendPtyInputAsync("pane-1", inputBytes);
+        await client.SendPtyInputAsync("nook-1", inputBytes);
 
         var received = await stub.WaitForPtyInputAsync(TimeSpan.FromSeconds(5));
         Assert.Equal(inputBytes, received);
@@ -220,9 +220,9 @@ internal sealed class StubDaemon : IAsyncDisposable
         await WriteFrameAsync(envelope, null);
     }
 
-    public async Task SendPtyDataAsync(string paneId, long offset, byte[] data)
+    public async Task SendPtyDataAsync(string nookId, long offset, byte[] data)
     {
-        var envelope = new ControlEnvelope("pty", null, null, null, null, null, null, paneId, offset, data.Length);
+        var envelope = new ControlEnvelope("pty", null, null, null, null, null, null, nookId, offset, data.Length);
         await WriteFrameAsync(envelope, data);
     }
 

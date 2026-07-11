@@ -54,6 +54,6 @@ describe("isTaskLikeKey", () => {
   it("recognizes task-related keys", () => {
     expect(isTaskLikeKey("tasks.json")).toBe(true);
     expect(isTaskLikeKey("state/task-board.json")).toBe(true);
-    expect(isTaskLikeKey("workspace.json")).toBe(false);
+    expect(isTaskLikeKey("bay.json")).toBe(false);
   });
 });

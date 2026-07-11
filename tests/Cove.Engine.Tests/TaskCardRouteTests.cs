@@ -34,7 +34,7 @@ public sealed class TaskCardRouteTests
         await using var h = await DaemonTestHarness.StartAsync();
         await using FrameConnection ctl = await h.ConnectAsync("cli");
 
-        var create = await SendAsync(ctl, "c", "cove://commands/task.create", P("""{"title":"test card","workspaceId":"ws1","source":"user:test","priority":"high","size":"m"}"""), ct);
+        var create = await SendAsync(ctl, "c", "cove://commands/task.create", P("""{"title":"test card","bayId":"ws1","source":"user:test","priority":"high","size":"m"}"""), ct);
         Assert.True(create.Ok, create.Error?.Message);
         var cardId = create.Data!.Value.GetProperty("id").GetString()!;
         Assert.Equal(1, create.Data!.Value.GetProperty("taskNumber").GetInt32());
@@ -45,7 +45,7 @@ public sealed class TaskCardRouteTests
         Assert.True(get.Ok);
         Assert.Equal("test card", get.Data!.Value.GetProperty("title").GetString());
 
-        var list = await SendAsync(ctl, "l", "cove://commands/task.list", P("""{"workspaceId":"ws1"}"""), ct);
+        var list = await SendAsync(ctl, "l", "cove://commands/task.list", P("""{"bayId":"ws1"}"""), ct);
         Assert.True(list.Ok);
         Assert.Equal(1, list.Data!.Value.GetProperty("cards").GetArrayLength());
 
@@ -72,8 +72,8 @@ public sealed class TaskCardRouteTests
         await using var h = await DaemonTestHarness.StartAsync();
         await using FrameConnection ctl = await h.ConnectAsync("cli");
 
-        var c1 = await SendAsync(ctl, "1", "cove://commands/task.create", P("""{"title":"first","workspaceId":"ws1","source":"user:test"}"""), ct);
-        var c2 = await SendAsync(ctl, "2", "cove://commands/task.create", P("""{"title":"second","workspaceId":"ws1","source":"user:test"}"""), ct);
+        var c1 = await SendAsync(ctl, "1", "cove://commands/task.create", P("""{"title":"first","bayId":"ws1","source":"user:test"}"""), ct);
+        var c2 = await SendAsync(ctl, "2", "cove://commands/task.create", P("""{"title":"second","bayId":"ws1","source":"user:test"}"""), ct);
 
         Assert.Equal(1, c1.Data!.Value.GetProperty("taskNumber").GetInt32());
         Assert.Equal(2, c2.Data!.Value.GetProperty("taskNumber").GetInt32());

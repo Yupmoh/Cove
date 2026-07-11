@@ -24,14 +24,14 @@ public sealed class BrowserAutomationBridge
         _timeout = timeout ?? TimeSpan.FromSeconds(10);
     }
 
-    public async Task<AutomationOutcome> ExecuteAsync(string paneId, string kind, string? refId, string? value, string? js, CancellationToken ct)
+    public async Task<AutomationOutcome> ExecuteAsync(string nookId, string kind, string? refId, string? value, string? js, CancellationToken ct)
     {
         var requestId = Guid.NewGuid().ToString("N");
         var tcs = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
         _pending[requestId] = tcs;
         try
         {
-            _emit(new BrowserAutomationExecEvent(requestId, paneId, kind, refId, value, js));
+            _emit(new BrowserAutomationExecEvent(requestId, nookId, kind, refId, value, js));
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             cts.CancelAfter(_timeout);
             using var reg = cts.Token.Register(() => tcs.TrySetCanceled());
@@ -40,7 +40,7 @@ public sealed class BrowserAutomationBridge
         }
         catch (OperationCanceledException)
         {
-            _logger.LogWarning("browser automation: no GUI answered {kind} for pane {paneId} within {timeout}s (request {requestId})", kind, paneId, _timeout.TotalSeconds, requestId);
+            _logger.LogWarning("browser automation: no GUI answered {kind} for nook {nookId} within {timeout}s (request {requestId})", kind, nookId, _timeout.TotalSeconds, requestId);
             return AutomationOutcome.Adrift();
         }
         finally

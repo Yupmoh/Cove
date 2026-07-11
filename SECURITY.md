@@ -12,7 +12,7 @@ You will receive a response within 72 hours. If the vulnerability is confirmed, 
 
 ## Scope
 
-Cove is a local-first terminal workspace. The daemon listens on a local control socket (`cove://`) and does not expose network endpoints by default. Telemetry is opt-in and off by default. Crash reports are local-only with zero network egress.
+Cove is a local-first terminal bay. The daemon listens on a local control socket (`cove://`) and does not expose network endpoints by default. Telemetry is opt-in and off by default. Crash reports are local-only with zero network egress.
 
 ## Supported versions
 

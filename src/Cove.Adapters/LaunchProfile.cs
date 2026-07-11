@@ -85,7 +85,7 @@ public sealed class LaunchProfileStore
 
         foreach (var file in Directory.EnumerateFiles(adapterDir, "*.json"))
         {
-            if (Path.GetFileName(file) == ".panes.json")
+            if (Path.GetFileName(file) == ".nooks.json")
                 continue;
             try
             {
@@ -199,52 +199,52 @@ public sealed class LaunchProfileStore
 
     private string GetProfilePath(string adapter, string slug) => Path.Combine(_root, adapter, slug + ".json");
 
-    private string GetPanesPath(string adapter) => Path.Combine(_root, adapter, ".panes.json");
+    private string GetNooksPath(string adapter) => Path.Combine(_root, adapter, ".nooks.json");
 
-    private PaneSelectionStore LoadPanes(string adapter)
+    private NookSelectionStore LoadNooks(string adapter)
     {
-        var path = GetPanesPath(adapter);
+        var path = GetNooksPath(adapter);
         if (!File.Exists(path))
-            return new PaneSelectionStore(new Dictionary<string, PaneSelection>(), null);
+            return new NookSelectionStore(new Dictionary<string, NookSelection>(), null);
         try
         {
             var content = File.ReadAllText(path);
-            var store = JsonSerializer.Deserialize(content, AdaptersJsonContext.Default.PaneSelectionStore);
-            return store ?? new PaneSelectionStore(new Dictionary<string, PaneSelection>(), null);
+            var store = JsonSerializer.Deserialize(content, AdaptersJsonContext.Default.NookSelectionStore);
+            return store ?? new NookSelectionStore(new Dictionary<string, NookSelection>(), null);
         }
         catch (JsonException) { }
-        return new PaneSelectionStore(new Dictionary<string, PaneSelection>(), null);
+        return new NookSelectionStore(new Dictionary<string, NookSelection>(), null);
     }
 
-    private void SavePanes(string adapter, PaneSelectionStore store)
+    private void SaveNooks(string adapter, NookSelectionStore store)
     {
-        var path = GetPanesPath(adapter);
+        var path = GetNooksPath(adapter);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        var json = JsonSerializer.Serialize(store, AdaptersJsonContext.Default.PaneSelectionStore);
+        var json = JsonSerializer.Serialize(store, AdaptersJsonContext.Default.NookSelectionStore);
         File.WriteAllText(path, json);
     }
 
-    public void SetProfileForPane(string adapter, string slug, string paneId)
+    public void SetProfileForNook(string adapter, string slug, string nookId)
     {
         if (!LaunchProfileValidator.IsValidAdapter(adapter) || !LaunchProfileValidator.IsValidSlug(slug))
         {
             _logger?.LaunchProfileLoadInvalidSlug(slug);
             return;
         }
-        var panes = LoadPanes(adapter);
-        var selections = new Dictionary<string, PaneSelection>(panes.PaneSelections)
+        var nooks = LoadNooks(adapter);
+        var selections = new Dictionary<string, NookSelection>(nooks.NookSelections)
         {
-            [paneId] = new PaneSelection(slug, DateTimeOffset.UtcNow)
+            [nookId] = new NookSelection(slug, DateTimeOffset.UtcNow)
         };
-        SavePanes(adapter, panes with { PaneSelections = selections, LastUsed = slug });
+        SaveNooks(adapter, nooks with { NookSelections = selections, LastUsed = slug });
     }
 
-    public string? GetProfileForPane(string adapter, string paneId)
+    public string? GetProfileForNook(string adapter, string nookId)
     {
         if (!LaunchProfileValidator.IsValidAdapter(adapter))
             return null;
-        var panes = LoadPanes(adapter);
-        return panes.PaneSelections.TryGetValue(paneId, out var sel) ? sel.Slug : null;
+        var nooks = LoadNooks(adapter);
+        return nooks.NookSelections.TryGetValue(nookId, out var sel) ? sel.Slug : null;
     }
 
     public void RecordLastUsed(string adapter, string slug)
@@ -254,34 +254,34 @@ public sealed class LaunchProfileStore
             _logger?.LaunchProfileLoadInvalidSlug(slug);
             return;
         }
-        var panes = LoadPanes(adapter);
-        var selections = new Dictionary<string, PaneSelection>(panes.PaneSelections);
-        foreach (var (pid, sel) in panes.PaneSelections)
+        var nooks = LoadNooks(adapter);
+        var selections = new Dictionary<string, NookSelection>(nooks.NookSelections);
+        foreach (var (pid, sel) in nooks.NookSelections)
         {
             if (sel.Slug == slug)
                 selections[pid] = sel with { LastUsedAt = DateTimeOffset.UtcNow };
         }
-        SavePanes(adapter, panes with { PaneSelections = selections, LastUsed = slug });
+        SaveNooks(adapter, nooks with { NookSelections = selections, LastUsed = slug });
     }
 
     public string? GetLastUsed(string adapter)
     {
         if (!LaunchProfileValidator.IsValidAdapter(adapter))
             return null;
-        var panes = LoadPanes(adapter);
-        return panes.LastUsed;
+        var nooks = LoadNooks(adapter);
+        return nooks.LastUsed;
     }
 
-    public FooterChipData? GetFooterChipData(string adapter, string paneId)
+    public FooterChipData? GetFooterChipData(string adapter, string nookId)
     {
-        var paneSlug = GetProfileForPane(adapter, paneId);
-        var effectiveSlug = paneSlug ?? GetDefault(adapter).Slug;
+        var nookSlug = GetProfileForNook(adapter, nookId);
+        var effectiveSlug = nookSlug ?? GetDefault(adapter).Slug;
         var profile = Load(adapter, effectiveSlug);
         if (profile is null)
             return null;
-        var panes = LoadPanes(adapter);
+        var nooks = LoadNooks(adapter);
         DateTimeOffset? lastUsedAt = null;
-        foreach (var (_, sel) in panes.PaneSelections)
+        foreach (var (_, sel) in nooks.NookSelections)
         {
             if (sel.Slug == effectiveSlug)
             {

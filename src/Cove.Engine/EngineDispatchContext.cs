@@ -10,7 +10,7 @@ using Cove.Engine.Hooks;
 using Cove.Engine.Knowledge;
 using Cove.Engine.Launch;
 using Cove.Engine.Lifecycle;
-using Cove.Engine.Panes;
+using Cove.Engine.Nooks;
 using Cove.Engine.Protocol;
 using Cove.Engine.Pty;
 using Cove.Engine.Sessions;
@@ -23,10 +23,10 @@ public sealed class EngineDispatchContext
 {
     public EngineDispatchContext(
         ControlRequest request,
-        PaneRegistry? panes = null,
+        NookRegistry? nooks = null,
         Cove.Engine.Layout.LayoutService? layout = null,
-        Cove.Engine.Workspaces.WorkspaceManager? workspaces = null,
-        Cove.Engine.Workspaces.RunCommandService? runCommands = null,
+        Cove.Engine.Bays.BayManager? bays = null,
+        Cove.Engine.Bays.RunCommandService? runCommands = null,
         Cove.Engine.Restart.RestorationService? restoration = null,
         Cove.Engine.Snapshots.SnapshotService? snapshots = null,
         Cove.Engine.Skills.SkillsService? skills = null,
@@ -57,17 +57,17 @@ public sealed class EngineDispatchContext
         ReviewStore? reviews = null,
         AttributionIndex? attribution = null,
         ReviewDispatcher? reviewDispatcher = null,
-        PaneTypeRegistry? paneTypes = null,
-        BrowserPaneManager? browser = null,
+        NookTypeRegistry? nookTypes = null,
+        BrowserNookManager? browser = null,
         ConfigService? config = null,
         AdapterManifestStore? manifestStore = null,
         RegistryService? registry = null,
         Cove.Engine.Activity.OmniChatStore? omniChat = null,
-        PaneScopeStore? paneScopes = null,
+        NookScopeStore? nookScopes = null,
         Cove.Engine.Protocol.StateBus? stateBus = null,
         ExtensionRegistry? extensions = null,
         CaptureStore? captures = null,
-        Cove.Engine.Workspaces.GitReadModel? gitReadModel = null,
+        Cove.Engine.Bays.GitReadModel? gitReadModel = null,
         Cove.Engine.Search.SearchService? searchService = null,
         Cove.Engine.Theming.ThemeService? themes = null,
         Cove.Engine.Keybindings.KeybindingEngine? keybindings = null,
@@ -79,9 +79,9 @@ public sealed class EngineDispatchContext
         Cove.Adapters.SessionService? sessionService = null)
     {
         Request = request;
-        Panes = panes;
+        Nooks = nooks;
         Layout = layout;
-        Workspaces = workspaces;
+        Bays = bays;
         RunCommands = runCommands;
         Restoration = restoration;
         Snapshots = snapshots;
@@ -113,13 +113,13 @@ public sealed class EngineDispatchContext
         Reviews = reviews;
         Attribution = attribution;
         ReviewDispatcher = reviewDispatcher;
-        PaneTypes = paneTypes;
+        NookTypes = nookTypes;
         Browser = browser;
         Config = config;
         ManifestStore = manifestStore;
         Registry = registry;
         OmniChat = omniChat;
-        PaneScopes = paneScopes;
+        NookScopes = nookScopes;
         StateBus = stateBus;
         Extensions = extensions;
         Captures = captures;
@@ -136,10 +136,10 @@ public sealed class EngineDispatchContext
     }
 
     public ControlRequest Request { get; }
-    public PaneRegistry? Panes { get; }
+    public NookRegistry? Nooks { get; }
     public Cove.Engine.Layout.LayoutService? Layout { get; }
-    public Cove.Engine.Workspaces.WorkspaceManager? Workspaces { get; }
-    public Cove.Engine.Workspaces.RunCommandService? RunCommands { get; }
+    public Cove.Engine.Bays.BayManager? Bays { get; }
+    public Cove.Engine.Bays.RunCommandService? RunCommands { get; }
     public Cove.Engine.Restart.RestorationService? Restoration { get; }
     public Cove.Engine.Snapshots.SnapshotService? Snapshots { get; }
     public Cove.Engine.Skills.SkillsService? Skills { get; }
@@ -170,17 +170,17 @@ public sealed class EngineDispatchContext
     public ReviewStore? Reviews { get; }
     public AttributionIndex? Attribution { get; }
     public ReviewDispatcher? ReviewDispatcher { get; }
-    public PaneTypeRegistry? PaneTypes { get; }
+    public NookTypeRegistry? NookTypes { get; }
     public ConfigService? Config { get; }
-    public BrowserPaneManager? Browser { get; }
+    public BrowserNookManager? Browser { get; }
     public AdapterManifestStore? ManifestStore { get; }
     public RegistryService? Registry { get; }
     public OmniChatStore? OmniChat { get; }
-    public PaneScopeStore? PaneScopes { get; }
+    public NookScopeStore? NookScopes { get; }
     public Cove.Engine.Protocol.StateBus? StateBus { get; }
     public Cove.Engine.Protocol.ExtensionRegistry? Extensions { get; }
     public CaptureStore? Captures { get; }
-    public Cove.Engine.Workspaces.GitReadModel? GitReadModel { get; }
+    public Cove.Engine.Bays.GitReadModel? GitReadModel { get; }
     public Cove.Engine.Theming.ThemeService? Themes { get; }
     public Cove.Engine.Keybindings.KeybindingEngine? Keybindings { get; }
     public Cove.Engine.Search.SearchService? SearchService { get; }

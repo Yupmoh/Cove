@@ -9,46 +9,46 @@ public sealed class TuiClientTests
     public void Render_ProducesNonEmptyLayout()
     {
         var tui = new TuiRenderer();
-        var output = tui.Render(new TuiState { FocusedPaneId = "p1", PaneCount = 3 });
+        var output = tui.Render(new TuiState { FocusedNookId = "p1", NookCount = 3 });
         Assert.False(string.IsNullOrEmpty(output));
         Assert.Contains("Cove", output);
     }
 
     [Fact]
-    public void Render_WithPanes_ShowsCount()
+    public void Render_WithNooks_ShowsCount()
     {
         var tui = new TuiRenderer();
-        var output = tui.Render(new TuiState { FocusedPaneId = "p1", PaneCount = 5 });
+        var output = tui.Render(new TuiState { FocusedNookId = "p1", NookCount = 5 });
         Assert.Contains("5", output);
     }
 
     [Fact]
-    public void Render_WithNoPanes_ShowsEmptyState()
+    public void Render_WithNoNooks_ShowsEmptyState()
     {
         var tui = new TuiRenderer();
-        var output = tui.Render(new TuiState { FocusedPaneId = null, PaneCount = 0 });
-        Assert.Contains("No panes", output);
+        var output = tui.Render(new TuiState { FocusedNookId = null, NookCount = 0 });
+        Assert.Contains("No nooks", output);
     }
 
     [Fact]
-    public void Render_StatusBar_ShowsFocusedPane()
+    public void Render_StatusBar_ShowsFocusedNook()
     {
         var tui = new TuiRenderer();
-        var output = tui.Render(new TuiState { FocusedPaneId = "pane-abc123", PaneCount = 1 });
-        Assert.Contains("pane-abc123", output);
+        var output = tui.Render(new TuiState { FocusedNookId = "nook-abc123", NookCount = 1 });
+        Assert.Contains("nook-abc123", output);
     }
 
     [Fact]
     public void FormatCommand_HumanReadable()
     {
-        var cmd = TuiFormatter.FormatCommand("cove://commands/pane.list", null);
-        Assert.Contains("pane.list", cmd);
+        var cmd = TuiFormatter.FormatCommand("cove://commands/nook.list", null);
+        Assert.Contains("nook.list", cmd);
     }
 
     [Fact]
     public void FormatCommand_WithParams_IncludesJson()
     {
-        var cmd = TuiFormatter.FormatCommand("cove://commands/pane.spawn", """{"command":"bash"}""");
-        Assert.Contains("pane.spawn", cmd);
+        var cmd = TuiFormatter.FormatCommand("cove://commands/nook.spawn", """{"command":"bash"}""");
+        Assert.Contains("nook.spawn", cmd);
     }
 }

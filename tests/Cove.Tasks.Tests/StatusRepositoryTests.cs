@@ -27,7 +27,7 @@ public sealed class StatusRepositoryTests
     {
         using var conn = factory.Open();
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = "INSERT INTO cards (id, workspace_id, task_number, title, status_id, source, order_key, created_at, updated_at) VALUES (@Id, @Ws, @Num, @Title, @Status, @Source, @OrderKey, @Now, @Now)";
+        cmd.CommandText = "INSERT INTO cards (id, bay_id, task_number, title, status_id, source, order_key, created_at, updated_at) VALUES (@Id, @Ws, @Num, @Title, @Status, @Source, @OrderKey, @Now, @Now)";
         cmd.Parameters.AddWithValue("@Id", System.Guid.NewGuid().ToString("N"));
         cmd.Parameters.AddWithValue("@Ws", ws);
         cmd.Parameters.AddWithValue("@Num", num);
@@ -52,30 +52,30 @@ public sealed class StatusRepositoryTests
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task ListByWorkspace_ReturnsOrderedByPosition()
+    public async System.Threading.Tasks.Task ListByBay_ReturnsOrderedByPosition()
     {
         var (_, _, statuses, _, _, _) = await NewAsync();
         await statuses.CreateAsync("ws1", "done", "Done", "34c759", position: 30);
         await statuses.CreateAsync("ws1", "todo", "Todo", "808080", position: 10);
         await statuses.CreateAsync("ws1", "in-progress", "In Progress", "4a9eff", position: 20);
 
-        var list = statuses.ListByWorkspace("ws1");
+        var list = statuses.ListByBay("ws1");
         Assert.Equal(new[] { "todo", "in-progress", "done" }, list.Select(s => s.Id).ToArray());
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task ListByWorkspace_ExcludesHiddenByDefault()
+    public async System.Threading.Tasks.Task ListByBay_ExcludesHiddenByDefault()
     {
         var (_, _, statuses, _, _, _) = await NewAsync();
         await statuses.CreateAsync("ws1", "visible", "Visible", "808080", position: 0);
         var hidden = await statuses.CreateAsync("ws1", "archived", "Archived", "999999", position: 10);
         await statuses.SetHiddenAsync("ws1", "archived", hidden: true);
 
-        var visible = statuses.ListByWorkspace("ws1", includeHidden: false);
+        var visible = statuses.ListByBay("ws1", includeHidden: false);
         Assert.Single(visible);
         Assert.Equal("visible", visible[0].Id);
 
-        var all = statuses.ListByWorkspace("ws1", includeHidden: true);
+        var all = statuses.ListByBay("ws1", includeHidden: true);
         Assert.Equal(2, all.Count);
     }
 
@@ -89,7 +89,7 @@ public sealed class StatusRepositoryTests
 
         await statuses.ReorderAsync("ws1", new[] { "c", "a", "b" });
 
-        var list = statuses.ListByWorkspace("ws1");
+        var list = statuses.ListByBay("ws1");
         Assert.Equal(new[] { "c", "a", "b" }, list.Select(s => s.Id).ToArray());
         Assert.True(list[0].Position < list[1].Position);
         Assert.True(list[1].Position < list[2].Position);
@@ -104,7 +104,7 @@ public sealed class StatusRepositoryTests
         var cardRow = new CardRow
         {
             Id = System.Guid.NewGuid().ToString("N"),
-            WorkspaceId = "ws1",
+            BayId = "ws1",
             TaskNumber = 1,
             Title = "test",
             StatusId = "backlog",
@@ -119,7 +119,7 @@ public sealed class StatusRepositoryTests
 
         var card = cards.GetById(cardRow.Id);
         Assert.Equal("todo", card!.StatusId);
-        Assert.Null(statuses.GetByWorkspaceAndId("ws1", "backlog"));
+        Assert.Null(statuses.GetByBayAndId("ws1", "backlog"));
     }
 
     [Fact]
@@ -136,17 +136,17 @@ public sealed class StatusRepositoryTests
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task WorkspaceIsolation_StatusesScopedPerWorkspace()
+    public async System.Threading.Tasks.Task BayIsolation_StatusesScopedPerBay()
     {
         var (_, _, statuses, _, _, _) = await NewAsync();
         await statuses.CreateAsync("ws1", "todo", "Todo", "808080", position: 0);
         await statuses.CreateAsync("ws2", "todo", "Todo", "808080", position: 0);
 
-        var ws1 = statuses.ListByWorkspace("ws1");
-        var ws2 = statuses.ListByWorkspace("ws2");
+        var ws1 = statuses.ListByBay("ws1");
+        var ws2 = statuses.ListByBay("ws2");
         Assert.Single(ws1);
         Assert.Single(ws2);
-        Assert.Equal("ws1", ws1[0].WorkspaceId);
-        Assert.Equal("ws2", ws2[0].WorkspaceId);
+        Assert.Equal("ws1", ws1[0].BayId);
+        Assert.Equal("ws2", ws2[0].BayId);
     }
 }

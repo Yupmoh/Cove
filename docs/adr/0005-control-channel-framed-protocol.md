@@ -14,7 +14,7 @@ The framework provides no CLI-to-app control channel, single-instance detection,
 
 - One portable protocol serves GUI, TUI, and CLI clients.
 - JSON is zero-reflection via a source-generated context.
-- The byte-exact frame layout is the normative wire contract; M0 wires `cove version` (cli-local) and `cove pane list` (core-routed).
+- The byte-exact frame layout is the normative wire contract; M0 wires `cove version` (cli-local) and `cove nook list` (core-routed).
 
 ## Inventory IDs
 

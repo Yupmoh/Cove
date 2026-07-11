@@ -10,7 +10,7 @@ namespace Cove.Engine.Sessions;
 public sealed record RecentSession(
     string Adapter,
     string SessionId,
-    string WorkspaceId,
+    string BayId,
     string Cwd,
     DateTimeOffset StartedAt);
 
@@ -26,7 +26,7 @@ public sealed class RecentSessionStore
         EnsureSchema();
     }
 
-    public void RecordStart(string adapter, string sessionId, string workspaceId, string cwd, DateTimeOffset startedAt)
+    public void RecordStart(string adapter, string sessionId, string bayId, string cwd, DateTimeOffset startedAt)
     {
         if (string.IsNullOrEmpty(adapter) || string.IsNullOrEmpty(sessionId))
         {
@@ -37,12 +37,12 @@ public sealed class RecentSessionStore
         conn.Open();
         using var cmd = conn.CreateCommand();
         cmd.CommandText = """
-            INSERT INTO sessions (adapter, session_id, workspace_id, cwd, started_at)
+            INSERT INTO sessions (adapter, session_id, bay_id, cwd, started_at)
             VALUES (@adapter, @session, @ws, @cwd, @ts)
             """;
         cmd.Parameters.AddWithValue("@adapter", adapter);
         cmd.Parameters.AddWithValue("@session", sessionId);
-        cmd.Parameters.AddWithValue("@ws", workspaceId ?? "");
+        cmd.Parameters.AddWithValue("@ws", bayId ?? "");
         cmd.Parameters.AddWithValue("@cwd", cwd ?? "");
         cmd.Parameters.AddWithValue("@ts", startedAt.ToString("o"));
         cmd.ExecuteNonQuery();
@@ -56,7 +56,7 @@ public sealed class RecentSessionStore
         using var cmd = conn.CreateCommand();
         var filter = string.IsNullOrEmpty(adapter) ? "" : " WHERE adapter = @adapter";
         var cap = limit > 0 ? " LIMIT @limit" : "";
-        cmd.CommandText = $"SELECT adapter, session_id, workspace_id, cwd, started_at FROM sessions{filter} ORDER BY started_at DESC, rowid DESC{cap}";
+        cmd.CommandText = $"SELECT adapter, session_id, bay_id, cwd, started_at FROM sessions{filter} ORDER BY started_at DESC, rowid DESC{cap}";
         if (!string.IsNullOrEmpty(adapter))
             cmd.Parameters.AddWithValue("@adapter", adapter);
         if (limit > 0)
@@ -82,7 +82,7 @@ public sealed class RecentSessionStore
                 rowid INTEGER PRIMARY KEY AUTOINCREMENT,
                 adapter TEXT NOT NULL,
                 session_id TEXT NOT NULL,
-                workspace_id TEXT NOT NULL DEFAULT '',
+                bay_id TEXT NOT NULL DEFAULT '',
                 cwd TEXT NOT NULL DEFAULT '',
                 started_at TEXT NOT NULL
             );

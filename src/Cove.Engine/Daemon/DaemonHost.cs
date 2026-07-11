@@ -29,11 +29,11 @@ public sealed class DaemonHost
     private Cove.Engine.Restart.RestorationSummaryEvent? _restorationSummary;
 
     private IPtyHost? _ptyHost;
-    private PaneRegistry? _panes;
+    private NookRegistry? _nooks;
     private Cove.Engine.Layout.LayoutService? _layout;
     private System.Threading.Timer? _scrollbackTimer;
-    private Cove.Engine.Workspaces.WorkspaceManager? _workspaces;
-    private Cove.Engine.Workspaces.RunCommandService? _runCommands;
+    private Cove.Engine.Bays.BayManager? _bays;
+    private Cove.Engine.Bays.RunCommandService? _runCommands;
     private Cove.Engine.Restart.RestorationService? _restoration;
     private Cove.Engine.Snapshots.SnapshotService? _snapshots;
     private Cove.Engine.Skills.SkillsService? _skills;
@@ -55,7 +55,7 @@ public sealed class DaemonHost
     private Cove.Engine.Sessions.SessionResumeOrchestrator? _sessions;
     private Cove.Engine.Sessions.RecentSessionStore? _recentSessions;
     private Cove.Engine.Activity.OmniChatStore? _omniChat;
-    private Cove.Engine.Protocol.PaneScopeStore? _paneScopes;
+    private Cove.Engine.Protocol.NookScopeStore? _nookScopes;
     private Cove.Engine.Protocol.StateBus? _stateBus;
     private Cove.Engine.Protocol.ExtensionRegistry? _extensions;
     private Cove.Engine.Lifecycle.AgentLifecycleController? _lifecycle;
@@ -80,13 +80,13 @@ public sealed class DaemonHost
     private Cove.Engine.Knowledge.ReviewStore? _reviews;
     private Cove.Engine.Knowledge.AttributionIndex? _attribution;
     private Cove.Engine.Knowledge.ReviewDispatcher? _reviewDispatcher;
-    private Cove.Engine.Panes.PaneTypeRegistry? _paneTypes;
-    private Cove.Engine.Browser.BrowserPaneManager? _browser;
+    private Cove.Engine.Nooks.NookTypeRegistry? _nookTypes;
+    private Cove.Engine.Browser.BrowserNookManager? _browser;
     private Cove.Engine.Config.ConfigService? _config;
     private Cove.Engine.Captures.CaptureStore? _captures;
     private Cove.Engine.Diagnostics.DiagnosticsHub? _diagnostics;
     private Cove.Engine.Diagnostics.PerformanceBundleService? _perfBundles;
-    private Cove.Engine.Workspaces.GitReadModel? _gitReadModel;
+    private Cove.Engine.Bays.GitReadModel? _gitReadModel;
     private Cove.Engine.Search.SearchService? _searchService;
     private Cove.Engine.Theming.ThemeService? _themes;
     private Cove.Engine.Keybindings.KeybindingEngine? _keybindings;
@@ -128,17 +128,17 @@ public sealed class DaemonHost
         var cliPath = CliBinLink.Ensure(dataDir, System.Environment.ProcessPath, logger);
         var spawnEnv = new SpawnEnvironment(probedPath, dataDir, cliPath, "default");
         var shellDir = ShellIntegration.Install(dataDir);
-        _panes = new PaneRegistry(_ptyHost, logger, spawnEnv, shellDir);
+        _nooks = new NookRegistry(_ptyHost, logger, spawnEnv, shellDir);
         _layout = new Cove.Engine.Layout.LayoutService();
-        _workspaces = new Cove.Engine.Workspaces.WorkspaceManager(logger: logger);
-        _runCommands = new Cove.Engine.Workspaces.RunCommandService(new Cove.Engine.Workspaces.RunCommandStore(System.IO.Path.Combine(dataDir, "run-commands"), logger), new Cove.Engine.Workspaces.PtyRunCommandSessionFactory(_ptyHost, spawnEnv, shellDir, logger), logger: logger);
+        _bays = new Cove.Engine.Bays.BayManager(logger: logger);
+        _runCommands = new Cove.Engine.Bays.RunCommandService(new Cove.Engine.Bays.RunCommandStore(System.IO.Path.Combine(dataDir, "run-commands"), logger), new Cove.Engine.Bays.PtyRunCommandSessionFactory(_ptyHost, spawnEnv, shellDir, logger), logger: logger);
         _restoration = new Cove.Engine.Restart.RestorationService(dataDir, logger, emitProgress: e => BroadcastEvent("restore.progress", e, Cove.Engine.Restart.RestorationJsonContext.Default.RestoreProgressEvent));
-        _snapshots = new Cove.Engine.Snapshots.SnapshotService(dataDir, System.IO.Path.Combine(dataDir, "snapshots"), new Cove.Engine.Workspaces.ProcessGitRunner(), logger);
+        _snapshots = new Cove.Engine.Snapshots.SnapshotService(dataDir, System.IO.Path.Combine(dataDir, "snapshots"), new Cove.Engine.Bays.ProcessGitRunner(), logger);
         _skills = new Cove.Engine.Skills.SkillsService(dataDir, logger: logger);
         _agents = new Cove.Adapters.AgentDefinitionStore(System.IO.Path.Combine(dataDir, "agents"), logger);
         _launchProfiles = new Cove.Adapters.LaunchProfileStore(System.IO.Path.Combine(dataDir, "launch-profiles"), logger);
         _adapterEnv = new Cove.Adapters.AdapterEnvStore(System.IO.Path.Combine(dataDir, "adapter-env"), logger);
-        _envPropagation = new Cove.Engine.Adapters.EnvPropagationService(_adapterEnv, new Cove.Engine.Adapters.PaneRegistryEnvTarget(_panes), a => ResolveAdapterBinary(a, logger), logger);
+        _envPropagation = new Cove.Engine.Adapters.EnvPropagationService(_adapterEnv, new Cove.Engine.Adapters.NookRegistryEnvTarget(_nooks), a => ResolveAdapterBinary(a, logger), logger);
         _hookServer = new Cove.Engine.Hooks.HookHttpServer(dataDir, logger);
         _hookRouter = new Cove.Engine.Hooks.HookEventRouter(logger);
         _agentRouter = new Cove.Engine.Agents.AgentMessageRouter();
@@ -172,7 +172,7 @@ public sealed class DaemonHost
         _stateBus = new Cove.Engine.Protocol.StateBus(dataDir, logger);
         _extensions = new Cove.Engine.Protocol.ExtensionRegistry(_manifestStore!);
         _extensions.Index();
-        _paneScopes = new Cove.Engine.Protocol.PaneScopeStore(dataDir, logger);
+        _nookScopes = new Cove.Engine.Protocol.NookScopeStore(dataDir, logger);
         _noteSnapshots = new Cove.Engine.Knowledge.NoteSnapshotService(dataDir, logger);
         _noteFiles = new Cove.Engine.Knowledge.NoteFileStore(dataDir, logger, _noteSnapshots);
         _timeline = new Cove.Engine.Knowledge.TimelineStore(dataDir, logger);
@@ -190,7 +190,7 @@ public sealed class DaemonHost
         _attribution = new Cove.Engine.Knowledge.AttributionIndex(dataDir, logger);
         _reviewDispatcher = new Cove.Engine.Knowledge.ReviewDispatcher(logger);
         _omniChat = new Cove.Engine.Activity.OmniChatStore(System.IO.Path.Combine(dataDir, "omni-chat"), logger);
-        _browser = new Cove.Engine.Browser.BrowserPaneManager();
+        _browser = new Cove.Engine.Browser.BrowserNookManager();
         _config = new Cove.Engine.Config.ConfigService(dataDir, logger);
         _captures = new Cove.Engine.Captures.CaptureStore(dataDir, logger);
         var lspUserEntries = _config.GetLspServerEntries()
@@ -199,7 +199,7 @@ public sealed class DaemonHost
         _lspService = new Cove.Engine.Lsp.LspService(logger, lspUserEntries);
         _diagnostics = new Cove.Engine.Diagnostics.DiagnosticsHub(null, logger);
         _perfBundles = new Cove.Engine.Diagnostics.PerformanceBundleService(_diagnostics, System.IO.Path.Combine(dataDir, "perf-bundles"), logger);
-        _gitReadModel = new Cove.Engine.Workspaces.GitReadModel(new Cove.Engine.Workspaces.ProcessGitRunner(), logger);
+        _gitReadModel = new Cove.Engine.Bays.GitReadModel(new Cove.Engine.Bays.ProcessGitRunner(), logger);
         _searchService = new Cove.Engine.Search.SearchService(logger);
         _keybindings = new Cove.Engine.Keybindings.KeybindingEngine();
         Cove.Engine.Keybindings.DefaultKeymap.RegisterAll(_keybindings);
@@ -219,13 +219,13 @@ public sealed class DaemonHost
         _browserAutomation = new Cove.Engine.Browser.BrowserAutomationBridge(e => BroadcastEvent("browser.automation.exec", e, Cove.Protocol.CoveJsonContext.Default.BrowserAutomationExecEvent), logger);
         _config!.SettingsChanged += key => BroadcastEvent("config.changed", new ConfigChangedEvent(key), Cove.Protocol.CoveJsonContext.Default.ConfigChangedEvent);
         _hookServer.OnEvent += _hookRouter.Route;
-        _paneTypes = Cove.Engine.Panes.PaneTypeRegistry.CreateWithBuiltins();
+        _nookTypes = Cove.Engine.Nooks.NookTypeRegistry.CreateWithBuiltins();
         _notificationPolicy = new Cove.Engine.Notifications.NotificationPolicyEngine(dataDir, logger);
-        _needsInputSignaler = new Cove.Engine.Hooks.NeedsInputSignaler(_activity!, new DaemonNotificationBus(this), () => GetFocusedPane(), _notificationPolicy);
-        _hookRouter.NeedsInputTransition += (paneId, needsInput) =>
+        _needsInputSignaler = new Cove.Engine.Hooks.NeedsInputSignaler(_activity!, new DaemonNotificationBus(this), () => GetFocusedNook(), _notificationPolicy);
+        _hookRouter.NeedsInputTransition += (nookId, needsInput) =>
         {
-            if (needsInput) _needsInputSignaler!.CheckAndSignal(paneId);
-            else _needsInputSignaler!.ClearSignal(paneId);
+            if (needsInput) _needsInputSignaler!.CheckAndSignal(nookId);
+            else _needsInputSignaler!.ClearSignal(nookId);
         };
         _hookMatrix = new Cove.Engine.Hooks.HookEnvelopeMatrix();
         PopulateHookMatrix(_hookMatrix, _manifestStore!, logger);
@@ -240,31 +240,31 @@ public sealed class DaemonHost
         _hookServer.Aggregator = aggregator;
         await _hookServer.StartAsync();
 
-        var workspacesRoot = System.IO.Path.Combine(dataDir, "workspaces");
+        var baysRoot = System.IO.Path.Combine(dataDir, "bays");
         var wasClean = _restoration.WasCleanShutdown();
         _restoration.MarkLaunching();
-        _restoration.EmitProgress("default", "load_workspace", Cove.Engine.Restart.RestorePhase.Started, wasClean ? "clean" : "unclean");
-        _layout!.OnChanged = () => PersistActiveWorkspace(workspacesRoot, logger);
-        _hookRouter.SessionStarted += (paneId, adapter, sessionId) =>
+        _restoration.EmitProgress("default", "load_bay", Cove.Engine.Restart.RestorePhase.Started, wasClean ? "clean" : "unclean");
+        _layout!.OnChanged = () => PersistActiveBay(baysRoot, logger);
+        _hookRouter.SessionStarted += (nookId, adapter, sessionId) =>
         {
-            _sessions?.SetSessionId(paneId, adapter, sessionId);
-            PersistActiveWorkspace(workspacesRoot, logger);
+            _sessions?.SetSessionId(nookId, adapter, sessionId);
+            PersistActiveBay(baysRoot, logger);
         };
-        var loadedWorkspaces = Cove.Engine.Layout.WorkspaceStartup.Enumerate(workspacesRoot, logger);
+        var loadedBays = Cove.Engine.Layout.BayStartup.Enumerate(baysRoot, logger);
         var fallbackProjectDir = System.Environment.CurrentDirectory;
         var restoreEnabled = _config?.GetSessionRestoreOnLaunch() ?? true;
         Cove.Engine.Restart.ResumeCommand BuildResume(string adapter, string sessionId, Cove.Engine.Restart.LauncherOverrides o)
             => resumeProtocol.BuildResumeCommandAsync(adapter, sessionId, o).GetAwaiter().GetResult();
         var restoreTotals = new Cove.Engine.Restart.RestoreSummary(0, 0, 0);
-        foreach (var entry in loadedWorkspaces)
+        foreach (var entry in loadedBays)
         {
             var sl = entry.Snapshot;
-            var restorables = new List<Cove.Engine.Restart.RestorablePane?>();
-            foreach (var room in sl.Rooms)
-                foreach (var leaf in Cove.Engine.Layout.MosaicOps.Leaves(room.LayoutTree))
-                    if (entry.Sessions.TryGetValue(leaf.PaneId, out var d))
-                        restorables.Add(new Cove.Engine.Restart.RestorablePane(d.PaneId, d.Command, d.Args, d.Cwd, d.Title, d.Adapter, d.AgentName, d.SessionId, d.Yolo));
-            var spawner = new RestoreSpawner(_panes!, entry.WorkspaceDir, sl.Id, _agentRouter, _sessions, logger);
+            var restorables = new List<Cove.Engine.Restart.RestorableNook?>();
+            foreach (var shore in sl.Shores)
+                foreach (var leaf in Cove.Engine.Layout.MosaicOps.Leaves(shore.LayoutTree))
+                    if (entry.Sessions.TryGetValue(leaf.NookId, out var d))
+                        restorables.Add(new Cove.Engine.Restart.RestorableNook(d.NookId, d.Command, d.Args, d.Cwd, d.Title, d.Adapter, d.AgentName, d.SessionId, d.Yolo));
+            var spawner = new RestoreSpawner(_nooks!, entry.BayDir, sl.Id, _agentRouter, _sessions, logger);
             var restorer = new Cove.Engine.Restart.SessionRestorer(spawner, BuildResume, logger);
             var summary = restorer.Restore(restorables, restoreEnabled);
             restoreTotals = new Cove.Engine.Restart.RestoreSummary(
@@ -272,37 +272,37 @@ public sealed class DaemonHost
                 restoreTotals.Fresh + summary.Fresh,
                 restoreTotals.Skipped + summary.Skipped);
             _layout!.LoadSnapshot(sl);
-            var displayName = Cove.Engine.Layout.WorkspaceStartup.DisplayName(sl, fallbackProjectDir);
+            var displayName = Cove.Engine.Layout.BayStartup.DisplayName(sl, fallbackProjectDir);
             var projectDir = string.IsNullOrWhiteSpace(sl.ProjectDir) ? fallbackProjectDir : sl.ProjectDir;
-            await _workspaces!.AdoptExistingAsync(sl.Id, displayName, projectDir).ConfigureAwait(false);
-            logger.LogWarning("workspace startup: adopted {Id} '{Name}' rooms={Rooms} dir={Dir}", sl.Id, displayName, sl.Rooms.Count, projectDir);
+            await _bays!.AdoptExistingAsync(sl.Id, displayName, projectDir).ConfigureAwait(false);
+            logger.LogWarning("bay startup: adopted {Id} '{Name}' shores={Shores} dir={Dir}", sl.Id, displayName, sl.Shores.Count, projectDir);
         }
-        if (loadedWorkspaces.Count == 0)
+        if (loadedBays.Count == 0)
         {
-            var seedDir = _panes!.ProjectDir ?? fallbackProjectDir;
+            var seedDir = _nooks!.ProjectDir ?? fallbackProjectDir;
             var seedName = System.IO.Path.GetFileName(seedDir.TrimEnd('/', '\\'));
-            if (string.IsNullOrWhiteSpace(seedName)) seedName = "Workspace";
-            var seeded = await _workspaces!.CreateWorkspaceAsync(seedName, seedDir).ConfigureAwait(false);
-            _layout!.SetActiveWorkspace(seeded.Id);
-            logger.LogWarning("workspace startup: no persisted workspaces, seeded default {Id} '{Name}' dir={Dir}", seeded.Id, seedName, seedDir);
+            if (string.IsNullOrWhiteSpace(seedName)) seedName = "Bay";
+            var seeded = await _bays!.CreateBayAsync(seedName, seedDir).ConfigureAwait(false);
+            _layout!.SetActiveBay(seeded.Id);
+            logger.LogWarning("bay startup: no persisted bays, seeded default {Id} '{Name}' dir={Dir}", seeded.Id, seedName, seedDir);
         }
-        else if (_workspaces!.Registry.FocusedWorkspaceId is { } focused)
+        else if (_bays!.Registry.FocusedBayId is { } focused)
         {
-            _layout!.SetActiveWorkspace(focused);
-            if (_workspaces.Get(focused) is { } focusedActor && !string.IsNullOrEmpty(focusedActor.State.ProjectDir))
-                _panes!.ProjectDir = focusedActor.State.ProjectDir;
+            _layout!.SetActiveBay(focused);
+            if (_bays.Get(focused) is { } focusedActor && !string.IsNullOrEmpty(focusedActor.State.ProjectDir))
+                _nooks!.ProjectDir = focusedActor.State.ProjectDir;
         }
         if (restoreTotals.Restored + restoreTotals.Fresh + restoreTotals.Skipped > 0)
         {
             _restorationSummary = new Cove.Engine.Restart.RestorationSummaryEvent(restoreTotals.Restored, restoreTotals.Fresh, restoreTotals.Skipped);
             logger.LogWarning("session restoration: restored={Restored} fresh={Fresh} skipped={Skipped}", restoreTotals.Restored, restoreTotals.Fresh, restoreTotals.Skipped);
         }
-        _restoration.EmitProgress("default", "materialize_panes", Cove.Engine.Restart.RestorePhase.PanesMaterialized);
+        _restoration.EmitProgress("default", "materialize_nooks", Cove.Engine.Restart.RestorePhase.NooksMaterialized);
         try { if (_runCommands is not null) await _runCommands.RelaunchPreviouslyRunningAsync().ConfigureAwait(false); }
         catch (System.Exception ex) { logger.LogWarning(ex, "run-command relaunch on restore failed"); }
         _restoration.EmitProgress("default", "restore_complete", Cove.Engine.Restart.RestorePhase.Completed);
         PopulateAmbientAggregator(aggregator, dataDir, logger);
-        _scrollbackTimer = new System.Threading.Timer(_ => PersistAllScrollback(workspacesRoot, logger), null, System.TimeSpan.FromSeconds(15), System.TimeSpan.FromSeconds(15));
+        _scrollbackTimer = new System.Threading.Timer(_ => PersistAllScrollback(baysRoot, logger), null, System.TimeSpan.FromSeconds(15), System.TimeSpan.FromSeconds(15));
         if (!OperatingSystem.IsWindows() && File.Exists(_paths.SocketPath))
         {
             if (_endpoint.TryProbe(250))
@@ -345,15 +345,15 @@ public sealed class DaemonHost
 
         await listener.DisposeAsync().ConfigureAwait(false);
         try { _restoration?.MarkCleanShutdown(); } catch (System.Exception ex) { logger.LogWarning(ex, "clean-shutdown marker failed"); }
-        try { PersistAllScrollback(System.IO.Path.Combine(_paths.DataDir.Root, "workspaces"), logger); } catch (System.Exception ex) { logger.LogWarning(ex, "shutdown scrollback snapshot failed"); }
+        try { PersistAllScrollback(System.IO.Path.Combine(_paths.DataDir.Root, "bays"), logger); } catch (System.Exception ex) { logger.LogWarning(ex, "shutdown scrollback snapshot failed"); }
         _scrollbackTimer?.Dispose();
         if (_runCommands is not null)
             await _runCommands.DisposeAsync().ConfigureAwait(false);
-        if (_workspaces is not null)
-            await _workspaces.DisposeAsync().ConfigureAwait(false);
+        if (_bays is not null)
+            await _bays.DisposeAsync().ConfigureAwait(false);
         if (_lspService is not null)
             await _lspService.DisposeAsync().ConfigureAwait(false);
-        _panes?.Dispose();
+        _nooks?.Dispose();
         _skills?.Dispose();
         _adapterReloadWatcher?.Dispose();
         _envPropagation?.Dispose();
@@ -479,7 +479,7 @@ public sealed class DaemonHost
             await WriteResponseAsync(conn, Fail(req.Id, "not_ready", "sys/hello required before commands"), cancellationToken).ConfigureAwait(false);
             return false;
         }
-        ControlResponse? generated = await Cove.Engine.EngineCommandRouter.RouteAsync(req, _panes, _layout, _workspaces, _runCommands, _restoration, _snapshots, _skills, _agents, _launchProfiles, _adapterEnv, _hookServer, _hookRouter, _agentRouter, _activity, _sessions, _lifecycle, _launcher, _taskService, _dispatchSaga, _resumeSaga, _timeline, _blackboard, _noteFiles, _memory, _memoryRanker, _proposals, _consolidator, _edits, _corpus, _vaultSettings, _library, _reviews, _attribution, _reviewDispatcher, _paneTypes, _browser, _config, _manifestStore, _registry, _omniChat, _paneScopes, _stateBus, _extensions, _captures, _gitReadModel, _searchService, _themes, _keybindings, _browserAutomation, _diagnostics, _perfBundles, _recentSessions, _lspService, _sessionService, cancellationToken).ConfigureAwait(false);
+        ControlResponse? generated = await Cove.Engine.EngineCommandRouter.RouteAsync(req, _nooks, _layout, _bays, _runCommands, _restoration, _snapshots, _skills, _agents, _launchProfiles, _adapterEnv, _hookServer, _hookRouter, _agentRouter, _activity, _sessions, _lifecycle, _launcher, _taskService, _dispatchSaga, _resumeSaga, _timeline, _blackboard, _noteFiles, _memory, _memoryRanker, _proposals, _consolidator, _edits, _corpus, _vaultSettings, _library, _reviews, _attribution, _reviewDispatcher, _nookTypes, _browser, _config, _manifestStore, _registry, _omniChat, _nookScopes, _stateBus, _extensions, _captures, _gitReadModel, _searchService, _themes, _keybindings, _browserAutomation, _diagnostics, _perfBundles, _recentSessions, _lspService, _sessionService, cancellationToken).ConfigureAwait(false);
         if (generated is not null)
         {
             if (generated.Ok && IsMutatingVerb(req.Uri))
@@ -525,8 +525,8 @@ public sealed class DaemonHost
             case "cove://commands/window.focus":
                 {
                     bool focused = TryForwardFocus(cancellationToken);
-                    if (focused && _workspaces is not null && _workspaces.Registry.FocusedWorkspaceId is { } focusedWs)
-                        _ = _workspaces.RefreshWorktreesAsync(focusedWs);
+                    if (focused && _bays is not null && _bays.Registry.FocusedBayId is { } focusedWs)
+                        _ = _bays.RefreshWorktreesAsync(focusedWs);
                     JsonElement data = focused
                         ? Parse("{\"focused\":true}")
                         : Parse("{\"focused\":false,\"reason\":\"no_render_client\"}");
@@ -534,8 +534,8 @@ public sealed class DaemonHost
                     return false;
                 }
 
-            case "cove://commands/pane.subscribe":
-                await StreamPaneAsync(conn, stream, req, cancellationToken).ConfigureAwait(false);
+            case "cove://commands/nook.subscribe":
+                await StreamNookAsync(conn, stream, req, cancellationToken).ConfigureAwait(false);
                 return true;
 
             default:
@@ -563,7 +563,7 @@ public sealed class DaemonHost
         var id = parts.Length > 2 ? parts[2] : "default";
         if (!Cove.Engine.Protocol.StateBus.IsValidScope(scope))
         {
-            await WriteResponseAsync(conn, Fail(req.Id, "invalid_params", "scope must be app, workspace, tab, or pane"), cancellationToken).ConfigureAwait(false);
+            await WriteResponseAsync(conn, Fail(req.Id, "invalid_params", "scope must be app, bay, tab, or nook"), cancellationToken).ConfigureAwait(false);
             return;
         }
         JsonElement valProp = default;
@@ -592,29 +592,29 @@ public sealed class DaemonHost
         await WriteResponseAsync(conn, new ControlResponse(req.Id, true, data), cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task StreamPaneAsync(FrameConnection conn, Stream stream, ControlRequest req, CancellationToken cancellationToken)
+    private async Task StreamNookAsync(FrameConnection conn, Stream stream, ControlRequest req, CancellationToken cancellationToken)
     {
-        if (_panes is null || req.Params is not JsonElement el
+        if (_nooks is null || req.Params is not JsonElement el
             || el.Deserialize(CoveJsonContext.Default.SubscribeParams) is not { } sp)
         {
             await WriteResponseAsync(conn, Fail(req.Id, "invalid_params", "subscribe params required"), cancellationToken).ConfigureAwait(false);
             return;
         }
-        if (!_panes.TryGet(sp.PaneId, out PaneSession pane))
+        if (!_nooks.TryGet(sp.NookId, out NookSession nook))
         {
-            await WriteResponseAsync(conn, Fail(req.Id, "not_found", $"unknown pane {sp.PaneId}"), cancellationToken).ConfigureAwait(false);
+            await WriteResponseAsync(conn, Fail(req.Id, "not_found", $"unknown nook {sp.NookId}"), cancellationToken).ConfigureAwait(false);
             return;
         }
 
         const ulong streamId = 1;
-        long head = pane.Ring.Head;
-        long tail = pane.Ring.Tail;
+        long head = nook.Ring.Head;
+        long tail = nook.Ring.Tail;
         long baseOffset = Math.Clamp((long)sp.SinceOffset, tail, head);
         var subResult = new SubscribeResult(streamId, (ulong)baseOffset, ProtocolConstants.FlowWindow);
         await WriteResponseAsync(conn, new ControlResponse(req.Id, true, ToElement(subResult, CoveJsonContext.Default.SubscribeResult)), cancellationToken).ConfigureAwait(false);
 
         var sink = new SocketByteStreamSink(stream);
-        var sender = new PtyStreamSender(streamId, pane.Session.SessionId, pane.Ring, baseOffset, sink);
+        var sender = new PtyStreamSender(streamId, nook.Session.SessionId, nook.Ring, baseOffset, sink);
         var gate = new object();
         bool childMarked = false;
 
@@ -635,7 +635,7 @@ public sealed class DaemonHost
                         lock (gate)
                             sender.OnCredit(ack);
                     }
-                    pane.Signal.Set();
+                    nook.Signal.Set();
                 }
             }
             catch
@@ -644,7 +644,7 @@ public sealed class DaemonHost
             finally
             {
                 streamCts.Cancel();
-                pane.Signal.Set();
+                nook.Signal.Set();
             }
         });
 
@@ -652,12 +652,12 @@ public sealed class DaemonHost
         {
             while (!streamCts.IsCancellationRequested)
             {
-                Task wait = pane.Signal.WaitAsync();
+                Task wait = nook.Signal.WaitAsync();
                 lock (gate)
                 {
-                    if (!childMarked && pane.Reader.HasCompleted)
+                    if (!childMarked && nook.Reader.HasCompleted)
                     {
-                        sender.MarkChildExited(pane.Reader.ExitCode);
+                        sender.MarkChildExited(nook.Reader.ExitCode);
                         childMarked = true;
                     }
                     sender.PumpAvailable();
@@ -701,30 +701,30 @@ public sealed class DaemonHost
         };
     }
 
-    private string? GetFocusedPane()
+    private string? GetFocusedNook()
     {
-        return _layout?.FocusedPaneId();
+        return _layout?.FocusedNookId();
     }
 
-    private void PersistActiveWorkspace(string workspacesRoot, ILogger logger)
+    private void PersistActiveBay(string baysRoot, ILogger logger)
     {
-        if (_layout is not { } layout || _panes is not { } panes)
+        if (_layout is not { } layout || _nooks is not { } nooks)
             return;
         try
         {
-            var wsId = layout.ActiveWorkspaceId;
-            var actor = _workspaces?.Get(wsId);
+            var wsId = layout.ActiveBayId;
+            var actor = _bays?.Get(wsId);
             var name = actor?.State.Name ?? wsId;
-            var dir = actor?.State.ProjectDir ?? panes.ProjectDir ?? System.Environment.CurrentDirectory;
-            var wsDir = System.IO.Path.Combine(workspacesRoot, wsId);
+            var dir = actor?.State.ProjectDir ?? nooks.ProjectDir ?? System.Environment.CurrentDirectory;
+            var wsDir = System.IO.Path.Combine(baysRoot, wsId);
             var snap = layout.ToSnapshot(wsId, name, dir);
-            var leafIds = new System.Collections.Generic.HashSet<string>(layout.LeafPaneIds(wsId), System.StringComparer.Ordinal);
-            var descs = panes.Descriptors()
-                .Where(d => leafIds.Contains(d.PaneId))
+            var leafIds = new System.Collections.Generic.HashSet<string>(layout.LeafNookIds(wsId), System.StringComparer.Ordinal);
+            var descs = nooks.Descriptors()
+                .Where(d => leafIds.Contains(d.NookId))
                 .Select(d =>
                 {
-                    var sid = _sessions?.GetState(d.PaneId)?.SessionId;
-                    var yolo = _launcher?.GetOverrides(d.PaneId)?.Yolo ?? d.Yolo;
+                    var sid = _sessions?.GetState(d.NookId)?.SessionId;
+                    var yolo = _launcher?.GetOverrides(d.NookId)?.Yolo ?? d.Yolo;
                     return d with
                     {
                         SessionId = string.IsNullOrEmpty(sid) ? d.SessionId : sid,
@@ -732,25 +732,25 @@ public sealed class DaemonHost
                     };
                 })
                 .ToArray();
-            Cove.Engine.Layout.WorkspacePersistence.Save(snap, descs, wsDir);
+            Cove.Engine.Layout.BayPersistence.Save(snap, descs, wsDir);
         }
-        catch (System.Exception ex) { logger.LogWarning(ex, "workspace persist failed"); }
+        catch (System.Exception ex) { logger.LogWarning(ex, "bay persist failed"); }
     }
 
-    private void PersistAllScrollback(string workspacesRoot, ILogger logger)
+    private void PersistAllScrollback(string baysRoot, ILogger logger)
     {
-        if (_layout is not { } layout || _panes is not { } reg)
+        if (_layout is not { } layout || _nooks is not { } reg)
             return;
         try
         {
-            foreach (var wsId in layout.WorkspaceIds)
+            foreach (var wsId in layout.BayIds)
             {
-                var wsDir = System.IO.Path.Combine(workspacesRoot, wsId);
-                foreach (var paneId in layout.LeafPaneIds(wsId))
+                var wsDir = System.IO.Path.Combine(baysRoot, wsId);
+                foreach (var nookId in layout.LeafNookIds(wsId))
                 {
-                    var bytes = reg.SnapshotRing(paneId);
+                    var bytes = reg.SnapshotRing(nookId);
                     if (bytes.Length > 0)
-                        Cove.Engine.Layout.WorkspacePersistence.SaveScrollback(paneId, bytes, wsDir);
+                        Cove.Engine.Layout.BayPersistence.SaveScrollback(nookId, bytes, wsDir);
                 }
             }
         }
@@ -772,13 +772,13 @@ public sealed class DaemonHost
 
     private static bool IsMutatingVerb(string uri)
     {
-        return uri.StartsWith("cove://commands/workspace.", System.StringComparison.Ordinal)
-            || uri.StartsWith("cove://commands/room.", System.StringComparison.Ordinal)
+        return uri.StartsWith("cove://commands/bay.", System.StringComparison.Ordinal)
+            || uri.StartsWith("cove://commands/shore.", System.StringComparison.Ordinal)
             || uri.StartsWith("cove://commands/wing.", System.StringComparison.Ordinal)
             || uri.StartsWith("cove://commands/collection.", System.StringComparison.Ordinal)
             || uri.StartsWith("cove://commands/resident.", System.StringComparison.Ordinal)
             || uri.StartsWith("cove://commands/worktree.", System.StringComparison.Ordinal)
-            || uri.StartsWith("cove://commands/workspace-command.", System.StringComparison.Ordinal)
+            || uri.StartsWith("cove://commands/bay-command.", System.StringComparison.Ordinal)
             || uri.StartsWith("cove://commands/task.", System.StringComparison.Ordinal)
             || uri.StartsWith("cove://commands/run.", System.StringComparison.Ordinal);
     }
@@ -818,10 +818,10 @@ public sealed class DaemonHost
             skillsManifest: () => BuildSkillsManifest(),
             agentPackaging: () => ""));
         aggregator.Add("userPromptSubmit", new Cove.Engine.Hooks.LocationContextProvider(
-            room: () => "default",
+            shore: () => "default",
             wing: () => null,
-            workspace: () => "default",
-            otherPanes: () => _panes?.List().Select(p => p.PaneId).ToList() ?? new List<string>()));
+            bay: () => "default",
+            otherNooks: () => _nooks?.List().Select(p => p.NookId).ToList() ?? new List<string>()));
         aggregator.Add("preToolUse", new Cove.Engine.Hooks.RunCommandContextProvider(
             runningCommands: () => GetRunningCommands(logger)));
     }
@@ -857,7 +857,7 @@ public sealed class DaemonHost
         try
         {
             return _runCommands.ListEffectiveAsync("default", null).GetAwaiter().GetResult()
-                .Where(c => c.Lifecycle == Cove.Engine.Workspaces.RunCommandLifecycle.Running)
+                .Where(c => c.Lifecycle == Cove.Engine.Bays.RunCommandLifecycle.Running)
                 .Select(c => c.Definition.Label)
                 .ToList();
         }
@@ -930,38 +930,38 @@ public sealed class DaemonHost
 
     private sealed class RestoreSpawner : Cove.Engine.Restart.IRestoreSpawner
     {
-        private readonly PaneRegistry _panes;
-        private readonly string _workspaceDir;
-        private readonly string _workspaceId;
+        private readonly NookRegistry _nooks;
+        private readonly string _bayDir;
+        private readonly string _bayId;
         private readonly Cove.Engine.Agents.AgentMessageRouter? _agentRouter;
         private readonly Cove.Engine.Sessions.SessionResumeOrchestrator? _sessions;
         private readonly ILogger _logger;
 
-        public RestoreSpawner(PaneRegistry panes, string workspaceDir, string workspaceId, Cove.Engine.Agents.AgentMessageRouter? agentRouter, Cove.Engine.Sessions.SessionResumeOrchestrator? sessions, ILogger logger)
+        public RestoreSpawner(NookRegistry nooks, string bayDir, string bayId, Cove.Engine.Agents.AgentMessageRouter? agentRouter, Cove.Engine.Sessions.SessionResumeOrchestrator? sessions, ILogger logger)
         {
-            _panes = panes;
-            _workspaceDir = workspaceDir;
-            _workspaceId = workspaceId;
+            _nooks = nooks;
+            _bayDir = bayDir;
+            _bayId = bayId;
             _agentRouter = agentRouter;
             _sessions = sessions;
             _logger = logger;
         }
 
-        public void Respawn(Cove.Engine.Restart.RestorablePane pane, string command, string[] args, string cwd)
+        public void Respawn(Cove.Engine.Restart.RestorableNook nook, string command, string[] args, string cwd)
         {
             try
             {
-                var scrollback = Cove.Engine.Layout.WorkspacePersistence.LoadScrollback(pane.PaneId, _workspaceDir);
-                _panes.RespawnAs(pane.PaneId, command, args, cwd, 80, 24, scrollback, pane.Adapter, pane.AgentName);
-                if (!string.IsNullOrEmpty(pane.Title))
-                    _panes.Rename(pane.PaneId, pane.Title!);
-                if (!string.IsNullOrEmpty(pane.Adapter))
+                var scrollback = Cove.Engine.Layout.BayPersistence.LoadScrollback(nook.NookId, _bayDir);
+                _nooks.RespawnAs(nook.NookId, command, args, cwd, 80, 24, scrollback, nook.Adapter, nook.AgentName);
+                if (!string.IsNullOrEmpty(nook.Title))
+                    _nooks.Rename(nook.NookId, nook.Title!);
+                if (!string.IsNullOrEmpty(nook.Adapter))
                 {
-                    _agentRouter?.Register(pane.PaneId, pane.Adapter!, pane.AgentName, _workspaceId);
-                    _sessions?.Register(pane.PaneId, pane.Adapter!, pane.SessionId);
+                    _agentRouter?.Register(nook.NookId, nook.Adapter!, nook.AgentName, _bayId);
+                    _sessions?.Register(nook.NookId, nook.Adapter!, nook.SessionId);
                 }
             }
-            catch (System.Exception ex) { _logger.LogWarning(ex, "respawn on restore failed for {PaneId}", pane.PaneId); }
+            catch (System.Exception ex) { _logger.LogWarning(ex, "respawn on restore failed for {NookId}", nook.NookId); }
         }
     }
 
@@ -971,19 +971,19 @@ public sealed class DaemonHost
 
         public DaemonNotificationBus(DaemonHost host) => _host = host;
 
-        public void BroadcastNeedsInputSignal(string paneId, string adapter)
-            => _host.BroadcastEvent("needs-input.signal", new Cove.Protocol.NeedsInputSignalDto(paneId, adapter), Cove.Protocol.CoveJsonContext.Default.NeedsInputSignalDto);
+        public void BroadcastNeedsInputSignal(string nookId, string adapter)
+            => _host.BroadcastEvent("needs-input.signal", new Cove.Protocol.NeedsInputSignalDto(nookId, adapter), Cove.Protocol.CoveJsonContext.Default.NeedsInputSignalDto);
 
-        public void BroadcastDockBadge(string paneId, string adapter)
-            => _host.BroadcastEvent("dock.badge", new Cove.Protocol.NeedsInputSignalDto(paneId, adapter), Cove.Protocol.CoveJsonContext.Default.NeedsInputSignalDto);
+        public void BroadcastDockBadge(string nookId, string adapter)
+            => _host.BroadcastEvent("dock.badge", new Cove.Protocol.NeedsInputSignalDto(nookId, adapter), Cove.Protocol.CoveJsonContext.Default.NeedsInputSignalDto);
 
-        public void ClearNeedsInputSignal(string paneId)
-            => _host.BroadcastEvent("needs-input.clear", new Cove.Protocol.NeedsInputSignalDto(paneId, ""), Cove.Protocol.CoveJsonContext.Default.NeedsInputSignalDto);
+        public void ClearNeedsInputSignal(string nookId)
+            => _host.BroadcastEvent("needs-input.clear", new Cove.Protocol.NeedsInputSignalDto(nookId, ""), Cove.Protocol.CoveJsonContext.Default.NeedsInputSignalDto);
 
         public void ClearDockBadge()
             => _host.BroadcastEvent("dock.badge.clear", new Cove.Protocol.NeedsInputSignalDto("", ""), Cove.Protocol.CoveJsonContext.Default.NeedsInputSignalDto);
 
-        public void DeliverNotification(string id, string title, string body, string paneId)
-            => _host.BroadcastEvent("notification.deliver", new Cove.Protocol.NotificationDeliverDto(id, title, body, paneId), Cove.Protocol.CoveJsonContext.Default.NotificationDeliverDto);
+        public void DeliverNotification(string id, string title, string body, string nookId)
+            => _host.BroadcastEvent("notification.deliver", new Cove.Protocol.NotificationDeliverDto(id, title, body, nookId), Cove.Protocol.CoveJsonContext.Default.NotificationDeliverDto);
     }
 }

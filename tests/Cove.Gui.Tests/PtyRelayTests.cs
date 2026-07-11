@@ -22,7 +22,7 @@ public class PtyRelayTests
         });
 
         using var ws = new ClientWebSocket();
-        await ws.ConnectAsync(new Uri($"ws://127.0.0.1:{server.Port}/pty?pane=p1&since=0"), CancellationToken.None);
+        await ws.ConnectAsync(new Uri($"ws://127.0.0.1:{server.Port}/pty?nook=p1&since=0"), CancellationToken.None);
 
         var baseMsg = await ReceiveText(ws);
         Assert.Contains("\"t\":\"base\"", baseMsg);
@@ -56,7 +56,7 @@ public class PtyRelayTests
         });
 
         using var ws = new ClientWebSocket();
-        await ws.ConnectAsync(new Uri($"ws://127.0.0.1:{server.Port}/pty?pane=p1&since=0"), CancellationToken.None);
+        await ws.ConnectAsync(new Uri($"ws://127.0.0.1:{server.Port}/pty?nook=p1&since=0"), CancellationToken.None);
         _ = await ReceiveText(ws);
         var resync = await ReceiveText(ws);
         Assert.Contains("\"t\":\"resync\"", resync);

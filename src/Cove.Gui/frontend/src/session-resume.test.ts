@@ -12,7 +12,7 @@ function row(over: Partial<RecentSessionRow>): RecentSessionRow {
   return {
     adapter: "claude-code",
     sessionId: "s1",
-    workspaceId: "ws",
+    bayId: "ws",
     cwd: "/home/me/proj",
     startedAt: new Date().toISOString(),
     ...over,
@@ -37,7 +37,7 @@ describe("resumeSpawnPlan", () => {
     expect(action.command).toBe("claude");
     expect(action.args).toEqual(["resume", "abc"]);
     expect(action.cwd).toBe(projectDir);
-    expect(action.roomName).toBe("Claude Code");
+    expect(action.shoreName).toBe("Claude Code");
     expect(action.toast).toBeNull();
   });
 

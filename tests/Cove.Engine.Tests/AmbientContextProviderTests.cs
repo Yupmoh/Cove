@@ -33,32 +33,32 @@ public sealed class AmbientContextProviderTests
     }
 
     [Fact]
-    public void LocationContext_IncludesRoom_Wing_Workspace_Panes()
+    public void LocationContext_IncludesShore_Wing_Bay_Nooks()
     {
         var provider = new LocationContextProvider(
-            room: () => "main",
+            shore: () => "main",
             wing: () => "left",
-            workspace: () => "default",
-            otherPanes: () => new string?[] { "agent-2", "agent-3" });
+            bay: () => "default",
+            otherNooks: () => new string?[] { "agent-2", "agent-3" });
         var context = provider.Build("p1");
         var json = JsonDocument.Parse(context.GetRawText());
-        Assert.Equal("main", json.RootElement.GetProperty("room").GetString());
+        Assert.Equal("main", json.RootElement.GetProperty("shore").GetString());
         Assert.Equal("left", json.RootElement.GetProperty("wing").GetString());
-        Assert.Equal("default", json.RootElement.GetProperty("workspace").GetString());
-        Assert.Equal("p1", json.RootElement.GetProperty("paneId").GetString());
-        var panes = json.RootElement.GetProperty("panes").EnumerateArray().Select(p => p.GetString()).ToArray();
-        Assert.Equal(new[] { "agent-2", "agent-3" }, panes);
+        Assert.Equal("default", json.RootElement.GetProperty("bay").GetString());
+        Assert.Equal("p1", json.RootElement.GetProperty("nookId").GetString());
+        var nooks = json.RootElement.GetProperty("nooks").EnumerateArray().Select(p => p.GetString()).ToArray();
+        Assert.Equal(new[] { "agent-2", "agent-3" }, nooks);
     }
 
     [Fact]
-    public void LocationContext_NullRoom_OmitsRoom()
+    public void LocationContext_NullShore_OmitsShore()
     {
         var provider = new LocationContextProvider(() => null, () => null, () => "default", () => System.Array.Empty<string?>());
         var context = provider.Build(null);
         var json = JsonDocument.Parse(context.GetRawText());
-        Assert.False(json.RootElement.TryGetProperty("room", out _));
+        Assert.False(json.RootElement.TryGetProperty("shore", out _));
         Assert.False(json.RootElement.TryGetProperty("wing", out _));
-        Assert.Equal("default", json.RootElement.GetProperty("workspace").GetString());
+        Assert.Equal("default", json.RootElement.GetProperty("bay").GetString());
     }
 
     [Fact]
@@ -98,7 +98,7 @@ public sealed class AmbientContextProviderTests
     {
         var aggregator = new AmbientContextAggregator();
         aggregator.Add("session", new SessionStartContextProvider(() => "primer", () => "{}", () => "{}"));
-        aggregator.Add("location", new LocationContextProvider(() => "room", () => null, () => "ws", () => System.Array.Empty<string?>()));
+        aggregator.Add("location", new LocationContextProvider(() => "shore", () => null, () => "ws", () => System.Array.Empty<string?>()));
 
         var session = aggregator.Get("session", "p1");
         var location = aggregator.Get("location", "p1");

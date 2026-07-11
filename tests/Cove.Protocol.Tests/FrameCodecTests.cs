@@ -38,7 +38,7 @@ public sealed class FrameCodecTests
         Assert.Equal(44u, h.Length);
         ControlRequest req = ControlCodec.DecodeRequest(frame.AsSpan(ProtocolConstants.HeaderSize));
         Assert.Equal("1", req.Id);
-        Assert.Equal("cove://commands/pane.list", req.Uri);
+        Assert.Equal("cove://commands/nook.list", req.Uri);
         Assert.Null(req.Params);
     }
 

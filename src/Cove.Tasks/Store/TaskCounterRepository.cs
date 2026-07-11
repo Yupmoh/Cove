@@ -15,29 +15,29 @@ public sealed class TaskCounterRepository
         _channel = channel;
     }
 
-    public async System.Threading.Tasks.Task<int> NextNumberAsync(string workspaceId)
+    public async System.Threading.Tasks.Task<int> NextNumberAsync(string bayId)
     {
-        return await _channel.ExecuteAsync(conn => System.Threading.Tasks.Task.FromResult(AllocateNumber(conn, workspaceId)));
+        return await _channel.ExecuteAsync(conn => System.Threading.Tasks.Task.FromResult(AllocateNumber(conn, bayId)));
     }
 
-    private static int AllocateNumber(SqliteConnection conn, string workspaceId)
+    private static int AllocateNumber(SqliteConnection conn, string bayId)
     {
         return conn.ExecuteScalar<int>(
             """
-            INSERT INTO task_counter (workspace_id, next_number)
-            VALUES (@WorkspaceId, 2)
-            ON CONFLICT(workspace_id) DO UPDATE SET next_number = next_number + 1
+            INSERT INTO task_counter (bay_id, next_number)
+            VALUES (@BayId, 2)
+            ON CONFLICT(bay_id) DO UPDATE SET next_number = next_number + 1
             RETURNING next_number - 1
             """,
-            new { WorkspaceId = workspaceId });
+            new { BayId = bayId });
     }
 
-    public int PeekNumber(string workspaceId)
+    public int PeekNumber(string bayId)
     {
         using var conn = _factory.Open();
         var v = conn.ExecuteScalar<int>(
-            "SELECT next_number FROM task_counter WHERE workspace_id = @WorkspaceId",
-            new { WorkspaceId = workspaceId });
+            "SELECT next_number FROM task_counter WHERE bay_id = @BayId",
+            new { BayId = bayId });
         return v == 0 ? 1 : v;
     }
 }

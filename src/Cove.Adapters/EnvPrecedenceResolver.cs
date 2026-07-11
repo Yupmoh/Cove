@@ -3,10 +3,10 @@ using Cove.Protocol;
 namespace Cove.Adapters;
 
 public sealed record CoveEnvContext(
-    string PaneId,
+    string NookId,
     string CliPath,
     string DataDir,
-    string WorkspaceId,
+    string BayId,
     int HookPort,
     string? TaskId = null,
     string? TaskRunId = null);
@@ -15,9 +15,9 @@ public sealed class EnvPrecedenceResolver
 {
     private static readonly HashSet<string> NonOverridable = new()
     {
-        "COVE", "COVE_CLI_PATH", "COVE_DATA_DIR", "COVE_PANE_ID",
-        "COVE_WORKSPACE_ID", "COVE_HOOK_PORT", "COVE_TASK_ID", "COVE_TASK_RUN_ID",
-        "COVE_ROOM_ID", "COVE_SDK_VERSION", "COVE_ADAPTER_DIR", "COVE_EVENT"
+        "COVE", "COVE_CLI_PATH", "COVE_DATA_DIR", "COVE_NOOK_ID",
+        "COVE_BAY_ID", "COVE_HOOK_PORT", "COVE_TASK_ID", "COVE_TASK_RUN_ID",
+        "COVE_SHORE_ID", "COVE_SDK_VERSION", "COVE_ADAPTER_DIR", "COVE_EVENT"
     };
 
     private readonly IReadOnlyDictionary<string, string> _systemEnv;
@@ -69,10 +69,10 @@ public sealed class EnvPrecedenceResolver
         if (ctx is null)
             return;
 
-        env["COVE_PANE_ID"] = ctx.PaneId;
+        env["COVE_NOOK_ID"] = ctx.NookId;
         env["COVE_CLI_PATH"] = ctx.CliPath;
         env["COVE_DATA_DIR"] = ctx.DataDir;
-        env["COVE_WORKSPACE_ID"] = ctx.WorkspaceId;
+        env["COVE_BAY_ID"] = ctx.BayId;
         env["COVE_HOOK_PORT"] = ctx.HookPort.ToString();
 
         if (ctx.TaskId is not null)

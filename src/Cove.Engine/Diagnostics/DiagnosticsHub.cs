@@ -20,11 +20,11 @@ public sealed record DiagnosticsSnapshot(
     int GcGen0Collections,
     int GcGen1Collections,
     int GcGen2Collections,
-    int ActivePanes,
-    int ActiveWorkspaces,
+    int ActiveNooks,
+    int ActiveBays,
     int ActiveAgents,
     double CpuUsagePercent,
-    System.Collections.Generic.Dictionary<string, long> PaneScrollbackBytes);
+    System.Collections.Generic.Dictionary<string, long> NookScrollbackBytes);
 
 public sealed class DiagnosticsHub
 {
@@ -61,10 +61,10 @@ public sealed class DiagnosticsHub
     }
 
     public DiagnosticsSnapshot TakeSnapshot(
-        int activePanes = 0,
-        int activeWorkspaces = 0,
+        int activeNooks = 0,
+        int activeBays = 0,
         int activeAgents = 0,
-        System.Collections.Generic.Dictionary<string, long>? paneScrollbackBytes = null)
+        System.Collections.Generic.Dictionary<string, long>? nookScrollbackBytes = null)
     {
         var snapshot = new DiagnosticsSnapshot(
             System.DateTimeOffset.UtcNow,
@@ -74,11 +74,11 @@ public sealed class DiagnosticsHub
             System.GC.CollectionCount(0),
             System.GC.CollectionCount(1),
             System.GC.CollectionCount(2),
-            activePanes,
-            activeWorkspaces,
+            activeNooks,
+            activeBays,
             activeAgents,
             0,
-            paneScrollbackBytes ?? new());
+            nookScrollbackBytes ?? new());
 
         if (_config.Enabled)
         {

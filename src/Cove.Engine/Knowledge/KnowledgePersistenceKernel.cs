@@ -34,18 +34,18 @@ public sealed class KnowledgePersistenceKernel
         cmd.CommandText = """
             CREATE TABLE IF NOT EXISTS timeline (
                 id TEXT PRIMARY KEY,
-                workspace_id TEXT NOT NULL,
+                bay_id TEXT NOT NULL,
                 kind TEXT NOT NULL,
                 scope TEXT,
                 title TEXT,
                 body TEXT,
                 metadata_json TEXT,
                 tags_json TEXT,
-                pane_id TEXT,
+                nook_id TEXT,
                 created_at TEXT NOT NULL,
                 backfill_key TEXT
             );
-            CREATE INDEX IF NOT EXISTS idx_timeline_workspace ON timeline (workspace_id, created_at);
+            CREATE INDEX IF NOT EXISTS idx_timeline_bay ON timeline (bay_id, created_at);
             CREATE INDEX IF NOT EXISTS idx_timeline_kind ON timeline (kind);
             CREATE INDEX IF NOT EXISTS idx_timeline_scope ON timeline (scope);
             CREATE UNIQUE INDEX IF NOT EXISTS idx_timeline_backfill ON timeline (backfill_key) WHERE backfill_key IS NOT NULL;
@@ -77,7 +77,7 @@ public sealed class KnowledgePersistenceKernel
         cmd.CommandText = """
             CREATE TABLE IF NOT EXISTS facts (
                 id TEXT PRIMARY KEY,
-                workspace_id TEXT NOT NULL,
+                bay_id TEXT NOT NULL,
                 kind TEXT NOT NULL,
                 content TEXT NOT NULL,
                 confidence REAL NOT NULL DEFAULT 0.5,
@@ -91,7 +91,7 @@ public sealed class KnowledgePersistenceKernel
             );
             CREATE TABLE IF NOT EXISTS episodes (
                 id TEXT PRIMARY KEY,
-                workspace_id TEXT NOT NULL,
+                bay_id TEXT NOT NULL,
                 session_id TEXT,
                 summary_l0 TEXT,
                 summary_l1 TEXT,
@@ -101,7 +101,7 @@ public sealed class KnowledgePersistenceKernel
             );
             CREATE TABLE IF NOT EXISTS blackboard (
                 id TEXT PRIMARY KEY,
-                workspace_id TEXT NOT NULL,
+                bay_id TEXT NOT NULL,
                 kind TEXT NOT NULL,
                 audience TEXT NOT NULL,
                 content TEXT NOT NULL,
@@ -138,7 +138,7 @@ public sealed class KnowledgePersistenceKernel
         cmd.CommandText = """
             CREATE TABLE IF NOT EXISTS sessions (
                 id TEXT PRIMARY KEY,
-                workspace_id TEXT NOT NULL,
+                bay_id TEXT NOT NULL,
                 adapter TEXT NOT NULL,
                 started_at TEXT NOT NULL,
                 ended_at TEXT,
@@ -175,7 +175,7 @@ public sealed class KnowledgePersistenceKernel
         cmd.CommandText = """
             CREATE TABLE IF NOT EXISTS notes_index (
                 note_id TEXT PRIMARY KEY,
-                workspace_id TEXT NOT NULL,
+                bay_id TEXT NOT NULL,
                 title TEXT,
                 body TEXT,
                 type TEXT NOT NULL,

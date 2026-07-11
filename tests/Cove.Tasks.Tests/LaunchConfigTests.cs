@@ -9,7 +9,7 @@ public sealed class LaunchConfigTests
     {
         Adapter = "claude",
         ProfileSlug = "default",
-        ExecutionMode = "pane",
+        ExecutionMode = "nook",
         InProgressStatusId = "in-progress",
         ReviewStatusId = "in-review",
         CompletionStatusId = "done",
@@ -32,7 +32,7 @@ public sealed class LaunchConfigTests
         Assert.NotNull(parsed);
         Assert.Equal("claude", parsed!.Adapter);
         Assert.Equal("default", parsed.ProfileSlug);
-        Assert.Equal("pane", parsed.ExecutionMode);
+        Assert.Equal("nook", parsed.ExecutionMode);
         Assert.Equal("in-progress", parsed.InProgressStatusId);
         Assert.Equal("in-review", parsed.ReviewStatusId);
         Assert.Equal("done", parsed.CompletionStatusId);
@@ -77,9 +77,9 @@ public sealed class LaunchConfigTests
     }
 
     [Fact]
-    public void Validate_PaneModeIgnoresWorktreeFields()
+    public void Validate_NookModeIgnoresWorktreeFields()
     {
-        var config = ValidConfig() with { ExecutionMode = "pane", WorktreeBranchSource = null, MergeTarget = null };
+        var config = ValidConfig() with { ExecutionMode = "nook", WorktreeBranchSource = null, MergeTarget = null };
         var result = LaunchConfigValidator.Validate(config, ValidContext());
         Assert.True(result.IsValid);
     }

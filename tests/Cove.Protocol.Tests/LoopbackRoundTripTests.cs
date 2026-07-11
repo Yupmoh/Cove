@@ -69,8 +69,8 @@ public sealed class LoopbackRoundTripTests
             ControlResponse pr = ControlCodec.DecodeResponse(pong.Payload);
             Assert.True(pr.Data!.Value.GetProperty("pong").GetBoolean());
 
-            var pane1 = new List<byte>();
-            var pane2 = new List<byte>();
+            var nook1 = new List<byte>();
+            var nook2 = new List<byte>();
             ulong next1 = 0, next2 = 0;
             for (int i = 0; i < 3; i++)
             {
@@ -82,18 +82,18 @@ public sealed class LoopbackRoundTripTests
                 {
                     Assert.Equal(next1, offset);
                     next1 += (ulong)raw.Length;
-                    pane1.AddRange(raw);
+                    nook1.AddRange(raw);
                 }
                 else
                 {
                     Assert.Equal(2UL, f.Header.StreamId);
                     Assert.Equal(next2, offset);
                     next2 += (ulong)raw.Length;
-                    pane2.AddRange(raw);
+                    nook2.AddRange(raw);
                 }
             }
-            Assert.Equal("hi\r\nbye\r\n", Encoding.ASCII.GetString(pane1.ToArray()));
-            Assert.Equal("OK", Encoding.ASCII.GetString(pane2.ToArray()));
+            Assert.Equal("hi\r\nbye\r\n", Encoding.ASCII.GetString(nook1.ToArray()));
+            Assert.Equal("OK", Encoding.ASCII.GetString(nook2.ToArray()));
 
             byte[] creditPayload = new byte[8];
             StreamPayload.WriteOffset(creditPayload, next1);

@@ -3,7 +3,7 @@ import { EmptyStateMessages, type EmptyStateConfig } from "./empty-states";
 
 describe("EmptyStateMessages", () => {
   it("has all expected messages", () => {
-    expect(EmptyStateMessages.noRooms).toBe("No rooms yet");
+    expect(EmptyStateMessages.noShores).toBe("No shores yet");
     expect(EmptyStateMessages.noNotes).toBe("No notes yet");
     expect(EmptyStateMessages.noSearchResults).toBe("No results");
     expect(EmptyStateMessages.noChanges).toBe("No changes");

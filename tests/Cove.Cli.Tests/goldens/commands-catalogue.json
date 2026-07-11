@@ -184,7 +184,7 @@
     "source": "core"
   },
   {
-    "command": "cove://commands/agent.spawned-panes",
+    "command": "cove://commands/agent.spawned-nooks",
     "source": "core"
   },
   {
@@ -362,7 +362,7 @@
     "source": "core"
   },
   {
-    "command": "cove://commands/collection.move-workspace",
+    "command": "cove://commands/collection.move-bay",
     "source": "core"
   },
   {
@@ -657,47 +657,47 @@
     "source": "core"
   },
   {
-    "command": "cove://commands/pane-types.list",
+    "command": "cove://commands/nook-types.list",
     "source": "core"
   },
   {
-    "command": "cove://commands/pane.kill",
+    "command": "cove://commands/nook.kill",
     "source": "core"
   },
   {
-    "command": "cove://commands/pane.list",
+    "command": "cove://commands/nook.list",
     "source": "core"
   },
   {
-    "command": "cove://commands/pane.read",
+    "command": "cove://commands/nook.read",
     "source": "core"
   },
   {
-    "command": "cove://commands/pane.rename",
+    "command": "cove://commands/nook.rename",
     "source": "core"
   },
   {
-    "command": "cove://commands/pane.resize",
+    "command": "cove://commands/nook.resize",
     "source": "core"
   },
   {
-    "command": "cove://commands/pane.scope.get",
+    "command": "cove://commands/nook.scope.get",
     "source": "core"
   },
   {
-    "command": "cove://commands/pane.scope.set",
+    "command": "cove://commands/nook.scope.set",
     "source": "core"
   },
   {
-    "command": "cove://commands/pane.search",
+    "command": "cove://commands/nook.search",
     "source": "core"
   },
   {
-    "command": "cove://commands/pane.spawn",
+    "command": "cove://commands/nook.spawn",
     "source": "core"
   },
   {
-    "command": "cove://commands/pane.write",
+    "command": "cove://commands/nook.write",
     "source": "core"
   },
   {
@@ -789,31 +789,31 @@
     "source": "core"
   },
   {
-    "command": "cove://commands/room.close",
+    "command": "cove://commands/shore.close",
     "source": "core"
   },
   {
-    "command": "cove://commands/room.create",
+    "command": "cove://commands/shore.create",
     "source": "core"
   },
   {
-    "command": "cove://commands/room.list",
+    "command": "cove://commands/shore.list",
     "source": "core"
   },
   {
-    "command": "cove://commands/room.move-to-wing",
+    "command": "cove://commands/shore.move-to-wing",
     "source": "core"
   },
   {
-    "command": "cove://commands/room.pin",
+    "command": "cove://commands/shore.pin",
     "source": "core"
   },
   {
-    "command": "cove://commands/room.rename",
+    "command": "cove://commands/shore.rename",
     "source": "core"
   },
   {
-    "command": "cove://commands/room.switch",
+    "command": "cove://commands/shore.switch",
     "source": "core"
   },
   {
@@ -1220,83 +1220,83 @@
     "source": "core"
   },
   {
-    "command": "cove://commands/workspace-command.clear",
+    "command": "cove://commands/bay-command.clear",
     "source": "core"
   },
   {
-    "command": "cove://commands/workspace-command.create",
+    "command": "cove://commands/bay-command.create",
     "source": "core"
   },
   {
-    "command": "cove://commands/workspace-command.delete",
+    "command": "cove://commands/bay-command.delete",
     "source": "core"
   },
   {
-    "command": "cove://commands/workspace-command.edit",
+    "command": "cove://commands/bay-command.edit",
     "source": "core"
   },
   {
-    "command": "cove://commands/workspace-command.list",
+    "command": "cove://commands/bay-command.list",
     "source": "core"
   },
   {
-    "command": "cove://commands/workspace-command.logs",
+    "command": "cove://commands/bay-command.logs",
     "source": "core"
   },
   {
-    "command": "cove://commands/workspace-command.restart",
+    "command": "cove://commands/bay-command.restart",
     "source": "core"
   },
   {
-    "command": "cove://commands/workspace-command.start",
+    "command": "cove://commands/bay-command.start",
     "source": "core"
   },
   {
-    "command": "cove://commands/workspace-command.status",
+    "command": "cove://commands/bay-command.status",
     "source": "core"
   },
   {
-    "command": "cove://commands/workspace-command.stop",
+    "command": "cove://commands/bay-command.stop",
     "source": "core"
   },
   {
-    "command": "cove://commands/workspace.create",
+    "command": "cove://commands/bay.create",
     "source": "core"
   },
   {
-    "command": "cove://commands/workspace.delete",
+    "command": "cove://commands/bay.delete",
     "source": "core"
   },
   {
-    "command": "cove://commands/workspace.hide",
+    "command": "cove://commands/bay.hide",
     "source": "core"
   },
   {
-    "command": "cove://commands/workspace.list",
+    "command": "cove://commands/bay.list",
     "source": "core"
   },
   {
-    "command": "cove://commands/workspace.move-room",
+    "command": "cove://commands/bay.move-shore",
     "source": "core"
   },
   {
-    "command": "cove://commands/workspace.rename",
+    "command": "cove://commands/bay.rename",
     "source": "core"
   },
   {
-    "command": "cove://commands/workspace.reorder",
+    "command": "cove://commands/bay.reorder",
     "source": "core"
   },
   {
-    "command": "cove://commands/workspace.set-accent",
+    "command": "cove://commands/bay.set-accent",
     "source": "core"
   },
   {
-    "command": "cove://commands/workspace.set-icon",
+    "command": "cove://commands/bay.set-icon",
     "source": "core"
   },
   {
-    "command": "cove://commands/workspace.switch",
+    "command": "cove://commands/bay.switch",
     "source": "core"
   },
   {
@@ -1328,7 +1328,7 @@
     "source": "core"
   },
   {
-    "command": "cove://hooks/pane-states",
+    "command": "cove://hooks/nook-states",
     "source": "core"
   },
   {
@@ -1500,11 +1500,11 @@
     "source": "cli"
   },
   {
-    "command": "pane list",
+    "command": "nook list",
     "source": "cli"
   },
   {
-    "command": "pane-types list",
+    "command": "nook-types list",
     "source": "cli"
   },
   {

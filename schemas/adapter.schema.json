@@ -255,7 +255,7 @@
     },
     "retention": {
       "type": "object",
-      "description": "SDK v2. Optional. Declares the underlying tool's session retention knobs so atrium can render a 'click to extend' chip in the adapter pane footer and write new values via the tool's own config file. Adapters whose tool has no retention cap omit this field entirely; the chip is skipped.",
+      "description": "SDK v2. Optional. Declares the underlying tool's session retention knobs so atrium can render a 'click to extend' chip in the adapter nook footer and write new values via the tool's own config file. Adapters whose tool has no retention cap omit this field entirely; the chip is skipped.",
       "required": ["fields", "readScript", "writeScript"],
       "properties": {
         "fields": {

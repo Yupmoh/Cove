@@ -22,12 +22,12 @@ export function toggleWordWrap(current: WordWrap): WordWrap {
   return current === "on" ? "off" : "on";
 }
 
-export function wordWrapStorageKey(paneId: string): string {
-  return `cove.editor.wordWrap.${paneId}`;
+export function wordWrapStorageKey(nookId: string): string {
+  return `cove.editor.wordWrap.${nookId}`;
 }
 
-export function minimapStorageKey(paneId: string): string {
-  return `cove.editor.minimap.${paneId}`;
+export function minimapStorageKey(nookId: string): string {
+  return `cove.editor.minimap.${nookId}`;
 }
 
 export interface AttributionEntryLike {

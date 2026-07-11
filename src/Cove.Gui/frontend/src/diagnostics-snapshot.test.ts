@@ -9,11 +9,11 @@ const sample: DiagnosticsSnapshot = {
   gcGen0Collections: 12,
   gcGen1Collections: 3,
   gcGen2Collections: 1,
-  activePanes: 5,
-  activeWorkspaces: 2,
+  activeNooks: 5,
+  activeBays: 2,
   activeAgents: 1,
   cpuUsagePercent: 7.5,
-  paneScrollbackBytes: { "pane-a": 1024, "pane-b": 2048 },
+  nookScrollbackBytes: { "nook-a": 1024, "nook-b": 2048 },
 };
 
 describe("parseSnapshotExport", () => {
@@ -51,11 +51,11 @@ describe("parseSnapshotExport", () => {
 });
 
 describe("totalScrollbackBytes", () => {
-  it("sums per-pane scrollback", () => {
+  it("sums per-nook scrollback", () => {
     expect(totalScrollbackBytes(sample)).toBe(3072);
   });
-  it("returns zero with no panes", () => {
-    expect(totalScrollbackBytes({ ...sample, paneScrollbackBytes: {} })).toBe(0);
+  it("returns zero with no nooks", () => {
+    expect(totalScrollbackBytes({ ...sample, nookScrollbackBytes: {} })).toBe(0);
   });
 });
 
@@ -67,7 +67,7 @@ describe("snapshotRows", () => {
     expect(byLabel["Working set"]).toBe("128.0 MB");
     expect(byLabel["Threads"]).toBe("24");
     expect(byLabel["GC gen0 / gen1 / gen2"]).toBe("12 / 3 / 1");
-    expect(byLabel["Active panes"]).toBe("5");
+    expect(byLabel["Active nooks"]).toBe("5");
   });
 });
 

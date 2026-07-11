@@ -9,7 +9,7 @@ public sealed class RunRow
 {
     public string Id { get; set; } = "";
     public string CardId { get; set; } = "";
-    public string WorkspaceId { get; set; } = "";
+    public string BayId { get; set; } = "";
     public string RunFamilyId { get; set; } = "";
     public string State { get; set; } = "active";
     public bool Backgrounded { get; set; }
@@ -27,7 +27,7 @@ public sealed class RunRepository
 {
     private readonly SqliteConnectionFactory _factory;
     private readonly TasksWriteChannel? _channel;
-    private const string SelectColumns = "id AS Id, card_id AS CardId, workspace_id AS WorkspaceId, run_family_id AS RunFamilyId, state AS State, backgrounded AS Backgrounded, launch_profile_json AS LaunchProfileJson, review_status_id AS ReviewStatusId, completion_status_id AS CompletionStatusId, pending_prompt AS PendingPrompt, started_at AS StartedAt, ended_at AS EndedAt, created_at AS CreatedAt, updated_at AS UpdatedAt";
+    private const string SelectColumns = "id AS Id, card_id AS CardId, bay_id AS BayId, run_family_id AS RunFamilyId, state AS State, backgrounded AS Backgrounded, launch_profile_json AS LaunchProfileJson, review_status_id AS ReviewStatusId, completion_status_id AS CompletionStatusId, pending_prompt AS PendingPrompt, started_at AS StartedAt, ended_at AS EndedAt, created_at AS CreatedAt, updated_at AS UpdatedAt";
 
     public RunRepository(SqliteConnectionFactory factory, TasksWriteChannel? channel = null)
     {
@@ -35,7 +35,7 @@ public sealed class RunRepository
         _channel = channel;
     }
 
-    public System.Threading.Tasks.Task<RunRow?> CreateAsync(string cardId, string workspaceId, string? launchProfileJson, string? runFamilyId = null, bool backgrounded = false, string? reviewStatusId = null, string? completionStatusId = null)
+    public System.Threading.Tasks.Task<RunRow?> CreateAsync(string cardId, string bayId, string? launchProfileJson, string? runFamilyId = null, bool backgrounded = false, string? reviewStatusId = null, string? completionStatusId = null)
     {
         var id = System.Guid.NewGuid().ToString("N");
         var row = new RunRow
@@ -43,7 +43,7 @@ public sealed class RunRepository
             Id = id,
             CardId = cardId,
             RunFamilyId = runFamilyId ?? id,
-            WorkspaceId = workspaceId,
+            BayId = bayId,
             State = "active",
             Backgrounded = backgrounded,
             LaunchProfileJson = launchProfileJson,
@@ -69,7 +69,7 @@ public sealed class RunRepository
     private static void CreateInternal(SqliteConnection conn, RunRow row)
     {
         conn.Execute(
-            "INSERT INTO task_runs (id, card_id, workspace_id, run_family_id, state, backgrounded, launch_profile_json, review_status_id, completion_status_id, pending_prompt, started_at, ended_at, created_at, updated_at) VALUES (@Id, @CardId, @WorkspaceId, @RunFamilyId, @State, @Backgrounded, @LaunchProfileJson, @ReviewStatusId, @CompletionStatusId, @PendingPrompt, @StartedAt, @EndedAt, @CreatedAt, @UpdatedAt)",
+            "INSERT INTO task_runs (id, card_id, bay_id, run_family_id, state, backgrounded, launch_profile_json, review_status_id, completion_status_id, pending_prompt, started_at, ended_at, created_at, updated_at) VALUES (@Id, @CardId, @BayId, @RunFamilyId, @State, @Backgrounded, @LaunchProfileJson, @ReviewStatusId, @CompletionStatusId, @PendingPrompt, @StartedAt, @EndedAt, @CreatedAt, @UpdatedAt)",
             row);
     }
 
@@ -105,10 +105,10 @@ public sealed class RunRepository
         return conn.Query<RunRow>($"SELECT {SelectColumns} FROM task_runs WHERE state = @State ORDER BY created_at", new { State = state }).AsList();
     }
 
-    public IReadOnlyList<RunRow> ListByWorkspace(string workspaceId)
+    public IReadOnlyList<RunRow> ListByBay(string bayId)
     {
         using var conn = _factory.Open();
-        return conn.Query<RunRow>($"SELECT {SelectColumns} FROM task_runs WHERE workspace_id = @WorkspaceId ORDER BY created_at", new { WorkspaceId = workspaceId }).AsList();
+        return conn.Query<RunRow>($"SELECT {SelectColumns} FROM task_runs WHERE bay_id = @BayId ORDER BY created_at", new { BayId = bayId }).AsList();
     }
 
     public IReadOnlyList<RunRow> ListByCardAndState(string cardId, string state)
@@ -117,10 +117,10 @@ public sealed class RunRepository
         return conn.Query<RunRow>($"SELECT {SelectColumns} FROM task_runs WHERE card_id = @CardId AND state = @State ORDER BY created_at", new { CardId = cardId, State = state }).AsList();
     }
 
-    public IReadOnlyList<RunRow> ListByWorkspaceAndState(string workspaceId, string state)
+    public IReadOnlyList<RunRow> ListByBayAndState(string bayId, string state)
     {
         using var conn = _factory.Open();
-        return conn.Query<RunRow>($"SELECT {SelectColumns} FROM task_runs WHERE workspace_id = @WorkspaceId AND state = @State ORDER BY created_at", new { WorkspaceId = workspaceId, State = state }).AsList();
+        return conn.Query<RunRow>($"SELECT {SelectColumns} FROM task_runs WHERE bay_id = @BayId AND state = @State ORDER BY created_at", new { BayId = bayId, State = state }).AsList();
     }
 
     public bool HasActiveRun(string cardId)

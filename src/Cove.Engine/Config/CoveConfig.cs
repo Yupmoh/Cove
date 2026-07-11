@@ -46,7 +46,7 @@ public sealed class CoveConfig
     public UpdatesSection Updates { get; set; } = new();
     [Setting("Diagnostics", "diagnostics", "section", "Diagnostics settings")]
     public DiagnosticsSection Diagnostics { get; set; } = new();
-    [Setting("Worktree", "workspace", "section", "Worktree settings")]
+    [Setting("Worktree", "bay", "section", "Worktree settings")]
     public WorktreeSection Worktree { get; set; } = new();
     [Setting("Telemetry", "privacy", "section", "Telemetry settings")]
     public TelemetrySection Telemetry { get; set; } = new();
@@ -64,7 +64,7 @@ public sealed class CoveConfig
     public LspSection Lsp { get; set; } = new();
     [Setting("Adapter Commands", "tools", "section", "Custom adapter commands")]
     public AdapterCommandsSection AdapterCommands { get; set; } = new();
-    [Setting("Sessions", "workspace", "section", "Session restoration settings")]
+    [Setting("Sessions", "bay", "section", "Session restoration settings")]
     public SessionSection Session { get; set; } = new();
 
     public Dictionary<string, JsonElement> Extra { get; } = new();
@@ -282,7 +282,7 @@ public sealed class AppearanceSection
 {
     [Setting("UI Scale", "appearance", "number", "Interface scale multiplier (0.8-1.5)")]
     public double UiScale { get; set; } = 1.0;
-    [Setting("Layout Gap", "appearance", "number", "Gap between panes in pixels")]
+    [Setting("Layout Gap", "appearance", "number", "Gap between nooks in pixels")]
     public int LayoutGap { get; set; } = 4;
     [Setting("Icon Set", "appearance", "select", "Icon set style", Options = new[] { "default", "outline", "filled" })]
     public string IconSet { get; set; } = "default";
@@ -290,8 +290,8 @@ public sealed class AppearanceSection
     public string Wallpaper { get; set; } = "";
     [Setting("Accent Override", "appearance", "text", "Override accent color hex (empty for theme default)")]
     public string Accent { get; set; } = "";
-    [Setting("Pane Light", "appearance", "toggle", "Lighten inactive panes")]
-    public bool PaneLight { get; set; } = false;
+    [Setting("Nook Light", "appearance", "toggle", "Lighten inactive nooks")]
+    public bool NookLight { get; set; } = false;
 
     public static AppearanceSection Read(JsonElement el)
     {
@@ -306,7 +306,7 @@ public sealed class AppearanceSection
                 case "iconSet": if (prop.Value.ValueKind == JsonValueKind.String) s.IconSet = prop.Value.GetString() ?? s.IconSet; break;
                 case "wallpaper": if (prop.Value.ValueKind == JsonValueKind.String) s.Wallpaper = prop.Value.GetString() ?? s.Wallpaper; break;
                 case "accent": if (prop.Value.ValueKind == JsonValueKind.String) s.Accent = prop.Value.GetString() ?? s.Accent; break;
-                case "paneLight": s.PaneLight = ConfigValueCoercion.AsBool(prop.Value, s.PaneLight); break;
+                case "nookLight": s.NookLight = ConfigValueCoercion.AsBool(prop.Value, s.NookLight); break;
             }
         }
         return s;
@@ -320,7 +320,7 @@ public sealed class AppearanceSection
         writer.WriteString("iconSet", IconSet);
         writer.WriteString("wallpaper", Wallpaper);
         writer.WriteString("accent", Accent);
-        writer.WriteBoolean("paneLight", PaneLight);
+        writer.WriteBoolean("nookLight", NookLight);
         writer.WriteEndObject();
     }
 }
@@ -539,9 +539,9 @@ public sealed class DiagnosticsSection
 
 public sealed class WorktreeSection
 {
-    [Setting("Default Location Pattern", "workspace", "text", "Worktree default location pattern")]
+    [Setting("Default Location Pattern", "bay", "text", "Worktree default location pattern")]
     public string DefaultLocationPattern { get; set; } = "../{repo}-worktrees/{branch}";
-    [Setting("Post-Create Commands", "workspace", "text", "Commands to run after worktree creation")]
+    [Setting("Post-Create Commands", "bay", "text", "Commands to run after worktree creation")]
     public List<string> PostCreateCommands { get; set; } = new();
 
     public static WorktreeSection Read(JsonElement el)
@@ -856,7 +856,7 @@ public sealed class LspSection
 
 public sealed class SessionSection
 {
-    [Setting("Restore On Launch", "workspace", "toggle", "Respawn terminal and agent panes when the daemon restarts")]
+    [Setting("Restore On Launch", "bay", "toggle", "Respawn terminal and agent nooks when the daemon restarts")]
     public bool RestoreOnLaunch { get; set; } = true;
 
     public static SessionSection Read(JsonElement el)

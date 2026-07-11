@@ -12,11 +12,11 @@ public static class ActivityCommands
             return Task.FromResult(ctx.Fail("not_ready", "activity aggregate not available"));
 
         var cards = aggregate.List().Select(c => new ActivityCardDto(
-            c.PaneId,
+            c.NookId,
             c.Adapter,
             c.Name,
-            c.Workspace,
-            c.Room,
+            c.Bay,
+            c.Shore,
             c.Status.ToString().ToLowerInvariant(),
             c.StopReason,
             c.ActiveSubagents,
@@ -33,11 +33,11 @@ public static class ActivityCommands
             return Task.FromResult(ctx.Fail("not_ready", "activity aggregate not available"));
 
         var cards = aggregate.NeedsInputCards().Select(c => new ActivityCardDto(
-            c.PaneId,
+            c.NookId,
             c.Adapter,
             c.Name,
-            c.Workspace,
-            c.Room,
+            c.Bay,
+            c.Shore,
             c.Status.ToString().ToLowerInvariant(),
             c.StopReason,
             c.ActiveSubagents,

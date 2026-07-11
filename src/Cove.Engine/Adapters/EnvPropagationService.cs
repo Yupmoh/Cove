@@ -4,15 +4,15 @@ using Microsoft.Extensions.Logging;
 
 namespace Cove.Engine.Adapters;
 
-public interface ISignalablePane
+public interface ISignalableNook
 {
-    string PaneId { get; }
+    string NookId { get; }
     bool Signal(int signum);
 }
 
 public interface IEnvPropagationTarget
 {
-    IReadOnlyList<ISignalablePane> GetPanesForBinary(string binary);
+    IReadOnlyList<ISignalableNook> GetNooksForBinary(string binary);
 }
 
 public sealed class EnvPropagationService : IDisposable
@@ -40,10 +40,10 @@ public sealed class EnvPropagationService : IDisposable
             return;
         }
 
-        IReadOnlyList<ISignalablePane> panes;
+        IReadOnlyList<ISignalableNook> nooks;
         try
         {
-            panes = _target.GetPanesForBinary(binary);
+            nooks = _target.GetNooksForBinary(binary);
         }
         catch (Exception ex)
         {
@@ -51,7 +51,7 @@ public sealed class EnvPropagationService : IDisposable
             return;
         }
 
-        if (panes.Count == 0)
+        if (nooks.Count == 0)
             return;
 
         if (OperatingSystem.IsWindows())
@@ -61,16 +61,16 @@ public sealed class EnvPropagationService : IDisposable
         }
 
         var signum = PtyConstants.SigUsr1;
-        foreach (var pane in panes)
+        foreach (var nook in nooks)
         {
             try
             {
-                if (!pane.Signal(signum))
-                    _logger?.EnvPropagationSignalFailed(adapter, binary, pane.PaneId, "signal returned false");
+                if (!nook.Signal(signum))
+                    _logger?.EnvPropagationSignalFailed(adapter, binary, nook.NookId, "signal returned false");
             }
             catch (Exception ex)
             {
-                _logger?.EnvPropagationSignalFailed(adapter, binary, pane.PaneId, ex.Message);
+                _logger?.EnvPropagationSignalFailed(adapter, binary, nook.NookId, ex.Message);
             }
         }
     }

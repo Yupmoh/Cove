@@ -9,11 +9,11 @@ public sealed class KeybindingEngineTests
     public void RegisterDefault_ThenResolve_ReturnsBinding()
     {
         var engine = new KeybindingEngine();
-        engine.RegisterDefault("Cmd+T", "app-command", "room.new", "New room");
+        engine.RegisterDefault("Cmd+T", "app-command", "shore.new", "New shore");
 
         var binding = engine.Resolve("cmd+t");
         Assert.NotNull(binding);
-        Assert.Equal("room.new", binding!.Action);
+        Assert.Equal("shore.new", binding!.Action);
         Assert.Equal("app-command", binding.ActionType);
     }
 
@@ -35,7 +35,7 @@ public sealed class KeybindingEngineTests
     public void SetOverride_ReplacesDefault()
     {
         var engine = new KeybindingEngine();
-        engine.RegisterDefault("Cmd+T", "app-command", "room.new", null);
+        engine.RegisterDefault("Cmd+T", "app-command", "shore.new", null);
         engine.SetOverride("Cmd+T", new KeyBinding("cmd+t", "app-command", "task.create", null));
 
         var binding = engine.Resolve("cmd+t");
@@ -46,7 +46,7 @@ public sealed class KeybindingEngineTests
     public void SetOverride_NullUnbinds()
     {
         var engine = new KeybindingEngine();
-        engine.RegisterDefault("Cmd+T", "app-command", "room.new", null);
+        engine.RegisterDefault("Cmd+T", "app-command", "shore.new", null);
         engine.SetOverride("Cmd+T", null);
 
         Assert.Null(engine.Resolve("cmd+t"));
@@ -56,18 +56,18 @@ public sealed class KeybindingEngineTests
     public void ClearOverride_RestoresDefault()
     {
         var engine = new KeybindingEngine();
-        engine.RegisterDefault("Cmd+T", "app-command", "room.new", null);
+        engine.RegisterDefault("Cmd+T", "app-command", "shore.new", null);
         engine.SetOverride("Cmd+T", new KeyBinding("cmd+t", "app-command", "other", null));
         engine.ClearOverride("Cmd+T");
 
-        Assert.Equal("room.new", engine.Resolve("cmd+t")!.Action);
+        Assert.Equal("shore.new", engine.Resolve("cmd+t")!.Action);
     }
 
     [Fact]
     public void GetConflicts_DetectsTwoActionsSameChord()
     {
         var engine = new KeybindingEngine();
-        engine.RegisterDefault("Cmd+T", "app-command", "room.new", null);
+        engine.RegisterDefault("Cmd+T", "app-command", "shore.new", null);
         engine.RegisterDefault("cmd+t", "app-command", "task.create", null);
 
         var conflicts = engine.GetConflicts();
@@ -79,8 +79,8 @@ public sealed class KeybindingEngineTests
     public void GetConflicts_Empty_WhenDistinctChords()
     {
         var engine = new KeybindingEngine();
-        engine.RegisterDefault("Cmd+T", "app-command", "room.new", null);
-        engine.RegisterDefault("Cmd+W", "app-command", "room.close", null);
+        engine.RegisterDefault("Cmd+T", "app-command", "shore.new", null);
+        engine.RegisterDefault("Cmd+W", "app-command", "shore.close", null);
 
         var conflicts = engine.GetConflicts();
         Assert.Empty(conflicts);
@@ -90,8 +90,8 @@ public sealed class KeybindingEngineTests
     public void GetConflicts_Empty_WhenSameActionSameChord()
     {
         var engine = new KeybindingEngine();
-        engine.RegisterDefault("Cmd+T", "app-command", "room.new", null);
-        engine.RegisterDefault("cmd+t", "app-command", "room.new", null);
+        engine.RegisterDefault("Cmd+T", "app-command", "shore.new", null);
+        engine.RegisterDefault("cmd+t", "app-command", "shore.new", null);
 
         var conflicts = engine.GetConflicts();
         Assert.Empty(conflicts);
@@ -130,7 +130,7 @@ public sealed class KeybindingEngineTests
     public void TrySetOverride_Conflict_ReturnsWarningButApplies()
     {
         var engine = new KeybindingEngine();
-        engine.RegisterDefault("Cmd+T", "app-command", "room.new", null);
+        engine.RegisterDefault("Cmd+T", "app-command", "shore.new", null);
         var result = engine.TrySetOverride("Cmd+T", new KeyBinding("cmd+t", "app-command", "task.create", null));
 
         Assert.True(result.Success);
@@ -153,7 +153,7 @@ public sealed class KeybindingEngineTests
     public void Resolve_UriCommandBinding_ReturnsUriCommandActionType()
     {
         var engine = new KeybindingEngine();
-        engine.RegisterDefault("Cmd+Shift+O", "uri-command", "cove://commands/room.new", null);
+        engine.RegisterDefault("Cmd+Shift+O", "uri-command", "cove://commands/shore.new", null);
 
         var binding = engine.Resolve("cmd+shift+o");
         Assert.NotNull(binding);
@@ -179,7 +179,7 @@ public sealed class KeybindingEngineTests
     public void LoadFromJson_ParsesOverrides()
     {
         var engine = new KeybindingEngine();
-        engine.RegisterDefault("Cmd+T", "app-command", "room.new", null);
+        engine.RegisterDefault("Cmd+T", "app-command", "shore.new", null);
         engine.LoadFromJson("""{"cmd+t":{"actionType":"app-command","action":"task.create"},"cmd+w":null}""");
 
         Assert.Equal("task.create", engine.Resolve("cmd+t")!.Action);
@@ -202,12 +202,12 @@ public sealed class KeybindingEngineTests
     public void GetResolvedBindings_MergesDefaultsAndOverrides()
     {
         var engine = new KeybindingEngine();
-        engine.RegisterDefault("Cmd+T", "app-command", "room.new", null);
-        engine.RegisterDefault("Cmd+W", "app-command", "room.close", null);
+        engine.RegisterDefault("Cmd+T", "app-command", "shore.new", null);
+        engine.RegisterDefault("Cmd+W", "app-command", "shore.close", null);
         engine.SetOverride("Cmd+W", null);
 
         var bindings = engine.GetResolvedBindings();
         Assert.Single(bindings);
-        Assert.Equal("room.new", bindings[0].Action);
+        Assert.Equal("shore.new", bindings[0].Action);
     }
 }

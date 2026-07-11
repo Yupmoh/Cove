@@ -13,7 +13,7 @@ public enum SessionLifecycle
 
 public sealed record SessionState
 {
-    public required string PaneId { get; init; }
+    public required string NookId { get; init; }
     public required string Adapter { get; init; }
     public string? SessionId { get; init; }
     public required SessionLifecycle Lifecycle { get; init; }
@@ -30,88 +30,88 @@ public sealed class SessionResumeOrchestrator
         _logger = logger;
     }
 
-    public void Register(string paneId, string adapter, string? sessionId)
+    public void Register(string nookId, string adapter, string? sessionId)
     {
-        _states[paneId] = new SessionState { PaneId = paneId, Adapter = adapter, SessionId = sessionId, Lifecycle = SessionLifecycle.Active, Resumable = true };
+        _states[nookId] = new SessionState { NookId = nookId, Adapter = adapter, SessionId = sessionId, Lifecycle = SessionLifecycle.Active, Resumable = true };
     }
 
-    public void SetSessionId(string paneId, string adapter, string sessionId)
+    public void SetSessionId(string nookId, string adapter, string sessionId)
     {
-        if (_states.TryGetValue(paneId, out var state))
-            _states[paneId] = state with { SessionId = sessionId };
+        if (_states.TryGetValue(nookId, out var state))
+            _states[nookId] = state with { SessionId = sessionId };
         else
-            _states[paneId] = new SessionState { PaneId = paneId, Adapter = adapter, SessionId = sessionId, Lifecycle = SessionLifecycle.Active, Resumable = true };
+            _states[nookId] = new SessionState { NookId = nookId, Adapter = adapter, SessionId = sessionId, Lifecycle = SessionLifecycle.Active, Resumable = true };
     }
 
-    public void Unregister(string paneId)
+    public void Unregister(string nookId)
     {
-        _states.Remove(paneId);
+        _states.Remove(nookId);
     }
 
-    public SessionState? GetState(string paneId)
+    public SessionState? GetState(string nookId)
     {
-        return _states.TryGetValue(paneId, out var state) ? state : null;
+        return _states.TryGetValue(nookId, out var state) ? state : null;
     }
 
-    public void Dismiss(string paneId)
+    public void Dismiss(string nookId)
     {
-        if (!_states.TryGetValue(paneId, out var state))
+        if (!_states.TryGetValue(nookId, out var state))
         {
-            _logger?.SessionUnknownPane("dismiss", paneId);
+            _logger?.SessionUnknownNook("dismiss", nookId);
             return;
         }
-        _states[paneId] = state with { Lifecycle = SessionLifecycle.Dismissed, Resumable = true };
+        _states[nookId] = state with { Lifecycle = SessionLifecycle.Dismissed, Resumable = true };
     }
 
-    public void Background(string paneId)
+    public void Background(string nookId)
     {
-        if (!_states.TryGetValue(paneId, out var state))
+        if (!_states.TryGetValue(nookId, out var state))
         {
-            _logger?.SessionUnknownPane("background", paneId);
+            _logger?.SessionUnknownNook("background", nookId);
             return;
         }
-        _states[paneId] = state with { Lifecycle = SessionLifecycle.Background, Resumable = true };
+        _states[nookId] = state with { Lifecycle = SessionLifecycle.Background, Resumable = true };
     }
 
-    public void Foreground(string paneId)
+    public void Foreground(string nookId)
     {
-        if (!_states.TryGetValue(paneId, out var state))
+        if (!_states.TryGetValue(nookId, out var state))
         {
-            _logger?.SessionUnknownPane("foreground", paneId);
+            _logger?.SessionUnknownNook("foreground", nookId);
             return;
         }
-        _states[paneId] = state with { Lifecycle = SessionLifecycle.Active };
+        _states[nookId] = state with { Lifecycle = SessionLifecycle.Active };
     }
 
-    public void Stop(string paneId)
+    public void Stop(string nookId)
     {
-        if (!_states.TryGetValue(paneId, out var state))
+        if (!_states.TryGetValue(nookId, out var state))
         {
-            _logger?.SessionUnknownPane("stop", paneId);
+            _logger?.SessionUnknownNook("stop", nookId);
             return;
         }
-        _states[paneId] = state with { Lifecycle = SessionLifecycle.Cancelled, Resumable = false };
+        _states[nookId] = state with { Lifecycle = SessionLifecycle.Cancelled, Resumable = false };
     }
 
-    public bool CanWake(string paneId)
+    public bool CanWake(string nookId)
     {
-        if (!_states.TryGetValue(paneId, out var state))
+        if (!_states.TryGetValue(nookId, out var state))
             return false;
         return state.Lifecycle == SessionLifecycle.Dismissed && state.Resumable;
     }
 
-    public void MarkWaking(string paneId)
+    public void MarkWaking(string nookId)
     {
-        if (!_states.TryGetValue(paneId, out var state))
+        if (!_states.TryGetValue(nookId, out var state))
             return;
-        _states[paneId] = state with { Lifecycle = SessionLifecycle.Waking };
+        _states[nookId] = state with { Lifecycle = SessionLifecycle.Waking };
     }
 
-    public void MarkActive(string paneId)
+    public void MarkActive(string nookId)
     {
-        if (!_states.TryGetValue(paneId, out var state))
+        if (!_states.TryGetValue(nookId, out var state))
             return;
-        _states[paneId] = state with { Lifecycle = SessionLifecycle.Active };
+        _states[nookId] = state with { Lifecycle = SessionLifecycle.Active };
     }
 
     public IEnumerable<SessionState> ListDismissed()

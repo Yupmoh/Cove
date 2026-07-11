@@ -98,7 +98,7 @@ public sealed class CoveDataDirTests
             Assert.Equal(Path.Combine(root, "logs"), dd.LogsDir);
             Assert.Equal(Path.Combine(root, "bin"), dd.BinDir);
             Assert.Equal(Path.Combine(root, "cache"), dd.CacheDir);
-            Assert.Equal(Path.Combine(root, "workspaces"), dd.WorkspacesDir);
+            Assert.Equal(Path.Combine(root, "bays"), dd.BaysDir);
             Assert.Equal(Path.Combine(root, "themes"), dd.ThemesDir);
             Assert.Equal(Path.Combine(root, "library"), dd.LibraryDir);
             Assert.Equal(Path.Combine(root, "run-commands"), dd.RunCommandsDir);

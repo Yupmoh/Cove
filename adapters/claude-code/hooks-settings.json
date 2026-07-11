@@ -1,22 +1,22 @@
 {
   "hooks": {
     "SessionStart": [
-      { "hooks": [{ "type": "command", "command": "\"$COVE_CLI_PATH\" hook emit session-start --adapter claude-code --pane-id \"$COVE_PANE_ID\"" }] }
+      { "hooks": [{ "type": "command", "command": "\"$COVE_CLI_PATH\" hook emit session-start --adapter claude-code --nook-id \"$COVE_NOOK_ID\"" }] }
     ],
     "SessionEnd": [
-      { "hooks": [{ "type": "command", "command": "\"$COVE_CLI_PATH\" hook emit session-end --adapter claude-code --pane-id \"$COVE_PANE_ID\"" }] }
+      { "hooks": [{ "type": "command", "command": "\"$COVE_CLI_PATH\" hook emit session-end --adapter claude-code --nook-id \"$COVE_NOOK_ID\"" }] }
     ],
     "UserPromptSubmit": [
-      { "hooks": [{ "type": "command", "command": "\"$COVE_CLI_PATH\" hook emit user-prompt-submit --adapter claude-code --pane-id \"$COVE_PANE_ID\"" }] }
+      { "hooks": [{ "type": "command", "command": "\"$COVE_CLI_PATH\" hook emit user-prompt-submit --adapter claude-code --nook-id \"$COVE_NOOK_ID\"" }] }
     ],
     "PreToolUse": [
-      { "matcher": "*", "hooks": [{ "type": "command", "command": "\"$COVE_CLI_PATH\" hook emit pre-tool-use --adapter claude-code --pane-id \"$COVE_PANE_ID\"" }] }
+      { "matcher": "*", "hooks": [{ "type": "command", "command": "\"$COVE_CLI_PATH\" hook emit pre-tool-use --adapter claude-code --nook-id \"$COVE_NOOK_ID\"" }] }
     ],
     "PostToolUse": [
-      { "matcher": "*", "hooks": [{ "type": "command", "command": "\"$COVE_CLI_PATH\" hook emit post-tool-use --adapter claude-code --pane-id \"$COVE_PANE_ID\"" }] }
+      { "matcher": "*", "hooks": [{ "type": "command", "command": "\"$COVE_CLI_PATH\" hook emit post-tool-use --adapter claude-code --nook-id \"$COVE_NOOK_ID\"" }] }
     ],
     "Stop": [
-      { "hooks": [{ "type": "command", "command": "\"$COVE_CLI_PATH\" hook emit stop --adapter claude-code --pane-id \"$COVE_PANE_ID\"" }] }
+      { "hooks": [{ "type": "command", "command": "\"$COVE_CLI_PATH\" hook emit stop --adapter claude-code --nook-id \"$COVE_NOOK_ID\"" }] }
     ]
   }
 }

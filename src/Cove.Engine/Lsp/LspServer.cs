@@ -136,7 +136,7 @@ public sealed class LspServer : IAsyncDisposable
 
     private async Task ReplyToServerRequestAsync(string rawId, string method, JsonElement? paramEl, CancellationToken ct)
     {
-        if (method == "workspace/configuration")
+        if (method == "bay/configuration")
         {
             var itemCount = paramEl is { } p && p.TryGetProperty("items", out var items) && items.ValueKind == JsonValueKind.Array
                 ? items.GetArrayLength()

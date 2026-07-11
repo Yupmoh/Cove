@@ -31,27 +31,27 @@ public sealed class ControlCodecTests
     }
 
     [Fact]
-    public void PaneListRequest_OmitsNullFields()
+    public void NookListRequest_OmitsNullFields()
     {
-        var req = new ControlRequest("1", "cove://commands/pane.list");
+        var req = new ControlRequest("1", "cove://commands/nook.list");
         string json = Encoding.UTF8.GetString(ControlCodec.Encode(req));
-        Assert.Equal("{\"id\":\"1\",\"uri\":\"cove://commands/pane.list\"}", json);
+        Assert.Equal("{\"id\":\"1\",\"uri\":\"cove://commands/nook.list\"}", json);
     }
 
     [Fact]
     public void SuccessResponse_OmitsError()
     {
-        JsonElement d = JsonDocument.Parse("{\"panes\":[]}").RootElement.Clone();
+        JsonElement d = JsonDocument.Parse("{\"nooks\":[]}").RootElement.Clone();
         var resp = new ControlResponse("1", true, d);
         string json = Encoding.UTF8.GetString(ControlCodec.Encode(resp));
-        Assert.Equal("{\"id\":\"1\",\"ok\":true,\"data\":{\"panes\":[]}}", json);
+        Assert.Equal("{\"id\":\"1\",\"ok\":true,\"data\":{\"nooks\":[]}}", json);
     }
 
     [Fact]
     public void ErrorResponse_OmitsData()
     {
-        var resp = new ControlResponse("1", false, null, new ControlError("not_found", "no pane 7f3a"));
+        var resp = new ControlResponse("1", false, null, new ControlError("not_found", "no nook 7f3a"));
         string json = Encoding.UTF8.GetString(ControlCodec.Encode(resp));
-        Assert.Equal("{\"id\":\"1\",\"ok\":false,\"error\":{\"code\":\"not_found\",\"message\":\"no pane 7f3a\"}}", json);
+        Assert.Equal("{\"id\":\"1\",\"ok\":false,\"error\":{\"code\":\"not_found\",\"message\":\"no nook 7f3a\"}}", json);
     }
 }

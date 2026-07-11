@@ -62,9 +62,9 @@ public sealed class LoopbackServer : IAsyncDisposable
                     var accept = ComputeAcceptKey(headers["sec-websocket-key"]);
                     var resp = $"HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: {accept}\r\n\r\n";
                     await stream.WriteAsync(Encoding.ASCII.GetBytes(resp), _cts.Token);
-                    var (pane, since) = ParsePtyQuery(target);
+                    var (nook, since) = ParsePtyQuery(target);
                     var ws = WebSocket.CreateFromStream(stream, isServer: true, subProtocol: null, keepAliveInterval: TimeSpan.FromSeconds(30));
-                    await PtyWsHandler.RunAsync(ws, _dial, _clientVersion, _channel, pane, since, _cts.Token);
+                    await PtyWsHandler.RunAsync(ws, _dial, _clientVersion, _channel, nook, since, _cts.Token);
                     return;
                 }
 
@@ -176,18 +176,18 @@ public sealed class LoopbackServer : IAsyncDisposable
         return "";
     }
 
-    private static (string pane, ulong since) ParsePtyQuery(string target)
+    private static (string nook, ulong since) ParsePtyQuery(string target)
     {
         var q = target.Contains('?') ? target[(target.IndexOf('?') + 1)..] : "";
-        string pane = ""; ulong since = 0;
+        string nook = ""; ulong since = 0;
         foreach (var kv in q.Split('&', StringSplitOptions.RemoveEmptyEntries))
         {
             var eq = kv.Split('=', 2);
             if (eq.Length != 2) continue;
-            if (eq[0] == "pane") pane = Uri.UnescapeDataString(eq[1]);
+            if (eq[0] == "nook") nook = Uri.UnescapeDataString(eq[1]);
             else if (eq[0] == "since") _ = ulong.TryParse(eq[1], out since);
         }
-        return (pane, since);
+        return (nook, since);
     }
 
     private static async Task<(string target, Dictionary<string, string> headers)?> ReadRequestAsync(Stream stream, CancellationToken ct)

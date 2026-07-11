@@ -60,7 +60,7 @@ public class HookHttpServerTests
     }
 
     [Fact]
-    public async Task EmitEndpoint_ExtractsPaneIdHeader()
+    public async Task EmitEndpoint_ExtractsNookIdHeader()
     {
         var dir = NewDir();
         Directory.CreateDirectory(dir);
@@ -74,13 +74,13 @@ public class HookHttpServerTests
 
             using var client = new HttpClient();
             using var msg = new HttpRequestMessage(HttpMethod.Post, $"http://127.0.0.1:{server.Port}/api/adapter/codex/stop");
-            msg.Headers.Add("X-Cove-Pane-Id", "pane-42");
+            msg.Headers.Add("X-Cove-Nook-Id", "nook-42");
             msg.Content = new StringContent("{}", Encoding.UTF8, "application/json");
             var resp = await client.SendAsync(msg);
 
             Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
             Assert.NotNull(received);
-            Assert.Equal("pane-42", received!.PaneId);
+            Assert.Equal("nook-42", received!.NookId);
         }
         finally { try { Directory.Delete(dir, true); } catch { } }
     }
@@ -93,16 +93,16 @@ public class HookHttpServerTests
         try
         {
             using var server = new HookHttpServer(dir);
-            server.SetContext(JsonDocument.Parse("""{"workspace":"my-ws","paneId":"p1"}""").RootElement.Clone());
+            server.SetContext(JsonDocument.Parse("""{"bay":"my-ws","nookId":"p1"}""").RootElement.Clone());
             await server.StartAsync();
 
             using var client = new HttpClient();
             using var msg = new HttpRequestMessage(HttpMethod.Post, $"http://127.0.0.1:{server.Port}/api/adapter/claude-code/session-start");
-            msg.Headers.Add("X-Cove-Pane-Id", "p1");
+            msg.Headers.Add("X-Cove-Nook-Id", "p1");
             msg.Content = new StringContent("{}", Encoding.UTF8, "application/json");
             var resp = await client.SendAsync(msg);
 
-            Assert.True(resp.Headers.Contains("X-Cove-Pane-Id"));
+            Assert.True(resp.Headers.Contains("X-Cove-Nook-Id"));
             var body = await resp.Content.ReadAsStringAsync();
             Assert.Contains("coveContext", body);
         }

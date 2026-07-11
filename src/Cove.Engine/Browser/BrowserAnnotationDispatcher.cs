@@ -3,7 +3,7 @@ using Microsoft.Extensions.Logging;
 namespace Cove.Engine.Browser;
 
 public sealed record AnnotationDispatchRequest(
-    string TargetPaneId,
+    string TargetNookId,
     string SourceUrl,
     string[] AnnotationIds,
     string? TaskRunId,
@@ -11,7 +11,7 @@ public sealed record AnnotationDispatchRequest(
 
 public sealed record AnnotationDispatchResult(
     string DispatchId,
-    string TargetPaneId,
+    string TargetNookId,
     int AnnotationCount,
     System.DateTimeOffset DispatchedAt);
 
@@ -26,12 +26,12 @@ public sealed class BrowserAnnotationDispatcher
         _logger = logger;
     }
 
-    public async Task<AnnotationDispatchResult> DispatchAsync(AnnotationDispatchRequest request, Func<string, byte[], Task> writeToPane)
+    public async Task<AnnotationDispatchResult> DispatchAsync(AnnotationDispatchRequest request, Func<string, byte[], Task> writeToNook)
     {
-        if (string.IsNullOrWhiteSpace(request.TargetPaneId))
+        if (string.IsNullOrWhiteSpace(request.TargetNookId))
         {
-            _logger.LogWarning("browser-annotation-dispatch: no target pane specified");
-            throw new ArgumentException("target pane required", nameof(request));
+            _logger.LogWarning("browser-annotation-dispatch: no target nook specified");
+            throw new ArgumentException("target nook required", nameof(request));
         }
 
         var dispatchId = System.Guid.NewGuid().ToString("N");
@@ -58,12 +58,12 @@ public sealed class BrowserAnnotationDispatcher
         var renderedMessage = RenderMessage(request, annotations);
         var bytes = System.Text.Encoding.UTF8.GetBytes(renderedMessage + "\r");
 
-        await writeToPane(request.TargetPaneId, bytes).ConfigureAwait(false);
+        await writeToNook(request.TargetNookId, bytes).ConfigureAwait(false);
 
-        _logger.LogInformation("browser-annotation-dispatch: {id} → pane {pane} ({count} annotations from {url})",
-            dispatchId, request.TargetPaneId, annotations.Count, request.SourceUrl);
+        _logger.LogInformation("browser-annotation-dispatch: {id} → nook {nook} ({count} annotations from {url})",
+            dispatchId, request.TargetNookId, annotations.Count, request.SourceUrl);
 
-        return new AnnotationDispatchResult(dispatchId, request.TargetPaneId, annotations.Count, dispatchedAt);
+        return new AnnotationDispatchResult(dispatchId, request.TargetNookId, annotations.Count, dispatchedAt);
     }
 
     private static string RenderMessage(AnnotationDispatchRequest request, IReadOnlyList<BrowserAnnotation> annotations)

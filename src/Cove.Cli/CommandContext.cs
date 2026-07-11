@@ -86,7 +86,7 @@ public sealed class CommandContext
     private async Task<int> DispatchAsync(FrameConnection conn, string uri, System.Text.Json.JsonElement? parsedParams)
     {
         await conn.WriteFrameAsync(FrameType.Request, 0,
-            ControlCodec.Encode(new ControlRequest("1", uri, Params: parsedParams, Source: Source, CallerPaneId: ResolveCallerPaneId())), System.Threading.CancellationToken.None);
+            ControlCodec.Encode(new ControlRequest("1", uri, Params: parsedParams, Source: Source, CallerNookId: ResolveCallerNookId())), System.Threading.CancellationToken.None);
         Frame? resp = await conn.ReadFrameAsync(System.Threading.CancellationToken.None);
         if (resp is not { } f)
         {
@@ -106,10 +106,10 @@ public sealed class CommandContext
         return 0;
     }
 
-    private static string? ResolveCallerPaneId()
+    private static string? ResolveCallerNookId()
     {
-        var paneId = System.Environment.GetEnvironmentVariable("COVE_PANE_ID");
-        return string.IsNullOrEmpty(paneId) ? null : paneId;
+        var nookId = System.Environment.GetEnvironmentVariable("COVE_NOOK_ID");
+        return string.IsNullOrEmpty(nookId) ? null : nookId;
     }
 
     private JsonElement ApplyFilter(JsonElement data)

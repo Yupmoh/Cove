@@ -17,44 +17,44 @@ public sealed class LayoutRoutesTests
     private static Task<ControlResponse?> Route(string uri, JsonElement? prm, LayoutService layout) =>
         EngineCommandRouter.RouteAsync(new ControlRequest("1", uri, prm), null, layout);
 
-    private static string? RoomIdOf(ControlResponse r)
+    private static string? ShoreIdOf(ControlResponse r)
     {
         Assert.True(r.Ok);
         Assert.NotNull(r.Data);
         var res = r.Data!.Value.Deserialize(Cove.Protocol.CoveJsonContext.Default.LayoutMutateResult);
         Assert.NotNull(res);
-        return res!.RoomId;
+        return res!.ShoreId;
     }
 
     private static int LeafCount(ControlResponse r)
     {
         Assert.True(r.Ok);
         Assert.NotNull(r.Data);
-        var snap = r.Data!.Value.Deserialize(Cove.Persistence.CoveJsonContext.Default.WorkspaceSnapshot);
+        var snap = r.Data!.Value.Deserialize(Cove.Persistence.CoveJsonContext.Default.BaySnapshot);
         Assert.NotNull(snap);
-        var room = snap!.Rooms.FirstOrDefault();
-        Assert.NotNull(room);
-        return MosaicOps.Leaves(room!.LayoutTree).Count;
+        var shore = snap!.Shores.FirstOrDefault();
+        Assert.NotNull(shore);
+        return MosaicOps.Leaves(shore!.LayoutTree).Count;
     }
 
     [Fact]
-    public async Task Get_WithWorkspaceId_ReturnsThatWorkspaceSnapshot()
+    public async Task Get_WithBayId_ReturnsThatBaySnapshot()
     {
         var layout = new LayoutService();
-        layout.SetActiveWorkspace("ws-a");
-        await Route("cove://commands/layout.mutate", P(new LayoutMutateParams("createRoom", NewPaneId: "pa", Name: "alpha")), layout);
-        layout.SetActiveWorkspace("ws-b");
-        await Route("cove://commands/layout.mutate", P(new LayoutMutateParams("createRoom", NewPaneId: "pb", Name: "beta")), layout);
+        layout.SetActiveBay("ws-a");
+        await Route("cove://commands/layout.mutate", P(new LayoutMutateParams("createShore", NewNookId: "pa", Name: "alpha")), layout);
+        layout.SetActiveBay("ws-b");
+        await Route("cove://commands/layout.mutate", P(new LayoutMutateParams("createShore", NewNookId: "pb", Name: "beta")), layout);
 
         var prm = JsonSerializer.SerializeToElement(new LayoutGetParams("ws-a"), Cove.Protocol.CoveJsonContext.Default.LayoutGetParams);
         var forA = await Route("cove://commands/layout.get", prm, layout);
         Assert.True(forA!.Ok);
-        var snapA = forA.Data!.Value.Deserialize(Cove.Persistence.CoveJsonContext.Default.WorkspaceSnapshot);
+        var snapA = forA.Data!.Value.Deserialize(Cove.Persistence.CoveJsonContext.Default.BaySnapshot);
         Assert.Equal("ws-a", snapA!.Id);
-        Assert.Equal("alpha", snapA.Rooms.Single().Name);
+        Assert.Equal("alpha", snapA.Shores.Single().Name);
 
         var noParams = await Route("cove://commands/layout.get", null, layout);
-        var snapActive = noParams!.Data!.Value.Deserialize(Cove.Persistence.CoveJsonContext.Default.WorkspaceSnapshot);
+        var snapActive = noParams!.Data!.Value.Deserialize(Cove.Persistence.CoveJsonContext.Default.BaySnapshot);
         Assert.Equal("ws-b", snapActive!.Id);
     }
 
@@ -65,15 +65,15 @@ public sealed class LayoutRoutesTests
 
         var create = await Route(
             "cove://commands/layout.mutate",
-            P(new LayoutMutateParams("createRoom", NewPaneId: "p1", Name: "main")),
+            P(new LayoutMutateParams("createShore", NewNookId: "p1", Name: "main")),
             layout);
         Assert.NotNull(create);
-        var roomId = RoomIdOf(create!);
-        Assert.NotNull(roomId);
+        var shoreId = ShoreIdOf(create!);
+        Assert.NotNull(shoreId);
 
         var split = await Route(
             "cove://commands/layout.mutate",
-            P(new LayoutMutateParams("split", RoomId: roomId, TargetPaneId: "p1", NewPaneId: "p2", Orientation: "row")),
+            P(new LayoutMutateParams("split", ShoreId: shoreId, TargetNookId: "p1", NewNookId: "p2", Orientation: "row")),
             layout);
         Assert.NotNull(split);
         Assert.True(split!.Ok);
@@ -84,7 +84,7 @@ public sealed class LayoutRoutesTests
 
         var close = await Route(
             "cove://commands/layout.mutate",
-            P(new LayoutMutateParams("close", RoomId: roomId, PaneId: "p2")),
+            P(new LayoutMutateParams("close", ShoreId: shoreId, NookId: "p2")),
             layout);
         Assert.NotNull(close);
         Assert.True(close!.Ok);
@@ -95,13 +95,13 @@ public sealed class LayoutRoutesTests
     }
 
     [Fact]
-    public async Task Mutate_UnknownRoom_Fails()
+    public async Task Mutate_UnknownShore_Fails()
     {
         var layout = new LayoutService();
 
         var resp = await Route(
             "cove://commands/layout.mutate",
-            P(new LayoutMutateParams("split", RoomId: "does-not-exist", TargetPaneId: "p1", NewPaneId: "p2")),
+            P(new LayoutMutateParams("split", ShoreId: "does-not-exist", TargetNookId: "p1", NewNookId: "p2")),
             layout);
 
         Assert.NotNull(resp);

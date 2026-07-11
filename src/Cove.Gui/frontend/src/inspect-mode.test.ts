@@ -15,8 +15,8 @@ describe("cssPath", () => {
 
   it("skips body and html", () => {
     const body = fakeEl("body");
-    const leaf = fakeEl("div", { classes: ["pane"], parent: body });
-    expect(cssPath(leaf)).toBe("div.pane");
+    const leaf = fakeEl("div", { classes: ["nook"], parent: body });
+    expect(cssPath(leaf)).toBe("div.nook");
   });
 
   it("handles null", () => {
@@ -30,8 +30,8 @@ describe("buildFeedbackReport", () => {
       note: "button misaligned",
       target: { selector: "div.x", tag: "div", classes: ["x"], rect: { x: 1, y: 2, width: 3, height: 4 }, textExcerpt: "hi" },
       regionRect: null,
-      workspace: "Cove",
-      room: "main",
+      bay: "Cove",
+      shore: "main",
       appVersion: "0.1.0",
       htmlExcerpt: "y".repeat(9000),
       nowIso: "2026-07-10T00:00:00Z",
@@ -51,10 +51,10 @@ describe("feedbackSlug", () => {
 
 describe("harnessPrompt", () => {
   it("mentions note, selector, and report path", () => {
-    const r = buildFeedbackReport({ note: "misaligned", target: { selector: "div.pane", tag: "div", classes: [], rect: { x: 0, y: 0, width: 1, height: 1 }, textExcerpt: "" }, regionRect: null, workspace: "w", room: "r", appVersion: "v", htmlExcerpt: "", nowIso: "t" });
+    const r = buildFeedbackReport({ note: "misaligned", target: { selector: "div.nook", tag: "div", classes: [], rect: { x: 0, y: 0, width: 1, height: 1 }, textExcerpt: "" }, regionRect: null, bay: "w", shore: "r", appVersion: "v", htmlExcerpt: "", nowIso: "t" });
     const p = harnessPrompt(r, "/tmp/fb.json");
     expect(p).toContain("misaligned");
-    expect(p).toContain("div.pane");
+    expect(p).toContain("div.nook");
     expect(p).toContain("/tmp/fb.json");
   });
 });

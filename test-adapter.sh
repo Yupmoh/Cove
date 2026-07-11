@@ -246,10 +246,10 @@ else
 fi
 
 # ── Phase 4: /resolve acceptance ─────────────────────────────────────
-# Synthetic events go in under a single throwaway test-pane-id so Phase 5
+# Synthetic events go in under a single throwaway test-nook-id so Phase 5
 # can read them back in isolation. Random suffix avoids overlap across
 # concurrent harness runs.
-TEST_PANE_ID="cove-test-${ADAPTER_NAME}-$$"
+TEST_NOOK_ID="cove-test-${ADAPTER_NAME}-$$"
 
 section "Phase 4: /resolve acceptance"
 
@@ -269,9 +269,9 @@ else
     uri="cove://hooks/${ADAPTER_NAME}/${event}"
     payload="$(jq -n \
       --arg uri "$uri" \
-      --arg pane "$TEST_PANE_ID" \
+      --arg nook "$TEST_NOOK_ID" \
       --argjson params "$(cat "$expected_file")" \
-      '{uri: $uri, paneId: $pane, params: $params}')"
+      '{uri: $uri, nookId: $nook, params: $params}')"
     response="$(curl -sS -X POST "http://127.0.0.1:${RESOLVE_PORT}/resolve" \
       -H 'Content-Type: application/json' \
       -d "$payload" 2>&1)"
@@ -285,8 +285,8 @@ else
 fi
 
 # ── Phase 5: cove state captured what we sent ──────────────────────
-# Reads back the events cove stored for our throwaway test pane via
-# `cove://hooks/_state?paneId=<id>`. This moves the harness from
+# Reads back the events cove stored for our throwaway test nook via
+# `cove://hooks/_state?nookId=<id>`. This moves the harness from
 # "cove accepted the event" to "cove stored it with the right shape".
 # Optional per-adapter `tests/state.assert.sh` receives the JSON state
 # document on stdin and the adapter name as $1 — exit 0 if assertions pass.
@@ -299,7 +299,7 @@ elif [[ -z "$RESOLVE_PORT" ]]; then
 else
   state_response="$(curl -sS -X POST "http://127.0.0.1:${RESOLVE_PORT}/resolve" \
     -H 'Content-Type: application/json' \
-    -d "$(jq -n --arg pane "$TEST_PANE_ID" '{uri: ("cove://hooks/_state?paneId=" + $pane + "&limit=100")}')" 2>&1)"
+    -d "$(jq -n --arg nook "$TEST_NOOK_ID" '{uri: ("cove://hooks/_state?nookId=" + $nook + "&limit=100")}')" 2>&1)"
 
   if ! echo "$state_response" | jq -e '.events | type == "array"' >/dev/null 2>&1; then
     fail "_state returned invalid shape" "$state_response"

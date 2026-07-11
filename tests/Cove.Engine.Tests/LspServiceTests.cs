@@ -26,7 +26,7 @@ public sealed class LspServiceTests
         return doc.RootElement.Clone();
     }
 
-    private static string? FindWorkspaceTypeScriptLib()
+    private static string? FindBayTypeScriptLib()
     {
         var dir = AppContext.BaseDirectory;
         for (var i = 0; i < 8; i++)
@@ -44,7 +44,7 @@ public sealed class LspServiceTests
     public async Task Diagnostics_TypeScriptTypeError_ReportsError()
     {
         if (FindOnPath("typescript-language-server") is null) return;
-        if (FindWorkspaceTypeScriptLib() is not { } tsLib) return;
+        if (FindBayTypeScriptLib() is not { } tsLib) return;
         var dir = Path.Combine(Path.GetTempPath(), "cove-lspsvc-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(Path.Combine(dir, "node_modules"));
         File.CreateSymbolicLink(Path.Combine(dir, "node_modules", "typescript"), tsLib);

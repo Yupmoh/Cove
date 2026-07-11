@@ -11,14 +11,14 @@ public sealed class CoveJsonContextTests
     {
         var state = new CoveState
         {
-            FocusedWorkspace = "ws-1",
-            OpenWorkspaces = new[] { "ws-1" },
+            FocusedBay = "ws-1",
+            OpenBays = new[] { "ws-1" },
             WindowGeometry = new WindowGeometry(120, 80, 1440, 900),
         };
         var json = JsonSerializer.Serialize(state, CoveJsonContext.Default.CoveState);
         Assert.Contains("\"schemaVersion\"", json);
-        Assert.Contains("\"focusedWorkspace\"", json);
-        Assert.Contains("\"openWorkspaces\"", json);
+        Assert.Contains("\"focusedBay\"", json);
+        Assert.Contains("\"openBays\"", json);
         Assert.Contains("\"windowGeometry\"", json);
         Assert.Contains("\n", json);
     }
@@ -28,7 +28,7 @@ public sealed class CoveJsonContextTests
     {
         var state = new CoveState();
         var json = JsonSerializer.Serialize(state, CoveJsonContext.Default.CoveState);
-        Assert.DoesNotContain("focusedWorkspace", json);
+        Assert.DoesNotContain("focusedBay", json);
         Assert.DoesNotContain("windowGeometry", json);
     }
 

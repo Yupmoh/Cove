@@ -9,12 +9,12 @@ public static class PtyWsHandler
 {
     public static async Task RunAsync(
         WebSocket ws, Func<CancellationToken, Task<Stream>> dial, string clientVersion, string channel,
-        string paneId, ulong since, CancellationToken ct)
+        string nookId, ulong since, CancellationToken ct)
     {
         PtyStreamClient? client = null;
         try
         {
-            client = await PtyStreamClient.SubscribeAsync(dial, clientVersion, channel, paneId, since, ct);
+            client = await PtyStreamClient.SubscribeAsync(dial, clientVersion, channel, nookId, since, ct);
             ulong browserAcked = client.BaseOffset;
             await SendText(ws, $"{{\"t\":\"base\",\"off\":{client.BaseOffset}}}", ct);
 
@@ -37,7 +37,7 @@ public static class PtyWsHandler
                 onEnd: async (final, code, c) => await SendText(ws, $"{{\"t\":\"end\",\"code\":{code}}}", c),
                 ct);
         }
-        catch (Exception ex) { Console.Error.WriteLine($"pty ws relay ended for pane {paneId}: {ex.Message}"); }
+        catch (Exception ex) { Console.Error.WriteLine($"pty ws relay ended for nook {nookId}: {ex.Message}"); }
         finally
         {
             if (client is not null) await client.DisposeAsync();

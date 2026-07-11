@@ -4,14 +4,14 @@ Cove ships a full terminal-mode client (`cove attach`) that drives the same head
 
 ## Architecture
 
-The TUI is a **second live client** of the `cove://` daemon — not a separate application. It connects via the same control protocol (M9-P02 ControlClient) and renders the same workspace/room/pane mosaic as the GUI.
+The TUI is a **second live client** of the `cove://` daemon — not a separate application. It connects via the same control protocol (M9-P02 ControlClient) and renders the same bay/shore/nook mosaic as the GUI.
 
 | Component | Role |
 |---|---|
 | ControlClient | Connects to daemon over `cove://` (UDS/named-pipe), invokes verbs, subscribes to events, streams PTY bytes |
 | TerminalCapabilities | Detects terminal color/glyph/unicode support from TERM/COLORTERM/NO_COLOR/TERM_PROGRAM |
 | Cell compositor | Double-buffered grid with damage tracking (M9-P03, human-judgment) |
-| VT emulator | xterm-subset parser for per-pane grid + scrollback (M9-P04, human-judgment) |
+| VT emulator | xterm-subset parser for per-nook grid + scrollback (M9-P04, human-judgment) |
 | Spectre backend | Custom IAnsiConsole compositing into cell regions (M9-P05, human-judgment) |
 | Input layer | Raw mode, CSI-u/kitty decode, SGR-1006 mouse (M9-P06, human-judgment) |
 
@@ -21,17 +21,17 @@ The TUI uses the same default keymap as the GUI (MC-P13), adapted for terminal c
 
 | Chord | Action |
 |---|---|
-| `prefix+c` | New room |
-| `prefix+n` | New pane (split right) |
-| `prefix+shift+n` | New pane (split down) |
-| `prefix+[` | Focus previous pane |
-| `prefix+]` | Focus next pane |
+| `prefix+c` | New shore |
+| `prefix+n` | New nook (split right) |
+| `prefix+shift+n` | New nook (split down) |
+| `prefix+[` | Focus previous nook |
+| `prefix+]` | Focus next nook |
 | `prefix+d` | Detach from session |
 | `prefix+l` | Open launcher |
 | `prefix+:` | Open command palette |
-| `prefix+s` | Switch workspace |
-| `prefix+w` | Close pane |
-| `prefix+x` | Maximize/zoom pane |
+| `prefix+s` | Switch bay |
+| `prefix+w` | Close nook |
+| `prefix+x` | Maximize/zoom nook |
 
 ## SSH guide
 
@@ -76,7 +76,7 @@ When the `NO_COLOR` environment variable is set (any value), Cove disables all c
 
 ## GUI-only degradation stubs
 
-Browser, editor, canvas, and media panes render honest placeholders in TUI mode — a single-line description + "open in GUI" hint, never a fake rendering.
+Browser, editor, canvas, and media nooks render honest placeholders in TUI mode — a single-line description + "open in GUI" hint, never a fake rendering.
 
 ## Status
 

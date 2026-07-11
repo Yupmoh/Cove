@@ -34,21 +34,21 @@ public sealed class TaskStatusRouteTests
         await using var h = await DaemonTestHarness.StartAsync();
         await using FrameConnection ctl = await h.ConnectAsync("cli");
 
-        var create = await SendAsync(ctl, "c", "cove://commands/task.status.create", P("""{"workspaceId":"ws1","id":"backlog","name":"Backlog","hexColor":"999999","position":10}"""), ct);
+        var create = await SendAsync(ctl, "c", "cove://commands/task.status.create", P("""{"bayId":"ws1","id":"backlog","name":"Backlog","hexColor":"999999","position":10}"""), ct);
         Assert.True(create.Ok, create.Error?.Message);
 
-        var list = await SendAsync(ctl, "l", "cove://commands/task.status.list", P("""{"workspaceId":"ws1"}"""), ct);
+        var list = await SendAsync(ctl, "l", "cove://commands/task.status.list", P("""{"bayId":"ws1"}"""), ct);
         Assert.True(list.Ok);
         var statusCount = list.Data!.Value.GetProperty("statuses").GetArrayLength();
         Assert.True(statusCount >= 6);
 
-        var hidden = await SendAsync(ctl, "h", "cove://commands/task.status.set-hidden", P("""{"workspaceId":"ws1","id":"backlog","hidden":true}"""), ct);
+        var hidden = await SendAsync(ctl, "h", "cove://commands/task.status.set-hidden", P("""{"bayId":"ws1","id":"backlog","hidden":true}"""), ct);
         Assert.True(hidden.Ok);
 
-        var del = await SendAsync(ctl, "d", "cove://commands/task.status.delete", P("""{"workspaceId":"ws1","id":"backlog","rehomeToStatusId":"todo"}"""), ct);
+        var del = await SendAsync(ctl, "d", "cove://commands/task.status.delete", P("""{"bayId":"ws1","id":"backlog","rehomeToStatusId":"todo"}"""), ct);
         Assert.True(del.Ok);
 
-        var listAfter = await SendAsync(ctl, "l2", "cove://commands/task.status.list", P("""{"workspaceId":"ws1"}"""), ct);
+        var listAfter = await SendAsync(ctl, "l2", "cove://commands/task.status.list", P("""{"bayId":"ws1"}"""), ct);
         var ids = listAfter.Data!.Value.GetProperty("statuses").EnumerateArray().Select(s => s.GetProperty("id").GetString()).ToList();
         Assert.DoesNotContain("backlog", ids);
     }
@@ -63,8 +63,8 @@ public sealed class TaskStatusRouteTests
         await using var h = await DaemonTestHarness.StartAsync();
         await using FrameConnection ctl = await h.ConnectAsync("cli");
 
-        var first = await SendAsync(ctl, "1", "cove://commands/task.status.create", P("""{"workspaceId":"ws1","id":"todo2","name":"Todo","hexColor":"808080","position":10}"""), ct);
-        var second = await SendAsync(ctl, "2", "cove://commands/task.status.create", P("""{"workspaceId":"ws1","id":"todo3","name":"Todo","hexColor":"808080","position":11}"""), ct);
+        var first = await SendAsync(ctl, "1", "cove://commands/task.status.create", P("""{"bayId":"ws1","id":"todo2","name":"Todo","hexColor":"808080","position":10}"""), ct);
+        var second = await SendAsync(ctl, "2", "cove://commands/task.status.create", P("""{"bayId":"ws1","id":"todo3","name":"Todo","hexColor":"808080","position":11}"""), ct);
         Assert.False(second.Ok);
         Assert.Equal("conflict", second.Error!.Code);
     }

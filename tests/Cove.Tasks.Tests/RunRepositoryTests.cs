@@ -30,7 +30,7 @@ public sealed class RunRepositoryTests
     {
         using var conn = factory.Open();
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = "INSERT OR IGNORE INTO statuses (workspace_id, id, name, hex_color, position, created_at, updated_at) VALUES (@Ws, @Id, @Id, '808080', 0, @Now, @Now)";
+        cmd.CommandText = "INSERT OR IGNORE INTO statuses (bay_id, id, name, hex_color, position, created_at, updated_at) VALUES (@Ws, @Id, @Id, '808080', 0, @Now, @Now)";
         cmd.Parameters.AddWithValue("@Ws", ws);
         cmd.Parameters.AddWithValue("@Id", id);
         cmd.Parameters.AddWithValue("@Now", System.DateTimeOffset.UtcNow.ToString("o"));
@@ -42,7 +42,7 @@ public sealed class RunRepositoryTests
         var row = new CardRow
         {
             Id = System.Guid.NewGuid().ToString("N"),
-            WorkspaceId = ws,
+            BayId = ws,
             TaskNumber = num,
             Title = "card-" + num,
             StatusId = "todo",
@@ -156,11 +156,11 @@ public sealed class RunRepositoryTests
         var cardId = await SeedCardAsync(cards, "ws1", 1);
         var run = await runs.CreateAsync(cardId, "ws1", null);
 
-        var segment = await segments.AddAsync(run!.Id, paneId: "pane-1", adapterSessionId: "session-1");
+        var segment = await segments.AddAsync(run!.Id, nookId: "nook-1", adapterSessionId: "session-1");
 
         Assert.NotNull(segment);
         Assert.Equal(run.Id, segment!.RunId);
-        Assert.Equal("pane-1", segment.PaneId);
+        Assert.Equal("nook-1", segment.NookId);
         var list = segments.ListByRun(run.Id);
         Assert.Single(list);
     }
@@ -171,7 +171,7 @@ public sealed class RunRepositoryTests
         var (_, runs, segments, cards, _) = await NewAsync();
         var cardId = await SeedCardAsync(cards, "ws1", 1);
         var run = await runs.CreateAsync(cardId, "ws1", null);
-        var seg = await segments.AddAsync(run!.Id, "pane-1", "session-1");
+        var seg = await segments.AddAsync(run!.Id, "nook-1", "session-1");
 
         await segments.EndAsync(seg!.Id);
 
@@ -180,15 +180,15 @@ public sealed class RunRepositoryTests
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task ListByWorkspace_ReturnsWorkspaceRuns()
+    public async System.Threading.Tasks.Task ListByBay_ReturnsBayRuns()
     {
         var (_, runs, _, cards, _) = await NewAsync();
         var cardId = await SeedCardAsync(cards, "ws1", 1);
         await runs.CreateAsync(cardId, "ws1", null);
 
-        var list = runs.ListByWorkspace("ws1");
+        var list = runs.ListByBay("ws1");
         Assert.Single(list);
-        Assert.Empty(runs.ListByWorkspace("ws2"));
+        Assert.Empty(runs.ListByBay("ws2"));
     }
 
     [Fact]

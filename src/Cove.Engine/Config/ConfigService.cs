@@ -97,7 +97,7 @@ public sealed class ConfigService : System.IDisposable
             "appearance.iconSet" => (true, _config.Appearance.IconSet),
             "appearance.wallpaper" => (true, _config.Appearance.Wallpaper),
             "appearance.accent" => (true, _config.Appearance.Accent),
-            "appearance.paneLight" => (true, _config.Appearance.PaneLight),
+            "appearance.nookLight" => (true, _config.Appearance.NookLight),
             "terminal.fontFamily" => (true, _config.Terminal.FontFamily),
             "terminal.fontSize" => (true, _config.Terminal.FontSize),
             "terminal.lineHeight" => (true, _config.Terminal.LineHeight),
@@ -162,7 +162,7 @@ public sealed class ConfigService : System.IDisposable
                 case "appearance.iconSet": _config.Appearance.IconSet = value; break;
                 case "appearance.wallpaper": _config.Appearance.Wallpaper = value; break;
                 case "appearance.accent": _config.Appearance.Accent = value; break;
-                case "appearance.paneLight": _config.Appearance.PaneLight = AutoDetectBool(value); break;
+                case "appearance.nookLight": _config.Appearance.NookLight = AutoDetectBool(value); break;
                 case "terminal.fontFamily": _config.Terminal.FontFamily = value; break;
                 case "terminal.fontSize": _config.Terminal.FontSize = AutoDetectInt(value); break;
                 case "terminal.lineHeight": _config.Terminal.LineHeight = AutoDetectDouble(value); break;

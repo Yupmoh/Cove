@@ -1,4 +1,4 @@
-using Cove.Engine.Workspaces;
+using Cove.Engine.Bays;
 using Xunit;
 
 namespace Cove.Engine.Tests;
@@ -37,13 +37,13 @@ public sealed class WorktreeTests
     {
         var git = new FakeGitRunner();
         int n = 0;
-        await using var m = new WorkspaceManager(newId: () => $"id-{++n}", gitRunner: git);
-        var parent = await m.CreateWorkspaceAsync("proj", "/repo");
+        await using var m = new BayManager(newId: () => $"id-{++n}", gitRunner: git);
+        var parent = await m.CreateBayAsync("proj", "/repo");
 
         var wt = await m.CreateWorktreeAsync(parent.Id, "feature", "/repo-wt/feature", newBranch: true);
         Assert.NotNull(wt);
         Assert.True(wt!.IsWorktree);
-        Assert.Equal(parent.Id, wt.ParentWorkspaceId);
+        Assert.Equal(parent.Id, wt.ParentBayId);
         Assert.Equal("feature", wt.WorktreeBranch);
         Assert.Equal(parent.CollectionId, wt.CollectionId);
         Assert.Contains(git.Calls, c => c.StartsWith("worktree add", StringComparison.Ordinal));
@@ -52,13 +52,13 @@ public sealed class WorktreeTests
         Assert.Single(list);
         Assert.Equal(wt.Id, list[0].Id);
 
-        await m.SwitchWorkspaceAsync(wt.Id);
-        Assert.Equal(wt.Id, m.Registry.FocusedWorkspaceId);
+        await m.SwitchBayAsync(wt.Id);
+        Assert.Equal(wt.Id, m.Registry.FocusedBayId);
 
         var removed = await m.RemoveWorktreeAsync(wt.Id);
         Assert.True(removed);
         Assert.Empty(m.ListWorktrees(parent.Id));
-        Assert.Equal(parent.Id, m.Registry.FocusedWorkspaceId);
+        Assert.Equal(parent.Id, m.Registry.FocusedBayId);
         Assert.Contains(git.Calls, c => c.StartsWith("worktree remove", StringComparison.Ordinal));
     }
 
@@ -100,12 +100,12 @@ public sealed class WorktreeTests
     {
         var git = new FakeGitRunner();
         int n = 0;
-        var changes = new List<WorkspaceChange>();
-        await using var m = new WorkspaceManager(
+        var changes = new List<BayChange>();
+        await using var m = new BayManager(
             emit: c => changes.Add(c),
             newId: () => $"id-{++n}",
             gitRunner: git);
-        var parent = await m.CreateWorkspaceAsync("proj", "/repo");
+        var parent = await m.CreateBayAsync("proj", "/repo");
         var wt = await m.CreateWorktreeAsync(parent.Id, "feature", "/repo-wt/feature", newBranch: true);
         Assert.NotNull(wt);
 
@@ -117,14 +117,14 @@ public sealed class WorktreeTests
         git.SetPorcelain("worktree /repo\nHEAD aaaa\nbranch refs/heads/main\n\nworktree /repo-wt/feature\nHEAD bbbb\nbranch refs/heads/feature2\n\n");
         changes.Clear();
         await m.RefreshWorktreesAsync(parent.Id);
-        Assert.Contains(changes, c => c.Kind == WorkspaceChangeKind.Updated && c.WorkspaceId == wt!.Id);
+        Assert.Contains(changes, c => c.Kind == BayChangeKind.Updated && c.BayId == wt!.Id);
         var refreshed = m.ListWorktrees(parent.Id).Single();
         Assert.Equal("feature2", refreshed.WorktreeBranch);
 
         git.SetPorcelain("worktree /repo\nHEAD aaaa\nbranch refs/heads/main\n\n");
         changes.Clear();
         await m.RefreshWorktreesAsync(parent.Id);
-        Assert.Contains(changes, c => c.Kind == WorkspaceChangeKind.Deleted && c.WorkspaceId == wt!.Id);
+        Assert.Contains(changes, c => c.Kind == BayChangeKind.Deleted && c.BayId == wt!.Id);
         Assert.Empty(m.ListWorktrees(parent.Id));
     }
 
@@ -144,14 +144,14 @@ public sealed class WorktreeTests
             await git.RunAsync(repo, ["add", "."]);
             await git.RunAsync(repo, ["commit", "-m", "init"]);
 
-            var changes = new List<WorkspaceChange>();
+            var changes = new List<BayChange>();
             var deleted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             int n = 0;
-            await using var m = new WorkspaceManager(
-                emit: c => { lock (changes) changes.Add(c); if (c.Kind == WorkspaceChangeKind.Deleted) deleted.TrySetResult(true); },
+            await using var m = new BayManager(
+                emit: c => { lock (changes) changes.Add(c); if (c.Kind == BayChangeKind.Deleted) deleted.TrySetResult(true); },
                 newId: () => $"id-{++n}",
                 gitRunner: git);
-            var parent = await m.CreateWorkspaceAsync("proj", repo);
+            var parent = await m.CreateBayAsync("proj", repo);
             var wt = await m.CreateWorktreeAsync(parent.Id, "feature", wtPath, newBranch: true);
             Assert.NotNull(wt);
 
@@ -206,7 +206,7 @@ public sealed class WorktreeTests
         }
     }
     [Fact]
-    public async Task AdoptWorktree_BindsOrphan_AsChildWorkspace()
+    public async Task AdoptWorktree_BindsOrphan_AsChildBay()
     {
         var repo = Path.Combine(Path.GetTempPath(), "cove-adopt-" + Guid.NewGuid().ToString("N"));
         var wtPath = Path.Combine(Path.GetTempPath(), "cove-adopt-wt-" + Guid.NewGuid().ToString("N"));
@@ -223,17 +223,17 @@ public sealed class WorktreeTests
             await git.RunAsync(repo, ["worktree", "add", wtPath, "-b", "feature"]);
 
             int n = 0;
-            var changes = new System.Collections.Generic.List<WorkspaceChange>();
-            await using var m = new WorkspaceManager(
+            var changes = new System.Collections.Generic.List<BayChange>();
+            await using var m = new BayManager(
                 newId: () => $"id-{++n}",
                 gitRunner: git,
                 emit: c => changes.Add(c));
-            var parent = await m.CreateWorkspaceAsync("proj", repo);
+            var parent = await m.CreateBayAsync("proj", repo);
 
             var adopted = await m.AdoptWorktreeAsync(parent.Id, wtPath, "feature");
             Assert.NotNull(adopted);
             Assert.True(adopted!.IsWorktree);
-            Assert.Equal(parent.Id, adopted.ParentWorkspaceId);
+            Assert.Equal(parent.Id, adopted.ParentBayId);
             Assert.Equal("feature", adopted.WorktreeBranch);
             Assert.Equal(wtPath, adopted.ProjectDir);
 

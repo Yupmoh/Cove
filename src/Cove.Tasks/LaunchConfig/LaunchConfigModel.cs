@@ -5,7 +5,7 @@ public sealed record LaunchConfigModel
     public string? Adapter { get; init; }
     public string? ProfileSlug { get; init; }
     private readonly string? _executionMode;
-    public string ExecutionMode { get => _executionMode ?? "pane"; init => _executionMode = value; }
+    public string ExecutionMode { get => _executionMode ?? "nook"; init => _executionMode = value; }
     public string? InProgressStatusId { get; init; }
     public string? ReviewStatusId { get; init; }
     public string? CompletionStatusId { get; init; }

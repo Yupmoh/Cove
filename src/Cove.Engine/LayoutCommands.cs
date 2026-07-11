@@ -15,13 +15,13 @@ internal static class LayoutCommands
     {
         if (ctx.Layout is not { } layout)
             return Task.FromResult(ctx.Fail("not_ready", "layout service unavailable"));
-        var requestedWorkspaceId = ctx.Request.Params is JsonElement el
-            ? el.Deserialize(Cove.Protocol.CoveJsonContext.Default.LayoutGetParams)?.WorkspaceId
+        var requestedBayId = ctx.Request.Params is JsonElement el
+            ? el.Deserialize(Cove.Protocol.CoveJsonContext.Default.LayoutGetParams)?.BayId
             : null;
-        var snapshot = string.IsNullOrEmpty(requestedWorkspaceId)
+        var snapshot = string.IsNullOrEmpty(requestedBayId)
             ? ActiveSnapshot(ctx, layout)
-            : SnapshotFor(ctx, layout, requestedWorkspaceId);
-        return Task.FromResult(ctx.Ok(snapshot, Cove.Persistence.CoveJsonContext.Default.WorkspaceSnapshot));
+            : SnapshotFor(ctx, layout, requestedBayId);
+        return Task.FromResult(ctx.Ok(snapshot, Cove.Persistence.CoveJsonContext.Default.BaySnapshot));
     }
 
     [CoveCommand("cove://commands/layout.snapshot")]
@@ -29,14 +29,14 @@ internal static class LayoutCommands
     {
         if (ctx.Layout is not { } layout)
             return Task.FromResult(ctx.Fail("not_ready", "layout service unavailable"));
-        return Task.FromResult(ctx.Ok(ActiveSnapshot(ctx, layout), Cove.Persistence.CoveJsonContext.Default.WorkspaceSnapshot));
+        return Task.FromResult(ctx.Ok(ActiveSnapshot(ctx, layout), Cove.Persistence.CoveJsonContext.Default.BaySnapshot));
     }
 
-    private static Cove.Persistence.WorkspaceSnapshot SnapshotFor(EngineDispatchContext ctx, Cove.Engine.Layout.LayoutService layout, string wsId)
+    private static Cove.Persistence.BaySnapshot SnapshotFor(EngineDispatchContext ctx, Cove.Engine.Layout.LayoutService layout, string wsId)
     {
         var name = wsId;
         var projectDir = Environment.CurrentDirectory;
-        if (ctx.Workspaces?.Get(wsId) is { } actor)
+        if (ctx.Bays?.Get(wsId) is { } actor)
         {
             name = actor.State.Name;
             projectDir = actor.State.ProjectDir;
@@ -44,12 +44,12 @@ internal static class LayoutCommands
         return layout.ToSnapshot(wsId, name, projectDir);
     }
 
-    private static Cove.Persistence.WorkspaceSnapshot ActiveSnapshot(EngineDispatchContext ctx, Cove.Engine.Layout.LayoutService layout)
+    private static Cove.Persistence.BaySnapshot ActiveSnapshot(EngineDispatchContext ctx, Cove.Engine.Layout.LayoutService layout)
     {
-        var wsId = layout.ActiveWorkspaceId;
+        var wsId = layout.ActiveBayId;
         var name = wsId;
         var projectDir = Environment.CurrentDirectory;
-        if (ctx.Workspaces?.Get(wsId) is { } actor)
+        if (ctx.Bays?.Get(wsId) is { } actor)
         {
             name = actor.State.Name;
             projectDir = actor.State.ProjectDir;
@@ -69,29 +69,29 @@ internal static class LayoutCommands
         {
             return Task.FromResult(p.Op switch
             {
-                "createRoom" => ctx.Ok(new LayoutMutateResult(layout.CreateRoom(p.Name ?? "main", NewLeaf(p.NewPaneId!, p.PaneType))), Cove.Protocol.CoveJsonContext.Default.LayoutMutateResult),
-                "split" => MutateOk(() => layout.SplitPane(p.RoomId!, p.TargetPaneId!, Orient(p.Orientation), NewLeaf(p.NewPaneId!, p.PaneType)), p.RoomId, ctx),
-                "replace" => MutateOk(() => layout.ReplacePane(p.RoomId!, p.TargetPaneId!, NewLeaf(p.NewPaneId!, p.PaneType)), p.RoomId, ctx),
-                "close" => MutateOk(() => layout.ClosePane(p.RoomId!, p.PaneId!), p.RoomId, ctx),
-                "closeRoom" => CloseRoomOk(() => layout.CloseRoom(p.RoomId!), p.RoomId, ctx),
-                "addSubtab" => MutateOk(() => layout.AddSubtab(p.RoomId!, p.PaneId!, p.NewPaneId!), p.RoomId, ctx),
-                "activateSubtab" => MutateOk(() => layout.ActivateSubtab(p.RoomId!, p.PaneId!, p.Dir), p.RoomId, ctx),
-                "promoteSubtab" => MutateOk(() => layout.PromoteSubtab(p.RoomId!, p.PaneId!, p.Dir, p.NewPaneId!), p.RoomId, ctx),
-                "centerDrop" => MutateOk(() => layout.CenterDrop(p.RoomId!, p.TargetPaneId!, p.Dir, p.PaneId!), p.RoomId, ctx),
-                "movePane" => MutateOk(() => layout.MovePane(p.RoomId!, p.PaneId!, p.TargetPaneId!, Orient(p.Orientation), p.Dir), p.RoomId, ctx),
-                "movePaneToRoom" => MutateOk(() => layout.MovePaneToRoom(p.PaneId!, p.RoomId!), p.RoomId, ctx),
-                "focus" => MutateOk(() => layout.FocusPane(p.RoomId!, p.PaneId!), p.RoomId, ctx),
-                "cycleFocus" => MutateOk(() => layout.CycleFocus(p.RoomId!, p.Dir), p.RoomId, ctx),
-                "zoom" => MutateOk(() => layout.SetZoom(p.RoomId!, p.PaneId), p.RoomId, ctx),
-                "unzoom" => MutateOk(() => layout.SetZoom(p.RoomId!, null), p.RoomId, ctx),
-                "rename" => MutateOk(() => layout.RenameRoom(p.RoomId!, p.Name ?? ""), p.RoomId, ctx),
-                "reorder" => ReorderOk(() => layout.ReorderRooms(p.RoomIds ?? System.Array.Empty<string>()), ctx),
+                "createShore" => ctx.Ok(new LayoutMutateResult(layout.CreateShore(p.Name ?? "main", NewLeaf(p.NewNookId!, p.NookType))), Cove.Protocol.CoveJsonContext.Default.LayoutMutateResult),
+                "split" => MutateOk(() => layout.SplitNook(p.ShoreId!, p.TargetNookId!, Orient(p.Orientation), NewLeaf(p.NewNookId!, p.NookType)), p.ShoreId, ctx),
+                "replace" => MutateOk(() => layout.ReplaceNook(p.ShoreId!, p.TargetNookId!, NewLeaf(p.NewNookId!, p.NookType)), p.ShoreId, ctx),
+                "close" => MutateOk(() => layout.CloseNook(p.ShoreId!, p.NookId!), p.ShoreId, ctx),
+                "closeShore" => CloseShoreOk(() => layout.CloseShore(p.ShoreId!), p.ShoreId, ctx),
+                "addSubtab" => MutateOk(() => layout.AddSubtab(p.ShoreId!, p.NookId!, p.NewNookId!), p.ShoreId, ctx),
+                "activateSubtab" => MutateOk(() => layout.ActivateSubtab(p.ShoreId!, p.NookId!, p.Dir), p.ShoreId, ctx),
+                "promoteSubtab" => MutateOk(() => layout.PromoteSubtab(p.ShoreId!, p.NookId!, p.Dir, p.NewNookId!), p.ShoreId, ctx),
+                "centerDrop" => MutateOk(() => layout.CenterDrop(p.ShoreId!, p.TargetNookId!, p.Dir, p.NookId!), p.ShoreId, ctx),
+                "moveNook" => MutateOk(() => layout.MoveNook(p.ShoreId!, p.NookId!, p.TargetNookId!, Orient(p.Orientation), p.Dir), p.ShoreId, ctx),
+                "moveNookToShore" => MutateOk(() => layout.MoveNookToShore(p.NookId!, p.ShoreId!), p.ShoreId, ctx),
+                "focus" => MutateOk(() => layout.FocusNook(p.ShoreId!, p.NookId!), p.ShoreId, ctx),
+                "cycleFocus" => MutateOk(() => layout.CycleFocus(p.ShoreId!, p.Dir), p.ShoreId, ctx),
+                "zoom" => MutateOk(() => layout.SetZoom(p.ShoreId!, p.NookId), p.ShoreId, ctx),
+                "unzoom" => MutateOk(() => layout.SetZoom(p.ShoreId!, null), p.ShoreId, ctx),
+                "rename" => MutateOk(() => layout.RenameShore(p.ShoreId!, p.Name ?? ""), p.ShoreId, ctx),
+                "reorder" => ReorderOk(() => layout.ReorderShores(p.ShoreIds ?? System.Array.Empty<string>()), ctx),
                 _ => ctx.Fail("invalid_params", $"unknown op {p.Op}"),
             });
         }
         catch (KeyNotFoundException)
         {
-            return Task.FromResult(ctx.Fail("not_found", "unknown room or pane"));
+            return Task.FromResult(ctx.Fail("not_found", "unknown shore or nook"));
         }
         catch (InvalidOperationException)
         {
@@ -102,24 +102,24 @@ internal static class LayoutCommands
     [CoveCommand("cove://commands/session.state")]
     public static Task<ControlResponse> SessionState(EngineDispatchContext ctx)
     {
-        if (ctx.Request.Params is not JsonElement el || el.Deserialize(Cove.Protocol.CoveJsonContext.Default.PaneRefParams) is not { } p)
-            return Task.FromResult(ctx.Fail("invalid_params", "pane ref required"));
-        var info = ctx.Panes?.List().FirstOrDefault(x => x.PaneId == p.PaneId);
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(Cove.Protocol.CoveJsonContext.Default.NookRefParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "nook ref required"));
+        var info = ctx.Nooks?.List().FirstOrDefault(x => x.NookId == p.NookId);
         if (info is null)
-            return Task.FromResult(ctx.Fail("not_found", $"unknown pane {p.PaneId}"));
-        return Task.FromResult(ctx.Ok(new SessionStateResult(info.PaneId, info.Command, info.Cols, info.Rows, info.Alive, info.Cwd), Cove.Protocol.CoveJsonContext.Default.SessionStateResult));
+            return Task.FromResult(ctx.Fail("not_found", $"unknown nook {p.NookId}"));
+        return Task.FromResult(ctx.Ok(new SessionStateResult(info.NookId, info.Command, info.Cols, info.Rows, info.Alive, info.Cwd), Cove.Protocol.CoveJsonContext.Default.SessionStateResult));
     }
 
-    private static ControlResponse MutateOk(Action work, string? roomId, EngineDispatchContext ctx)
+    private static ControlResponse MutateOk(Action work, string? shoreId, EngineDispatchContext ctx)
     {
         work();
-        return ctx.Ok(new LayoutMutateResult(roomId), Cove.Protocol.CoveJsonContext.Default.LayoutMutateResult);
+        return ctx.Ok(new LayoutMutateResult(shoreId), Cove.Protocol.CoveJsonContext.Default.LayoutMutateResult);
     }
 
-    private static ControlResponse CloseRoomOk(Action work, string? roomId, EngineDispatchContext ctx)
+    private static ControlResponse CloseShoreOk(Action work, string? shoreId, EngineDispatchContext ctx)
     {
         work();
-        return ctx.Ok(new LayoutMutateResult(roomId), Cove.Protocol.CoveJsonContext.Default.LayoutMutateResult);
+        return ctx.Ok(new LayoutMutateResult(shoreId), Cove.Protocol.CoveJsonContext.Default.LayoutMutateResult);
     }
 
     private static ControlResponse ReorderOk(Action work, EngineDispatchContext ctx)
@@ -128,28 +128,28 @@ internal static class LayoutCommands
         return ctx.Ok(new LayoutMutateResult(null), Cove.Protocol.CoveJsonContext.Default.LayoutMutateResult);
     }
 
-    private static PaneLeaf NewLeaf(string id, string? paneType = null) => new PaneLeaf
+    private static NookLeaf NewLeaf(string id, string? nookType = null) => new NookLeaf
     {
-        PaneId = id,
-        Subtabs = new[] { new Subtab(id, ParsePaneType(paneType)) },
+        NookId = id,
+        Subtabs = new[] { new Subtab(id, ParseNookType(nookType)) },
     };
 
-    private static PaneType ParsePaneType(string? s) => s switch
+    private static NookType ParseNookType(string? s) => s switch
     {
-        "terminal" or null or "" => PaneType.Terminal,
-        "empty" => PaneType.Empty,
-        "editor" => PaneType.Editor,
-        "markdown" => PaneType.Markdown,
-        "search" => PaneType.Search,
-        "sourceControl" or "git" => PaneType.SourceControl,
-        "browser" => PaneType.Browser,
-        "image" => PaneType.Image,
-        "diff" => PaneType.Diff,
-        "pdf" => PaneType.Pdf,
-        "video" => PaneType.Video,
-        "tasks-list" => PaneType.Tasks,
-        "notepad" => PaneType.Notepad,
-        _ => PaneType.Terminal,
+        "terminal" or null or "" => NookType.Terminal,
+        "empty" => NookType.Empty,
+        "editor" => NookType.Editor,
+        "markdown" => NookType.Markdown,
+        "search" => NookType.Search,
+        "sourceControl" or "git" => NookType.SourceControl,
+        "browser" => NookType.Browser,
+        "image" => NookType.Image,
+        "diff" => NookType.Diff,
+        "pdf" => NookType.Pdf,
+        "video" => NookType.Video,
+        "tasks-list" => NookType.Tasks,
+        "notepad" => NookType.Notepad,
+        _ => NookType.Terminal,
     };
 
     private static SplitOrientation Orient(string? s) => (s is "column" or "col" or "vertical") ? SplitOrientation.Column : SplitOrientation.Row;

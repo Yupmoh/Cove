@@ -52,7 +52,7 @@ public sealed class KnowledgePersistenceKernelTests
         using var conn = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={System.IO.Path.Combine(dir, "timeline.db")}");
         conn.Open();
         using var insertCmd = conn.CreateCommand();
-        insertCmd.CommandText = "INSERT INTO timeline (id, workspace_id, kind, scope, title, body, created_at) VALUES ('t1', 'ws1', 'note.created', 'workspace', 'Test Entry', ' searchable body content ', '2026-01-01T00:00:00Z')";
+        insertCmd.CommandText = "INSERT INTO timeline (id, bay_id, kind, scope, title, body, created_at) VALUES ('t1', 'ws1', 'note.created', 'bay', 'Test Entry', ' searchable body content ', '2026-01-01T00:00:00Z')";
         insertCmd.ExecuteNonQuery();
 
         using var ftsCmd = conn.CreateCommand();

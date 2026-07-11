@@ -5,7 +5,7 @@ using Cove.Engine.Hooks;
 using Cove.Engine.Knowledge;
 using Cove.Engine.Launch;
 using Cove.Engine.Lifecycle;
-using Cove.Engine.Panes;
+using Cove.Engine.Nooks;
 using Cove.Engine.Protocol;
 using Cove.Engine.Pty;
 using Cove.Engine.Sessions;
@@ -19,10 +19,10 @@ public static class EngineCommandRouter
 {
     public static async Task<ControlResponse?> RouteAsync(
         ControlRequest request,
-        PaneRegistry? panes = null,
+        NookRegistry? nooks = null,
         Cove.Engine.Layout.LayoutService? layout = null,
-        Cove.Engine.Workspaces.WorkspaceManager? workspaces = null,
-        Cove.Engine.Workspaces.RunCommandService? runCommands = null,
+        Cove.Engine.Bays.BayManager? bays = null,
+        Cove.Engine.Bays.RunCommandService? runCommands = null,
         Cove.Engine.Restart.RestorationService? restoration = null,
         Cove.Engine.Snapshots.SnapshotService? snapshots = null,
         Cove.Engine.Skills.SkillsService? skills = null,
@@ -53,17 +53,17 @@ public static class EngineCommandRouter
         ReviewStore? reviews = null,
         AttributionIndex? attribution = null,
         ReviewDispatcher? reviewDispatcher = null,
-        PaneTypeRegistry? paneTypes = null,
-        BrowserPaneManager? browser = null,
+        NookTypeRegistry? nookTypes = null,
+        BrowserNookManager? browser = null,
         ConfigService? config = null,
         Cove.Adapters.AdapterManifestStore? manifestStore = null,
         Cove.Adapters.RegistryService? registry = null,
         Cove.Engine.Activity.OmniChatStore? omniChat = null,
-        Cove.Engine.Protocol.PaneScopeStore? paneScopes = null,
+        Cove.Engine.Protocol.NookScopeStore? nookScopes = null,
         Cove.Engine.Protocol.StateBus? stateBus = null,
         Cove.Engine.Protocol.ExtensionRegistry? extensions = null,
         Cove.Engine.Captures.CaptureStore? captures = null,
-        Cove.Engine.Workspaces.GitReadModel? gitReadModel = null,
+        Cove.Engine.Bays.GitReadModel? gitReadModel = null,
         Cove.Engine.Search.SearchService? searchService = null,
         Cove.Engine.Theming.ThemeService? themes = null,
         Cove.Engine.Keybindings.KeybindingEngine? keybindings = null,
@@ -88,14 +88,14 @@ public static class EngineCommandRouter
         }
         try
         {
-            if (paneScopes is not null && ScopeEnforcement.IsPaneTargetingVerb(request.Uri))
+            if (nookScopes is not null && ScopeEnforcement.IsNookTargetingVerb(request.Uri))
             {
-                var denied = ScopeEnforcement.Check(request, paneScopes!, workspaces, layout);
+                var denied = ScopeEnforcement.Check(request, nookScopes!, bays, layout);
                 if (denied is not null)
                     return denied;
             }
-            var dispatchCtx = new EngineDispatchContext(request, panes, layout, workspaces, runCommands, restoration, snapshots, skills, agents, launchProfiles, adapterEnv, hookServer, hookRouter, agentRouter, activity, sessions, lifecycle, launcher, taskService, dispatchSaga, resumeSaga, timeline, blackboard, noteFiles, memory, memoryRanker, proposals, consolidator, edits, corpus, vaultSettings, library, reviews, attribution, reviewDispatcher, paneTypes, browser, config, manifestStore, registry, omniChat, paneScopes, stateBus, extensions, captures, gitReadModel, searchService, themes, keybindings, browserAutomation, diagnostics, perfBundles, recentSessions, lspService, sessionService);
-            dispatchCtx.Redrive = subReq => RouteAsync(subReq, panes, layout, workspaces, runCommands, restoration, snapshots, skills, agents, launchProfiles, adapterEnv, hookServer, hookRouter, agentRouter, activity, sessions, lifecycle, launcher, taskService, dispatchSaga, resumeSaga, timeline, blackboard, noteFiles, memory, memoryRanker, proposals, consolidator, edits, corpus, vaultSettings, library, reviews, attribution, reviewDispatcher, paneTypes, browser, config, manifestStore, registry, omniChat, paneScopes, stateBus, extensions, captures, gitReadModel, searchService, themes, keybindings, browserAutomation, diagnostics, perfBundles, recentSessions, lspService, sessionService, cancellationToken);
+            var dispatchCtx = new EngineDispatchContext(request, nooks, layout, bays, runCommands, restoration, snapshots, skills, agents, launchProfiles, adapterEnv, hookServer, hookRouter, agentRouter, activity, sessions, lifecycle, launcher, taskService, dispatchSaga, resumeSaga, timeline, blackboard, noteFiles, memory, memoryRanker, proposals, consolidator, edits, corpus, vaultSettings, library, reviews, attribution, reviewDispatcher, nookTypes, browser, config, manifestStore, registry, omniChat, nookScopes, stateBus, extensions, captures, gitReadModel, searchService, themes, keybindings, browserAutomation, diagnostics, perfBundles, recentSessions, lspService, sessionService);
+            dispatchCtx.Redrive = subReq => RouteAsync(subReq, nooks, layout, bays, runCommands, restoration, snapshots, skills, agents, launchProfiles, adapterEnv, hookServer, hookRouter, agentRouter, activity, sessions, lifecycle, launcher, taskService, dispatchSaga, resumeSaga, timeline, blackboard, noteFiles, memory, memoryRanker, proposals, consolidator, edits, corpus, vaultSettings, library, reviews, attribution, reviewDispatcher, nookTypes, browser, config, manifestStore, registry, omniChat, nookScopes, stateBus, extensions, captures, gitReadModel, searchService, themes, keybindings, browserAutomation, diagnostics, perfBundles, recentSessions, lspService, sessionService, cancellationToken);
             return await typed(dispatchCtx);
         }
         catch (System.Exception ex)

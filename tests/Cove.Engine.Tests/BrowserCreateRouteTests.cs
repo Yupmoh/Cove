@@ -8,57 +8,57 @@ namespace Cove.Engine.Tests;
 
 public sealed class BrowserCreateRouteTests
 {
-    private static EngineDispatchContext CtxWith(LayoutService layout, BrowserPaneManager? browser, JsonElement? paramsEl = null)
+    private static EngineDispatchContext CtxWith(LayoutService layout, BrowserNookManager? browser, JsonElement? paramsEl = null)
     {
         var p = paramsEl ?? JsonSerializer.SerializeToElement(
             new BrowserCreateParams("https://example.com", null, null), CoveJsonContext.Default.BrowserCreateParams);
         var request = new ControlRequest("1", "cove://commands/browser.create", p);
-        return new EngineDispatchContext(request, panes: null, layout: layout, browser: browser);
+        return new EngineDispatchContext(request, nooks: null, layout: layout, browser: browser);
     }
 
     [Fact]
-    public async Task CreateBrowserPane_OpensInManager()
+    public async Task CreateBrowserNook_OpensInManager()
     {
         var layout = new LayoutService();
-        var browser = new BrowserPaneManager();
+        var browser = new BrowserNookManager();
         var ctx = CtxWith(layout, browser);
-        var resp = await BrowserCommands.CreateBrowserPane(ctx);
+        var resp = await BrowserCommands.CreateBrowserNook(ctx);
         Assert.True(resp.Ok);
-        var dto = resp.Data!.Value.Deserialize(CoveJsonContext.Default.BrowserPaneDto)!;
+        var dto = resp.Data!.Value.Deserialize(CoveJsonContext.Default.BrowserNookDto)!;
         Assert.Equal("https://example.com", dto.CurrentUrl);
     }
 
     [Fact]
-    public async Task CreateBrowserPane_GeneratesPaneId()
+    public async Task CreateBrowserNook_GeneratesNookId()
     {
         var layout = new LayoutService();
-        var browser = new BrowserPaneManager();
+        var browser = new BrowserNookManager();
         var ctx = CtxWith(layout, browser);
-        var resp = await BrowserCommands.CreateBrowserPane(ctx);
+        var resp = await BrowserCommands.CreateBrowserNook(ctx);
         Assert.True(resp.Ok);
-        var dto = resp.Data!.Value.Deserialize(CoveJsonContext.Default.BrowserPaneDto)!;
-        Assert.False(string.IsNullOrEmpty(dto.PaneId));
-        Assert.StartsWith("pane-", dto.PaneId);
+        var dto = resp.Data!.Value.Deserialize(CoveJsonContext.Default.BrowserNookDto)!;
+        Assert.False(string.IsNullOrEmpty(dto.NookId));
+        Assert.StartsWith("nook-", dto.NookId);
     }
 
     [Fact]
-    public async Task CreateBrowserPane_NoManager_Fails()
+    public async Task CreateBrowserNook_NoManager_Fails()
     {
         var layout = new LayoutService();
         var ctx = CtxWith(layout, browser: null);
-        var resp = await BrowserCommands.CreateBrowserPane(ctx);
+        var resp = await BrowserCommands.CreateBrowserNook(ctx);
         Assert.False(resp.Ok);
         Assert.Equal("not_ready", resp.Error!.Code);
     }
 
     [Fact]
-    public async Task CreateBrowserPane_InvalidParams_Fails()
+    public async Task CreateBrowserNook_InvalidParams_Fails()
     {
         var layout = new LayoutService();
-        var browser = new BrowserPaneManager();
+        var browser = new BrowserNookManager();
         var request = new ControlRequest("1", "cove://commands/browser.create", null);
-        var ctx = new EngineDispatchContext(request, panes: null, layout: layout, browser: browser);
-        var resp = await BrowserCommands.CreateBrowserPane(ctx);
+        var ctx = new EngineDispatchContext(request, nooks: null, layout: layout, browser: browser);
+        var resp = await BrowserCommands.CreateBrowserNook(ctx);
         Assert.False(resp.Ok);
         Assert.Equal("invalid_params", resp.Error!.Code);
     }

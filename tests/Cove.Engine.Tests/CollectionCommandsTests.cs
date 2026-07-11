@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
 using Cove.Engine;
-using Cove.Engine.Workspaces;
+using Cove.Engine.Bays;
 using Cove.Protocol;
 using Xunit;
 
@@ -9,7 +9,7 @@ namespace Cove.Engine.Tests;
 
 public sealed class CollectionCommandsTests
 {
-    private static Task<ControlResponse?> Route(WorkspaceManager m, string uri, JsonElement? prm) =>
+    private static Task<ControlResponse?> Route(BayManager m, string uri, JsonElement? prm) =>
         EngineCommandRouter.RouteAsync(new ControlRequest("1", uri, prm), null, null, m);
 
     private static JsonElement El<T>(T v, JsonTypeInfo<T> ti) => JsonSerializer.SerializeToElement(v, ti);
@@ -18,9 +18,9 @@ public sealed class CollectionCommandsTests
     public async Task Collections_Default_Synthesis_And_Crud()
     {
         int n = 0;
-        await using var m = new WorkspaceManager(newId: () => $"id-{++n}");
-        var ws1 = await m.CreateWorkspaceAsync("a", "/a");
-        await m.CreateWorkspaceAsync("b", "/b");
+        await using var m = new BayManager(newId: () => $"id-{++n}");
+        var ws1 = await m.CreateBayAsync("a", "/a");
+        await m.CreateBayAsync("b", "/b");
 
         var l0 = await Route(m, "cove://commands/collection.list", null);
         var cols0 = l0!.Data!.Value.GetProperty("collections");
@@ -32,7 +32,7 @@ public sealed class CollectionCommandsTests
             El(new CollectionCreateParams("client-a"), CollectionJsonContext.Default.CollectionCreateParams));
         var cid = created!.Data!.Value.GetProperty("id").GetString()!;
 
-        var moved = await Route(m, "cove://commands/collection.move-workspace",
+        var moved = await Route(m, "cove://commands/collection.move-bay",
             El(new CollectionMoveParams(ws1.Id, cid), CollectionJsonContext.Default.CollectionMoveParams));
         Assert.True(moved!.Ok);
 

@@ -12,13 +12,13 @@ public static class ExportCommands
         if (ctx.TaskService is not { } svc)
             return Task.FromResult(ctx.Fail("not_ready", "task store not available"));
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.TaskBoardExportParams) is not { } p)
-            return Task.FromResult(ctx.Fail("invalid_params", "export params required (exportPath, workspaceCount)"));
+            return Task.FromResult(ctx.Fail("invalid_params", "export params required (exportPath, bayCount)"));
         var factory = svc.GetConnectionFactory();
         var exportService = new Cove.Tasks.Export.TaskBoardExportService(factory, Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
-        var result = exportService.Export(p.ExportPath, p.WorkspaceCount);
+        var result = exportService.Export(p.ExportPath, p.BayCount);
         if (!result.Success)
             return Task.FromResult(ctx.Fail("export_failed", result.Error ?? "export failed"));
-        return Task.FromResult(ctx.Ok(new TaskBoardExportResultDto(true, result.ExportPath, result.Manifest?.ExportedAt.ToString("o"), result.Manifest?.SchemaVersion ?? 0, result.Manifest?.WorkspaceCount ?? 0, null), CoveJsonContext.Default.TaskBoardExportResultDto));
+        return Task.FromResult(ctx.Ok(new TaskBoardExportResultDto(true, result.ExportPath, result.Manifest?.ExportedAt.ToString("o"), result.Manifest?.SchemaVersion ?? 0, result.Manifest?.BayCount ?? 0, null), CoveJsonContext.Default.TaskBoardExportResultDto));
     }
 
     [CoveCommand("cove://commands/task-board.diff")]

@@ -13,17 +13,17 @@ public static class RestoreChooserCommands
     {
         if (ctx.Restoration is not { } restoration)
             return ctx.Fail("not_ready", "restoration service unavailable");
-        if (ctx.Panes is not { } panes)
-            return ctx.Fail("not_ready", "pane registry unavailable");
+        if (ctx.Nooks is not { } nooks)
+            return ctx.Fail("not_ready", "nook registry unavailable");
 
         var chooser = new RestoreChooserService(restoration);
-        var workspacesRoot = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(restoration.StatePath)!, "workspaces");
+        var baysRoot = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(restoration.StatePath)!, "bays");
         var items = new List<RestoreChoiceItem>();
-        foreach (var entry in WorkspaceStartup.Enumerate(workspacesRoot, restoration.Logger))
-            foreach (var room in entry.Snapshot.Rooms)
-                foreach (var leaf in MosaicOps.Leaves(room.LayoutTree))
-                    if (entry.Sessions.TryGetValue(leaf.PaneId, out var d))
-                        items.Add(new RestoreChoiceItem(entry.Snapshot.Id, room.Id, d.PaneId, d.Command, WasRunning(panes, d.PaneId), false));
+        foreach (var entry in BayStartup.Enumerate(baysRoot, restoration.Logger))
+            foreach (var shore in entry.Snapshot.Shores)
+                foreach (var leaf in MosaicOps.Leaves(shore.LayoutTree))
+                    if (entry.Sessions.TryGetValue(leaf.NookId, out var d))
+                        items.Add(new RestoreChoiceItem(entry.Snapshot.Id, shore.Id, d.NookId, d.Command, WasRunning(nooks, d.NookId), false));
 
         var result = chooser.Evaluate(items);
         return await Task.FromResult(ctx.Ok(result, RestoreChooserVerbJsonContext.Default.RestoreChooserResult));
@@ -34,33 +34,33 @@ public static class RestoreChooserCommands
     {
         if (ctx.Restoration is not { } restoration)
             return ctx.Fail("not_ready", "restoration service unavailable");
-        if (ctx.Panes is not { } panes)
-            return ctx.Fail("not_ready", "pane registry unavailable");
+        if (ctx.Nooks is not { } nooks)
+            return ctx.Fail("not_ready", "nook registry unavailable");
         if (ctx.Layout is not { } layout)
             return ctx.Fail("not_ready", "layout service unavailable");
         if (ctx.Request.Params is not JsonElement el
             || el.Deserialize(RestoreChooserVerbJsonContext.Default.RestoreConfirmParams) is not { } p)
-            return ctx.Fail("bad_params", "selectedPaneIds required");
+            return ctx.Fail("bad_params", "selectedNookIds required");
 
         var chooser = new RestoreChooserService(restoration);
         if (p.AutoRestoreOnLaunch)
             chooser.SaveSettings(new RestoreSettings(true));
 
-        var workspacesRoot = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(restoration.StatePath)!, "workspaces");
-        var selected = new HashSet<string>(p.SelectedPaneIds ?? [], StringComparer.Ordinal);
+        var baysRoot = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(restoration.StatePath)!, "bays");
+        var selected = new HashSet<string>(p.SelectedNookIds ?? [], StringComparer.Ordinal);
         var restored = new List<string>();
 
-        foreach (var entry in WorkspaceStartup.Enumerate(workspacesRoot, restoration.Logger))
+        foreach (var entry in BayStartup.Enumerate(baysRoot, restoration.Logger))
         {
             layout.LoadSnapshot(entry.Snapshot);
-            foreach (var room in entry.Snapshot.Rooms)
-                foreach (var leaf in MosaicOps.Leaves(room.LayoutTree))
-                    if (entry.Sessions.TryGetValue(leaf.PaneId, out var d) && selected.Contains(d.PaneId))
+            foreach (var shore in entry.Snapshot.Shores)
+                foreach (var leaf in MosaicOps.Leaves(shore.LayoutTree))
+                    if (entry.Sessions.TryGetValue(leaf.NookId, out var d) && selected.Contains(d.NookId))
                     {
                         try
                         {
-                            panes.RespawnAs(d.PaneId, d.Command, d.Args, d.Cwd, 80, 24, WorkspacePersistence.LoadScrollback(d.PaneId, entry.WorkspaceDir));
-                            restored.Add(d.PaneId);
+                            nooks.RespawnAs(d.NookId, d.Command, d.Args, d.Cwd, 80, 24, BayPersistence.LoadScrollback(d.NookId, entry.BayDir));
+                            restored.Add(d.NookId);
                         }
                         catch { }
                     }
@@ -75,19 +75,19 @@ public static class RestoreChooserCommands
     {
         if (ctx.Restoration is not { } restoration)
             return ctx.Fail("not_ready", "restoration service unavailable");
-        if (ctx.Panes is not { } panes)
-            return ctx.Fail("not_ready", "pane registry unavailable");
+        if (ctx.Nooks is not { } nooks)
+            return ctx.Fail("not_ready", "nook registry unavailable");
         if (ctx.Layout is not { } layout)
             return ctx.Fail("not_ready", "layout service unavailable");
 
-        var workspacesRoot = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(restoration.StatePath)!, "workspaces");
-        foreach (var entry in WorkspaceStartup.Enumerate(workspacesRoot, restoration.Logger))
+        var baysRoot = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(restoration.StatePath)!, "bays");
+        foreach (var entry in BayStartup.Enumerate(baysRoot, restoration.Logger))
         {
-            foreach (var room in entry.Snapshot.Rooms)
-                foreach (var leaf in MosaicOps.Leaves(room.LayoutTree))
-                    if (entry.Sessions.TryGetValue(leaf.PaneId, out var d))
+            foreach (var shore in entry.Snapshot.Shores)
+                foreach (var leaf in MosaicOps.Leaves(shore.LayoutTree))
+                    if (entry.Sessions.TryGetValue(leaf.NookId, out var d))
                     {
-                        try { panes.RespawnAs(d.PaneId, d.Command, d.Args, d.Cwd, 80, 24, WorkspacePersistence.LoadScrollback(d.PaneId, entry.WorkspaceDir)); }
+                        try { nooks.RespawnAs(d.NookId, d.Command, d.Args, d.Cwd, 80, 24, BayPersistence.LoadScrollback(d.NookId, entry.BayDir)); }
                         catch { }
                     }
             layout.LoadSnapshot(entry.Snapshot);
@@ -96,12 +96,12 @@ public static class RestoreChooserCommands
         return await Task.FromResult(ctx.Ok());
     }
 
-    private static bool WasRunning(PaneRegistry panes, string paneId)
-        => panes.TryGet(paneId, out _);
+    private static bool WasRunning(NookRegistry nooks, string nookId)
+        => nooks.TryGet(nookId, out _);
 }
 
-public sealed record RestoreConfirmParams(IReadOnlyList<string>? SelectedPaneIds, bool AutoRestoreOnLaunch = false);
-public sealed record RestoreConfirmResult(IReadOnlyList<string> RestoredPaneIds);
+public sealed record RestoreConfirmParams(IReadOnlyList<string>? SelectedNookIds, bool AutoRestoreOnLaunch = false);
+public sealed record RestoreConfirmResult(IReadOnlyList<string> RestoredNookIds);
 
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,

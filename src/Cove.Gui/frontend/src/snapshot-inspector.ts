@@ -20,7 +20,7 @@ interface SnapshotListResult { snapshots: SnapshotListItem[] }
 interface SnapshotInspectResult { diffs: SnapshotDiffItem[] }
 interface SnapshotRestoreResult { content: Record<string, string> }
 
-export async function renderSnapshotInspector(workspaceId: string): Promise<HTMLElement> {
+export async function renderSnapshotInspector(bayId: string): Promise<HTMLElement> {
   const el = document.createElement("div");
   el.className = "snapshot-inspector";
   el.style.cssText = "display:flex;flex-direction:column;height:100%;background:#0b1622;color:#e5e9f0;font-family:system-ui,sans-serif;";

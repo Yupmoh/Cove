@@ -14,7 +14,7 @@ public sealed class StateBus
 
     public event Action<string>? StateChanged;
 
-    private static readonly HashSet<string> ValidScopes = new() { "app", "workspace", "tab", "pane" };
+    private static readonly HashSet<string> ValidScopes = new() { "app", "bay", "tab", "nook" };
 
     public StateBus(string dataDir, ILogger? logger = null)
     {

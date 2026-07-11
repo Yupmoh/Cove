@@ -13,7 +13,7 @@ public static class SignalingCommands
             return ctx.Fail("not_ready", "task store not available");
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.TaskSetInReviewParams) is not { } p)
             return ctx.Fail("invalid_params", "set-in-review params required");
-        var resolution = ResolveRun(svc, ctx, p.RunId, p.WorkspaceId);
+        var resolution = ResolveRun(svc, ctx, p.RunId, p.BayId);
         if (!resolution.Found)
             return ctx.Fail("not_found", resolution.Error ?? "could not resolve run");
         var run = resolution.Run!;
@@ -34,7 +34,7 @@ public static class SignalingCommands
             return ctx.Fail("not_ready", "task store not available");
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.TaskSetDoneParams) is not { } p)
             return ctx.Fail("invalid_params", "set-done params required");
-        var resolution = ResolveRun(svc, ctx, p.RunId, p.WorkspaceId);
+        var resolution = ResolveRun(svc, ctx, p.RunId, p.BayId);
         if (!resolution.Found)
             return ctx.Fail("not_found", resolution.Error ?? "could not resolve run");
         var run = resolution.Run!;
@@ -65,10 +65,10 @@ public static class SignalingCommands
         var config = card.LaunchConfigJson is not null
             ? Cove.Tasks.LaunchConfig.LaunchConfigSerializer.Deserialize(card.LaunchConfigJson)
             : null;
-        var run = await svc.CreateRunAsync(p.CardId, card.WorkspaceId, card.LaunchConfigJson, reviewStatusId: config?.ReviewStatusId, completionStatusId: config?.CompletionStatusId);
-        var paneId = p.PaneId ?? ctx.Request.CallerPaneId;
-        if (paneId is not null)
-            await svc.AddRunSegmentAsync(run!.Id, paneId, null);
+        var run = await svc.CreateRunAsync(p.CardId, card.BayId, card.LaunchConfigJson, reviewStatusId: config?.ReviewStatusId, completionStatusId: config?.CompletionStatusId);
+        var nookId = p.NookId ?? ctx.Request.CallerNookId;
+        if (nookId is not null)
+            await svc.AddRunSegmentAsync(run!.Id, nookId, null);
         return ctx.Ok(new TaskClaimResult(true, run!.Id, null), CoveJsonContext.Default.TaskClaimResult);
     }
 
@@ -77,17 +77,17 @@ public static class SignalingCommands
         public bool Found => Run is not null;
     }
 
-    private static RunResolution ResolveRun(Cove.Tasks.TaskService svc, EngineDispatchContext ctx, string? runId, string? workspaceId)
+    private static RunResolution ResolveRun(Cove.Tasks.TaskService svc, EngineDispatchContext ctx, string? runId, string? bayId)
     {
         if (runId is not null)
         {
             if (TryParseHumanId(runId, out var number))
             {
-                if (workspaceId is null)
-                    return new RunResolution(null, "COVE-N task id requires --workspace (or run from a workspace-bound pane)");
-                var card = svc.GetCardByHumanId(workspaceId, number);
+                if (bayId is null)
+                    return new RunResolution(null, "COVE-N task id requires --bay (or run from a bay-bound nook)");
+                var card = svc.GetCardByHumanId(bayId, number);
                 if (card is null)
-                    return new RunResolution(null, $"no card COVE-{number} in workspace {workspaceId}");
+                    return new RunResolution(null, $"no card COVE-{number} in bay {bayId}");
                 var run = svc.GetActiveRunForCard(card.Id);
                 if (run is null)
                     return new RunResolution(null, $"card COVE-{number} has no active or interrupted run");
@@ -99,13 +99,13 @@ public static class SignalingCommands
             if (prefixed is not null) return new RunResolution(prefixed, null);
             return new RunResolution(null, $"no run matching {runId}");
         }
-        if (ctx.Request.CallerPaneId is { } paneId)
+        if (ctx.Request.CallerNookId is { } nookId)
         {
-            var run = svc.GetRunByPane(paneId);
+            var run = svc.GetRunByNook(nookId);
             if (run is not null) return new RunResolution(run, null);
-            return new RunResolution(null, $"no run bound to pane {paneId}");
+            return new RunResolution(null, $"no run bound to nook {nookId}");
         }
-        return new RunResolution(null, "pass --run-id (task id | UUID | prefix) or run from a bound pane");
+        return new RunResolution(null, "pass --run-id (task id | UUID | prefix) or run from a bound nook");
     }
 
     private static bool TryParseHumanId(string humanId, out int number)
@@ -126,7 +126,7 @@ public static class SignalingCommands
         Size = (TaskSize)row.Size,
         Assignee = row.Assignee,
         Source = row.Source,
-        WorkspaceId = row.WorkspaceId,
+        BayId = row.BayId,
         TaskNumber = row.TaskNumber,
         CurrentPrimaryRunId = row.CurrentPrimaryRunId,
         CreatedAt = System.DateTimeOffset.Parse(row.CreatedAt),

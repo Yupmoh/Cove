@@ -17,27 +17,27 @@ public sealed class LauncherOverrideStore
         _logger = logger;
     }
 
-    public void Save(string paneId, LauncherOverrides overrides)
+    public void Save(string nookId, LauncherOverrides overrides)
     {
-        if (!IsValidPaneId(paneId))
+        if (!IsValidNookId(nookId))
         {
-            _logger?.LauncherOverrideSaveRejectedInvalidPaneId(paneId);
+            _logger?.LauncherOverrideSaveRejectedInvalidNookId(nookId);
             return;
         }
         Directory.CreateDirectory(_root);
-        var path = GetPath(paneId);
+        var path = GetPath(nookId);
         var json = JsonSerializer.Serialize(overrides, LauncherOverridePersistenceJsonContext.Default.LauncherOverrides);
         File.WriteAllText(path, json);
     }
 
-    public bool TryLoad(string paneId, out LauncherOverrides? overrides)
+    public bool TryLoad(string nookId, out LauncherOverrides? overrides)
     {
-        if (!IsValidPaneId(paneId))
+        if (!IsValidNookId(nookId))
         {
             overrides = null;
             return false;
         }
-        var path = GetPath(paneId);
+        var path = GetPath(nookId);
         if (!File.Exists(path))
         {
             overrides = null;
@@ -51,21 +51,21 @@ public sealed class LauncherOverrideStore
         }
         catch (JsonException ex)
         {
-            _logger?.LauncherOverrideLoadFailed(paneId, ex.Message);
+            _logger?.LauncherOverrideLoadFailed(nookId, ex.Message);
             overrides = null;
             return false;
         }
     }
 
-    public void Delete(string paneId)
+    public void Delete(string nookId)
     {
-        if (!IsValidPaneId(paneId))
+        if (!IsValidNookId(nookId))
             return;
-        var path = GetPath(paneId);
+        var path = GetPath(nookId);
         if (File.Exists(path))
         {
             try { File.Delete(path); }
-            catch (IOException ex) { _logger?.LauncherOverrideDeleteFailed(paneId, ex.Message); }
+            catch (IOException ex) { _logger?.LauncherOverrideDeleteFailed(nookId, ex.Message); }
         }
     }
 
@@ -76,26 +76,26 @@ public sealed class LauncherOverrideStore
             return result;
         foreach (var file in Directory.EnumerateFiles(_root, "*.json"))
         {
-            var paneId = Path.GetFileNameWithoutExtension(file);
+            var nookId = Path.GetFileNameWithoutExtension(file);
             try
             {
                 var json = File.ReadAllText(file);
                 var overrides = JsonSerializer.Deserialize(json, LauncherOverridePersistenceJsonContext.Default.LauncherOverrides);
                 if (overrides is not null)
-                    result[paneId] = overrides;
+                    result[nookId] = overrides;
             }
             catch (JsonException ex)
             {
-                _logger?.LauncherOverrideLoadFailed(paneId, ex.Message);
+                _logger?.LauncherOverrideLoadFailed(nookId, ex.Message);
             }
         }
         return result;
     }
 
-    private static bool IsValidPaneId(string paneId) =>
-        !string.IsNullOrEmpty(paneId) && paneId.All(c => char.IsLetterOrDigit(c) || c == '-');
+    private static bool IsValidNookId(string nookId) =>
+        !string.IsNullOrEmpty(nookId) && nookId.All(c => char.IsLetterOrDigit(c) || c == '-');
 
-    private string GetPath(string paneId) => Path.Combine(_root, paneId + ".json");
+    private string GetPath(string nookId) => Path.Combine(_root, nookId + ".json");
 }
 
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase, DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
@@ -104,12 +104,12 @@ public sealed partial class LauncherOverridePersistenceJsonContext : JsonSeriali
 
 internal static partial class LauncherOverrideLog
 {
-    [ZLoggerMessage(LogLevel.Warning, "launcher override save rejected invalid paneId={paneId}")]
-    public static partial void LauncherOverrideSaveRejectedInvalidPaneId(this ILogger logger, string paneId);
+    [ZLoggerMessage(LogLevel.Warning, "launcher override save rejected invalid nookId={nookId}")]
+    public static partial void LauncherOverrideSaveRejectedInvalidNookId(this ILogger logger, string nookId);
 
-    [ZLoggerMessage(LogLevel.Warning, "launcher override load failed paneId={paneId} error={error}")]
-    public static partial void LauncherOverrideLoadFailed(this ILogger logger, string paneId, string error);
+    [ZLoggerMessage(LogLevel.Warning, "launcher override load failed nookId={nookId} error={error}")]
+    public static partial void LauncherOverrideLoadFailed(this ILogger logger, string nookId, string error);
 
-    [ZLoggerMessage(LogLevel.Warning, "launcher override delete failed paneId={paneId} error={error}")]
-    public static partial void LauncherOverrideDeleteFailed(this ILogger logger, string paneId, string error);
+    [ZLoggerMessage(LogLevel.Warning, "launcher override delete failed nookId={nookId} error={error}")]
+    public static partial void LauncherOverrideDeleteFailed(this ILogger logger, string nookId, string error);
 }

@@ -27,20 +27,20 @@ public sealed class RestoreChooserTests
         return svc;
     }
 
-    private static RestoreChoiceItem Item(string paneId, bool running, bool hidden = false, string ws = "ws-1") =>
-        new(ws, "room-1", paneId, paneId, running, hidden);
+    private static RestoreChoiceItem Item(string nookId, bool running, bool hidden = false, string ws = "ws-1") =>
+        new(ws, "shore-1", nookId, nookId, running, hidden);
 
     [Fact]
-    public void CleanShutdown_AutoRelaunches_AllPanes()
+    public void CleanShutdown_AutoRelaunches_AllNooks()
     {
         var dir = NewDir();
         try
         {
             var rest = NewService(dir, cleanShutdown: true);
             var chooser = new RestoreChooserService(rest);
-            var panes = new List<RestoreChoiceItem> { Item("p1", true), Item("p2", false) };
+            var nooks = new List<RestoreChoiceItem> { Item("p1", true), Item("p2", false) };
 
-            var result = chooser.Evaluate(panes);
+            var result = chooser.Evaluate(nooks);
 
             Assert.True(result.AutoRelaunch);
             Assert.Equal(2, result.Items.Count);
@@ -57,9 +57,9 @@ public sealed class RestoreChooserTests
             var rest = NewService(dir, cleanShutdown: false);
             var chooser = new RestoreChooserService(rest);
             chooser.SaveSettings(new RestoreSettings(true));
-            var panes = new List<RestoreChoiceItem> { Item("p1", true), Item("p2", false) };
+            var nooks = new List<RestoreChoiceItem> { Item("p1", true), Item("p2", false) };
 
-            var result = chooser.Evaluate(panes);
+            var result = chooser.Evaluate(nooks);
 
             Assert.True(result.AutoRelaunch);
         }
@@ -67,27 +67,27 @@ public sealed class RestoreChooserTests
     }
 
     [Fact]
-    public void UncleanExit_NoAutoRestore_ShowsChooser_AllPanesWithIndicators()
+    public void UncleanExit_NoAutoRestore_ShowsChooser_AllNooksWithIndicators()
     {
         var dir = NewDir();
         try
         {
             var rest = NewService(dir, cleanShutdown: false);
             var chooser = new RestoreChooserService(rest);
-            var panes = new List<RestoreChoiceItem>
+            var nooks = new List<RestoreChoiceItem>
             {
                 Item("p1", running: true),
                 Item("p2", running: false),
                 Item("p3", running: true, hidden: true),
             };
 
-            var result = chooser.Evaluate(panes);
+            var result = chooser.Evaluate(nooks);
 
             Assert.False(result.AutoRelaunch);
             Assert.Equal(3, result.Items.Count);
-            Assert.Contains(result.Items, i => i.PaneId == "p1" && i.WasRunning);
-            Assert.Contains(result.Items, i => i.PaneId == "p2" && !i.WasRunning);
-            Assert.Contains(result.Items, i => i.PaneId == "p3" && i.Hidden);
+            Assert.Contains(result.Items, i => i.NookId == "p1" && i.WasRunning);
+            Assert.Contains(result.Items, i => i.NookId == "p2" && !i.WasRunning);
+            Assert.Contains(result.Items, i => i.NookId == "p3" && i.Hidden);
         }
         finally { try { Directory.Delete(dir, true); } catch { } }
     }
@@ -109,18 +109,18 @@ public sealed class RestoreChooserTests
     }
 
     [Fact]
-    public void LazyMount_TracksMountedPanes()
+    public void LazyMount_TracksMountedNooks()
     {
         var registry = new LazyMountRegistry();
         Assert.False(registry.IsMounted("p1"));
 
         registry.Mount("p1");
         Assert.True(registry.IsMounted("p1"));
-        Assert.Single(registry.MountedPanes());
+        Assert.Single(registry.MountedNooks());
 
         registry.Unmount("p1");
         Assert.False(registry.IsMounted("p1"));
-        Assert.Empty(registry.MountedPanes());
+        Assert.Empty(registry.MountedNooks());
     }
 
     [Fact]
@@ -128,6 +128,6 @@ public sealed class RestoreChooserTests
     {
         var registry = new LazyMountRegistry();
         registry.Unmount("never-mounted");
-        Assert.Empty(registry.MountedPanes());
+        Assert.Empty(registry.MountedNooks());
     }
 }

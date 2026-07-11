@@ -8,22 +8,22 @@ import { detectWebgl2 } from "./renderer";
 import type { RendererKind } from "./renderer";
 
 const RENDERERS: RendererKind[] = ["webgl", "canvas", "dom"];
-const PANE_COUNTS = [1, 5, 10, 20];
+const NOOK_COUNTS = [1, 5, 10, 20];
 const SCENARIOS = ["idle", "yesSpam", "resizeStorm"] as const;
 const CELL_DURATION_MS = 3000;
 const RESIZE_TICK_MS = 100;
 const YES_CHUNK = "y\n".repeat(512);
 
 type Scenario = (typeof SCENARIOS)[number] | "yesSpamHidden";
-interface Row { renderer: RendererKind; panes: number; visible: number; scenario: Scenario; fps: number; frameP95Ms: number; longtaskMs: number; throughputMBs: number; glContextLoss: number; }
+interface Row { renderer: RendererKind; nooks: number; visible: number; scenario: Scenario; fps: number; frameP95Ms: number; longtaskMs: number; throughputMBs: number; glContextLoss: number; }
 
 const grid = document.getElementById("grid")!;
 const status = document.getElementById("status")!;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-function makePane(renderer: RendererKind): { term: Terminal; fit: FitAddon; el: HTMLDivElement; loss: () => number } {
+function makeNook(renderer: RendererKind): { term: Terminal; fit: FitAddon; el: HTMLDivElement; loss: () => number } {
   const el = document.createElement("div");
-  el.className = "pane";
+  el.className = "nook";
   grid.appendChild(el);
   const term = new Terminal({ scrollback: 1000, fontSize: 11, fontFamily: "monospace" });
   const fit = new FitAddon();
@@ -39,11 +39,11 @@ function makePane(renderer: RendererKind): { term: Terminal; fit: FitAddon; el: 
   return { term, fit, el, loss: () => losses };
 }
 
-async function runCell(renderer: RendererKind, panes: number, scenario: Scenario): Promise<Row> {
-  const visible = scenario === "yesSpamHidden" ? 4 : panes;
+async function runCell(renderer: RendererKind, nooks: number, scenario: Scenario): Promise<Row> {
+  const visible = scenario === "yesSpamHidden" ? 4 : nooks;
   const cells: { term: Terminal; fit: FitAddon; el: HTMLDivElement; loss: () => number }[] = [];
-  for (let i = 0; i < panes; i++) {
-    const p = makePane(renderer);
+  for (let i = 0; i < nooks; i++) {
+    const p = makeNook(renderer);
     if (i >= visible) p.el.style.display = "none";
     cells.push(p);
   }
@@ -81,7 +81,7 @@ async function runCell(renderer: RendererKind, panes: number, scenario: Scenario
   obs.disconnect();
 
   const row: Row = {
-    renderer, panes, visible, scenario,
+    renderer, nooks, visible, scenario,
     fps: round1(fps(deltas)),
     frameP95Ms: round1(computeStats(deltas).p95),
     longtaskMs: Math.round(longtaskMs),
@@ -94,8 +94,8 @@ async function runCell(renderer: RendererKind, panes: number, scenario: Scenario
 }
 
 function toMarkdown(rows: Row[], meta: string): string {
-  const head = "| renderer | panes | visible | scenario | fps | frameP95(ms) | longtask(ms) | throughput(MB/s) | glLoss |\n|---|---|---|---|---|---|---|---|---|";
-  const body = rows.map((r) => `| ${r.renderer} | ${r.panes} | ${r.visible} | ${r.scenario} | ${r.fps} | ${r.frameP95Ms} | ${r.longtaskMs} | ${r.throughputMBs} | ${r.glContextLoss} |`).join("\n");
+  const head = "| renderer | nooks | visible | scenario | fps | frameP95(ms) | longtask(ms) | throughput(MB/s) | glLoss |\n|---|---|---|---|---|---|---|---|---|";
+  const body = rows.map((r) => `| ${r.renderer} | ${r.nooks} | ${r.visible} | ${r.scenario} | ${r.fps} | ${r.frameP95Ms} | ${r.longtaskMs} | ${r.throughputMBs} | ${r.glContextLoss} |`).join("\n");
   return `${meta}\n\n${head}\n${body}\n`;
 }
 
@@ -105,7 +105,7 @@ function toMarkdown(rows: Row[], meta: string): string {
   const rows: Row[] = [];
   const plan: [RendererKind, number, Scenario][] = [];
   for (const r of RENDERERS) {
-    for (const n of PANE_COUNTS) for (const s of SCENARIOS) plan.push([r, n, s]);
+    for (const n of NOOK_COUNTS) for (const s of SCENARIOS) plan.push([r, n, s]);
     plan.push([r, 20, "yesSpamHidden"]);
   }
   for (let i = 0; i < plan.length; i++) {

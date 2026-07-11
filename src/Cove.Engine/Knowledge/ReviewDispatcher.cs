@@ -3,8 +3,8 @@ using Microsoft.Extensions.Logging;
 namespace Cove.Engine.Knowledge;
 
 public sealed record ReviewDispatchRequest(
-    string TargetPaneId,
-    string WorkspaceId,
+    string TargetNookId,
+    string BayId,
     string SessionId,
     string? TaskRunId,
     string Message,
@@ -12,7 +12,7 @@ public sealed record ReviewDispatchRequest(
 
 public sealed record ReviewDispatchResult(
     string DispatchId,
-    string TargetPaneId,
+    string TargetNookId,
     string SessionId,
     string? TaskRunId,
     System.DateTimeOffset DispatchedAt);
@@ -26,7 +26,7 @@ public sealed class ReviewDispatcher
         _logger = logger;
     }
 
-    public async Task<ReviewDispatchResult> DispatchAsync(ReviewDispatchRequest request, Func<string, byte[], Task> writeToPane)
+    public async Task<ReviewDispatchResult> DispatchAsync(ReviewDispatchRequest request, Func<string, byte[], Task> writeToNook)
     {
         var dispatchId = System.Guid.NewGuid().ToString("N");
         var dispatchedAt = System.DateTimeOffset.UtcNow;
@@ -34,12 +34,12 @@ public sealed class ReviewDispatcher
         var renderedMessage = RenderMessage(request);
         var bytes = System.Text.Encoding.UTF8.GetBytes(renderedMessage + "\r");
 
-        await writeToPane(request.TargetPaneId, bytes).ConfigureAwait(false);
+        await writeToNook(request.TargetNookId, bytes).ConfigureAwait(false);
 
-        _logger.LogWarning("review-dispatch: {id} → pane {pane} (session {session}, task {task})",
-            dispatchId, request.TargetPaneId, request.SessionId, request.TaskRunId ?? "none");
+        _logger.LogWarning("review-dispatch: {id} → nook {nook} (session {session}, task {task})",
+            dispatchId, request.TargetNookId, request.SessionId, request.TaskRunId ?? "none");
 
-        return new ReviewDispatchResult(dispatchId, request.TargetPaneId, request.SessionId, request.TaskRunId, dispatchedAt);
+        return new ReviewDispatchResult(dispatchId, request.TargetNookId, request.SessionId, request.TaskRunId, dispatchedAt);
     }
 
     private static string RenderMessage(ReviewDispatchRequest request)

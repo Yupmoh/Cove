@@ -7,7 +7,7 @@ namespace Cove.Adapters.Tests;
 public sealed class EnvPrecedenceResolverTests
 {
     private static readonly string[] CoveNonOverridable =
-        { "COVE", "COVE_CLI_PATH", "COVE_DATA_DIR", "COVE_PANE_ID", "COVE_WORKSPACE_ID", "COVE_HOOK_PORT", "COVE_TASK_ID", "COVE_TASK_RUN_ID" };
+        { "COVE", "COVE_CLI_PATH", "COVE_DATA_DIR", "COVE_NOOK_ID", "COVE_BAY_ID", "COVE_HOOK_PORT", "COVE_TASK_ID", "COVE_TASK_RUN_ID" };
 
     [Fact]
     public void Resolve_SystemEnv_First()
@@ -42,11 +42,11 @@ public sealed class EnvPrecedenceResolverTests
     [Fact]
     public void Resolve_CoveNonOverridable_AlwaysWins()
     {
-        var systemEnv = new Dictionary<string, string> { ["COVE_PANE_ID"] = "user-tries-to-set" };
-        var adapterEnv = new[] { new AdapterEnvVar("COVE_PANE_ID", "adapter-tries") };
+        var systemEnv = new Dictionary<string, string> { ["COVE_NOOK_ID"] = "user-tries-to-set" };
+        var adapterEnv = new[] { new AdapterEnvVar("COVE_NOOK_ID", "adapter-tries") };
         var resolver = new EnvPrecedenceResolver(systemEnv);
-        var result = resolver.Resolve("claude-code", adapterEnv, coveContext: new CoveEnvContext(PaneId: "pane-123", CliPath: "/cove", DataDir: "/data", WorkspaceId: "ws1", HookPort: 9999));
-        Assert.Equal("pane-123", result["COVE_PANE_ID"]);
+        var result = resolver.Resolve("claude-code", adapterEnv, coveContext: new CoveEnvContext(NookId: "nook-123", CliPath: "/cove", DataDir: "/data", BayId: "ws1", HookPort: 9999));
+        Assert.Equal("nook-123", result["COVE_NOOK_ID"]);
     }
 
     [Fact]
@@ -54,12 +54,12 @@ public sealed class EnvPrecedenceResolverTests
     {
         var systemEnv = new Dictionary<string, string> { ["COVE"] = "0" };
         var resolver = new EnvPrecedenceResolver(systemEnv);
-        var result = resolver.Resolve("claude-code", Array.Empty<AdapterEnvVar>(), coveContext: new CoveEnvContext(PaneId: "p1", CliPath: "/cove", DataDir: "/data", WorkspaceId: "ws1", HookPort: 9999));
+        var result = resolver.Resolve("claude-code", Array.Empty<AdapterEnvVar>(), coveContext: new CoveEnvContext(NookId: "p1", CliPath: "/cove", DataDir: "/data", BayId: "ws1", HookPort: 9999));
         Assert.Equal("1", result["COVE"]);
-        Assert.Equal("p1", result["COVE_PANE_ID"]);
+        Assert.Equal("p1", result["COVE_NOOK_ID"]);
         Assert.Equal("/cove", result["COVE_CLI_PATH"]);
         Assert.Equal("/data", result["COVE_DATA_DIR"]);
-        Assert.Equal("ws1", result["COVE_WORKSPACE_ID"]);
+        Assert.Equal("ws1", result["COVE_BAY_ID"]);
         Assert.Equal("9999", result["COVE_HOOK_PORT"]);
     }
 
@@ -76,7 +76,7 @@ public sealed class EnvPrecedenceResolverTests
     public void Resolve_TaskBound_AddsTaskEnv()
     {
         var resolver = new EnvPrecedenceResolver(new Dictionary<string, string>());
-        var result = resolver.Resolve("claude-code", Array.Empty<AdapterEnvVar>(), coveContext: new CoveEnvContext(PaneId: "p1", CliPath: "/cove", DataDir: "/data", WorkspaceId: "ws1", HookPort: 9999, TaskId: "task-5", TaskRunId: "run-9"));
+        var result = resolver.Resolve("claude-code", Array.Empty<AdapterEnvVar>(), coveContext: new CoveEnvContext(NookId: "p1", CliPath: "/cove", DataDir: "/data", BayId: "ws1", HookPort: 9999, TaskId: "task-5", TaskRunId: "run-9"));
         Assert.Equal("task-5", result["COVE_TASK_ID"]);
         Assert.Equal("run-9", result["COVE_TASK_RUN_ID"]);
     }
@@ -85,7 +85,7 @@ public sealed class EnvPrecedenceResolverTests
     public void Resolve_NoTaskContext_TaskVarsAbsent()
     {
         var resolver = new EnvPrecedenceResolver(new Dictionary<string, string>());
-        var result = resolver.Resolve("claude-code", Array.Empty<AdapterEnvVar>(), coveContext: new CoveEnvContext(PaneId: "p1", CliPath: "/cove", DataDir: "/data", WorkspaceId: "ws1", HookPort: 9999));
+        var result = resolver.Resolve("claude-code", Array.Empty<AdapterEnvVar>(), coveContext: new CoveEnvContext(NookId: "p1", CliPath: "/cove", DataDir: "/data", BayId: "ws1", HookPort: 9999));
         Assert.False(result.ContainsKey("COVE_TASK_ID"));
         Assert.False(result.ContainsKey("COVE_TASK_RUN_ID"));
     }

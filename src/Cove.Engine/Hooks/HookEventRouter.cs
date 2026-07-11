@@ -5,8 +5,8 @@ using Microsoft.Extensions.Logging;
 
 namespace Cove.Engine.Hooks;
 
-public sealed record PaneAgentState(
-    string PaneId,
+public sealed record NookAgentState(
+    string NookId,
     string Adapter,
     string Status,
     int ActiveSubagents,
@@ -14,8 +14,8 @@ public sealed record PaneAgentState(
     string? StopReason = null,
     string? SessionId = null)
 {
-    public PaneAgentState WithStatus(string status) => this with { Status = status, LastEventAt = System.DateTimeOffset.UtcNow };
-    public PaneAgentState WithStop(string? reason) => this with { Status = "error", StopReason = reason, LastEventAt = System.DateTimeOffset.UtcNow };
+    public NookAgentState WithStatus(string status) => this with { Status = status, LastEventAt = System.DateTimeOffset.UtcNow };
+    public NookAgentState WithStop(string? reason) => this with { Status = "error", StopReason = reason, LastEventAt = System.DateTimeOffset.UtcNow };
 }
 
 public sealed class HookEventRouter
@@ -35,7 +35,7 @@ public sealed class HookEventRouter
         "rate-limited", "auth-failed", "billing-exceeded",
     };
 
-    private readonly ConcurrentDictionary<string, PaneAgentState> _paneStates = new();
+    private readonly ConcurrentDictionary<string, NookAgentState> _nookStates = new();
     private readonly ILogger? _logger;
 
     public HookEventRouter(ILogger? logger = null)
@@ -49,9 +49,9 @@ public sealed class HookEventRouter
 
     public void Route(HookEvent ev)
     {
-        if (ev.PaneId is null)
+        if (ev.NookId is null)
         {
-            _logger?.HookEventNoPaneId(ev.Adapter, ev.Event);
+            _logger?.HookEventNoNookId(ev.Adapter, ev.Event);
             return;
         }
 
@@ -61,9 +61,9 @@ public sealed class HookEventRouter
             return;
         }
 
-        if (ev.Event != "session-start" && !_paneStates.ContainsKey(ev.PaneId))
+        if (ev.Event != "session-start" && !_nookStates.ContainsKey(ev.NookId))
         {
-            _logger?.HookEventUntrackedPane(ev.Adapter, ev.Event, ev.PaneId);
+            _logger?.HookEventUntrackedNook(ev.Adapter, ev.Event, ev.NookId);
             return;
         }
 
@@ -71,43 +71,43 @@ public sealed class HookEventRouter
         {
             case "session-start":
                 var sessionId = ExtractSessionId(ev.Payload);
-                var priorSessionId = _paneStates.TryGetValue(ev.PaneId, out var prior) ? prior.SessionId : null;
-                _paneStates[ev.PaneId] = new PaneAgentState(ev.PaneId, ev.Adapter, "active", 0, System.DateTimeOffset.UtcNow, SessionId: sessionId ?? priorSessionId);
+                var priorSessionId = _nookStates.TryGetValue(ev.NookId, out var prior) ? prior.SessionId : null;
+                _nookStates[ev.NookId] = new NookAgentState(ev.NookId, ev.Adapter, "active", 0, System.DateTimeOffset.UtcNow, SessionId: sessionId ?? priorSessionId);
                 if (sessionId is not null)
-                    SessionStarted?.Invoke(ev.PaneId, ev.Adapter, sessionId);
+                    SessionStarted?.Invoke(ev.NookId, ev.Adapter, sessionId);
                 break;
             case "session-end":
-                UpdateState(ev.PaneId, s => s with { Status = "idle", StopReason = null, LastEventAt = System.DateTimeOffset.UtcNow });
-                NeedsInputTransition?.Invoke(ev.PaneId, false);
+                UpdateState(ev.NookId, s => s with { Status = "idle", StopReason = null, LastEventAt = System.DateTimeOffset.UtcNow });
+                NeedsInputTransition?.Invoke(ev.NookId, false);
                 break;
             case "stop":
-                UpdateState(ev.PaneId, s => s.WithStatus("needs-input"));
-                NeedsInputTransition?.Invoke(ev.PaneId, true);
+                UpdateState(ev.NookId, s => s.WithStatus("needs-input"));
+                NeedsInputTransition?.Invoke(ev.NookId, true);
                 break;
             case "stop-failure":
                 var reason = ExtractStopReason(ev.Payload);
-                UpdateState(ev.PaneId, s => s.WithStop(reason));
+                UpdateState(ev.NookId, s => s.WithStop(reason));
                 break;
             case "user-prompt-submit":
-                UpdateState(ev.PaneId, s => s.WithStatus("active"));
-                NeedsInputTransition?.Invoke(ev.PaneId, false);
+                UpdateState(ev.NookId, s => s.WithStatus("active"));
+                NeedsInputTransition?.Invoke(ev.NookId, false);
                 break;
             case "pre-tool-use":
-                UpdateState(ev.PaneId, s => s.WithStatus("tool-running"));
+                UpdateState(ev.NookId, s => s.WithStatus("tool-running"));
                 break;
             case "post-tool-use":
-                UpdateState(ev.PaneId, s => s.WithStatus("active"));
+                UpdateState(ev.NookId, s => s.WithStatus("active"));
                 break;
             case "subagent-start":
-                UpdateState(ev.PaneId, s => s with { ActiveSubagents = s.ActiveSubagents + 1, LastEventAt = System.DateTimeOffset.UtcNow });
+                UpdateState(ev.NookId, s => s with { ActiveSubagents = s.ActiveSubagents + 1, LastEventAt = System.DateTimeOffset.UtcNow });
                 break;
             case "subagent-stop":
-                UpdateState(ev.PaneId, s => s with { ActiveSubagents = System.Math.Max(0, s.ActiveSubagents - 1), LastEventAt = System.DateTimeOffset.UtcNow });
+                UpdateState(ev.NookId, s => s with { ActiveSubagents = System.Math.Max(0, s.ActiveSubagents - 1), LastEventAt = System.DateTimeOffset.UtcNow });
                 break;
             case "notification":
             case "permission-request":
-                UpdateState(ev.PaneId, s => s with { LastEventAt = System.DateTimeOffset.UtcNow });
-                NeedsInputTransition?.Invoke(ev.PaneId, true);
+                UpdateState(ev.NookId, s => s with { LastEventAt = System.DateTimeOffset.UtcNow });
+                NeedsInputTransition?.Invoke(ev.NookId, true);
                 break;
         }
     }
@@ -147,16 +147,16 @@ public sealed class HookEventRouter
         return null;
     }
 
-    private void UpdateState(string paneId, System.Func<PaneAgentState, PaneAgentState> update)
+    private void UpdateState(string nookId, System.Func<NookAgentState, NookAgentState> update)
     {
-        while (_paneStates.TryGetValue(paneId, out var existing))
+        while (_nookStates.TryGetValue(nookId, out var existing))
         {
-            if (_paneStates.TryUpdate(paneId, update(existing), existing))
+            if (_nookStates.TryUpdate(nookId, update(existing), existing))
                 return;
         }
     }
 
-    public PaneAgentState? GetPaneState(string paneId) => _paneStates.TryGetValue(paneId, out var s) ? s : null;
+    public NookAgentState? GetNookState(string nookId) => _nookStates.TryGetValue(nookId, out var s) ? s : null;
 
-    public IReadOnlyDictionary<string, PaneAgentState> GetAllPaneStates() => _paneStates;
+    public IReadOnlyDictionary<string, NookAgentState> GetAllNookStates() => _nookStates;
 }

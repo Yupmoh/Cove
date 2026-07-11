@@ -9,23 +9,23 @@ public sealed class PrefixResolverTests
     public void Resolve_UniquePrefix_ReturnsFullId()
     {
         var resolver = new PrefixResolver();
-        resolver.Index("pane", "pane-abc123");
-        resolver.Index("pane", "pane-def456");
+        resolver.Index("nook", "nook-abc123");
+        resolver.Index("nook", "nook-def456");
 
-        var result = resolver.Resolve("pane", "pane-a");
+        var result = resolver.Resolve("nook", "nook-a");
 
         Assert.True(result.Found);
-        Assert.Equal("pane-abc123", result.Id);
+        Assert.Equal("nook-abc123", result.Id);
     }
 
     [Fact]
     public void Resolve_AmbiguousPrefix_ReturnsAmbiguous()
     {
         var resolver = new PrefixResolver();
-        resolver.Index("pane", "pane-abc123");
-        resolver.Index("pane", "pane-abc999");
+        resolver.Index("nook", "nook-abc123");
+        resolver.Index("nook", "nook-abc999");
 
-        var result = resolver.Resolve("pane", "pane-abc");
+        var result = resolver.Resolve("nook", "nook-abc");
 
         Assert.False(result.Found);
         Assert.Equal("ambiguous_id", result.ErrorCode);
@@ -35,9 +35,9 @@ public sealed class PrefixResolverTests
     public void Resolve_NoMatch_ReturnsNotFound()
     {
         var resolver = new PrefixResolver();
-        resolver.Index("pane", "pane-abc123");
+        resolver.Index("nook", "nook-abc123");
 
-        var result = resolver.Resolve("pane", "never-seen");
+        var result = resolver.Resolve("nook", "never-seen");
 
         Assert.False(result.Found);
         Assert.Equal("not_found", result.ErrorCode);
@@ -47,9 +47,9 @@ public sealed class PrefixResolverTests
     public void Resolve_EmptyPrefix_ReturnsNotFound()
     {
         var resolver = new PrefixResolver();
-        resolver.Index("pane", "pane-abc123");
+        resolver.Index("nook", "nook-abc123");
 
-        var result = resolver.Resolve("pane", "");
+        var result = resolver.Resolve("nook", "");
 
         Assert.False(result.Found);
         Assert.Equal("not_found", result.ErrorCode);
@@ -59,27 +59,27 @@ public sealed class PrefixResolverTests
     public void Resolve_FullId_ReturnsExact()
     {
         var resolver = new PrefixResolver();
-        resolver.Index("pane", "pane-abc123");
-        resolver.Index("pane", "pane-abc124");
+        resolver.Index("nook", "nook-abc123");
+        resolver.Index("nook", "nook-abc124");
 
-        var result = resolver.Resolve("pane", "pane-abc123");
+        var result = resolver.Resolve("nook", "nook-abc123");
 
         Assert.True(result.Found);
-        Assert.Equal("pane-abc123", result.Id);
+        Assert.Equal("nook-abc123", result.Id);
     }
 
     [Fact]
     public void Resolve_DifferentTypesAreIndependent()
     {
         var resolver = new PrefixResolver();
-        resolver.Index("pane", "abc123");
+        resolver.Index("nook", "abc123");
         resolver.Index("task", "abc123");
 
-        var paneResult = resolver.Resolve("pane", "abc");
+        var nookResult = resolver.Resolve("nook", "abc");
         var taskResult = resolver.Resolve("task", "abc");
 
-        Assert.True(paneResult.Found);
-        Assert.Equal("abc123", paneResult.Id);
+        Assert.True(nookResult.Found);
+        Assert.Equal("abc123", nookResult.Id);
         Assert.True(taskResult.Found);
         Assert.Equal("abc123", taskResult.Id);
     }
@@ -88,9 +88,9 @@ public sealed class PrefixResolverTests
     public void Resolve_RejectsPrefix_WhenFlagged()
     {
         var resolver = new PrefixResolver();
-        resolver.Index("pane", "pane-abc123");
+        resolver.Index("nook", "nook-abc123");
 
-        var result = resolver.Resolve("pane", "pane-a", rejectPrefix: true);
+        var result = resolver.Resolve("nook", "nook-a", rejectPrefix: true);
 
         Assert.False(result.Found);
         Assert.Equal("not_found", result.ErrorCode);

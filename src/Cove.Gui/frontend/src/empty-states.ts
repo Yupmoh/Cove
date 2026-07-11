@@ -34,7 +34,7 @@ export function buildEmptyState(config: EmptyStateConfig): HTMLElement {
 }
 
 export const EmptyStateMessages = {
-  noRooms: "No rooms yet",
+  noShores: "No shores yet",
   noNotes: "No notes yet",
   noSearchResults: "No results",
   noChanges: "No changes",

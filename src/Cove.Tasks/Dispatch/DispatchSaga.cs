@@ -11,7 +11,7 @@ public enum DispatchStep
     ResolveConfig,
     MintRun,
     CreateWorktree,
-    EnsurePane,
+    EnsureNook,
     InjectEnv,
     LaunchAdapter,
     MoveStatus,
@@ -25,35 +25,35 @@ public sealed class DispatchSaga
     private readonly TaskService _tasks;
     private readonly ILaunchProfileResolver _profileResolver;
     private readonly IWorktreeService _worktreeService;
-    private readonly IPaneHost _paneHost;
-    private readonly IRoomService _roomService;
+    private readonly INookHost _nookHost;
+    private readonly IShoreService _shoreService;
     private readonly IAgentLauncher _agentLauncher;
     private readonly ILogger _logger;
 
-    public DispatchSaga(TaskService tasks, ILaunchProfileResolver profileResolver, IWorktreeService worktreeService, IPaneHost paneHost, IRoomService roomService, IAgentLauncher agentLauncher, ILogger logger)
+    public DispatchSaga(TaskService tasks, ILaunchProfileResolver profileResolver, IWorktreeService worktreeService, INookHost nookHost, IShoreService shoreService, IAgentLauncher agentLauncher, ILogger logger)
     {
         _tasks = tasks;
         _profileResolver = profileResolver;
         _worktreeService = worktreeService;
-        _paneHost = paneHost;
-        _roomService = roomService;
+        _nookHost = nookHost;
+        _shoreService = shoreService;
         _agentLauncher = agentLauncher;
         _logger = logger;
     }
 
-    public async System.Threading.Tasks.Task<DispatchResult> LaunchAsync(string cardId, string workspaceId, string? executionModeOverride)
+    public async System.Threading.Tasks.Task<DispatchResult> LaunchAsync(string cardId, string bayId, string? executionModeOverride)
     {
         var card = _tasks.GetCard(cardId);
         if (card is null)
             return new DispatchResult(false, null, "card not found", DispatchStep.NotStarted);
 
         var config = Cove.Tasks.LaunchConfig.LaunchConfigSerializer.Deserialize(card.LaunchConfigJson);
-        var executionMode = executionModeOverride ?? config?.ExecutionMode ?? "pane";
+        var executionMode = executionModeOverride ?? config?.ExecutionMode ?? "nook";
 
         var step = DispatchStep.ResolveConfig;
         try
         {
-            var resolution = _profileResolver.ResolveTaskProfile(workspaceId, cardId);
+            var resolution = _profileResolver.ResolveTaskProfile(bayId, cardId);
             if (resolution is null)
             {
                 _logger.LogWarning("dispatch: profile resolution failed for card {cardId}", cardId);
@@ -62,7 +62,7 @@ public sealed class DispatchSaga
             step = DispatchStep.MintRun;
 
             var launchProfileJson = config is not null ? Cove.Tasks.LaunchConfig.LaunchConfigSerializer.Serialize(config) : null;
-            var run = await _tasks.CreateRunAsync(cardId, workspaceId, launchProfileJson, reviewStatusId: config?.ReviewStatusId, completionStatusId: config?.CompletionStatusId);
+            var run = await _tasks.CreateRunAsync(cardId, bayId, launchProfileJson, reviewStatusId: config?.ReviewStatusId, completionStatusId: config?.CompletionStatusId);
             if (run is null)
                 return new DispatchResult(false, null, "failed to create run", step);
 
@@ -72,7 +72,7 @@ public sealed class DispatchSaga
                 step = DispatchStep.CreateWorktree;
                 var branchSource = config?.WorktreeBranchSource ?? "task";
                 var branchName = config?.WorktreeBranchName ?? $"COVE-{card.TaskNumber}";
-                var worktree = _worktreeService.CreateAsync(workspaceId, branchSource, branchName, config?.MergeTarget);
+                var worktree = _worktreeService.CreateAsync(bayId, branchSource, branchName, config?.MergeTarget);
                 if (worktree is null)
                 {
                     _logger.LogWarning("dispatch: worktree creation failed for card {cardId}", cardId);
@@ -82,20 +82,20 @@ public sealed class DispatchSaga
                 worktreeBranch = worktree.BranchName;
             }
 
-            step = DispatchStep.EnsurePane;
-            var paneResult = _paneHost.CreatePane(resolution.Adapter, 80, 24);
-            if (paneResult is null)
+            step = DispatchStep.EnsureNook;
+            var nookResult = _nookHost.CreateNook(resolution.Adapter, 80, 24);
+            if (nookResult is null)
             {
-                _logger.LogWarning("dispatch: pane creation failed for card {cardId}", cardId);
+                _logger.LogWarning("dispatch: nook creation failed for card {cardId}", cardId);
                 await CompensateRunAsync(run.Id);
-                if (worktreeBranch is not null) _worktreeService.RemoveAsync(workspaceId, worktreeBranch);
-                return new DispatchResult(false, run.Id, "pane creation failed", step);
+                if (worktreeBranch is not null) _worktreeService.RemoveAsync(bayId, worktreeBranch);
+                return new DispatchResult(false, run.Id, "nook creation failed", step);
             }
 
             if (executionMode == "worktree" && card.Title is not null)
             {
-                var roomName = $"COVE-{card.TaskNumber} - {card.Title}";
-                _roomService.CreateRoom(workspaceId, roomName, null);
+                var shoreName = $"COVE-{card.TaskNumber} - {card.Title}";
+                _shoreService.CreateShore(bayId, shoreName, null);
             }
 
             step = DispatchStep.InjectEnv;
@@ -105,27 +105,27 @@ public sealed class DispatchSaga
                 ["COVE_TASK_RUN_ID"] = run.Id,
             };
             foreach (var kv in resolution.Env) env[kv.Key] = kv.Value;
-            if (!_paneHost.InjectEnv(paneResult.PaneId, env))
+            if (!_nookHost.InjectEnv(nookResult.NookId, env))
             {
-                _logger.LogWarning("dispatch: env injection failed for pane {paneId}", paneResult.PaneId);
+                _logger.LogWarning("dispatch: env injection failed for nook {nookId}", nookResult.NookId);
                 await CompensateRunAsync(run.Id);
-                if (worktreeBranch is not null) _worktreeService.RemoveAsync(workspaceId, worktreeBranch);
+                if (worktreeBranch is not null) _worktreeService.RemoveAsync(bayId, worktreeBranch);
                 return new DispatchResult(false, run.Id, "env injection failed", step);
             }
-            _paneHost.BindTaskCard(paneResult.PaneId, cardId);
+            _nookHost.BindTaskCard(nookResult.NookId, cardId);
 
             step = DispatchStep.LaunchAdapter;
             var prompt = $"{card.Title}\n\n{card.Description}";
-            var launchResult = _agentLauncher.Launch(paneResult.PaneId, resolution.Adapter, resolution.ResolvedCommand ?? "", env, prompt);
+            var launchResult = _agentLauncher.Launch(nookResult.NookId, resolution.Adapter, resolution.ResolvedCommand ?? "", env, prompt);
             if (!launchResult.Success)
             {
                 _logger.LogWarning("dispatch: adapter launch failed for card {cardId}: {error}", cardId, launchResult.Error);
                 await CompensateRunAsync(run.Id);
-                if (worktreeBranch is not null) _worktreeService.RemoveAsync(workspaceId, worktreeBranch);
+                if (worktreeBranch is not null) _worktreeService.RemoveAsync(bayId, worktreeBranch);
                 return new DispatchResult(false, run.Id, launchResult.Error ?? "adapter launch failed", step);
             }
 
-            await _tasks.AddRunSegmentAsync(run.Id, paneResult.PaneId, launchResult.AdapterSessionId);
+            await _tasks.AddRunSegmentAsync(run.Id, nookResult.NookId, launchResult.AdapterSessionId);
 
             step = DispatchStep.MoveStatus;
             var inProgressStatus = config?.InProgressStatusId ?? "in-progress";

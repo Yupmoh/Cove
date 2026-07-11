@@ -27,14 +27,14 @@ public sealed class NoteFileStore
         if (string.IsNullOrEmpty(note.Id))
             note = note with { Id = System.Guid.NewGuid().ToString("N") };
 
-        var noteDir = ResolveNoteDir(note.WorkspaceId, note.Id);
+        var noteDir = ResolveNoteDir(note.BayId, note.Id);
         System.IO.Directory.CreateDirectory(noteDir);
 
         var meta = new NoteMeta
         {
             Id = note.Id,
             Title = note.Title,
-            WorkspaceId = note.WorkspaceId,
+            BayId = note.BayId,
             Source = note.Source,
             Kind = note.Kind,
             CreatedAt = note.CreatedAt == default ? System.DateTimeOffset.UtcNow : note.CreatedAt,
@@ -45,14 +45,14 @@ public sealed class NoteFileStore
         WriteBody(noteDir, note.Kind, note.Content);
         UpsertFtsIndex(note);
 
-        _logger.LogWarning("notes: created {id} ({kind}) in {ws}", note.Id, note.Kind, note.WorkspaceId);
-        _snapshots?.Snapshot(note.WorkspaceId, note.Id, $"create: {note.Title}");
+        _logger.LogWarning("notes: created {id} ({kind}) in {ws}", note.Id, note.Kind, note.BayId);
+        _snapshots?.Snapshot(note.BayId, note.Id, $"create: {note.Title}");
         return note;
     }
 
-    public Note? Get(string workspaceId, string id)
+    public Note? Get(string bayId, string id)
     {
-        var noteDir = ResolveNoteDir(workspaceId, id);
+        var noteDir = ResolveNoteDir(bayId, id);
         var metaPath = System.IO.Path.Combine(noteDir, "meta.json");
         if (!System.IO.File.Exists(metaPath)) return null;
 
@@ -65,7 +65,7 @@ public sealed class NoteFileStore
             Id = meta.Id,
             Title = meta.Title,
             Content = body,
-            WorkspaceId = meta.WorkspaceId,
+            BayId = meta.BayId,
             Source = meta.Source,
             Kind = meta.Kind,
             CreatedAt = meta.CreatedAt,
@@ -73,10 +73,10 @@ public sealed class NoteFileStore
         };
     }
 
-    public System.Collections.Generic.IReadOnlyList<NoteMeta> ListByWorkspace(string workspaceId)
+    public System.Collections.Generic.IReadOnlyList<NoteMeta> ListByBay(string bayId)
     {
         var result = new System.Collections.Generic.List<NoteMeta>();
-        var wsDir = System.IO.Path.Combine(_notesRoot, workspaceId);
+        var wsDir = System.IO.Path.Combine(_notesRoot, bayId);
         if (!System.IO.Directory.Exists(wsDir)) return result;
 
         foreach (var noteDir in System.IO.Directory.GetDirectories(wsDir))
@@ -90,61 +90,61 @@ public sealed class NoteFileStore
         return result.OrderByDescending(m => m.UpdatedAt).ToList();
     }
 
-    public void Update(string workspaceId, string id, System.Func<Note, Note> update)
+    public void Update(string bayId, string id, System.Func<Note, Note> update)
     {
-        var existing = Get(workspaceId, id);
+        var existing = Get(bayId, id);
         if (existing is null)
         {
-            _logger.LogWarning("notes: update failed — note {id} not found in {ws}", id, workspaceId);
+            _logger.LogWarning("notes: update failed — note {id} not found in {ws}", id, bayId);
             return;
         }
 
         var updated = update(existing);
-        var noteDir = ResolveNoteDir(workspaceId, id);
+        var noteDir = ResolveNoteDir(bayId, id);
         var metaPath = System.IO.Path.Combine(noteDir, "meta.json");
         var meta = JsonSerializer.Deserialize(System.IO.File.ReadAllText(metaPath), NoteFileJsonContext.Default.NoteMeta)!;
         meta = meta with { Title = updated.Title, UpdatedAt = System.DateTimeOffset.UtcNow };
         WriteMeta(noteDir, meta);
         WriteBody(noteDir, updated.Kind, updated.Content);
         UpsertFtsIndex(updated);
-        _logger.LogWarning("notes: updated {id} in {ws}", id, workspaceId);
-        _snapshots?.Snapshot(workspaceId, id, $"update: {updated.Title}");
+        _logger.LogWarning("notes: updated {id} in {ws}", id, bayId);
+        _snapshots?.Snapshot(bayId, id, $"update: {updated.Title}");
     }
 
-    public void Delete(string workspaceId, string id)
+    public void Delete(string bayId, string id)
     {
-        var noteDir = ResolveNoteDir(workspaceId, id);
+        var noteDir = ResolveNoteDir(bayId, id);
         if (!System.IO.Directory.Exists(noteDir)) return;
         RemoveFromFtsIndex(id);
         System.IO.Directory.Delete(noteDir, true);
-        _logger.LogWarning("notes: deleted {id} in {ws}", id, workspaceId);
+        _logger.LogWarning("notes: deleted {id} in {ws}", id, bayId);
     }
 
-    public System.Collections.Generic.IReadOnlyList<NoteHistoryEntry> GetHistory(string workspaceId, string id)
+    public System.Collections.Generic.IReadOnlyList<NoteHistoryEntry> GetHistory(string bayId, string id)
     {
         if (_snapshots is null)
         {
             _logger.LogWarning("notes: snapshot service not available, cannot get history for {id}", id);
             return [];
         }
-        return _snapshots.GetHistory(workspaceId, id);
+        return _snapshots.GetHistory(bayId, id);
     }
 
-    public System.Collections.Generic.IReadOnlyList<Note> Search(string workspaceId, string query, int limit = 20)
+    public System.Collections.Generic.IReadOnlyList<Note> Search(string bayId, string query, int limit = 20)
     {
         var result = new System.Collections.Generic.List<Note>();
         using var conn = new SqliteConnection($"Data Source={_indexPath}");
         conn.Open();
         using var cmd = conn.CreateCommand();
         cmd.CommandText = """
-            SELECT n.note_id, n.workspace_id, n.title, n.body, n.type, n.updated_at
+            SELECT n.note_id, n.bay_id, n.title, n.body, n.type, n.updated_at
             FROM notes_fts f
             JOIN notes_index n ON n.rowid = f.rowid
-            WHERE n.workspace_id = @ws AND notes_fts MATCH @query
+            WHERE n.bay_id = @ws AND notes_fts MATCH @query
             ORDER BY rank
             LIMIT @limit
             """;
-        cmd.Parameters.AddWithValue("@ws", workspaceId);
+        cmd.Parameters.AddWithValue("@ws", bayId);
         cmd.Parameters.AddWithValue("@query", query);
         cmd.Parameters.AddWithValue("@limit", limit);
         using var reader = cmd.ExecuteReader();
@@ -153,7 +153,7 @@ public sealed class NoteFileStore
             result.Add(new Note
             {
                 Id = reader.GetString(0),
-                WorkspaceId = reader.GetString(1),
+                BayId = reader.GetString(1),
                 Title = reader.GetString(2),
                 Content = reader.GetString(3),
                 Source = "notes-index",
@@ -177,8 +177,8 @@ public sealed class NoteFileStore
 
         foreach (var wsDir in System.IO.Directory.GetDirectories(_notesRoot))
         {
-            var workspaceId = System.IO.Path.GetFileName(wsDir);
-            if (workspaceId == "index.db") continue;
+            var bayId = System.IO.Path.GetFileName(wsDir);
+            if (bayId == "index.db") continue;
             foreach (var noteDir in System.IO.Directory.GetDirectories(wsDir))
             {
                 var metaPath = System.IO.Path.Combine(noteDir, "meta.json");
@@ -186,7 +186,7 @@ public sealed class NoteFileStore
                 var meta = JsonSerializer.Deserialize(System.IO.File.ReadAllText(metaPath), NoteFileJsonContext.Default.NoteMeta);
                 if (meta is null) continue;
                 var body = ReadBody(noteDir, meta.Kind);
-                UpsertFtsIndex(conn, meta.Id, meta.WorkspaceId, meta.Title, body, meta.Kind, meta.UpdatedAt.ToString("o"));
+                UpsertFtsIndex(conn, meta.Id, meta.BayId, meta.Title, body, meta.Kind, meta.UpdatedAt.ToString("o"));
                 count++;
             }
         }
@@ -194,9 +194,9 @@ public sealed class NoteFileStore
         _logger.LogWarning("notes: rebuilt FTS index from disk ({count} notes)", count);
     }
 
-    public void SaveViewport(string workspaceId, string id, string viewportJson)
+    public void SaveViewport(string bayId, string id, string viewportJson)
     {
-        var noteDir = ResolveNoteDir(workspaceId, id);
+        var noteDir = ResolveNoteDir(bayId, id);
         if (!System.IO.Directory.Exists(noteDir))
         {
             _logger.LogWarning("notes: save viewport failed — note {id} not found", id);
@@ -205,39 +205,39 @@ public sealed class NoteFileStore
         System.IO.File.WriteAllText(System.IO.Path.Combine(noteDir, "viewport.json"), viewportJson);
     }
 
-    public string? LoadViewport(string workspaceId, string id)
+    public string? LoadViewport(string bayId, string id)
     {
-        var path = System.IO.Path.Combine(ResolveNoteDir(workspaceId, id), "viewport.json");
+        var path = System.IO.Path.Combine(ResolveNoteDir(bayId, id), "viewport.json");
         return System.IO.File.Exists(path) ? System.IO.File.ReadAllText(path) : null;
     }
 
-    public void SaveState(string workspaceId, string id, string stateJson)
+    public void SaveState(string bayId, string id, string stateJson)
     {
-        var noteDir = ResolveNoteDir(workspaceId, id);
+        var noteDir = ResolveNoteDir(bayId, id);
         if (!System.IO.Directory.Exists(noteDir)) return;
         System.IO.File.WriteAllText(System.IO.Path.Combine(noteDir, "state.json"), stateJson);
     }
 
-    public string? LoadState(string workspaceId, string id)
+    public string? LoadState(string bayId, string id)
     {
-        var path = System.IO.Path.Combine(ResolveNoteDir(workspaceId, id), "state.json");
+        var path = System.IO.Path.Combine(ResolveNoteDir(bayId, id), "state.json");
         return System.IO.File.Exists(path) ? System.IO.File.ReadAllText(path) : null;
     }
 
-    public string SaveMedia(string workspaceId, string id, string fileName, byte[] data)
+    public string SaveMedia(string bayId, string id, string fileName, byte[] data)
     {
-        var noteDir = ResolveNoteDir(workspaceId, id);
+        var noteDir = ResolveNoteDir(bayId, id);
         var mediaDir = System.IO.Path.Combine(noteDir, "media");
         System.IO.Directory.CreateDirectory(mediaDir);
         var mediaId = $"img-{System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}-{fileName}";
         var mediaPath = System.IO.Path.Combine(mediaDir, mediaId);
         System.IO.File.WriteAllBytes(mediaPath, data);
-        _logger.LogWarning("notes: saved media {mediaId} for note {id} in {ws}", mediaId, id, workspaceId);
-        return System.IO.Path.Combine(workspaceId, id, "media", mediaId);
+        _logger.LogWarning("notes: saved media {mediaId} for note {id} in {ws}", mediaId, id, bayId);
+        return System.IO.Path.Combine(bayId, id, "media", mediaId);
     }
 
-    private string ResolveNoteDir(string workspaceId, string noteId)
-        => System.IO.Path.Combine(_notesRoot, workspaceId, noteId);
+    private string ResolveNoteDir(string bayId, string noteId)
+        => System.IO.Path.Combine(_notesRoot, bayId, noteId);
 
     private static void WriteMeta(string noteDir, NoteMeta meta)
         => System.IO.File.WriteAllText(System.IO.Path.Combine(noteDir, "meta.json"), JsonSerializer.Serialize(meta, NoteFileJsonContext.Default.NoteMeta));
@@ -272,25 +272,25 @@ public sealed class NoteFileStore
     }
 
     private void UpsertFtsIndex(Note note)
-        => UpsertFtsIndex(note.Id, note.WorkspaceId, note.Title, note.Content, note.Kind, System.DateTimeOffset.UtcNow.ToString("o"));
+        => UpsertFtsIndex(note.Id, note.BayId, note.Title, note.Content, note.Kind, System.DateTimeOffset.UtcNow.ToString("o"));
 
-    private void UpsertFtsIndex(string id, string workspaceId, string title, string body, string type, string updatedAt)
+    private void UpsertFtsIndex(string id, string bayId, string title, string body, string type, string updatedAt)
     {
         using var conn = new SqliteConnection($"Data Source={_indexPath}");
         conn.Open();
-        UpsertFtsIndex(conn, id, workspaceId, title, body, type, updatedAt);
+        UpsertFtsIndex(conn, id, bayId, title, body, type, updatedAt);
     }
 
-    private static void UpsertFtsIndex(SqliteConnection conn, string id, string workspaceId, string title, string body, string type, string updatedAt)
+    private static void UpsertFtsIndex(SqliteConnection conn, string id, string bayId, string title, string body, string type, string updatedAt)
     {
         using var cmd = conn.CreateCommand();
         cmd.CommandText = """
-            INSERT INTO notes_index (note_id, workspace_id, title, body, type, updated_at)
+            INSERT INTO notes_index (note_id, bay_id, title, body, type, updated_at)
             VALUES (@id, @ws, @title, @body, @type, @ts)
             ON CONFLICT(note_id) DO UPDATE SET title=@title, body=@body, type=@type, updated_at=@ts;
             """;
         cmd.Parameters.AddWithValue("@id", id);
-        cmd.Parameters.AddWithValue("@ws", workspaceId);
+        cmd.Parameters.AddWithValue("@ws", bayId);
         cmd.Parameters.AddWithValue("@title", (object?)title ?? System.DBNull.Value);
         cmd.Parameters.AddWithValue("@body", (object?)body ?? System.DBNull.Value);
         cmd.Parameters.AddWithValue("@type", type);
@@ -313,7 +313,7 @@ public sealed record NoteMeta
 {
     public string Id { get; init; } = "";
     public required string Title { get; init; }
-    public required string WorkspaceId { get; init; }
+    public required string BayId { get; init; }
     public required string Source { get; init; }
     private readonly string? _kind;
     public string Kind { get => _kind ?? "markdown"; init => _kind = value; }

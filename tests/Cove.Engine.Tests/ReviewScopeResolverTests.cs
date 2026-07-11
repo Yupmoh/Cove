@@ -17,7 +17,7 @@ public sealed class ReviewScopeResolverTests
         => new(store, NullLogger.Instance);
 
     [Fact]
-    public void Resolve_WorkspaceScope_ReturnsAllComments()
+    public void Resolve_BayScope_ReturnsAllComments()
     {
         var store = NewStore();
         var resolver = NewResolver(store);
@@ -25,7 +25,7 @@ public sealed class ReviewScopeResolverTests
         store.AddComment("abc1234", "file.cs", 20, "alice", "another", null);
         store.AddComment("abc1234", "other.cs", 5, "alice", "third", null);
 
-        var comments = resolver.Resolve("abc1234", new ReviewScope("workspace", null));
+        var comments = resolver.Resolve("abc1234", new ReviewScope("bay", null));
 
         Assert.Equal(3, comments.Count);
     }

@@ -6,7 +6,7 @@ namespace Cove.Engine.Notifications;
 
 public enum NotificationTier { Ambient, Toast, OsNotification, DockBadge }
 
-public sealed record NotificationTrigger(bool NeedsInput, bool AppFocused, string PaneId, string? BannerId);
+public sealed record NotificationTrigger(bool NeedsInput, bool AppFocused, string NookId, string? BannerId);
 
 public sealed record NotificationEvaluation(
     bool SuppressAmbient,
@@ -32,7 +32,7 @@ public sealed class NotificationPolicyEngine
         [NotificationTier.DockBadge] = false,
     };
     private readonly HashSet<string> _dismissedBanners = new(System.StringComparer.OrdinalIgnoreCase);
-    private readonly HashSet<string> _needsInputNotifiedPanes = new(System.StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _needsInputNotifiedNooks = new(System.StringComparer.OrdinalIgnoreCase);
 
     public NotificationPolicyEngine(string dataDir, ILogger logger)
     {
@@ -45,10 +45,10 @@ public sealed class NotificationPolicyEngine
     public NotificationEvaluation Evaluate(NotificationTrigger trigger)
     {
         var suppressOs = !trigger.NeedsInput || trigger.AppFocused || !_tierEnabled[NotificationTier.OsNotification];
-        if (!suppressOs && _needsInputNotifiedPanes.Contains(trigger.PaneId))
+        if (!suppressOs && _needsInputNotifiedNooks.Contains(trigger.NookId))
             suppressOs = true;
         if (!suppressOs)
-            _needsInputNotifiedPanes.Add(trigger.PaneId);
+            _needsInputNotifiedNooks.Add(trigger.NookId);
 
         var suppressToast = !_tierEnabled[NotificationTier.Toast];
         var suppressBanner = trigger.BannerId is not null && IsDismissed(trigger.BannerId);
@@ -57,9 +57,9 @@ public sealed class NotificationPolicyEngine
         return new NotificationEvaluation(suppressAmbient, suppressToast, suppressOs, suppressBanner);
     }
 
-    public void ClearNeedsInput(string paneId)
+    public void ClearNeedsInput(string nookId)
     {
-        _needsInputNotifiedPanes.Remove(paneId);
+        _needsInputNotifiedNooks.Remove(nookId);
     }
 
     public bool IsTierEnabled(NotificationTier tier) => _tierEnabled.GetValueOrDefault(tier, false);

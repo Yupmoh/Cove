@@ -28,17 +28,17 @@ public static class DiagnosticsCommands
         if (ctx.Diagnostics is not { } hub)
             return Task.FromResult(ctx.Fail("not_ready", "diagnostics hub not available"));
 
-        var activePanes = 0;
-        var activeWorkspaces = 0;
+        var activeNooks = 0;
+        var activeBays = 0;
         var activeAgents = 0;
         if (ctx.Request.Params is JsonElement el && el.Deserialize(CoveJsonContext.Default.DiagnosticsSnapshotTakeParams) is { } p)
         {
-            activePanes = p.ActivePanes ?? 0;
-            activeWorkspaces = p.ActiveWorkspaces ?? 0;
+            activeNooks = p.ActiveNooks ?? 0;
+            activeBays = p.ActiveBays ?? 0;
             activeAgents = p.ActiveAgents ?? 0;
         }
 
-        var snapshot = hub.TakeSnapshot(activePanes, activeWorkspaces, activeAgents);
+        var snapshot = hub.TakeSnapshot(activeNooks, activeBays, activeAgents);
         return Task.FromResult(ctx.OkJson(hub.ExportSnapshotJson(snapshot)));
     }
 

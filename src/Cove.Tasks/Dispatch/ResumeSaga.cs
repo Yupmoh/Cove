@@ -19,20 +19,20 @@ public sealed class ResumeSaga
 {
     private readonly TaskService _tasks;
     private readonly ILaunchProfileResolver _profileResolver;
-    private readonly IPaneHost _paneHost;
+    private readonly INookHost _nookHost;
     private readonly IAdapterResumeLauncher _resumeLauncher;
     private readonly ILogger _logger;
 
-    public ResumeSaga(TaskService tasks, ILaunchProfileResolver profileResolver, IPaneHost paneHost, IAdapterResumeLauncher resumeLauncher, ILogger logger)
+    public ResumeSaga(TaskService tasks, ILaunchProfileResolver profileResolver, INookHost nookHost, IAdapterResumeLauncher resumeLauncher, ILogger logger)
     {
         _tasks = tasks;
         _profileResolver = profileResolver;
-        _paneHost = paneHost;
+        _nookHost = nookHost;
         _resumeLauncher = resumeLauncher;
         _logger = logger;
     }
 
-    public async System.Threading.Tasks.Task<ResumeResult> ResumeAsync(string runId, string? paneId, string? adapterOverride)
+    public async System.Threading.Tasks.Task<ResumeResult> ResumeAsync(string runId, string? nookId, string? adapterOverride)
     {
         var run = _tasks.GetRun(runId);
         if (run is null)
@@ -70,7 +70,7 @@ public sealed class ResumeSaga
             return new ResumeResult(false, null, "card not found", ResumeOutcome.RunNotFound);
         }
 
-        var resolution = _profileResolver.ResolveTaskProfile(run.WorkspaceId, run.CardId);
+        var resolution = _profileResolver.ResolveTaskProfile(run.BayId, run.CardId);
         if (resolution is null)
         {
             _logger.LogWarning("resume: profile resolution failed for card {cardId}", run.CardId);
@@ -85,18 +85,18 @@ public sealed class ResumeSaga
             ["COVE_TASK_RUN_ID"] = run.Id,
         };
 
-        if (paneId is not null)
+        if (nookId is not null)
         {
-            if (!_paneHost.InjectEnv(paneId, env))
+            if (!_nookHost.InjectEnv(nookId, env))
             {
-                _logger.LogWarning("resume: env injection failed for pane {paneId}", paneId);
+                _logger.LogWarning("resume: env injection failed for nook {nookId}", nookId);
                 return new ResumeResult(false, null, "env injection failed", ResumeOutcome.AdapterResumeFailed);
             }
-            _paneHost.BindTaskCard(paneId, card.Id);
+            _nookHost.BindTaskCard(nookId, card.Id);
         }
 
         var resolvedCommand = resolution.ResolvedCommand ?? "";
-        var resumeResult = _resumeLauncher.Resume(paneId ?? "", adapter, resolvedCommand, priorSessionId!, env);
+        var resumeResult = _resumeLauncher.Resume(nookId ?? "", adapter, resolvedCommand, priorSessionId!, env);
         if (!resumeResult.Success)
         {
             _logger.LogWarning("resume: adapter resume failed for run {runId}: {error}", runId, resumeResult.Error);
@@ -105,7 +105,7 @@ public sealed class ResumeSaga
             return new ResumeResult(false, null, resumeResult.Error ?? "adapter resume failed", ResumeOutcome.AdapterResumeFailed);
         }
 
-        var newSegment = await _tasks.AddRunSegmentAsync(runId, paneId, resumeResult.AdapterSessionId);
+        var newSegment = await _tasks.AddRunSegmentAsync(runId, nookId, resumeResult.AdapterSessionId);
 
         try { await _tasks.TransitionRunAsync(runId, RunState.Active); }
         catch (System.InvalidOperationException ex)

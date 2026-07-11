@@ -9,25 +9,25 @@ interface NoteReadResult {
 }
 
 let currentNoteId: string | null = null;
-let currentWorkspaceId: string | null = null;
+let currentBayId: string | null = null;
 let currentContent: string = "";
 let runtimeState: Record<string, unknown> = {};
 let sourceMode = false;
 
-export async function renderHtmlNote(workspaceId: string, noteId: string): Promise<HTMLElement> {
+export async function renderHtmlNote(bayId: string, noteId: string): Promise<HTMLElement> {
   const el = document.createElement("div");
   el.className = "html-note-editor";
   el.style.cssText = "display:flex;flex-direction:column;height:100%;background:#0b1622;color:#e5e9f0;font-family:system-ui,sans-serif;";
 
   currentNoteId = noteId;
-  currentWorkspaceId = workspaceId;
+  currentBayId = bayId;
 
   try {
-    const result = await invoke<NoteReadResult>("cove://commands/note.read", { workspaceId, id: noteId });
+    const result = await invoke<NoteReadResult>("cove://commands/note.read", { bayId, id: noteId });
     currentContent = result.content;
 
     const stateJson = await invoke<{ state: string | null }>("cove://commands/note.get-state", {
-      workspaceId,
+      bayId,
       id: noteId,
     }).catch(() => ({ state: null }));
     if (stateJson.state) {
@@ -127,10 +127,10 @@ function setupPostMessageListener(iframe: HTMLIFrameElement): void {
 }
 
 async function persistRuntimeState(): Promise<void> {
-  if (!currentWorkspaceId || !currentNoteId) return;
+  if (!currentBayId || !currentNoteId) return;
   try {
     await invoke("cove://commands/note.save-state", {
-      workspaceId: currentWorkspaceId,
+      bayId: currentBayId,
       id: currentNoteId,
       stateJson: JSON.stringify(runtimeState),
     });
@@ -147,10 +147,10 @@ function rerender(): void {
 }
 
 async function saveHtmlNote(): Promise<void> {
-  if (!currentWorkspaceId || !currentNoteId) return;
+  if (!currentBayId || !currentNoteId) return;
   try {
     await invoke("cove://commands/note.write", {
-      workspaceId: currentWorkspaceId,
+      bayId: currentBayId,
       id: currentNoteId,
       content: currentContent,
     });

@@ -27,19 +27,19 @@ public sealed class ResumeSagaTests
         public LaunchProfileResolution? ResolveTaskProfile(string ws, string cardId) => Result;
     }
 
-    private sealed class FakePaneHost : IPaneHost
+    private sealed class FakeNookHost : INookHost
     {
         public bool ShouldFailEnv { get; set; }
         public Dictionary<string, Dictionary<string, string>> InjectedEnvs { get; } = new();
         public Dictionary<string, string> BoundCards { get; } = new();
-        public PaneCreationResult? CreatePane(string? adapter, int cols, int rows) => new("pane-1");
-        public bool InjectEnv(string paneId, IReadOnlyDictionary<string, string> env)
+        public NookCreationResult? CreateNook(string? adapter, int cols, int rows) => new("nook-1");
+        public bool InjectEnv(string nookId, IReadOnlyDictionary<string, string> env)
         {
             if (ShouldFailEnv) return false;
-            InjectedEnvs[paneId] = new Dictionary<string, string>(env);
+            InjectedEnvs[nookId] = new Dictionary<string, string>(env);
             return true;
         }
-        public bool BindTaskCard(string paneId, string cardId) { BoundCards[paneId] = cardId; return true; }
+        public bool BindTaskCard(string nookId, string cardId) { BoundCards[nookId] = cardId; return true; }
     }
 
     private sealed class FakeResumeLauncher : IAdapterResumeLauncher
@@ -49,7 +49,7 @@ public sealed class ResumeSagaTests
         public int ResumeCalls { get; private set; }
         public string? LastPriorSessionId { get; private set; }
         public string? LastAdapter { get; private set; }
-        public AdapterResumeResult Resume(string paneId, string adapter, string resolvedCommand, string priorAdapterSessionId, IReadOnlyDictionary<string, string> env)
+        public AdapterResumeResult Resume(string nookId, string adapter, string resolvedCommand, string priorAdapterSessionId, IReadOnlyDictionary<string, string> env)
         {
             ResumeCalls++;
             LastPriorSessionId = priorAdapterSessionId;
@@ -62,7 +62,7 @@ public sealed class ResumeSagaTests
     {
         var cardId = (await svc.CreateCardAsync("ws1", "resume card", "user:test", "do the thing", 1, 2, null)).Id;
         var run = await svc.CreateRunAsync(cardId, "ws1", null);
-        await svc.AddRunSegmentAsync(run!.Id, "pane-original", "adapter-session-abc");
+        await svc.AddRunSegmentAsync(run!.Id, "nook-original", "adapter-session-abc");
         return (svc, cardId, run.Id);
     }
 
@@ -74,11 +74,11 @@ public sealed class ResumeSagaTests
         await svc.TransitionRunAsync(runId, RunState.Interrupted);
 
         var resolver = new FakeProfileResolver();
-        var paneHost = new FakePaneHost();
+        var nookHost = new FakeNookHost();
         var resumeLauncher = new FakeResumeLauncher();
-        var saga = new ResumeSaga(svc, resolver, paneHost, resumeLauncher, NullLogger.Instance);
+        var saga = new ResumeSaga(svc, resolver, nookHost, resumeLauncher, NullLogger.Instance);
 
-        var result = await saga.ResumeAsync(runId, "pane-new", null);
+        var result = await saga.ResumeAsync(runId, "nook-new", null);
 
         Assert.True(result.Success, result.Error);
         Assert.Equal(ResumeOutcome.Resumed, result.Outcome);
@@ -89,23 +89,23 @@ public sealed class ResumeSagaTests
 
         var segments = svc.ListRunSegments(runId);
         Assert.Equal(2, segments.Count);
-        Assert.Equal("pane-new", segments[1].PaneId);
+        Assert.Equal("nook-new", segments[1].NookId);
         Assert.Equal("resumed-session-1", segments[1].AdapterSessionId);
 
         var run = svc.GetRun(runId);
         Assert.Equal("active", run!.State);
 
-        Assert.Contains("COVE_TASK_ID", paneHost.InjectedEnvs["pane-new"].Keys);
-        Assert.Contains("COVE_TASK_RUN_ID", paneHost.InjectedEnvs["pane-new"].Keys);
+        Assert.Contains("COVE_TASK_ID", nookHost.InjectedEnvs["nook-new"].Keys);
+        Assert.Contains("COVE_TASK_RUN_ID", nookHost.InjectedEnvs["nook-new"].Keys);
     }
 
     [Fact]
     public async System.Threading.Tasks.Task RunNotFound_ReturnsError()
     {
         var svc = await NewSvcAsync();
-        var saga = new ResumeSaga(svc, new FakeProfileResolver(), new FakePaneHost(), new FakeResumeLauncher(), NullLogger.Instance);
+        var saga = new ResumeSaga(svc, new FakeProfileResolver(), new FakeNookHost(), new FakeResumeLauncher(), NullLogger.Instance);
 
-        var result = await saga.ResumeAsync("nonexistent", "pane-1", null);
+        var result = await saga.ResumeAsync("nonexistent", "nook-1", null);
 
         Assert.False(result.Success);
         Assert.Equal(ResumeOutcome.RunNotFound, result.Outcome);
@@ -117,9 +117,9 @@ public sealed class ResumeSagaTests
         var svc = await NewSvcAsync();
         var (_, _, runId) = await SeedRunWithSegmentAsync(svc);
 
-        var saga = new ResumeSaga(svc, new FakeProfileResolver(), new FakePaneHost(), new FakeResumeLauncher(), NullLogger.Instance);
+        var saga = new ResumeSaga(svc, new FakeProfileResolver(), new FakeNookHost(), new FakeResumeLauncher(), NullLogger.Instance);
 
-        var result = await saga.ResumeAsync(runId, "pane-1", null);
+        var result = await saga.ResumeAsync(runId, "nook-1", null);
 
         Assert.False(result.Success);
         Assert.Equal(ResumeOutcome.InvalidState, result.Outcome);
@@ -133,9 +133,9 @@ public sealed class ResumeSagaTests
         var run = await svc.CreateRunAsync(cardId, "ws1", null);
         await svc.TransitionRunAsync(run!.Id, RunState.Interrupted);
 
-        var saga = new ResumeSaga(svc, new FakeProfileResolver(), new FakePaneHost(), new FakeResumeLauncher(), NullLogger.Instance);
+        var saga = new ResumeSaga(svc, new FakeProfileResolver(), new FakeNookHost(), new FakeResumeLauncher(), NullLogger.Instance);
 
-        var result = await saga.ResumeAsync(run.Id, "pane-1", null);
+        var result = await saga.ResumeAsync(run.Id, "nook-1", null);
 
         Assert.False(result.Success);
         Assert.Equal(ResumeOutcome.NoCapturedSession, result.Outcome);
@@ -153,9 +153,9 @@ public sealed class ResumeSagaTests
         await svc.TransitionRunAsync(runId, RunState.Completed);
 
         var resumeLauncher = new FakeResumeLauncher();
-        var saga = new ResumeSaga(svc, new FakeProfileResolver(), new FakePaneHost(), resumeLauncher, NullLogger.Instance);
+        var saga = new ResumeSaga(svc, new FakeProfileResolver(), new FakeNookHost(), resumeLauncher, NullLogger.Instance);
 
-        var result = await saga.ResumeAsync(runId, "pane-new", null);
+        var result = await saga.ResumeAsync(runId, "nook-new", null);
 
         Assert.True(result.Success, result.Error);
         Assert.Equal(ResumeOutcome.Resumed, result.Outcome);
@@ -171,9 +171,9 @@ public sealed class ResumeSagaTests
         await svc.TransitionRunAsync(runId, RunState.Interrupted);
 
         var resumeLauncher = new FakeResumeLauncher { ShouldFail = true, Error = "adapter crashed" };
-        var saga = new ResumeSaga(svc, new FakeProfileResolver(), new FakePaneHost(), resumeLauncher, NullLogger.Instance);
+        var saga = new ResumeSaga(svc, new FakeProfileResolver(), new FakeNookHost(), resumeLauncher, NullLogger.Instance);
 
-        var result = await saga.ResumeAsync(runId, "pane-new", null);
+        var result = await saga.ResumeAsync(runId, "nook-new", null);
 
         Assert.False(result.Success);
         Assert.Equal(ResumeOutcome.AdapterResumeFailed, result.Outcome);
@@ -188,10 +188,10 @@ public sealed class ResumeSagaTests
         var (_, _, runId) = await SeedRunWithSegmentAsync(svc);
         await svc.TransitionRunAsync(runId, RunState.Interrupted);
 
-        var paneHost = new FakePaneHost { ShouldFailEnv = true };
-        var saga = new ResumeSaga(svc, new FakeProfileResolver(), paneHost, new FakeResumeLauncher(), NullLogger.Instance);
+        var nookHost = new FakeNookHost { ShouldFailEnv = true };
+        var saga = new ResumeSaga(svc, new FakeProfileResolver(), nookHost, new FakeResumeLauncher(), NullLogger.Instance);
 
-        var result = await saga.ResumeAsync(runId, "pane-new", null);
+        var result = await saga.ResumeAsync(runId, "nook-new", null);
 
         Assert.False(result.Success);
         Assert.Equal(ResumeOutcome.AdapterResumeFailed, result.Outcome);
@@ -205,9 +205,9 @@ public sealed class ResumeSagaTests
         await svc.TransitionRunAsync(runId, RunState.Interrupted);
 
         var resumeLauncher = new FakeResumeLauncher();
-        var saga = new ResumeSaga(svc, new FakeProfileResolver(), new FakePaneHost(), resumeLauncher, NullLogger.Instance);
+        var saga = new ResumeSaga(svc, new FakeProfileResolver(), new FakeNookHost(), resumeLauncher, NullLogger.Instance);
 
-        await saga.ResumeAsync(runId, "pane-new", "codex");
+        await saga.ResumeAsync(runId, "nook-new", "codex");
 
         Assert.Equal("codex", resumeLauncher.LastAdapter);
     }

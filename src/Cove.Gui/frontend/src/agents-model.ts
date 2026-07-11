@@ -1,16 +1,16 @@
 export type AgentState = "needs-input" | "running" | "idle" | "done";
 
 export interface AgentCard {
-  paneId: string;
+  nookId: string;
   adapter: string;
   name: string | null;
   status: string;
-  workspace?: string | null;
-  room?: string | null;
+  bay?: string | null;
+  shore?: string | null;
 }
 
 export interface AgentRow {
-  paneId: string;
+  nookId: string;
   name: string;
   adapter: string;
   state: AgentState;
@@ -58,15 +58,15 @@ export function agentDisplayName(card: AgentCard): string {
   if (name.length > 0) return name;
   const adapter = card.adapter.trim();
   if (adapter.length > 0) return adapter;
-  return card.paneId.length > 8 ? `${card.paneId.slice(0, 8)}…` : card.paneId;
+  return card.nookId.length > 8 ? `${card.nookId.slice(0, 8)}…` : card.nookId;
 }
 
-export function buildAgentRows(cards: AgentCard[], needsInputPaneIds: Set<string>): AgentRow[] {
+export function buildAgentRows(cards: AgentCard[], needsInputNookIds: Set<string>): AgentRow[] {
   const rows: AgentRow[] = cards.map((card) => {
-    const forced = needsInputPaneIds.has(card.paneId);
+    const forced = needsInputNookIds.has(card.nookId);
     const state = forced ? "needs-input" : mapAgentState(card.status);
     return {
-      paneId: card.paneId,
+      nookId: card.nookId,
       name: agentDisplayName(card),
       adapter: card.adapter,
       state,

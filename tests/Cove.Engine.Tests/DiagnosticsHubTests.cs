@@ -33,13 +33,13 @@ public sealed class DiagnosticsHubTests
     public void TakeSnapshot_ReturnsCurrentMetrics()
     {
         var hub = new DiagnosticsHub(new DiagnosticsConfig(true, false, 100, TimeSpan.FromMinutes(5)));
-        var snapshot = hub.TakeSnapshot(activePanes: 3, activeWorkspaces: 1, activeAgents: 2);
+        var snapshot = hub.TakeSnapshot(activeNooks: 3, activeBays: 1, activeAgents: 2);
 
         Assert.True(snapshot.ManagedMemoryBytes > 0);
         Assert.True(snapshot.WorkingSetBytes > 0);
         Assert.True(snapshot.ThreadCount > 0);
-        Assert.Equal(3, snapshot.ActivePanes);
-        Assert.Equal(1, snapshot.ActiveWorkspaces);
+        Assert.Equal(3, snapshot.ActiveNooks);
+        Assert.Equal(1, snapshot.ActiveBays);
         Assert.Equal(2, snapshot.ActiveAgents);
     }
 
@@ -117,13 +117,13 @@ public sealed class DiagnosticsHubTests
     }
 
     [Fact]
-    public void TakeSnapshot_CapturesPaneScrollbackBytes()
+    public void TakeSnapshot_CapturesNookScrollbackBytes()
     {
         var hub = new DiagnosticsHub(new DiagnosticsConfig(true, false, 100, TimeSpan.FromMinutes(5)));
-        var scrollback = new Dictionary<string, long> { ["pane-1"] = 1024, ["pane-2"] = 2048 };
-        var snapshot = hub.TakeSnapshot(paneScrollbackBytes: scrollback);
+        var scrollback = new Dictionary<string, long> { ["nook-1"] = 1024, ["nook-2"] = 2048 };
+        var snapshot = hub.TakeSnapshot(nookScrollbackBytes: scrollback);
 
-        Assert.Equal(1024, snapshot.PaneScrollbackBytes["pane-1"]);
-        Assert.Equal(2048, snapshot.PaneScrollbackBytes["pane-2"]);
+        Assert.Equal(1024, snapshot.NookScrollbackBytes["nook-1"]);
+        Assert.Equal(2048, snapshot.NookScrollbackBytes["nook-2"]);
     }
 }

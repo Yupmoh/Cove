@@ -1,4 +1,4 @@
-using Cove.Engine.Workspaces;
+using Cove.Engine.Bays;
 using Xunit;
 
 namespace Cove.Engine.Tests;
@@ -31,14 +31,14 @@ public sealed class RunCommandTests
     private static RunCommandService NewService() => new(new InMemoryRunCommandStore(), new FakeSessionFactory());
 
     private static RunCommandDefinition Def(string id, string label, string command, string? cwd = null) =>
-        new() { Id = id, WorkspaceId = "ws-1", Label = label, Command = command, Cwd = cwd ?? "" };
+        new() { Id = id, BayId = "ws-1", Label = label, Command = command, Cwd = cwd ?? "" };
 
     [Fact]
     public async Task Create_List_Edit_Delete_RoundTrips()
     {
         await using var svc = NewService();
         var d = await svc.CreateAsync("ws-1", "server", "vite", null);
-        Assert.Equal("ws-1", d.WorkspaceId);
+        Assert.Equal("ws-1", d.BayId);
         Assert.Equal("server", d.Label);
 
         var list = await svc.ListAsync("ws-1");
@@ -150,7 +150,7 @@ public sealed class RunCommandTests
             RunCommandService svc2 = new(store, new FakeSessionFactory());
             await svc2.RelaunchPreviouslyRunningAsync();
             var status = await svc2.StatusAsync(d.Id);
-            Assert.Equal(Cove.Engine.Workspaces.RunCommandLifecycle.Running, status!.Lifecycle);
+            Assert.Equal(Cove.Engine.Bays.RunCommandLifecycle.Running, status!.Lifecycle);
             await svc2.DisposeAsync();
         }
         finally { try { Directory.Delete(dir, true); } catch { } }
@@ -169,11 +169,11 @@ internal sealed class InMemoryRunCommandStore : IRunCommandStore
             return Task.FromResult(_defs.TryGetValue(id, out var d) ? d : null);
     }
 
-    public Task<IReadOnlyList<RunCommandDefinition>> ListAsync(string workspaceId)
+    public Task<IReadOnlyList<RunCommandDefinition>> ListAsync(string bayId)
     {
         lock (_gate)
             return Task.FromResult<IReadOnlyList<RunCommandDefinition>>(
-                _defs.Values.Where(d => d.WorkspaceId == workspaceId).ToList());
+                _defs.Values.Where(d => d.BayId == bayId).ToList());
     }
 
     public Task<RunCommandDefinition> SaveAsync(RunCommandDefinition def)

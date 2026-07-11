@@ -18,14 +18,14 @@ public sealed class ScrollbackSearchLiveTests
         await using var h = await DaemonTestHarness.StartAsync();
         await using FrameConnection ctl = await h.ConnectAsync("cli");
 
-        string paneId = await SpawnAsync(ctl, "/bin/sh", new[] { "-c", "printf 'NEEDLE_LINE\\n'; sleep 30" }, ct);
+        string nookId = await SpawnAsync(ctl, "/bin/sh", new[] { "-c", "printf 'NEEDLE_LINE\\n'; sleep 30" }, ct);
 
         var deadline = Task.Delay(System.TimeSpan.FromSeconds(30), ct);
         bool found = false;
         while (!deadline.IsCompleted)
         {
-            JsonElement sp = JsonSerializer.SerializeToElement(new SearchParams(paneId, "NEEDLE_LINE"), CoveJsonContext.Default.SearchParams);
-            ControlResponse r = await RequestAsync(ctl, "s", "cove://commands/pane.search", sp, ct);
+            JsonElement sp = JsonSerializer.SerializeToElement(new SearchParams(nookId, "NEEDLE_LINE"), CoveJsonContext.Default.SearchParams);
+            ControlResponse r = await RequestAsync(ctl, "s", "cove://commands/nook.search", sp, ct);
             if (r.Ok)
             {
                 var matches = r.Data!.Value.Deserialize(CoveJsonContext.Default.SearchResult)!.Matches;
@@ -42,7 +42,7 @@ public sealed class ScrollbackSearchLiveTests
     }
 
     [Fact]
-    public async Task Search_Works_OnPane_NotCurrentlySubscribed()
+    public async Task Search_Works_OnNook_NotCurrentlySubscribed()
     {
         if (System.OperatingSystem.IsWindows())
             return;
@@ -52,12 +52,12 @@ public sealed class ScrollbackSearchLiveTests
         await using var h = await DaemonTestHarness.StartAsync();
         await using FrameConnection ctl = await h.ConnectAsync("cli");
 
-        string paneId = await SpawnAsync(ctl, "/bin/sh", new[] { "-c", "printf 'HIDDEN_NEEDLE\\n'; sleep 30" }, ct);
+        string nookId = await SpawnAsync(ctl, "/bin/sh", new[] { "-c", "printf 'HIDDEN_NEEDLE\\n'; sleep 30" }, ct);
 
         await Task.Delay(1000, ct);
 
-        JsonElement sp = JsonSerializer.SerializeToElement(new SearchParams(paneId, "HIDDEN_NEEDLE"), CoveJsonContext.Default.SearchParams);
-        ControlResponse r = await RequestAsync(ctl, "s", "cove://commands/pane.search", sp, ct);
+        JsonElement sp = JsonSerializer.SerializeToElement(new SearchParams(nookId, "HIDDEN_NEEDLE"), CoveJsonContext.Default.SearchParams);
+        ControlResponse r = await RequestAsync(ctl, "s", "cove://commands/nook.search", sp, ct);
         Assert.True(r.Ok);
         var matches = r.Data!.Value.Deserialize(CoveJsonContext.Default.SearchResult)!.Matches;
         Assert.NotEmpty(matches);
@@ -65,7 +65,7 @@ public sealed class ScrollbackSearchLiveTests
     }
 
     [Fact]
-    public async Task Search_UnknownPane_ReturnsEmpty()
+    public async Task Search_UnknownNook_ReturnsEmpty()
     {
         if (System.OperatingSystem.IsWindows())
             return;
@@ -76,7 +76,7 @@ public sealed class ScrollbackSearchLiveTests
         await using FrameConnection ctl = await h.ConnectAsync("cli");
 
         JsonElement sp = JsonSerializer.SerializeToElement(new SearchParams("nonexistent", "x"), CoveJsonContext.Default.SearchParams);
-        ControlResponse r = await RequestAsync(ctl, "s", "cove://commands/pane.search", sp, ct);
+        ControlResponse r = await RequestAsync(ctl, "s", "cove://commands/nook.search", sp, ct);
         Assert.True(r.Ok);
         var matches = r.Data!.Value.Deserialize(CoveJsonContext.Default.SearchResult)!.Matches;
         Assert.Empty(matches);
@@ -87,9 +87,9 @@ public sealed class ScrollbackSearchLiveTests
         JsonElement sp = JsonSerializer.SerializeToElement(
             new SpawnParams(command, args, null, null, 80, 24),
             CoveJsonContext.Default.SpawnParams);
-        ControlResponse r = await RequestAsync(ctl, "spawn", "cove://commands/pane.spawn", sp, ct);
+        ControlResponse r = await RequestAsync(ctl, "spawn", "cove://commands/nook.spawn", sp, ct);
         Assert.True(r.Ok, r.Error?.Message);
-        return r.Data!.Value.Deserialize(CoveJsonContext.Default.PaneInfo)!.PaneId;
+        return r.Data!.Value.Deserialize(CoveJsonContext.Default.NookInfo)!.NookId;
     }
 
     private static async Task<ControlResponse> RequestAsync(FrameConnection ctl, string id, string uri, JsonElement? p, CancellationToken ct)

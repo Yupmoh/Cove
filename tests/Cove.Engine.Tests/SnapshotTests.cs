@@ -1,5 +1,5 @@
 using Cove.Engine.Snapshots;
-using Cove.Engine.Workspaces;
+using Cove.Engine.Bays;
 using Microsoft.Extensions.Logging;
 using Xunit;
 
@@ -24,8 +24,8 @@ public sealed class SnapshotTests
         return new SnapshotService(dir, snapshotsDir, new ProcessGitRunner(), new NoOpLogger());
     }
 
-    private static IReadOnlyDictionary<string, string> State(string workspaceId = "ws-1", string content = "hello") =>
-        new Dictionary<string, string> { [$"workspaces/{workspaceId}/workspace.json"] = content };
+    private static IReadOnlyDictionary<string, string> State(string bayId = "ws-1", string content = "hello") =>
+        new Dictionary<string, string> { [$"bays/{bayId}/bay.json"] = content };
 
     [Fact]
     public async Task Take_CreatesSnapshot_WithContentHash()
@@ -191,7 +191,7 @@ public sealed class SnapshotTests
             var svc = NewService(dir);
             var state = new Dictionary<string, string>
             {
-                ["workspaces/ws-1/workspace.json"] = "safe",
+                ["bays/ws-1/bay.json"] = "safe",
                 ["config/.env"] = "SECRET=abc123",
                 ["secrets/tokens.json"] = "{\"token\":\"xyz\"}",
                 ["library/cookies"] = "cookie-data",
@@ -202,7 +202,7 @@ public sealed class SnapshotTests
 
             var restored = await svc.RestoreAsync(snap!.Id);
             Assert.NotNull(restored);
-            Assert.Contains("safe", restored!["workspaces/ws-1/workspace.json"]);
+            Assert.Contains("safe", restored!["bays/ws-1/bay.json"]);
             Assert.DoesNotContain(restored, kv => kv.Key.Contains(".env"));
             Assert.DoesNotContain(restored, kv => kv.Key.Contains("secret"));
             Assert.DoesNotContain(restored, kv => kv.Key.Contains("cookies"));
@@ -252,14 +252,14 @@ public sealed class SnapshotTests
             var snap = await svc.TakeAsync(State(content: "v1"), SnapshotTrigger.Manual);
 
             await File.WriteAllTextAsync(
-                Path.Combine(dir, "snapshots", "workspaces/ws-1/workspace.json"),
+                Path.Combine(dir, "snapshots", "bays/ws-1/bay.json"),
                 "v2-modified");
 
             var diffs = await svc.InspectAsync(snap!.Id);
 
             Assert.NotNull(diffs);
             var diff = Assert.Single(diffs);
-            Assert.Equal("workspaces/ws-1/workspace.json", diff.Key);
+            Assert.Equal("bays/ws-1/bay.json", diff.Key);
             Assert.Contains("v1", diff.OldValue);
             Assert.Contains("v2-modified", diff.NewValue);
             Assert.Equal("changed", diff.ChangeType);
@@ -277,7 +277,7 @@ public sealed class SnapshotTests
             var snap = await svc.TakeAsync(State(content: "v1"), SnapshotTrigger.Manual);
 
             await File.WriteAllTextAsync(
-                Path.Combine(dir, "snapshots", "workspaces/ws-1/new.json"),
+                Path.Combine(dir, "snapshots", "bays/ws-1/new.json"),
                 "new-content");
 
             var diffs = await svc.InspectAsync(snap!.Id);
@@ -285,7 +285,7 @@ public sealed class SnapshotTests
             Assert.NotNull(diffs);
             var added = diffs.FirstOrDefault(d => d.ChangeType == "added");
             Assert.NotNull(added);
-            Assert.Equal("workspaces/ws-1/new.json", added!.Key);
+            Assert.Equal("bays/ws-1/new.json", added!.Key);
             Assert.Null(added.OldValue);
             Assert.Contains("new-content", added.NewValue);
         }
@@ -301,19 +301,19 @@ public sealed class SnapshotTests
             var svc = NewService(dir);
             var state = new Dictionary<string, string>
             {
-                ["workspaces/ws-1/workspace.json"] = "v1",
-                ["workspaces/ws-1/extra.json"] = "extra-content",
+                ["bays/ws-1/bay.json"] = "v1",
+                ["bays/ws-1/extra.json"] = "extra-content",
             };
             var snap = await svc.TakeAsync(state, SnapshotTrigger.Manual);
 
-            File.Delete(Path.Combine(dir, "snapshots", "workspaces/ws-1/extra.json"));
+            File.Delete(Path.Combine(dir, "snapshots", "bays/ws-1/extra.json"));
 
             var diffs = await svc.InspectAsync(snap!.Id);
 
             Assert.NotNull(diffs);
             var removed = diffs.FirstOrDefault(d => d.ChangeType == "removed");
             Assert.NotNull(removed);
-            Assert.Equal("workspaces/ws-1/extra.json", removed!.Key);
+            Assert.Equal("bays/ws-1/extra.json", removed!.Key);
             Assert.Contains("extra-content", removed.OldValue);
             Assert.Null(removed.NewValue);
         }

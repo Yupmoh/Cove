@@ -1,7 +1,7 @@
 export type SidebarSide = "left" | "right";
 
 export type SidebarMode =
-  | "workspaces"
+  | "bays"
   | "overview"
   | "skills"
   | "activity"
@@ -16,7 +16,7 @@ export interface SidebarModeMeta {
 }
 
 export const SIDEBAR_MODES: SidebarModeMeta[] = [
-  { mode: "workspaces", icon: "▤", label: "Workspaces", functional: true },
+  { mode: "bays", icon: "▤", label: "Bays", functional: true },
   { mode: "overview", icon: "▦", label: "Overview", functional: false },
   { mode: "skills", icon: "◈", label: "Skills", functional: false },
   { mode: "activity", icon: "☷", label: "Activity", functional: false },
@@ -43,7 +43,7 @@ export interface SidebarModel {
 
 export function initialSidebarModel(): SidebarModel {
   return {
-    leftMode: "workspaces",
+    leftMode: "bays",
     leftCollapsed: false,
     rightCollapsed: false,
     leftWidth: SIDEBAR_DEFAULT_WIDTH,

@@ -7,150 +7,150 @@ namespace Cove.Engine.Layout;
 
 public sealed class LayoutService
 {
-    public const string DefaultWorkspaceId = "default";
+    public const string DefaultBayId = "default";
 
-    private sealed class RoomState
+    private sealed class ShoreState
     {
         public required string Name { get; set; }
         public required MosaicNode Root { get; set; }
-        public string? ActivePaneId { get; set; }
-        public string? ZoomedPaneId { get; set; }
+        public string? ActiveNookId { get; set; }
+        public string? ZoomedNookId { get; set; }
     }
 
     private sealed class Bucket
     {
-        public readonly Dictionary<string, RoomState> Rooms = new(StringComparer.Ordinal);
+        public readonly Dictionary<string, ShoreState> Shores = new(StringComparer.Ordinal);
         public readonly List<string> Order = new();
-        public string? ActiveRoomId;
+        public string? ActiveShoreId;
     }
 
     private readonly Dictionary<string, Bucket> _buckets = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, string> _roomToWorkspace = new(StringComparer.Ordinal);
-    private string _activeWorkspaceId = DefaultWorkspaceId;
+    private readonly Dictionary<string, string> _shoreToBay = new(StringComparer.Ordinal);
+    private string _activeBayId = DefaultBayId;
     private readonly object _sync = new();
     public Action? OnChanged { get; set; }
 
     public LayoutService()
     {
-        _buckets[DefaultWorkspaceId] = new Bucket();
+        _buckets[DefaultBayId] = new Bucket();
     }
 
-    public string ActiveWorkspaceId
+    public string ActiveBayId
     {
-        get { lock (_sync) return _activeWorkspaceId; }
+        get { lock (_sync) return _activeBayId; }
     }
 
-    public IReadOnlyList<string> WorkspaceIds
+    public IReadOnlyList<string> BayIds
     {
         get { lock (_sync) return _buckets.Keys.ToList(); }
     }
 
-    public void SetActiveWorkspace(string workspaceId)
+    public void SetActiveBay(string bayId)
     {
         lock (_sync)
         {
-            EnsureBucket(workspaceId);
-            _activeWorkspaceId = workspaceId;
+            EnsureBucket(bayId);
+            _activeBayId = bayId;
         }
         OnChanged?.Invoke();
     }
 
-    public void EnsureWorkspace(string workspaceId)
+    public void EnsureBay(string bayId)
     {
         lock (_sync)
-            EnsureBucket(workspaceId);
+            EnsureBucket(bayId);
     }
 
-    public IReadOnlyList<string> RemoveWorkspace(string workspaceId)
+    public IReadOnlyList<string> RemoveBay(string bayId)
     {
-        var paneIds = new List<string>();
+        var nookIds = new List<string>();
         lock (_sync)
         {
-            if (!_buckets.TryGetValue(workspaceId, out var bucket))
-                return paneIds;
-            foreach (var roomId in bucket.Order)
+            if (!_buckets.TryGetValue(bayId, out var bucket))
+                return nookIds;
+            foreach (var shoreId in bucket.Order)
             {
-                _roomToWorkspace.Remove(roomId);
-                if (bucket.Rooms.TryGetValue(roomId, out var rs))
+                _shoreToBay.Remove(shoreId);
+                if (bucket.Shores.TryGetValue(shoreId, out var rs))
                     foreach (var leaf in MosaicOps.Leaves(rs.Root))
                         if (!IsEmptyLeaf(leaf))
-                            paneIds.Add(leaf.PaneId);
+                            nookIds.Add(leaf.NookId);
             }
-            _buckets.Remove(workspaceId);
-            if (_activeWorkspaceId == workspaceId)
-                _activeWorkspaceId = _buckets.Keys.FirstOrDefault() ?? DefaultWorkspaceId;
-            EnsureBucket(_activeWorkspaceId);
+            _buckets.Remove(bayId);
+            if (_activeBayId == bayId)
+                _activeBayId = _buckets.Keys.FirstOrDefault() ?? DefaultBayId;
+            EnsureBucket(_activeBayId);
         }
         OnChanged?.Invoke();
-        return paneIds;
+        return nookIds;
     }
 
-    public string CreateRoom(string name, PaneLeaf firstLeaf)
+    public string CreateShore(string name, NookLeaf firstLeaf)
     {
-        string roomId;
+        string shoreId;
         lock (_sync)
         {
             var bucket = ActiveBucket();
-            roomId = Guid.NewGuid().ToString("N");
-            bucket.Rooms[roomId] = new RoomState
+            shoreId = Guid.NewGuid().ToString("N");
+            bucket.Shores[shoreId] = new ShoreState
             {
                 Name = name,
                 Root = firstLeaf,
-                ActivePaneId = firstLeaf.PaneId,
-                ZoomedPaneId = null,
+                ActiveNookId = firstLeaf.NookId,
+                ZoomedNookId = null,
             };
-            bucket.Order.Add(roomId);
-            bucket.ActiveRoomId = roomId;
-            _roomToWorkspace[roomId] = _activeWorkspaceId;
+            bucket.Order.Add(shoreId);
+            bucket.ActiveShoreId = shoreId;
+            _shoreToBay[shoreId] = _activeBayId;
         }
         OnChanged?.Invoke();
-        return roomId;
+        return shoreId;
     }
 
-    public void SplitPane(string roomId, string targetPaneId, SplitOrientation orient, PaneLeaf newLeaf)
+    public void SplitNook(string shoreId, string targetNookId, SplitOrientation orient, NookLeaf newLeaf)
     {
         lock (_sync)
         {
-            var (bucket, room) = GetRoomOrThrow(roomId);
-            room.Root = MosaicOps.Split(room.Root, targetPaneId, orient, newLeaf);
-            room.ActivePaneId = newLeaf.PaneId;
-            bucket.ActiveRoomId = roomId;
-        }
-        OnChanged?.Invoke();
-    }
-
-    public void ReplacePane(string roomId, string targetPaneId, PaneLeaf newLeaf)
-    {
-        lock (_sync)
-        {
-            var (bucket, room) = GetRoomOrThrow(roomId);
-            room.Root = MosaicOps.ReplaceLeaf(room.Root, targetPaneId, _ => newLeaf);
-            room.ActivePaneId = newLeaf.PaneId;
-            bucket.ActiveRoomId = roomId;
+            var (bucket, shore) = GetShoreOrThrow(shoreId);
+            shore.Root = MosaicOps.Split(shore.Root, targetNookId, orient, newLeaf);
+            shore.ActiveNookId = newLeaf.NookId;
+            bucket.ActiveShoreId = shoreId;
         }
         OnChanged?.Invoke();
     }
 
-    public void AddSubtab(string roomId, string leafPaneId, string subtabDocId)
+    public void ReplaceNook(string shoreId, string targetNookId, NookLeaf newLeaf)
     {
         lock (_sync)
         {
-            var (_, room) = GetRoomOrThrow(roomId);
-            room.Root = MosaicOps.ReplaceLeaf(room.Root, leafPaneId, leaf => leaf with
+            var (bucket, shore) = GetShoreOrThrow(shoreId);
+            shore.Root = MosaicOps.ReplaceLeaf(shore.Root, targetNookId, _ => newLeaf);
+            shore.ActiveNookId = newLeaf.NookId;
+            bucket.ActiveShoreId = shoreId;
+        }
+        OnChanged?.Invoke();
+    }
+
+    public void AddSubtab(string shoreId, string leafNookId, string subtabDocId)
+    {
+        lock (_sync)
+        {
+            var (_, shore) = GetShoreOrThrow(shoreId);
+            shore.Root = MosaicOps.ReplaceLeaf(shore.Root, leafNookId, leaf => leaf with
             {
-                Subtabs = Append(leaf.Subtabs, new Subtab(subtabDocId, PaneType.Terminal)),
+                Subtabs = Append(leaf.Subtabs, new Subtab(subtabDocId, NookType.Terminal)),
                 ActiveSubtab = leaf.Subtabs.Count,
             });
         }
         OnChanged?.Invoke();
     }
 
-    public void ActivateSubtab(string roomId, string leafPaneId, int index)
+    public void ActivateSubtab(string shoreId, string leafNookId, int index)
     {
         lock (_sync)
         {
-            var (_, room) = GetRoomOrThrow(roomId);
-            room.Root = MosaicOps.ReplaceLeaf(room.Root, leafPaneId, leaf => leaf with
+            var (_, shore) = GetShoreOrThrow(shoreId);
+            shore.Root = MosaicOps.ReplaceLeaf(shore.Root, leafNookId, leaf => leaf with
             {
                 ActiveSubtab = Math.Clamp(index, 0, Math.Max(0, leaf.Subtabs.Count - 1)),
             });
@@ -158,62 +158,62 @@ public sealed class LayoutService
         OnChanged?.Invoke();
     }
 
-    public void PromoteSubtab(string roomId, string leafPaneId, int subtabIndex, string newPaneId)
+    public void PromoteSubtab(string shoreId, string leafNookId, int subtabIndex, string newNookId)
     {
         lock (_sync)
         {
-            var (_, room) = GetRoomOrThrow(roomId);
-            var leaf = MosaicOps.Find(room.Root, leafPaneId) ?? throw new KeyNotFoundException($"unknown pane {leafPaneId}");
+            var (_, shore) = GetShoreOrThrow(shoreId);
+            var leaf = MosaicOps.Find(shore.Root, leafNookId) ?? throw new KeyNotFoundException($"unknown nook {leafNookId}");
             if (leaf.Subtabs.Count <= 1)
                 throw new InvalidOperationException("cannot promote the only subtab");
             var idx = Math.Clamp(subtabIndex, 0, leaf.Subtabs.Count - 1);
             var promoted = leaf.Subtabs[idx];
             var remaining = RemoveAt(leaf.Subtabs, idx);
-            var newLeaf = new PaneLeaf
+            var newLeaf = new NookLeaf
             {
-                PaneId = newPaneId,
+                NookId = newNookId,
                 Subtabs = new[] { promoted },
                 ActiveSubtab = 0,
             };
-            room.Root = MosaicOps.ReplaceLeaf(room.Root, leafPaneId, _ => leaf with { Subtabs = remaining, ActiveSubtab = Math.Clamp(leaf.ActiveSubtab, 0, Math.Max(0, remaining.Length - 1)) });
-            room.Root = MosaicOps.Split(room.Root, leafPaneId, SplitOrientation.Row, newLeaf);
-            room.ActivePaneId = newPaneId;
+            shore.Root = MosaicOps.ReplaceLeaf(shore.Root, leafNookId, _ => leaf with { Subtabs = remaining, ActiveSubtab = Math.Clamp(leaf.ActiveSubtab, 0, Math.Max(0, remaining.Length - 1)) });
+            shore.Root = MosaicOps.Split(shore.Root, leafNookId, SplitOrientation.Row, newLeaf);
+            shore.ActiveNookId = newNookId;
         }
         OnChanged?.Invoke();
     }
 
-    public void CenterDrop(string roomId, string sourceLeafPaneId, int subtabIndex, string targetLeafPaneId)
+    public void CenterDrop(string shoreId, string sourceLeafNookId, int subtabIndex, string targetLeafNookId)
     {
         lock (_sync)
         {
-            var (bucket, room) = GetRoomOrThrow(roomId);
-            if (sourceLeafPaneId == targetLeafPaneId)
+            var (bucket, shore) = GetShoreOrThrow(shoreId);
+            if (sourceLeafNookId == targetLeafNookId)
                 throw new InvalidOperationException("cannot center-drop onto the same leaf");
-            var source = MosaicOps.Find(room.Root, sourceLeafPaneId) ?? throw new KeyNotFoundException($"unknown pane {sourceLeafPaneId}");
-            var target = MosaicOps.Find(room.Root, targetLeafPaneId) ?? throw new KeyNotFoundException($"unknown pane {targetLeafPaneId}");
+            var source = MosaicOps.Find(shore.Root, sourceLeafNookId) ?? throw new KeyNotFoundException($"unknown nook {sourceLeafNookId}");
+            var target = MosaicOps.Find(shore.Root, targetLeafNookId) ?? throw new KeyNotFoundException($"unknown nook {targetLeafNookId}");
             var idx = Math.Clamp(subtabIndex, 0, source.Subtabs.Count - 1);
             var moved = source.Subtabs[idx];
             var targetMerged = Append(target.Subtabs, moved);
-            room.Root = MosaicOps.ReplaceLeaf(room.Root, targetLeafPaneId, _ => target with { Subtabs = targetMerged, ActiveSubtab = targetMerged.Length - 1 });
+            shore.Root = MosaicOps.ReplaceLeaf(shore.Root, targetLeafNookId, _ => target with { Subtabs = targetMerged, ActiveSubtab = targetMerged.Length - 1 });
             if (source.Subtabs.Count <= 1)
             {
-                var collapsed = MosaicOps.Close(room.Root, sourceLeafPaneId);
+                var collapsed = MosaicOps.Close(shore.Root, sourceLeafNookId);
                 if (collapsed is null)
                 {
-                    room.Root = MakeEmptyLeaf();
-                    room.ActivePaneId = ((PaneLeaf)room.Root).PaneId;
+                    shore.Root = MakeEmptyLeaf();
+                    shore.ActiveNookId = ((NookLeaf)shore.Root).NookId;
                 }
                 else
                 {
-                    room.Root = collapsed;
-                    if (room.ActivePaneId == sourceLeafPaneId)
-                        room.ActivePaneId = targetLeafPaneId;
+                    shore.Root = collapsed;
+                    if (shore.ActiveNookId == sourceLeafNookId)
+                        shore.ActiveNookId = targetLeafNookId;
                 }
             }
             else
             {
                 var sourceRemaining = RemoveAt(source.Subtabs, idx);
-                room.Root = MosaicOps.ReplaceLeaf(room.Root, sourceLeafPaneId, _ => source with { Subtabs = sourceRemaining, ActiveSubtab = Math.Clamp(source.ActiveSubtab, 0, Math.Max(0, sourceRemaining.Length - 1)) });
+                shore.Root = MosaicOps.ReplaceLeaf(shore.Root, sourceLeafNookId, _ => source with { Subtabs = sourceRemaining, ActiveSubtab = Math.Clamp(source.ActiveSubtab, 0, Math.Max(0, sourceRemaining.Length - 1)) });
             }
             _ = bucket;
         }
@@ -239,173 +239,173 @@ public sealed class LayoutService
         return arr;
     }
 
-    public void MovePane(string roomId, string paneId, string targetPaneId, SplitOrientation orientation, int dir)
+    public void MoveNook(string shoreId, string nookId, string targetNookId, SplitOrientation orientation, int dir)
     {
         lock (_sync)
         {
-            var (_, room) = GetRoomOrThrow(roomId);
-            if (paneId == targetPaneId)
-                throw new InvalidOperationException("cannot move a pane onto itself");
-            var source = MosaicOps.Find(room.Root, paneId) ?? throw new KeyNotFoundException($"unknown pane {paneId}");
-            if (MosaicOps.Find(room.Root, targetPaneId) is null)
-                throw new KeyNotFoundException($"unknown pane {targetPaneId}");
-            var without = MosaicOps.Close(room.Root, paneId) ?? throw new InvalidOperationException("cannot move the only pane in a room");
-            room.Root = MosaicOps.Split(without, targetPaneId, orientation, source, before: dir < 0);
-            room.ActivePaneId = paneId;
-            room.ZoomedPaneId = null;
+            var (_, shore) = GetShoreOrThrow(shoreId);
+            if (nookId == targetNookId)
+                throw new InvalidOperationException("cannot move a nook onto itself");
+            var source = MosaicOps.Find(shore.Root, nookId) ?? throw new KeyNotFoundException($"unknown nook {nookId}");
+            if (MosaicOps.Find(shore.Root, targetNookId) is null)
+                throw new KeyNotFoundException($"unknown nook {targetNookId}");
+            var without = MosaicOps.Close(shore.Root, nookId) ?? throw new InvalidOperationException("cannot move the only nook in a shore");
+            shore.Root = MosaicOps.Split(without, targetNookId, orientation, source, before: dir < 0);
+            shore.ActiveNookId = nookId;
+            shore.ZoomedNookId = null;
         }
         OnChanged?.Invoke();
     }
 
-    public void MovePaneToRoom(string paneId, string targetRoomId)
+    public void MoveNookToShore(string nookId, string targetShoreId)
     {
         lock (_sync)
         {
-            var (_, targetRoom) = GetRoomOrThrow(targetRoomId);
-            RoomState? sourceRoom = null;
+            var (_, targetShore) = GetShoreOrThrow(targetShoreId);
+            ShoreState? sourceShore = null;
             foreach (var bucket in _buckets.Values)
             {
-                foreach (var rs in bucket.Rooms.Values)
+                foreach (var rs in bucket.Shores.Values)
                 {
-                    if (MosaicOps.Find(rs.Root, paneId) is not null)
+                    if (MosaicOps.Find(rs.Root, nookId) is not null)
                     {
-                        sourceRoom = rs;
+                        sourceShore = rs;
                         break;
                     }
                 }
-                if (sourceRoom is not null)
+                if (sourceShore is not null)
                     break;
             }
-            if (sourceRoom is null)
-                throw new KeyNotFoundException($"unknown pane {paneId}");
-            if (ReferenceEquals(sourceRoom, targetRoom))
-                throw new InvalidOperationException("pane is already in the target room");
-            var moved = MosaicOps.Find(sourceRoom.Root, paneId)!;
-            var without = MosaicOps.Close(sourceRoom.Root, paneId);
+            if (sourceShore is null)
+                throw new KeyNotFoundException($"unknown nook {nookId}");
+            if (ReferenceEquals(sourceShore, targetShore))
+                throw new InvalidOperationException("nook is already in the target shore");
+            var moved = MosaicOps.Find(sourceShore.Root, nookId)!;
+            var without = MosaicOps.Close(sourceShore.Root, nookId);
             if (without is null)
             {
-                sourceRoom.Root = MakeEmptyLeaf();
-                sourceRoom.ActivePaneId = ((PaneLeaf)sourceRoom.Root).PaneId;
-                sourceRoom.ZoomedPaneId = null;
+                sourceShore.Root = MakeEmptyLeaf();
+                sourceShore.ActiveNookId = ((NookLeaf)sourceShore.Root).NookId;
+                sourceShore.ZoomedNookId = null;
             }
             else
             {
-                sourceRoom.Root = without;
-                if (sourceRoom.ActivePaneId == paneId)
+                sourceShore.Root = without;
+                if (sourceShore.ActiveNookId == nookId)
                 {
                     var leaves = MosaicOps.Leaves(without);
-                    sourceRoom.ActivePaneId = leaves.Count > 0 ? leaves[0].PaneId : null;
+                    sourceShore.ActiveNookId = leaves.Count > 0 ? leaves[0].NookId : null;
                 }
             }
-            if (IsEmptyRoom(targetRoom.Root))
-                targetRoom.Root = moved;
+            if (IsEmptyShore(targetShore.Root))
+                targetShore.Root = moved;
             else
-                targetRoom.Root = new SplitNode { Orientation = SplitOrientation.Row, Ratio = 0.5, ChildA = targetRoom.Root, ChildB = moved };
-            targetRoom.ActivePaneId = paneId;
-            targetRoom.ZoomedPaneId = null;
+                targetShore.Root = new SplitNode { Orientation = SplitOrientation.Row, Ratio = 0.5, ChildA = targetShore.Root, ChildB = moved };
+            targetShore.ActiveNookId = nookId;
+            targetShore.ZoomedNookId = null;
         }
         OnChanged?.Invoke();
     }
 
-    public void ClosePane(string roomId, string paneId)
+    public void CloseNook(string shoreId, string nookId)
     {
         lock (_sync)
         {
-            var (_, room) = GetRoomOrThrow(roomId);
-            var next = MosaicOps.Close(room.Root, paneId);
+            var (_, shore) = GetShoreOrThrow(shoreId);
+            var next = MosaicOps.Close(shore.Root, nookId);
             if (next is null)
             {
-                room.Root = MakeEmptyLeaf();
-                room.ActivePaneId = ((PaneLeaf)room.Root).PaneId;
-                room.ZoomedPaneId = null;
+                shore.Root = MakeEmptyLeaf();
+                shore.ActiveNookId = ((NookLeaf)shore.Root).NookId;
+                shore.ZoomedNookId = null;
             }
             else
             {
-                room.Root = next;
-                if (room.ActivePaneId == paneId)
+                shore.Root = next;
+                if (shore.ActiveNookId == nookId)
                 {
                     var leaves = MosaicOps.Leaves(next);
-                    room.ActivePaneId = leaves.Count > 0 ? leaves[0].PaneId : null;
+                    shore.ActiveNookId = leaves.Count > 0 ? leaves[0].NookId : null;
                 }
             }
         }
         OnChanged?.Invoke();
     }
 
-    public IReadOnlyList<string> CloseRoom(string roomId)
+    public IReadOnlyList<string> CloseShore(string shoreId)
     {
-        var paneIds = new List<string>();
+        var nookIds = new List<string>();
         lock (_sync)
         {
-            if (!_roomToWorkspace.TryGetValue(roomId, out var wsId) || !_buckets.TryGetValue(wsId, out var bucket))
-                return paneIds;
-            if (bucket.Rooms.TryGetValue(roomId, out var rs))
+            if (!_shoreToBay.TryGetValue(shoreId, out var wsId) || !_buckets.TryGetValue(wsId, out var bucket))
+                return nookIds;
+            if (bucket.Shores.TryGetValue(shoreId, out var rs))
                 foreach (var leaf in MosaicOps.Leaves(rs.Root))
                     if (!IsEmptyLeaf(leaf))
-                        paneIds.Add(leaf.PaneId);
-            bucket.Rooms.Remove(roomId);
-            bucket.Order.Remove(roomId);
-            _roomToWorkspace.Remove(roomId);
-            if (bucket.ActiveRoomId == roomId)
-                bucket.ActiveRoomId = bucket.Order.Count > 0 ? bucket.Order[0] : null;
+                        nookIds.Add(leaf.NookId);
+            bucket.Shores.Remove(shoreId);
+            bucket.Order.Remove(shoreId);
+            _shoreToBay.Remove(shoreId);
+            if (bucket.ActiveShoreId == shoreId)
+                bucket.ActiveShoreId = bucket.Order.Count > 0 ? bucket.Order[0] : null;
         }
         OnChanged?.Invoke();
-        return paneIds;
+        return nookIds;
     }
 
-    public void FocusPane(string roomId, string paneId)
+    public void FocusNook(string shoreId, string nookId)
     {
         lock (_sync)
         {
-            var (bucket, room) = GetRoomOrThrow(roomId);
-            room.ActivePaneId = paneId;
-            bucket.ActiveRoomId = roomId;
+            var (bucket, shore) = GetShoreOrThrow(shoreId);
+            shore.ActiveNookId = nookId;
+            bucket.ActiveShoreId = shoreId;
         }
         OnChanged?.Invoke();
     }
 
-    public void CycleFocus(string roomId, int dir)
+    public void CycleFocus(string shoreId, int dir)
     {
         lock (_sync)
         {
-            var (_, room) = GetRoomOrThrow(roomId);
-            if (room.ActivePaneId is null)
+            var (_, shore) = GetShoreOrThrow(shoreId);
+            if (shore.ActiveNookId is null)
                 return;
-            var next = MosaicOps.NextPane(room.Root, room.ActivePaneId, dir);
+            var next = MosaicOps.NextNook(shore.Root, shore.ActiveNookId, dir);
             if (next is not null)
-                room.ActivePaneId = next;
+                shore.ActiveNookId = next;
         }
         OnChanged?.Invoke();
     }
 
-    public void SetZoom(string roomId, string? paneId)
+    public void SetZoom(string shoreId, string? nookId)
     {
         lock (_sync)
         {
-            var (_, room) = GetRoomOrThrow(roomId);
-            room.ZoomedPaneId = paneId;
+            var (_, shore) = GetShoreOrThrow(shoreId);
+            shore.ZoomedNookId = nookId;
         }
         OnChanged?.Invoke();
     }
 
-    public void RenameRoom(string roomId, string name)
+    public void RenameShore(string shoreId, string name)
     {
         lock (_sync)
         {
-            var (_, room) = GetRoomOrThrow(roomId);
-            room.Name = name;
+            var (_, shore) = GetShoreOrThrow(shoreId);
+            shore.Name = name;
         }
         OnChanged?.Invoke();
     }
 
-    public void ReorderRooms(IReadOnlyList<string> orderedRoomIds)
+    public void ReorderShores(IReadOnlyList<string> orderedShoreIds)
     {
         lock (_sync)
         {
             var bucket = ActiveBucket();
-            var known = new HashSet<string>(bucket.Rooms.Keys, StringComparer.Ordinal);
-            var next = new List<string>(bucket.Rooms.Count);
-            foreach (var id in orderedRoomIds)
+            var known = new HashSet<string>(bucket.Shores.Keys, StringComparer.Ordinal);
+            var next = new List<string>(bucket.Shores.Count);
+            foreach (var id in orderedShoreIds)
             {
                 if (known.Remove(id))
                     next.Add(id);
@@ -421,135 +421,135 @@ public sealed class LayoutService
         OnChanged?.Invoke();
     }
 
-    public WorkspaceSnapshot ToSnapshot(string id, string name, string projectDir)
+    public BaySnapshot ToSnapshot(string id, string name, string projectDir)
     {
         lock (_sync)
         {
             var bucket = _buckets.TryGetValue(id, out var b) ? b : ActiveBucket();
-            var rooms = new List<RoomSnapshot>(bucket.Rooms.Count);
-            foreach (var roomId in bucket.Order)
+            var shores = new List<ShoreSnapshot>(bucket.Shores.Count);
+            foreach (var shoreId in bucket.Order)
             {
-                if (!bucket.Rooms.TryGetValue(roomId, out var rs))
+                if (!bucket.Shores.TryGetValue(shoreId, out var rs))
                     continue;
-                rooms.Add(new RoomSnapshot
+                shores.Add(new ShoreSnapshot
                 {
-                    Id = roomId,
+                    Id = shoreId,
                     Name = rs.Name,
                     LayoutTree = rs.Root,
-                    ZoomedPaneId = rs.ZoomedPaneId,
+                    ZoomedNookId = rs.ZoomedNookId,
                 });
             }
 
-            return new WorkspaceSnapshot
+            return new BaySnapshot
             {
                 Id = id,
                 Name = name,
                 ProjectDir = projectDir,
-                ActiveRoomId = bucket.ActiveRoomId ?? (rooms.Count > 0 ? rooms[0].Id : null),
-                Rooms = rooms,
+                ActiveShoreId = bucket.ActiveShoreId ?? (shores.Count > 0 ? shores[0].Id : null),
+                Shores = shores,
             };
         }
     }
 
-    public void LoadSnapshot(WorkspaceSnapshot ws)
+    public void LoadSnapshot(BaySnapshot ws)
     {
         lock (_sync)
         {
             var bucket = new Bucket();
-            foreach (var rs in ws.Rooms)
+            foreach (var rs in ws.Shores)
             {
                 var leaves = MosaicOps.Leaves(rs.LayoutTree);
-                bucket.Rooms[rs.Id] = new RoomState
+                bucket.Shores[rs.Id] = new ShoreState
                 {
                     Name = rs.Name,
                     Root = rs.LayoutTree,
-                    ActivePaneId = leaves.Count > 0 ? leaves[0].PaneId : null,
-                    ZoomedPaneId = rs.ZoomedPaneId,
+                    ActiveNookId = leaves.Count > 0 ? leaves[0].NookId : null,
+                    ZoomedNookId = rs.ZoomedNookId,
                 };
                 bucket.Order.Add(rs.Id);
-                _roomToWorkspace[rs.Id] = ws.Id;
+                _shoreToBay[rs.Id] = ws.Id;
             }
-            bucket.ActiveRoomId = ws.ActiveRoomId ?? (bucket.Order.Count > 0 ? bucket.Order[0] : null);
+            bucket.ActiveShoreId = ws.ActiveShoreId ?? (bucket.Order.Count > 0 ? bucket.Order[0] : null);
             _buckets[ws.Id] = bucket;
-            _activeWorkspaceId = ws.Id;
+            _activeBayId = ws.Id;
         }
     }
 
-    public MosaicNode? GetRoot(string roomId)
+    public MosaicNode? GetRoot(string shoreId)
     {
         lock (_sync)
         {
-            if (!_roomToWorkspace.TryGetValue(roomId, out var wsId) || !_buckets.TryGetValue(wsId, out var bucket))
+            if (!_shoreToBay.TryGetValue(shoreId, out var wsId) || !_buckets.TryGetValue(wsId, out var bucket))
                 return null;
-            return bucket.Rooms.TryGetValue(roomId, out var room) ? room.Root : null;
+            return bucket.Shores.TryGetValue(shoreId, out var shore) ? shore.Root : null;
         }
     }
 
-    public string? GetActive(string roomId)
+    public string? GetActive(string shoreId)
     {
         lock (_sync)
         {
-            if (!_roomToWorkspace.TryGetValue(roomId, out var wsId) || !_buckets.TryGetValue(wsId, out var bucket))
+            if (!_shoreToBay.TryGetValue(shoreId, out var wsId) || !_buckets.TryGetValue(wsId, out var bucket))
                 return null;
-            return bucket.Rooms.TryGetValue(roomId, out var room) ? room.ActivePaneId : null;
+            return bucket.Shores.TryGetValue(shoreId, out var shore) ? shore.ActiveNookId : null;
         }
     }
 
-    public string? FocusedPaneId()
+    public string? FocusedNookId()
     {
         lock (_sync)
         {
             var bucket = ActiveBucket();
-            var roomId = bucket.ActiveRoomId ?? (bucket.Order.Count > 0 ? bucket.Order[0] : null);
-            if (roomId is null || !bucket.Rooms.TryGetValue(roomId, out var room))
+            var shoreId = bucket.ActiveShoreId ?? (bucket.Order.Count > 0 ? bucket.Order[0] : null);
+            if (shoreId is null || !bucket.Shores.TryGetValue(shoreId, out var shore))
                 return null;
-            return room.ActivePaneId;
+            return shore.ActiveNookId;
         }
     }
 
-    public IReadOnlyList<string> LeafPaneIds(string workspaceId)
+    public IReadOnlyList<string> LeafNookIds(string bayId)
     {
         var ids = new List<string>();
         lock (_sync)
         {
-            if (!_buckets.TryGetValue(workspaceId, out var bucket))
+            if (!_buckets.TryGetValue(bayId, out var bucket))
                 return ids;
-            foreach (var roomId in bucket.Order)
-                if (bucket.Rooms.TryGetValue(roomId, out var rs))
+            foreach (var shoreId in bucket.Order)
+                if (bucket.Shores.TryGetValue(shoreId, out var rs))
                     foreach (var leaf in MosaicOps.Leaves(rs.Root))
                         if (!IsEmptyLeaf(leaf))
-                            ids.Add(leaf.PaneId);
+                            ids.Add(leaf.NookId);
         }
         return ids;
     }
 
-    public static bool IsEmptyRoom(MosaicNode node) => node is PaneLeaf leaf && IsEmptyLeaf(leaf);
+    public static bool IsEmptyShore(MosaicNode node) => node is NookLeaf leaf && IsEmptyLeaf(leaf);
 
-    private static bool IsEmptyLeaf(PaneLeaf leaf)
-        => leaf.Subtabs.Count == 0 || leaf.Subtabs.All(s => s.PaneType == PaneType.Empty);
+    private static bool IsEmptyLeaf(NookLeaf leaf)
+        => leaf.Subtabs.Count == 0 || leaf.Subtabs.All(s => s.NookType == NookType.Empty);
 
-    private static PaneLeaf MakeEmptyLeaf()
+    private static NookLeaf MakeEmptyLeaf()
     {
         var id = Guid.NewGuid().ToString("N");
-        return new PaneLeaf { PaneId = id, Subtabs = new[] { new Subtab(id, PaneType.Empty) } };
+        return new NookLeaf { NookId = id, Subtabs = new[] { new Subtab(id, NookType.Empty) } };
     }
 
-    private Bucket ActiveBucket() => EnsureBucket(_activeWorkspaceId);
+    private Bucket ActiveBucket() => EnsureBucket(_activeBayId);
 
-    private Bucket EnsureBucket(string workspaceId)
+    private Bucket EnsureBucket(string bayId)
     {
-        if (!_buckets.TryGetValue(workspaceId, out var bucket))
+        if (!_buckets.TryGetValue(bayId, out var bucket))
         {
             bucket = new Bucket();
-            _buckets[workspaceId] = bucket;
+            _buckets[bayId] = bucket;
         }
         return bucket;
     }
 
-    private (Bucket Bucket, RoomState Room) GetRoomOrThrow(string roomId)
+    private (Bucket Bucket, ShoreState Shore) GetShoreOrThrow(string shoreId)
     {
-        if (!_roomToWorkspace.TryGetValue(roomId, out var wsId) || !_buckets.TryGetValue(wsId, out var bucket) || !bucket.Rooms.TryGetValue(roomId, out var room))
-            throw new KeyNotFoundException($"Unknown room '{roomId}'.");
-        return (bucket, room);
+        if (!_shoreToBay.TryGetValue(shoreId, out var wsId) || !_buckets.TryGetValue(wsId, out var bucket) || !bucket.Shores.TryGetValue(shoreId, out var shore))
+            throw new KeyNotFoundException($"Unknown shore '{shoreId}'.");
+        return (bucket, shore);
     }
 }

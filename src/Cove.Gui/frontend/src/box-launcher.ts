@@ -29,45 +29,45 @@ export interface LauncherTile {
   note: string;
 }
 
-export function shouldShowLauncher(roomCount: number): boolean {
-  return roomCount <= 0;
+export function shouldShowLauncher(shoreCount: number): boolean {
+  return shoreCount <= 0;
 }
 
-export interface RoomTreeNode {
+export interface ShoreTreeNode {
   kind: "leaf" | "split";
-  subtabs?: { paneType: string }[];
+  subtabs?: { nookType: string }[];
 }
 
-export function isEmptyRoomTree(node: RoomTreeNode | null | undefined): boolean {
+export function isEmptyShoreTree(node: ShoreTreeNode | null | undefined): boolean {
   if (!node || node.kind !== "leaf") return false;
   const subs = node.subtabs ?? [];
-  return subs.length === 0 || subs.every((s) => s.paneType === "empty");
+  return subs.length === 0 || subs.every((s) => s.nookType === "empty");
 }
 
 export type LauncherPlacement = "replace" | "create";
 
-export function launcherPlacement(activeRoomEmpty: boolean): LauncherPlacement {
-  return activeRoomEmpty ? "replace" : "create";
+export function launcherPlacement(activeShoreEmpty: boolean): LauncherPlacement {
+  return activeShoreEmpty ? "replace" : "create";
 }
 
-export interface PlaceablePane {
-  paneType: string;
+export interface PlaceableNook {
+  nookType: string;
   kind: "terminal" | "browser" | "tool";
-  roomName: string;
+  shoreName: string;
 }
 
-export function placeablePaneForAction(action: string): PlaceablePane | null {
+export function placeableNookForAction(action: string): PlaceableNook | null {
   switch (action) {
-    case "room.new":
-      return { paneType: "terminal", kind: "terminal", roomName: "Room" };
+    case "shore.new":
+      return { nookType: "terminal", kind: "terminal", shoreName: "Shore" };
     case "tool.browser":
-      return { paneType: "browser", kind: "browser", roomName: "Browser" };
+      return { nookType: "browser", kind: "browser", shoreName: "Browser" };
     case "tool.search":
-      return { paneType: "search", kind: "tool", roomName: "Search" };
+      return { nookType: "search", kind: "tool", shoreName: "Search" };
     case "tool.git":
-      return { paneType: "git", kind: "tool", roomName: "Source Control" };
+      return { nookType: "git", kind: "tool", shoreName: "Source Control" };
     case "tool.tasks":
-      return { paneType: "tasks-list", kind: "tool", roomName: "Tasks" };
+      return { nookType: "tasks-list", kind: "tool", shoreName: "Tasks" };
     default:
       return null;
   }

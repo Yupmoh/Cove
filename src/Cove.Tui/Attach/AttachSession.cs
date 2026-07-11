@@ -7,7 +7,7 @@ namespace Cove.Tui.Attach;
 public sealed class AttachSession
 {
     private readonly FrameConnection _conn;
-    private readonly string _paneId;
+    private readonly string _nookId;
     private ulong _streamId;
     private ulong _ackedOffset;
     private readonly SemaphoreSlim _writeGate = new(1, 1);
@@ -16,10 +16,10 @@ public sealed class AttachSession
     public ulong StreamId => _streamId;
     public ulong AckedOffset => _ackedOffset;
 
-    public AttachSession(FrameConnection conn, string paneId)
+    public AttachSession(FrameConnection conn, string nookId)
     {
         _conn = conn;
-        _paneId = paneId;
+        _nookId = nookId;
     }
 
     public async Task<SubscribeResult> SubscribeAsync(string clientKind, CancellationToken ct)
@@ -30,9 +30,9 @@ public sealed class AttachSession
         await SendRequestAsync("h", "cove://sys/hello", helloEl, ct).ConfigureAwait(false);
         await ReadResponseAsync("h", ct).ConfigureAwait(false);
 
-        var subEl = JsonSerializer.SerializeToElement(new SubscribeParams(_paneId, 0), CoveJsonContext.Default.SubscribeParams);
+        var subEl = JsonSerializer.SerializeToElement(new SubscribeParams(_nookId, 0), CoveJsonContext.Default.SubscribeParams);
         var subResp = await ReadResponseAsync("s", ct).ConfigureAwait(false);
-        await SendRequestAsync("s", "cove://commands/pane.subscribe", subEl, ct).ConfigureAwait(false);
+        await SendRequestAsync("s", "cove://commands/nook.subscribe", subEl, ct).ConfigureAwait(false);
         if (!subResp.Ok || subResp.Data is null)
             throw new InvalidOperationException($"subscribe failed: {subResp.Error?.Code}");
         var result = JsonSerializer.Deserialize(subResp.Data.Value, CoveJsonContext.Default.SubscribeResult)
@@ -73,8 +73,8 @@ public sealed class AttachSession
     public async Task SendInputAsync(byte[] data, CancellationToken ct)
     {
         if (data.Length == 0) return;
-        var writeEl = JsonSerializer.SerializeToElement(new PaneWriteParams(_paneId, toBase64(data)), CoveJsonContext.Default.PaneWriteParams);
-        await SendRequestAsync("w" + (++_seq), "cove://commands/pane.write", writeEl, ct).ConfigureAwait(false);
+        var writeEl = JsonSerializer.SerializeToElement(new NookWriteParams(_nookId, toBase64(data)), CoveJsonContext.Default.NookWriteParams);
+        await SendRequestAsync("w" + (++_seq), "cove://commands/nook.write", writeEl, ct).ConfigureAwait(false);
     }
 
     public async Task AckAsync(ulong ackOffset, CancellationToken ct)

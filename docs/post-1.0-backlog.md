@@ -13,14 +13,14 @@ Verified against the Ryn source tree (Work/Ryn) on 2026-07-09. Only these remain
 | UX-03 | MC-P03 | RESOLVED upstream: Ryn ships `SetBackdrop`/`GetBackdrop` with blur/acrylic/mica plus the `window.setBackdrop` IPC verb; the GUI launches with `BackdropMaterial.Blur` and exposes a backdrop toggle. Row kept for history — the 0.11-era "no vibrancy API" finding is stale. |
 | BR-23-41 | M7-P10-P14 | CDP-fidelity browser automation — WKWebView/WebView2 expose no CDP. `webviewPane.eval/execute` enables an injected-JS subset (no screenshot, no httpOnly cookies, `isTrusted=false`); adopting it is an owner decision. |
 | BR-53-57 | M7-P18 | CPU-throttle, occlusion, crash-recovery events — absent from WebViewPane. |
-| BR-58-60 (part) | M7-P19 | UA override + extensions — absent from WebViewPane. Per-pane sessions (≈incognito) work today via ephemeral `StoragePath`. |
-| BR-16-22 | M7-P09 | PiP, downloads, passkeys, deep links, codecs, file:// — beyond WebViewPane 0.11.0. Subtabs work today via multiple panes. |
+| BR-58-60 (part) | M7-P19 | UA override + extensions — absent from WebViewPane. Per-nook sessions (≈incognito) work today via ephemeral `StoragePath`. |
+| BR-16-22 | M7-P09 | PiP, downloads, passkeys, deep links, codecs, file:// — beyond WebViewPane 0.11.0. Subtabs work today via multiple nooks. |
 | KN-80/97 | M7-P22 | Native screen-recorder sidecar (ScreenCaptureKit/WGC/PipeWire). |
 | KN-81/82/84/102 | M7-P24 | Capture enrichment (chapters, redaction, live transcription). |
 | UX-83 | MC-P16 | Cross-platform chrome verification — needs Windows/Linux hardware. |
 | PL-76 | M9-P19 | TUI cross-platform hardening — needs Windows/Linux hardware. |
 
-Superseded, never to be built: M7-P01/P03/P04/P05 (CEF hosting) — replaced by `Ryn.Plugins.WebViewPane` (native WKWebView/WebView2 panes, no Chromium ever).
+Superseded, never to be built: M7-P01/P03/P04/P05 (CEF hosting) — replaced by `Ryn.Plugins.WebViewPane` (native WKWebView/WebView2 nooks, no Chromium ever).
 
 ## 2. External binaries / assets
 
@@ -43,7 +43,7 @@ The compositor foundation (P01/P03/P04/P05), the input decoder (P06 backend), th
 | Feature IDs | Packet | Description |
 |---|---|---|
 | TM-38-42 | M9-P07 | Mosaic layout engine + focus/split rendering |
-| UX-82 | M9-P08 | Chrome surfaces (status line, room tabs, sidebars) |
+| UX-82 | M9-P08 | Chrome surfaces (status line, shore tabs, sidebars) |
 | PL-84 | M9-P09 | Terminal capability + color/glyph degradation (detection built; rendering pending) |
 | UX-43-49 | M9-P10 | Theme parity resolver |
 | AG-39/UX-26 | M9-P11 | Launcher + command palette (TUI forms) |
@@ -62,7 +62,7 @@ The compositor foundation (P01/P03/P04/P05), the input decoder (P06 backend), th
 Not features — verification work. These shipped code paths have unit tests but no live exercise:
 
 - `cove attach` streaming (M9-P17): needs a live daemon + PTY session.
-- Monaco editor/diff/markdown panes + browser pane: type-checked + unit-tested; never visually confirmed in a running GUI.
+- Monaco editor/diff/markdown nooks + browser nook: type-checked + unit-tested; never visually confirmed in a running GUI.
 - Update flow (M8-P14): mock-verified only; `Ryn.Plugins.Updater` (real apply/relaunch) is not referenced.
 - CI matrix: main is ~215 commits ahead of origin — no CI run has validated any of this work. Push and watch a full run.
 - M1 gate 7 deviation: restored scrollback replays through the live xterm parser instead of rendering as a static grid.
@@ -81,8 +81,8 @@ Everything here was falsely listed as blocked/deferred; the capability exists an
 | MC-P13 | "Ryn CMP-03 gap" | `Ryn.Plugins.GlobalShortcut` shipped + wired; MenuBar accelerators cover menu chords |
 | M8-P10 | "Ryn notification.* gap" | `Ryn.Plugins.Notification` exists (Send/SendWithSound/SendWithIcon/IsSupported/RequestPermission); policy engine built (14 tests); needs package ref + bridge |
 | M8-P11 | "no app-icon-badge API" | `Ryn.Plugins.Badge` shipped + wired (Set/SetCount/Clear, mac+win backends) |
-| MP-P02/P03/P04/P13/P17 | "Monaco is Human effort" | Monaco shipped (`bcf65c9`/`5fe96da`); panes use it |
-| MP-P06/P08/P10/P14/P18/P19/P20 | "Requires Monaco/GUI" | Monaco + GUI exist; remaining work itemized in M-Panes LEDGER |
+| MP-P02/P03/P04/P13/P17 | "Monaco is Human effort" | Monaco shipped (`bcf65c9`/`5fe96da`); nooks use it |
+| MP-P06/P08/P10/P14/P18/P19/P20 | "Requires Monaco/GUI" | Monaco + GUI exist; remaining work itemized in M-Nooks LEDGER |
 | M8-P01 | "no daemon→GUI push channel" | DONE (`132cefe`): FrameType.Event + EngineEventForwarder → `engine.event` |
 | M7-P25/P26 | "Requires Ryn engine" | Backend done; frontend-only work in the existing settings window |
 | M9-P01/P03/P04/P05 | "human-judgment infrastructure" | DONE: compositor + VT emulator + Spectre backend, AOT-clean, 77 tests |

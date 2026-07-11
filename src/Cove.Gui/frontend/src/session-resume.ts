@@ -35,7 +35,7 @@ export type ResumeAction =
       command: string;
       args: string[];
       cwd: string;
-      roomName: string;
+      shoreName: string;
       toast: { title: string; body: string } | null;
     }
   | { kind: "error"; toast: { title: string; body: string } };
@@ -97,5 +97,5 @@ export function resumeSpawnPlan(result: VaultResumeResult, projectDir: string, d
     result.fallback === "fresh"
       ? { title: "Couldn't resume", body: `couldn't resume — started a fresh ${name} session` }
       : null;
-  return { kind: "spawn", adapter: result.adapter, command, args, cwd: projectDir, roomName: name, toast };
+  return { kind: "spawn", adapter: result.adapter, command, args, cwd: projectDir, shoreName: name, toast };
 }

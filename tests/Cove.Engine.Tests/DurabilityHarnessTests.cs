@@ -2,7 +2,7 @@ using System.Text.Json;
 using Cove.Engine.Daemon;
 using Cove.Engine.Restart;
 using Cove.Engine.Snapshots;
-using Cove.Engine.Workspaces;
+using Cove.Engine.Bays;
 using Cove.Platform.Ipc;
 using Cove.Protocol;
 using Microsoft.Extensions.Logging;
@@ -23,24 +23,24 @@ public sealed class DurabilityHarnessTests
     private static string NewDir() => Path.Combine(Path.GetTempPath(), "cove-dur-" + Guid.NewGuid().ToString("N"));
 
     [Fact]
-    public async Task CorruptWorkspaceJson_FallsBackToBakFile()
+    public async Task CorruptBayJson_FallsBackToBakFile()
     {
         var dir = NewDir();
         try
         {
-            var wsDir = Path.Combine(dir, "workspaces", "default");
+            var wsDir = Path.Combine(dir, "bays", "default");
             Directory.CreateDirectory(wsDir);
-            var layout = new Cove.Persistence.WorkspaceSnapshot { Id = "default", Name = "default", ProjectDir = System.Environment.CurrentDirectory };
-            var panes = new Cove.Persistence.PaneDescriptor[0];
-            Cove.Engine.Layout.WorkspacePersistence.Save(layout, panes, wsDir);
-            Cove.Engine.Layout.WorkspacePersistence.Save(layout, panes, wsDir);
+            var layout = new Cove.Persistence.BaySnapshot { Id = "default", Name = "default", ProjectDir = System.Environment.CurrentDirectory };
+            var nooks = new Cove.Persistence.NookDescriptor[0];
+            Cove.Engine.Layout.BayPersistence.Save(layout, nooks, wsDir);
+            Cove.Engine.Layout.BayPersistence.Save(layout, nooks, wsDir);
 
-            var wsPath = Path.Combine(wsDir, "workspace.json");
+            var wsPath = Path.Combine(wsDir, "bay.json");
             var bakPath = wsPath + ".bak";
             Assert.True(File.Exists(bakPath));
             await File.WriteAllTextAsync(wsPath, "{ CORRUPT JSON {{{").ConfigureAwait(true);
 
-            var (loaded, _) = Cove.Engine.Layout.WorkspacePersistence.Load(wsDir, new NoOpLogger());
+            var (loaded, _) = Cove.Engine.Layout.BayPersistence.Load(wsDir, new NoOpLogger());
             Assert.NotNull(loaded);
         }
         finally { try { Directory.Delete(dir, true); } catch { } }
@@ -79,7 +79,7 @@ public sealed class DurabilityHarnessTests
     }
 
     [Fact]
-    public async Task ControlPlaneRoundTrip_CreateAndListWorkspace()
+    public async Task ControlPlaneRoundTrip_CreateAndListBay()
     {
         if (System.OperatingSystem.IsWindows())
             return;
@@ -88,20 +88,20 @@ public sealed class DurabilityHarnessTests
         await using var h = await DaemonTestHarness.StartAsync();
         await using FrameConnection ctl = await h.ConnectAsync("cli");
 
-        var createReq = new ControlRequest("1", "cove://commands/workspace.create",
+        var createReq = new ControlRequest("1", "cove://commands/bay.create",
             System.Text.Json.JsonSerializer.SerializeToElement(
-                new WorkspaceCreateParams("test-ws", "/tmp", null),
-                Cove.Engine.Workspaces.WorkspacesJsonContext.Default.WorkspaceCreateParams));
+                new BayCreateParams("test-ws", "/tmp", null),
+                Cove.Engine.Bays.BaysJsonContext.Default.BayCreateParams));
         await ctl.WriteFrameAsync(FrameType.Request, 0, ControlCodec.Encode(createReq), ct);
         ControlResponse createResp = await ReadResponseAsync(ctl, "1", ct);
         Assert.True(createResp.Ok, createResp.Error?.Message);
 
-        var listReq = new ControlRequest("2", "cove://commands/workspace.list", null);
+        var listReq = new ControlRequest("2", "cove://commands/bay.list", null);
         await ctl.WriteFrameAsync(FrameType.Request, 0, ControlCodec.Encode(listReq), ct);
         ControlResponse listResp = await ReadResponseAsync(ctl, "2", ct);
         Assert.True(listResp.Ok, listResp.Error?.Message);
-        var list = listResp.Data!.Value.Deserialize(Cove.Engine.Workspaces.WorkspacesJsonContext.Default.WorkspaceListResult)!;
-        Assert.Contains(list.Workspaces, w => w.Name == "test-ws");
+        var list = listResp.Data!.Value.Deserialize(Cove.Engine.Bays.BaysJsonContext.Default.BayListResult)!;
+        Assert.Contains(list.Bays, w => w.Name == "test-ws");
     }
 
     [Fact]
@@ -112,7 +112,7 @@ public sealed class DurabilityHarnessTests
         try
         {
             var svc = new SnapshotService(dir, Path.Combine(dir, "snapshots"), new ProcessGitRunner(), new NoOpLogger());
-            var content = new Dictionary<string, string> { ["workspaces/ws-1/workspace.json"] = "content-v1" };
+            var content = new Dictionary<string, string> { ["bays/ws-1/bay.json"] = "content-v1" };
 
             var snap = await svc.TakeAsync(content, SnapshotTrigger.Manual);
             Assert.NotNull(snap);
@@ -122,7 +122,7 @@ public sealed class DurabilityHarnessTests
 
             var restored = await svc.RestoreAsync(snap!.Id);
             Assert.NotNull(restored);
-            Assert.Contains("content-v1", restored!["workspaces/ws-1/workspace.json"]);
+            Assert.Contains("content-v1", restored!["bays/ws-1/bay.json"]);
         }
         finally { try { Directory.Delete(dir, true); } catch { } }
     }

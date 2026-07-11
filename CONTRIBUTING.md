@@ -1,6 +1,6 @@
 # Contributing to Cove
 
-Cove is a free, open-source, AI-native terminal workspace. We welcome contributions.
+Cove is a free, open-source, AI-native terminal bay. We welcome contributions.
 
 ## Getting started
 
@@ -11,7 +11,7 @@ Cove is a free, open-source, AI-native terminal workspace. We welcome contributi
 
 ## Architecture overview
 
-Cove is a **headless-first** terminal workspace: a `cove daemon` engine owns PTYs, sessions, and SQLite state; the Ryn GUI, the TUI, and the `cove` CLI are all thin clients of one `cove://` control socket.
+Cove is a **headless-first** terminal bay: a `cove daemon` engine owns PTYs, sessions, and SQLite state; the Ryn GUI, the TUI, and the `cove` CLI are all thin clients of one `cove://` control socket.
 
 Read `docs/architecture.md` for the subsystem map, and `AGENTS.md` for executor rules if you are working from a plan packet.
 

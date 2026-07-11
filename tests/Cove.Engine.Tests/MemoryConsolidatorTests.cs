@@ -25,26 +25,26 @@ public sealed class MemoryConsolidatorTests
     public async Task ConsolidateAsync_DryRun_DoesNotCreateProposals()
     {
         var (_, store, proposals, consolidator) = NewStack();
-        store.AddFact(new Fact { WorkspaceId = "ws1", Kind = "decision", Content = "Use SQLite", Confidence = 0.8 });
-        store.AddFact(new Fact { WorkspaceId = "ws1", Kind = "decision", Content = "Use SQLite", Confidence = 0.5 });
+        store.AddFact(new Fact { BayId = "ws1", Kind = "decision", Content = "Use SQLite", Confidence = 0.8 });
+        store.AddFact(new Fact { BayId = "ws1", Kind = "decision", Content = "Use SQLite", Confidence = 0.5 });
 
         var count = await consolidator.ConsolidateAsync("ws1", dryRun: true);
 
         Assert.Equal(1, count);
-        Assert.Empty(proposals.ListByWorkspace("ws1"));
+        Assert.Empty(proposals.ListByBay("ws1"));
     }
 
     [Fact]
     public async Task ConsolidateAsync_NotDryRun_CreatesProposals()
     {
         var (_, store, proposals, consolidator) = NewStack();
-        store.AddFact(new Fact { WorkspaceId = "ws1", Kind = "decision", Content = "Use SQLite", Confidence = 0.8 });
-        store.AddFact(new Fact { WorkspaceId = "ws1", Kind = "decision", Content = "Use SQLite", Confidence = 0.5 });
+        store.AddFact(new Fact { BayId = "ws1", Kind = "decision", Content = "Use SQLite", Confidence = 0.8 });
+        store.AddFact(new Fact { BayId = "ws1", Kind = "decision", Content = "Use SQLite", Confidence = 0.5 });
 
         var count = await consolidator.ConsolidateAsync("ws1", dryRun: false);
 
         Assert.Equal(1, count);
-        var list = proposals.ListByWorkspace("ws1");
+        var list = proposals.ListByBay("ws1");
         Assert.Single(list);
         Assert.Equal("proposed", list[0].State);
     }
@@ -53,7 +53,7 @@ public sealed class MemoryConsolidatorTests
     public async Task ConsolidateAsync_IsCancellable()
     {
         var (_, store, _, consolidator) = NewStack();
-        store.AddFact(new Fact { WorkspaceId = "ws1", Kind = "decision", Content = "fact", Confidence = 0.5 });
+        store.AddFact(new Fact { BayId = "ws1", Kind = "decision", Content = "fact", Confidence = 0.5 });
 
         using var cts = new System.Threading.CancellationTokenSource();
         cts.Cancel();
@@ -82,8 +82,8 @@ public sealed class MemoryConsolidatorTests
         var p2 = proposals.Create("ws1", "merge", "B");
         proposals.Transition(p1.Id, "applied");
 
-        var proposed = proposals.ListByWorkspace("ws1", "proposed");
-        var applied = proposals.ListByWorkspace("ws1", "applied");
+        var proposed = proposals.ListByBay("ws1", "proposed");
+        var applied = proposals.ListByBay("ws1", "applied");
         Assert.Single(proposed);
         Assert.Single(applied);
         Assert.Equal(p2.Id, proposed[0].Id);

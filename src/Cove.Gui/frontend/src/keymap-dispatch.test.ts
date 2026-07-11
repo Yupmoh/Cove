@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import { eventToChord, buildChordMap, resolveDispatch, defaultBindings, type ResolvedBinding } from "./keymap-dispatch";
 
 const bindings: ResolvedBinding[] = [
-  { chord: "cmd+t", action: "room.new", actionType: "app-command" },
-  { chord: "cmd+d", action: "pane.split-right", actionType: "app-command" },
+  { chord: "cmd+t", action: "shore.new", actionType: "app-command" },
+  { chord: "cmd+d", action: "nook.split-right", actionType: "app-command" },
   { chord: "cmd+b", action: "view.toggle-sidebar", actionType: "app-command" },
   { chord: "cmd+c", action: "terminal.copy-or-sigint", actionType: "app-command" },
   { chord: "cmd+q", action: "app.quit", actionType: "app-command" },
@@ -24,7 +24,7 @@ describe("eventToChord", () => {
 describe("buildChordMap", () => {
   it("indexes bindings by normalized chord", () => {
     const m = buildChordMap(bindings);
-    expect(m.get("cmd+t")?.action).toBe("room.new");
+    expect(m.get("cmd+t")?.action).toBe("shore.new");
   });
 });
 
@@ -36,15 +36,15 @@ describe("resolveDispatch", () => {
   });
   it("marks a chord owned by a menu accelerator so the dispatcher does not double-fire", () => {
     const r = resolveDispatch("cmd+t", map, menuChords);
-    expect(r).toEqual({ kind: "menu-owned", action: "room.new" });
+    expect(r).toEqual({ kind: "menu-owned", action: "shore.new" });
   });
   it("still dispatches a menu action reached by a non-menu chord", () => {
-    const withAlias = buildChordMap([...bindings, { chord: "cmd+shift+t", action: "room.new", actionType: "app-command" }]);
-    expect(resolveDispatch("cmd+shift+t", withAlias, menuChords)).toEqual({ kind: "dispatch", action: "room.new", actionType: "app-command" });
+    const withAlias = buildChordMap([...bindings, { chord: "cmd+shift+t", action: "shore.new", actionType: "app-command" }]);
+    expect(resolveDispatch("cmd+shift+t", withAlias, menuChords)).toEqual({ kind: "dispatch", action: "shore.new", actionType: "app-command" });
   });
   it("dispatches a non-menu app action", () => {
     const r = resolveDispatch("cmd+d", map, menuChords);
-    expect(r).toEqual({ kind: "dispatch", action: "pane.split-right", actionType: "app-command" });
+    expect(r).toEqual({ kind: "dispatch", action: "nook.split-right", actionType: "app-command" });
   });
   it("does not globally dispatch terminal-scoped actions", () => {
     expect(resolveDispatch("cmd+c", map, menuChords).kind).toBe("terminal");
@@ -55,12 +55,12 @@ describe("resolveDispatch", () => {
 });
 
 describe("defaultBindings", () => {
-  it("covers the spec view, pane, room, workspace and tool chords", () => {
+  it("covers the spec view, nook, shore, bay and tool chords", () => {
     const actions = new Set(defaultBindings().map((b) => b.action));
     expect(actions.has("view.zen-mode")).toBe(true);
-    expect(actions.has("pane.split-down")).toBe(true);
-    expect(actions.has("room.new")).toBe(true);
-    expect(actions.has("workspace.switch-1")).toBe(true);
+    expect(actions.has("nook.split-down")).toBe(true);
+    expect(actions.has("shore.new")).toBe(true);
+    expect(actions.has("bay.switch-1")).toBe(true);
     expect(actions.has("tool.git")).toBe(true);
   });
   it("binds zen mode to cmd+shift+backtick", () => {

@@ -8,7 +8,7 @@ namespace Cove.Engine.Tests;
 public sealed class Osc7LiveTests
 {
     [Fact]
-    public async Task Cd_UpdatesPaneCwd_ViaOsc7_OverSocket()
+    public async Task Cd_UpdatesNookCwd_ViaOsc7_OverSocket()
     {
         if (System.OperatingSystem.IsWindows())
             return;
@@ -25,18 +25,18 @@ public sealed class Osc7LiveTests
         JsonElement sp = JsonSerializer.SerializeToElement(
             new SpawnParams(shell, System.Array.Empty<string>(), null, null, 80, 24),
             CoveJsonContext.Default.SpawnParams);
-        ControlResponse spawnResp = await RequestAsync(ctl, "spawn", "cove://commands/pane.spawn", sp, ct);
+        ControlResponse spawnResp = await RequestAsync(ctl, "spawn", "cove://commands/nook.spawn", sp, ct);
         Assert.True(spawnResp.Ok, spawnResp.Error?.Message);
-        string paneId = spawnResp.Data!.Value.Deserialize(CoveJsonContext.Default.PaneInfo)!.PaneId;
+        string nookId = spawnResp.Data!.Value.Deserialize(CoveJsonContext.Default.NookInfo)!.NookId;
 
         await Task.Delay(1000, ct);
         JsonElement wp = JsonSerializer.SerializeToElement(
-            new PaneWriteParams(paneId, System.Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("cd /tmp\n"))),
-            CoveJsonContext.Default.PaneWriteParams);
-        ControlResponse writeResp = await RequestAsync(ctl, "write", "cove://commands/pane.write", wp, ct);
+            new NookWriteParams(nookId, System.Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("cd /tmp\n"))),
+            CoveJsonContext.Default.NookWriteParams);
+        ControlResponse writeResp = await RequestAsync(ctl, "write", "cove://commands/nook.write", wp, ct);
         Assert.True(writeResp.Ok, writeResp.Error?.Message);
 
-        JsonElement ssp = JsonSerializer.SerializeToElement(new PaneRefParams(paneId), CoveJsonContext.Default.PaneRefParams);
+        JsonElement ssp = JsonSerializer.SerializeToElement(new NookRefParams(nookId), CoveJsonContext.Default.NookRefParams);
         string? cwd = null;
         var deadline = Task.Delay(System.TimeSpan.FromSeconds(30), ct);
         while (!deadline.IsCompleted)

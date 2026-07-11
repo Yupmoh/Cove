@@ -14,8 +14,8 @@ public static class BrowserCommands
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.BrowserOpenParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "browser open params required"));
 
-        var pane = mgr.Open(p.PaneId, p.Url);
-        return Task.FromResult(ctx.Ok(ToDto(pane), CoveJsonContext.Default.BrowserPaneDto));
+        var nook = mgr.Open(p.NookId, p.Url);
+        return Task.FromResult(ctx.Ok(ToDto(nook), CoveJsonContext.Default.BrowserNookDto));
     }
 
     [CoveCommand("cove://commands/browser.navigate")]
@@ -26,10 +26,10 @@ public static class BrowserCommands
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.BrowserNavigateParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "browser navigate params required"));
 
-        var pane = mgr.Navigate(p.PaneId, p.Url);
-        if (pane is null)
-            return Task.FromResult(ctx.Fail("not_found", "browser pane not found"));
-        return Task.FromResult(ctx.Ok(ToDto(pane), CoveJsonContext.Default.BrowserPaneDto));
+        var nook = mgr.Navigate(p.NookId, p.Url);
+        if (nook is null)
+            return Task.FromResult(ctx.Fail("not_found", "browser nook not found"));
+        return Task.FromResult(ctx.Ok(ToDto(nook), CoveJsonContext.Default.BrowserNookDto));
     }
 
     [CoveCommand("cove://commands/browser.back")]
@@ -37,13 +37,13 @@ public static class BrowserCommands
     {
         if (ctx.Browser is not { } mgr)
             return Task.FromResult(ctx.Fail("not_ready", "browser manager not available"));
-        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.BrowserPaneRefParams) is not { } p)
-            return Task.FromResult(ctx.Fail("invalid_params", "browser pane ref params required"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.BrowserNookRefParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "browser nook ref params required"));
 
-        var pane = mgr.Back(p.PaneId);
-        if (pane is null)
+        var nook = mgr.Back(p.NookId);
+        if (nook is null)
             return Task.FromResult(ctx.Fail("not_found", "cannot go back"));
-        return Task.FromResult(ctx.Ok(ToDto(pane), CoveJsonContext.Default.BrowserPaneDto));
+        return Task.FromResult(ctx.Ok(ToDto(nook), CoveJsonContext.Default.BrowserNookDto));
     }
 
     [CoveCommand("cove://commands/browser.forward")]
@@ -51,13 +51,13 @@ public static class BrowserCommands
     {
         if (ctx.Browser is not { } mgr)
             return Task.FromResult(ctx.Fail("not_ready", "browser manager not available"));
-        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.BrowserPaneRefParams) is not { } p)
-            return Task.FromResult(ctx.Fail("invalid_params", "browser pane ref params required"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.BrowserNookRefParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "browser nook ref params required"));
 
-        var pane = mgr.Forward(p.PaneId);
-        if (pane is null)
+        var nook = mgr.Forward(p.NookId);
+        if (nook is null)
             return Task.FromResult(ctx.Fail("not_found", "cannot go forward"));
-        return Task.FromResult(ctx.Ok(ToDto(pane), CoveJsonContext.Default.BrowserPaneDto));
+        return Task.FromResult(ctx.Ok(ToDto(nook), CoveJsonContext.Default.BrowserNookDto));
     }
 
     [CoveCommand("cove://commands/browser.reload")]
@@ -65,12 +65,12 @@ public static class BrowserCommands
     {
         if (ctx.Browser is not { } mgr)
             return Task.FromResult(ctx.Fail("not_ready", "browser manager not available"));
-        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.BrowserPaneRefParams) is not { } p)
-            return Task.FromResult(ctx.Fail("invalid_params", "browser pane ref params required"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.BrowserNookRefParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "browser nook ref params required"));
 
-        var url = mgr.Reload(p.PaneId);
+        var url = mgr.Reload(p.NookId);
         if (url is null)
-            return Task.FromResult(ctx.Fail("not_found", "browser pane not found"));
+            return Task.FromResult(ctx.Fail("not_found", "browser nook not found"));
         return Task.FromResult(ctx.Ok());
     }
 
@@ -79,25 +79,25 @@ public static class BrowserCommands
     {
         if (ctx.Browser is not { } mgr)
             return Task.FromResult(ctx.Fail("not_ready", "browser manager not available"));
-        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.BrowserPaneRefParams) is not { } p)
-            return Task.FromResult(ctx.Fail("invalid_params", "browser pane ref params required"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.BrowserNookRefParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "browser nook ref params required"));
 
-        mgr.Close(p.PaneId);
+        mgr.Close(p.NookId);
         return Task.FromResult(ctx.Ok());
     }
 
     [CoveCommand("cove://commands/browser.create")]
-    public static Task<ControlResponse> CreateBrowserPane(EngineDispatchContext ctx)
+    public static Task<ControlResponse> CreateBrowserNook(EngineDispatchContext ctx)
     {
         if (ctx.Browser is not { } mgr)
             return Task.FromResult(ctx.Fail("not_ready", "browser manager not available"));
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.BrowserCreateParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "browser create params required"));
 
-        string paneId = "pane-" + System.Guid.NewGuid().ToString("N");
-        var pane = mgr.Open(paneId, p.Url);
-        return Task.FromResult(ctx.Ok(ToDto(pane), CoveJsonContext.Default.BrowserPaneDto));
+        string nookId = "nook-" + System.Guid.NewGuid().ToString("N");
+        var nook = mgr.Open(nookId, p.Url);
+        return Task.FromResult(ctx.Ok(ToDto(nook), CoveJsonContext.Default.BrowserNookDto));
     }
-    private static BrowserPaneDto ToDto(BrowserPane pane) =>
-        new(pane.PaneId, pane.CurrentUrl, pane.History.ToList(), pane.HistoryIndex, pane.CanGoBack, pane.CanGoForward);
+    private static BrowserNookDto ToDto(BrowserNook nook) =>
+        new(nook.NookId, nook.CurrentUrl, nook.History.ToList(), nook.HistoryIndex, nook.CanGoBack, nook.CanGoForward);
 }

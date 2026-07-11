@@ -10,23 +10,23 @@ public sealed class HookSessionIdCaptureTests
     private static JsonElement Payload(string json) => JsonDocument.Parse(json).RootElement.Clone();
 
     [Fact]
-    public void SessionStart_WithSessionId_CapturesOntoPaneState_AndFiresCallback()
+    public void SessionStart_WithSessionId_CapturesOntoNookState_AndFiresCallback()
     {
         var router = new HookEventRouter();
-        (string pane, string adapter, string session)? captured = null;
-        router.SessionStarted += (pane, adapter, session) => captured = (pane, adapter, session);
+        (string nook, string adapter, string session)? captured = null;
+        router.SessionStarted += (nook, adapter, session) => captured = (nook, adapter, session);
 
         router.Route(new HookEvent
         {
             Adapter = "claude-code",
             Event = "session-start",
-            PaneId = "pane-1",
+            NookId = "nook-1",
             Payload = Payload("{\"session_id\":\"sess-abc\",\"cwd\":\"/repo\"}"),
         });
 
         Assert.NotNull(captured);
-        Assert.Equal(("pane-1", "claude-code", "sess-abc"), captured!.Value);
-        Assert.Equal("sess-abc", router.GetPaneState("pane-1")!.SessionId);
+        Assert.Equal(("nook-1", "claude-code", "sess-abc"), captured!.Value);
+        Assert.Equal("sess-abc", router.GetNookState("nook-1")!.SessionId);
     }
 
     [Fact]
@@ -37,12 +37,12 @@ public sealed class HookSessionIdCaptureTests
         {
             Adapter = "claude-code",
             Event = "session-start",
-            PaneId = "pane-1",
+            NookId = "nook-1",
             Payload = Payload("{\"session_id\":\"sess-abc\"}"),
         });
-        router.Route(new HookEvent { Adapter = "claude-code", Event = "stop", PaneId = "pane-1" });
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "stop", NookId = "nook-1" });
 
-        Assert.Equal("sess-abc", router.GetPaneState("pane-1")!.SessionId);
+        Assert.Equal("sess-abc", router.GetNookState("nook-1")!.SessionId);
     }
 
     [Fact]
@@ -52,9 +52,9 @@ public sealed class HookSessionIdCaptureTests
         var fired = false;
         router.SessionStarted += (_, _, _) => fired = true;
 
-        router.Route(new HookEvent { Adapter = "claude-code", Event = "session-start", PaneId = "pane-1" });
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "session-start", NookId = "nook-1" });
 
         Assert.False(fired);
-        Assert.Null(router.GetPaneState("pane-1")!.SessionId);
+        Assert.Null(router.GetNookState("nook-1")!.SessionId);
     }
 }

@@ -1,27 +1,27 @@
 using Cove.Engine.Layout;
-using Cove.Engine.Workspaces;
+using Cove.Engine.Bays;
 
 namespace Cove.Engine.Protocol;
 
 public sealed class ScopeResolver
 {
-    private readonly WorkspaceManager? _workspaces;
+    private readonly BayManager? _bays;
 
-    public ScopeResolver(WorkspaceManager? workspaces = null) => _workspaces = workspaces;
+    public ScopeResolver(BayManager? bays = null) => _bays = bays;
 
-    public (string? WorkspaceId, string? RoomId) ResolvePaneLocation(string? paneId)
+    public (string? BayId, string? ShoreId) ResolveNookLocation(string? nookId)
     {
-        if (paneId is null || _workspaces is null)
+        if (nookId is null || _bays is null)
             return (null, null);
-        foreach (var ws in _workspaces.ListWorkspaces())
+        foreach (var ws in _bays.ListBays())
         {
-            var actor = _workspaces.Get(ws.Id);
+            var actor = _bays.Get(ws.Id);
             if (actor is null) continue;
             var model = actor.State;
-            foreach (var room in model.Rooms)
-                foreach (var leaf in MosaicOps.Leaves(room.LayoutTree))
-                    if (leaf.PaneId == paneId)
-                        return (ws.Id, room.Id);
+            foreach (var shore in model.Shores)
+                foreach (var leaf in MosaicOps.Leaves(shore.LayoutTree))
+                    if (leaf.NookId == nookId)
+                        return (ws.Id, shore.Id);
         }
         return (null, null);
     }

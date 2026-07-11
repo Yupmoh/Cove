@@ -5,7 +5,7 @@ function svg(body: string): string {
 }
 
 export const ICONS: Record<string, string> = {
-  workspaces: svg('<rect x="3" y="4" width="18" height="16" rx="2"/><line x1="9.5" y1="4" x2="9.5" y2="20"/>'),
+  bays: svg('<rect x="3" y="4" width="18" height="16" rx="2"/><line x1="9.5" y1="4" x2="9.5" y2="20"/>'),
   overview: svg('<rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/>'),
   skills: svg('<path d="M12 3.5l1.9 5.6 5.6 1.9-5.6 1.9L12 18.5l-1.9-5.6-5.6-1.9 5.6-1.9z"/><path d="M19 15.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/>'),
   activity: svg('<polyline points="3 12 7.5 12 10.5 5.5 14 18.5 16.5 12 21 12"/>'),
@@ -38,7 +38,7 @@ export function iconSvg(name: string): string {
   return ICONS[name] ?? ICONS.terminal;
 }
 
-export const PANE_TYPE_ICON: Record<string, string> = {
+export const NOOK_TYPE_ICON: Record<string, string> = {
   terminal: "terminal",
   browser: "browser",
   search: "search",
@@ -57,8 +57,8 @@ export const PANE_TYPE_ICON: Record<string, string> = {
   empty: "terminal",
 };
 
-export function iconForPaneType(paneType: string): string {
-  return iconSvg(PANE_TYPE_ICON[paneType] ?? "terminal");
+export function iconForNookType(nookType: string): string {
+  return iconSvg(NOOK_TYPE_ICON[nookType] ?? "terminal");
 }
 
 export function monogram(label: string): string {

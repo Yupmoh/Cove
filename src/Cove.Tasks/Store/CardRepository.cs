@@ -7,7 +7,7 @@ namespace Cove.Tasks.Store;
 public sealed class CardRow
 {
     public string Id { get; set; } = "";
-    public string WorkspaceId { get; set; } = "";
+    public string BayId { get; set; } = "";
     public int TaskNumber { get; set; }
     public string Title { get; set; } = "";
     public string Description { get; set; } = "";
@@ -34,7 +34,7 @@ public sealed class CardRepository
     private readonly SqliteConnectionFactory _factory;
     private readonly TasksWriteChannel? _channel;
 
-    private const string SelectColumns = "id AS Id, workspace_id AS WorkspaceId, task_number AS TaskNumber, title AS Title, description AS Description, status_id AS StatusId, priority AS Priority, size AS Size, assignee AS Assignee, source AS Source, order_key AS OrderKey, current_primary_run_id AS CurrentPrimaryRunId, launch_config_json AS LaunchConfigJson, agent_ref AS AgentRef, skill_selection_json AS SkillSelectionJson, profile_slug AS ProfileSlug, due_at AS DueAt, attachments_json AS AttachmentsJson, comment_ids_json AS CommentIdsJson, created_at AS CreatedAt, updated_at AS UpdatedAt";
+    private const string SelectColumns = "id AS Id, bay_id AS BayId, task_number AS TaskNumber, title AS Title, description AS Description, status_id AS StatusId, priority AS Priority, size AS Size, assignee AS Assignee, source AS Source, order_key AS OrderKey, current_primary_run_id AS CurrentPrimaryRunId, launch_config_json AS LaunchConfigJson, agent_ref AS AgentRef, skill_selection_json AS SkillSelectionJson, profile_slug AS ProfileSlug, due_at AS DueAt, attachments_json AS AttachmentsJson, comment_ids_json AS CommentIdsJson, created_at AS CreatedAt, updated_at AS UpdatedAt";
 
     public CardRepository(SqliteConnectionFactory factory, TasksWriteChannel? channel = null)
     {
@@ -50,28 +50,28 @@ public sealed class CardRepository
             new { Id = id });
     }
 
-    public CardRow? GetByWorkspaceAndNumber(string workspaceId, int taskNumber)
+    public CardRow? GetByBayAndNumber(string bayId, int taskNumber)
     {
         using var conn = _factory.Open();
         return conn.QueryFirstOrDefault<CardRow>(
-            $"SELECT {SelectColumns} FROM cards WHERE workspace_id = @WorkspaceId AND task_number = @TaskNumber",
-            new { WorkspaceId = workspaceId, TaskNumber = taskNumber });
+            $"SELECT {SelectColumns} FROM cards WHERE bay_id = @BayId AND task_number = @TaskNumber",
+            new { BayId = bayId, TaskNumber = taskNumber });
     }
 
-    public IReadOnlyList<CardRow> ListByWorkspace(string workspaceId)
+    public IReadOnlyList<CardRow> ListByBay(string bayId)
     {
         using var conn = _factory.Open();
         return conn.Query<CardRow>(
-            $"SELECT {SelectColumns} FROM cards WHERE workspace_id = @WorkspaceId ORDER BY status_id, order_key",
-            new { WorkspaceId = workspaceId }).AsList();
+            $"SELECT {SelectColumns} FROM cards WHERE bay_id = @BayId ORDER BY status_id, order_key",
+            new { BayId = bayId }).AsList();
     }
 
-    public IReadOnlyList<CardRow> ListByStatus(string workspaceId, string statusId)
+    public IReadOnlyList<CardRow> ListByStatus(string bayId, string statusId)
     {
         using var conn = _factory.Open();
         return conn.Query<CardRow>(
-            $"SELECT {SelectColumns} FROM cards WHERE workspace_id = @WorkspaceId AND status_id = @StatusId ORDER BY order_key",
-            new { WorkspaceId = workspaceId, StatusId = statusId }).AsList();
+            $"SELECT {SelectColumns} FROM cards WHERE bay_id = @BayId AND status_id = @StatusId ORDER BY order_key",
+            new { BayId = bayId, StatusId = statusId }).AsList();
     }
 
     public System.Threading.Tasks.Task InsertAsync(CardRow row)
@@ -93,7 +93,7 @@ public sealed class CardRepository
     private static void InsertInternal(SqliteConnection conn, CardRow row)
     {
         conn.Execute(
-            "INSERT INTO cards (id, workspace_id, task_number, title, description, status_id, priority, size, assignee, source, order_key, current_primary_run_id, launch_config_json, agent_ref, skill_selection_json, profile_slug, due_at, attachments_json, comment_ids_json, created_at, updated_at) VALUES (@Id, @WorkspaceId, @TaskNumber, @Title, @Description, @StatusId, @Priority, @Size, @Assignee, @Source, @OrderKey, @CurrentPrimaryRunId, @LaunchConfigJson, @AgentRef, @SkillSelectionJson, @ProfileSlug, @DueAt, @AttachmentsJson, @CommentIdsJson, @CreatedAt, @UpdatedAt)",
+            "INSERT INTO cards (id, bay_id, task_number, title, description, status_id, priority, size, assignee, source, order_key, current_primary_run_id, launch_config_json, agent_ref, skill_selection_json, profile_slug, due_at, attachments_json, comment_ids_json, created_at, updated_at) VALUES (@Id, @BayId, @TaskNumber, @Title, @Description, @StatusId, @Priority, @Size, @Assignee, @Source, @OrderKey, @CurrentPrimaryRunId, @LaunchConfigJson, @AgentRef, @SkillSelectionJson, @ProfileSlug, @DueAt, @AttachmentsJson, @CommentIdsJson, @CreatedAt, @UpdatedAt)",
             row);
     }
 
@@ -133,52 +133,52 @@ public sealed class CardRepository
     private static int DeleteInternal(SqliteConnection conn, string id)
         => conn.Execute("DELETE FROM cards WHERE id = @Id", new { Id = id });
 
-    public int CountByWorkspace(string workspaceId)
+    public int CountByBay(string bayId)
     {
         using var conn = _factory.Open();
-        return conn.ExecuteScalar<int>("SELECT count(*) FROM cards WHERE workspace_id = @WorkspaceId", new { WorkspaceId = workspaceId });
+        return conn.ExecuteScalar<int>("SELECT count(*) FROM cards WHERE bay_id = @BayId", new { BayId = bayId });
     }
 
-    public System.Threading.Tasks.Task<double> NextOrderKeyAsync(string workspaceId, string statusId)
+    public System.Threading.Tasks.Task<double> NextOrderKeyAsync(string bayId, string statusId)
     {
         if (_channel is null)
-            return System.Threading.Tasks.Task.FromResult(NextOrderKeySync(workspaceId, statusId));
-        return _channel.ExecuteAsync(conn => System.Threading.Tasks.Task.FromResult(NextOrderKeyInternal(conn, workspaceId, statusId)));
+            return System.Threading.Tasks.Task.FromResult(NextOrderKeySync(bayId, statusId));
+        return _channel.ExecuteAsync(conn => System.Threading.Tasks.Task.FromResult(NextOrderKeyInternal(conn, bayId, statusId)));
     }
 
-    private double NextOrderKeySync(string workspaceId, string statusId)
+    private double NextOrderKeySync(string bayId, string statusId)
     {
         using var conn = _factory.Open();
-        return NextOrderKeyInternal(conn, workspaceId, statusId);
+        return NextOrderKeyInternal(conn, bayId, statusId);
     }
 
-    private static double NextOrderKeyInternal(SqliteConnection conn, string workspaceId, string statusId)
+    private static double NextOrderKeyInternal(SqliteConnection conn, string bayId, string statusId)
     {
-        var min = conn.ExecuteScalar<double?>("SELECT MIN(order_key) FROM cards WHERE workspace_id = @WorkspaceId AND status_id = @StatusId", new { WorkspaceId = workspaceId, StatusId = statusId });
+        var min = conn.ExecuteScalar<double?>("SELECT MIN(order_key) FROM cards WHERE bay_id = @BayId AND status_id = @StatusId", new { BayId = bayId, StatusId = statusId });
         return min.HasValue ? min.Value - 1.0 : 0.0;
     }
 
-    public System.Threading.Tasks.Task MoveToPositionAsync(string workspaceId, string statusId, string cardId, string? beforeId)
+    public System.Threading.Tasks.Task MoveToPositionAsync(string bayId, string statusId, string cardId, string? beforeId)
     {
         if (_channel is null)
         {
-            MoveToPositionSync(workspaceId, statusId, cardId, beforeId);
+            MoveToPositionSync(bayId, statusId, cardId, beforeId);
             return System.Threading.Tasks.Task.CompletedTask;
         }
-        return _channel.ExecuteAsync(conn => { MoveToPositionInternal(conn, workspaceId, statusId, cardId, beforeId); return System.Threading.Tasks.Task.CompletedTask; });
+        return _channel.ExecuteAsync(conn => { MoveToPositionInternal(conn, bayId, statusId, cardId, beforeId); return System.Threading.Tasks.Task.CompletedTask; });
     }
 
-    private void MoveToPositionSync(string workspaceId, string statusId, string cardId, string? beforeId)
+    private void MoveToPositionSync(string bayId, string statusId, string cardId, string? beforeId)
     {
         using var conn = _factory.Open();
-        MoveToPositionInternal(conn, workspaceId, statusId, cardId, beforeId);
+        MoveToPositionInternal(conn, bayId, statusId, cardId, beforeId);
     }
 
-    private static void MoveToPositionInternal(SqliteConnection conn, string workspaceId, string statusId, string cardId, string? beforeId)
+    private static void MoveToPositionInternal(SqliteConnection conn, string bayId, string statusId, string cardId, string? beforeId)
     {
         var rows = conn.Query<CardOrderRow>(
-            "SELECT id AS Id, order_key AS OrderKey FROM cards WHERE workspace_id = @WorkspaceId AND status_id = @StatusId ORDER BY order_key",
-            new { WorkspaceId = workspaceId, StatusId = statusId }).AsList();
+            "SELECT id AS Id, order_key AS OrderKey FROM cards WHERE bay_id = @BayId AND status_id = @StatusId ORDER BY order_key",
+            new { BayId = bayId, StatusId = statusId }).AsList();
 
         var cardIdx = rows.FindIndex(r => r.Id == cardId);
         if (cardIdx < 0) return;

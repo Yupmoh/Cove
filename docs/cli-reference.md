@@ -50,7 +50,7 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/agent.list` | core |  |
 | `cove://commands/agent.message` | core |  |
 | `cove://commands/agent.replay` | core |  |
-| `cove://commands/agent.spawned-panes` | core |  |
+| `cove://commands/agent.spawned-nooks` | core |  |
 | `cove://commands/agent.stop` | core |  |
 | `cove://commands/attach.raw` | core | raw external-terminal attach (TM-79, runtime-owned) |
 | `cove://commands/attribution.find-by-line` | core |  |
@@ -92,7 +92,7 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/capture_native_screenshot` | core | mcp-bridge capture_native_screenshot (PL-30, render-bound) |
 | `cove://commands/collection.create` | core |  |
 | `cove://commands/collection.list` | core |  |
-| `cove://commands/collection.move-workspace` | core |  |
+| `cove://commands/collection.move-bay` | core |  |
 | `cove://commands/collection.remove` | core |  |
 | `cove://commands/collection.rename` | core |  |
 | `cove://commands/collection.switch` | core |  |
@@ -164,17 +164,17 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/omni-chat.append` | core |  |
 | `cove://commands/omni-chat.clear` | core |  |
 | `cove://commands/omni-chat.history` | core |  |
-| `cove://commands/pane-types.list` | core |  |
-| `cove://commands/pane.kill` | core |  |
-| `cove://commands/pane.list` | core |  |
-| `cove://commands/pane.read` | core |  |
-| `cove://commands/pane.rename` | core |  |
-| `cove://commands/pane.resize` | core |  |
-| `cove://commands/pane.scope.get` | core |  |
-| `cove://commands/pane.scope.set` | core |  |
-| `cove://commands/pane.search` | core |  |
-| `cove://commands/pane.spawn` | core |  |
-| `cove://commands/pane.write` | core |  |
+| `cove://commands/nook-types.list` | core |  |
+| `cove://commands/nook.kill` | core |  |
+| `cove://commands/nook.list` | core |  |
+| `cove://commands/nook.read` | core |  |
+| `cove://commands/nook.rename` | core |  |
+| `cove://commands/nook.resize` | core |  |
+| `cove://commands/nook.scope.get` | core |  |
+| `cove://commands/nook.scope.set` | core |  |
+| `cove://commands/nook.search` | core |  |
+| `cove://commands/nook.spawn` | core |  |
+| `cove://commands/nook.write` | core |  |
 | `cove://commands/perf.bundle.create` | core |  |
 | `cove://commands/perf.bundle.delete` | core |  |
 | `cove://commands/perf.bundle.list` | core |  |
@@ -197,13 +197,13 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/review.reopen` | core |  |
 | `cove://commands/review.resolve` | core |  |
 | `cove://commands/review.telemetry` | core |  |
-| `cove://commands/room.close` | core |  |
-| `cove://commands/room.create` | core |  |
-| `cove://commands/room.list` | core |  |
-| `cove://commands/room.move-to-wing` | core |  |
-| `cove://commands/room.pin` | core |  |
-| `cove://commands/room.rename` | core |  |
-| `cove://commands/room.switch` | core |  |
+| `cove://commands/shore.close` | core |  |
+| `cove://commands/shore.create` | core |  |
+| `cove://commands/shore.list` | core |  |
+| `cove://commands/shore.move-to-wing` | core |  |
+| `cove://commands/shore.pin` | core |  |
+| `cove://commands/shore.rename` | core |  |
+| `cove://commands/shore.switch` | core |  |
 | `cove://commands/run.cancel` | core |  |
 | `cove://commands/run.complete` | core |  |
 | `cove://commands/run.list` | core |  |
@@ -304,26 +304,26 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/wing.reorder` | core |  |
 | `cove://commands/wing.set-icon` | core |  |
 | `cove://commands/wing.switch` | core |  |
-| `cove://commands/workspace-command.clear` | core |  |
-| `cove://commands/workspace-command.create` | core |  |
-| `cove://commands/workspace-command.delete` | core |  |
-| `cove://commands/workspace-command.edit` | core |  |
-| `cove://commands/workspace-command.list` | core |  |
-| `cove://commands/workspace-command.logs` | core |  |
-| `cove://commands/workspace-command.restart` | core |  |
-| `cove://commands/workspace-command.start` | core |  |
-| `cove://commands/workspace-command.status` | core |  |
-| `cove://commands/workspace-command.stop` | core |  |
-| `cove://commands/workspace.create` | core |  |
-| `cove://commands/workspace.delete` | core |  |
-| `cove://commands/workspace.hide` | core |  |
-| `cove://commands/workspace.list` | core |  |
-| `cove://commands/workspace.move-room` | core |  |
-| `cove://commands/workspace.rename` | core |  |
-| `cove://commands/workspace.reorder` | core |  |
-| `cove://commands/workspace.set-accent` | core |  |
-| `cove://commands/workspace.set-icon` | core |  |
-| `cove://commands/workspace.switch` | core |  |
+| `cove://commands/bay-command.clear` | core |  |
+| `cove://commands/bay-command.create` | core |  |
+| `cove://commands/bay-command.delete` | core |  |
+| `cove://commands/bay-command.edit` | core |  |
+| `cove://commands/bay-command.list` | core |  |
+| `cove://commands/bay-command.logs` | core |  |
+| `cove://commands/bay-command.restart` | core |  |
+| `cove://commands/bay-command.start` | core |  |
+| `cove://commands/bay-command.status` | core |  |
+| `cove://commands/bay-command.stop` | core |  |
+| `cove://commands/bay.create` | core |  |
+| `cove://commands/bay.delete` | core |  |
+| `cove://commands/bay.hide` | core |  |
+| `cove://commands/bay.list` | core |  |
+| `cove://commands/bay.move-shore` | core |  |
+| `cove://commands/bay.rename` | core |  |
+| `cove://commands/bay.reorder` | core |  |
+| `cove://commands/bay.set-accent` | core |  |
+| `cove://commands/bay.set-icon` | core |  |
+| `cove://commands/bay.switch` | core |  |
 | `cove://commands/worktree.adopt` | core |  |
 | `cove://commands/worktree.create` | core |  |
 | `cove://commands/worktree.list` | core |  |
@@ -331,7 +331,7 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/worktree.prune` | core |  |
 | `cove://commands/worktree.remove` | core |  |
 | `cove://hooks/_state` | core |  |
-| `cove://hooks/pane-states` | core |  |
+| `cove://hooks/nook-states` | core |  |
 | `diagnostics export` | cli |  |
 | `diagnostics snapshot` | cli |  |
 | `diagnostics snapshots` | cli |  |
@@ -374,8 +374,8 @@ Generated from the command registry. Do not edit by hand.
 | `note search` | cli |  |
 | `note update` | cli |  |
 | `note write` | cli |  |
-| `pane list` | cli |  |
-| `pane-types list` | cli |  |
+| `nook list` | cli |  |
+| `nook-types list` | cli |  |
 | `perf bundle create` | cli |  |
 | `perf bundle delete` | cli |  |
 | `perf bundle list` | cli |  |

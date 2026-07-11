@@ -12,10 +12,10 @@ public static class RunCommands
         if (ctx.TaskService is not { } svc)
             return Task.FromResult(ctx.Fail("not_ready", "task store not available"));
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.RunListParams) is not { } p)
-            return Task.FromResult(ctx.Fail("invalid_params", "run list params required (taskId or workspaceId required)"));
-        if (p.TaskId is null && p.WorkspaceId is null)
-            return Task.FromResult(ctx.Fail("invalid_params", "either taskId or workspaceId is required"));
-        var runs = svc.ListRuns(p.TaskId, p.WorkspaceId, p.State).Select(ToInfo).ToList();
+            return Task.FromResult(ctx.Fail("invalid_params", "run list params required (taskId or bayId required)"));
+        if (p.TaskId is null && p.BayId is null)
+            return Task.FromResult(ctx.Fail("invalid_params", "either taskId or bayId is required"));
+        var runs = svc.ListRuns(p.TaskId, p.BayId, p.State).Select(ToInfo).ToList();
         return Task.FromResult(ctx.Ok(new RunListResult(runs), CoveJsonContext.Default.RunListResult));
     }
 
@@ -39,7 +39,7 @@ public static class RunCommands
             return Task.FromResult(ctx.Fail("not_ready", "task store not available"));
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.RunRefParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "run ref params required"));
-        var segments = svc.ListRunSegments(p.Id).Select(s => new RunSegmentInfo(s.Id, s.RunId, s.PaneId, s.AdapterSessionId, s.StartedAt, s.EndedAt)).ToList();
+        var segments = svc.ListRunSegments(p.Id).Select(s => new RunSegmentInfo(s.Id, s.RunId, s.NookId, s.AdapterSessionId, s.StartedAt, s.EndedAt)).ToList();
         return Task.FromResult(ctx.Ok(new RunSegmentListResult(segments), CoveJsonContext.Default.RunSegmentListResult));
     }
 
@@ -96,5 +96,5 @@ public static class RunCommands
     }
 
     private static RunInfo ToInfo(Cove.Tasks.Runs.RunRow row) =>
-        new(row.Id, row.CardId, row.WorkspaceId, row.RunFamilyId, row.State, row.Backgrounded, row.LaunchProfileJson, row.PendingPrompt, row.StartedAt, row.EndedAt, row.CreatedAt);
+        new(row.Id, row.CardId, row.BayId, row.RunFamilyId, row.State, row.Backgrounded, row.LaunchProfileJson, row.PendingPrompt, row.StartedAt, row.EndedAt, row.CreatedAt);
 }

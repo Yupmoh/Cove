@@ -32,13 +32,13 @@ public sealed class NoteMediaSaveTests
         await using var h = await DaemonTestHarness.StartAsync();
         await using FrameConnection ctl = await h.ConnectAsync("cli");
 
-        var createResp = await SendAsync(ctl, "c1", "cove://commands/note.create", P("""{"title":"Test","workspaceId":"ws1","source":"test","content":"","kind":"markdown"}"""), ct);
+        var createResp = await SendAsync(ctl, "c1", "cove://commands/note.create", P("""{"title":"Test","bayId":"ws1","source":"test","content":"","kind":"markdown"}"""), ct);
         var noteId = createResp.Data!.Value.GetProperty("id").GetString()!;
 
         var imageBytes = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A };
         var base64 = System.Convert.ToBase64String(imageBytes);
 
-        var mediaResp = await SendAsync(ctl, "m1", "cove://commands/note.media.save", P($"{{\"workspaceId\":\"ws1\",\"id\":\"{noteId}\",\"fileName\":\"test.png\",\"base64Data\":\"{base64}\"}}"), ct);
+        var mediaResp = await SendAsync(ctl, "m1", "cove://commands/note.media.save", P($"{{\"bayId\":\"ws1\",\"id\":\"{noteId}\",\"fileName\":\"test.png\",\"base64Data\":\"{base64}\"}}"), ct);
         Assert.True(mediaResp.Ok, mediaResp.Error?.Code);
         var mediaPath = mediaResp.Data!.Value.GetProperty("mediaPath").GetString()!;
         Assert.Contains(noteId, mediaPath);
@@ -60,11 +60,11 @@ public sealed class NoteMediaSaveTests
         await using var h = await DaemonTestHarness.StartAsync();
         await using FrameConnection ctl = await h.ConnectAsync("cli");
 
-        var createResp = await SendAsync(ctl, "c1", "cove://commands/note.create", P("""{"title":"Test","workspaceId":"ws1","source":"test","content":"","kind":"markdown"}"""), ct);
+        var createResp = await SendAsync(ctl, "c1", "cove://commands/note.create", P("""{"title":"Test","bayId":"ws1","source":"test","content":"","kind":"markdown"}"""), ct);
         var noteId = createResp.Data!.Value.GetProperty("id").GetString()!;
 
         var dataUrl = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB";
-        var mediaResp = await SendAsync(ctl, "m1", "cove://commands/note.media.save", P($"{{\"workspaceId\":\"ws1\",\"id\":\"{noteId}\",\"fileName\":\"test.png\",\"base64Data\":\"{dataUrl}\"}}"), ct);
+        var mediaResp = await SendAsync(ctl, "m1", "cove://commands/note.media.save", P($"{{\"bayId\":\"ws1\",\"id\":\"{noteId}\",\"fileName\":\"test.png\",\"base64Data\":\"{dataUrl}\"}}"), ct);
         Assert.False(mediaResp.Ok);
         Assert.Equal("invalid_data", mediaResp.Error!.Code);
     }
@@ -79,10 +79,10 @@ public sealed class NoteMediaSaveTests
         await using var h = await DaemonTestHarness.StartAsync();
         await using FrameConnection ctl = await h.ConnectAsync("cli");
 
-        var createResp = await SendAsync(ctl, "c1", "cove://commands/note.create", P("""{"title":"Test","workspaceId":"ws1","source":"test","content":"","kind":"markdown"}"""), ct);
+        var createResp = await SendAsync(ctl, "c1", "cove://commands/note.create", P("""{"title":"Test","bayId":"ws1","source":"test","content":"","kind":"markdown"}"""), ct);
         var noteId = createResp.Data!.Value.GetProperty("id").GetString()!;
 
-        var mediaResp = await SendAsync(ctl, "m1", "cove://commands/note.media.save", P($"{{\"workspaceId\":\"ws1\",\"id\":\"{noteId}\",\"fileName\":\"test.png\",\"base64Data\":\"!!!not-base64!!!\"}}"), ct);
+        var mediaResp = await SendAsync(ctl, "m1", "cove://commands/note.media.save", P($"{{\"bayId\":\"ws1\",\"id\":\"{noteId}\",\"fileName\":\"test.png\",\"base64Data\":\"!!!not-base64!!!\"}}"), ct);
         Assert.False(mediaResp.Ok);
         Assert.Equal("invalid_data", mediaResp.Error!.Code);
     }

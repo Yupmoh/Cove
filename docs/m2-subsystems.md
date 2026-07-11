@@ -1,14 +1,14 @@
-# M2 Workspace Model — Subsystem Docs
+# M2 Bay Model — Subsystem Docs
 
 ## Persistence tiers
 
 **Tier 1 — flat JSON, atomic, git-snapshotted** (`AtomicJsonStore`):
-- `state.json` — live app/session state (open/focused workspaces, geometry, clean-shutdown marker, auto-restore setting)
-- `workspaces/{id}/workspace.json` — per-workspace layout snapshot (rooms, mosaic trees, pane records)
-- `workspaces/{id}/panes/{paneId}/session.json` — per-pane session descriptor (command, args, cwd)
-- `workspaces/{id}/panes/{paneId}/scrollback.bin` — per-pane scrollback ring snapshot (15s heartbeat)
+- `state.json` — live app/session state (open/focused bays, geometry, clean-shutdown marker, auto-restore setting)
+- `bays/{id}/bay.json` — per-bay layout snapshot (shores, mosaic trees, nook records)
+- `bays/{id}/nooks/{nookId}/session.json` — per-nook session descriptor (command, args, cwd)
+- `bays/{id}/nooks/{nookId}/scrollback.bin` — per-nook scrollback ring snapshot (15s heartbeat)
 - `run-commands/{id}.json` — run-command definitions
-- `run-commands/{id}.json` — scoped to `COVE_WORKSPACE_ID`
+- `run-commands/{id}.json` — scoped to `COVE_BAY_ID`
 
 All Tier-1 writes go through `AtomicJsonStore.Write` (temp-file-then-rename, fsync, chmod 0600, .bak fallback) or `WriteBytes` for binary.
 
@@ -16,13 +16,13 @@ All Tier-1 writes go through `AtomicJsonStore.Write` (temp-file-then-rename, fsy
 
 ## Restart cases
 
-**Case A — client reconnect (GUI reload / TUI attach):** sessions never died (daemon kept them alive and losslessly draining). Client re-attaches over the control channel and replays each pane's ring buffer via `pane.subscribe` with `SinceOffset`. Zero session loss (WS-79).
+**Case A — client reconnect (GUI reload / TUI attach):** sessions never died (daemon kept them alive and losslessly draining). Client re-attaches over the control channel and replays each nook's ring buffer via `nook.subscribe` with `SinceOffset`. Zero session loss (WS-79).
 
 **Case B — daemon restart (reboot / crash / quit+reopen):** full restoration sequence (WS-69):
-1. `RestorationService.LoadState()` reads `state.json` for open/focused workspaces + geometry + clean-shutdown marker
-2. `WorkspacePersistence.Load()` loads each workspace's `workspace.json` + session descriptors
-3. Rebuilds mosaic trees per room
-4. Materializes panes type-specifically: terminal panes relaunch fresh via `RespawnAs` with prior scrollback replayed (WS-74); agent panes enter the resume machine (T14); non-adapter in-flight commands are NOT resurrected (WS-78)
+1. `RestorationService.LoadState()` reads `state.json` for open/focused bays + geometry + clean-shutdown marker
+2. `BayPersistence.Load()` loads each bay's `bay.json` + session descriptors
+3. Rebuilds mosaic trees per shore
+4. Materializes nooks type-specifically: terminal nooks relaunch fresh via `RespawnAs` with prior scrollback replayed (WS-74); agent nooks enter the resume machine (T14); non-adapter in-flight commands are NOT resurrected (WS-78)
 5. `RestoreProgressEvent` broadcast at each step (WS-70 launching screen)
 
 **Clean-shutdown marker:** `state.json` carries `cleanShutdown: true` on graceful exit (written by `RestorationService.MarkCleanShutdown()`), cleared at launch (`MarkLaunching()`). Absence → unclean → RestoreChooser (WS-71) unless `autoRestoreOnLaunch` (WS-72).
@@ -30,20 +30,20 @@ All Tier-1 writes go through `AtomicJsonStore.Write` (temp-file-then-rename, fsy
 ## Worktree lifecycle
 
 - `IGitRunner` (T10) wraps `git worktree add/remove/list --porcelain`
-- Create: `git worktree add` + bind child workspace (`isWorktree`, `parentWorkspaceId`, `worktreeBranch`, inherit `collectionId`)
+- Create: `git worktree add` + bind child bay (`isWorktree`, `parentBayId`, `worktreeBranch`, inherit `collectionId`)
 - Remove: `git worktree remove` + forget; active-worktree removal → parent focus (WS-46)
-- Orphans: on-disk worktrees unbound to any Cove workspace; rescan on window-focus (WS-40)
+- Orphans: on-disk worktrees unbound to any Cove bay; rescan on window-focus (WS-40)
 - Real-time watching (WS-43): debounced `FileSystemWatcher` on git common dir (root `HEAD`+`packed-refs` + recursive `refs/`+`worktrees/`, `.lock` filtered)
 - Path normalization: `PathRealpath.Normalize` resolves symlinks (macOS `/var`→`/private/var`) so bound paths match porcelain realpaths
 
 ## Run-commands
 
-- Definitions persist to `run-commands/{id}.json`, scoped to workspace
-- `RunCommandSession` wraps a daemon-owned kept-alive PTY (no pane binding) + ring buffer + lifecycle (`not-launched`/`running`/`stopped`)
+- Definitions persist to `run-commands/{id}.json`, scoped to bay
+- `RunCommandSession` wraps a daemon-owned kept-alive PTY (no nook binding) + ring buffer + lifecycle (`not-launched`/`running`/`stopped`)
 - Idempotent start (WS-51): already-running → report + exit 0, no double-start
 - Restart-in-place (WS-53): dead shell revives, scrollback preserved
 - Inheritance (WS-52): `list` shows own + parent worktree commands
-- Verbs: `workspace-command.create/edit/delete/list/status/start/stop/restart/logs/clear`
+- Verbs: `bay-command.create/edit/delete/list/status/start/stop/restart/logs/clear`
 
 ## Snapshot / Vault
 
@@ -57,12 +57,12 @@ All Tier-1 writes go through `AtomicJsonStore.Write` (temp-file-then-rename, fsy
 
 ## Control-plane verbs
 
-- `workspace.*` — create/switch/list/delete/hide/reorder/set-icon/set-accent/copy-id/move-room
-- `room.*` — create/switch/close/pin/rename/list/move-to-wing
-- `wing.*` — list/create/rename/remove/switch/move-room/reorder/set-icon
-- `collection.*` — list/create/rename/remove/switch/move-workspace
+- `bay.*` — create/switch/list/delete/hide/reorder/set-icon/set-accent/copy-id/move-shore
+- `shore.*` — create/switch/close/pin/rename/list/move-to-wing
+- `wing.*` — list/create/rename/remove/switch/move-shore/reorder/set-icon
+- `collection.*` — list/create/rename/remove/switch/move-bay
 - `worktree.*` — create/list/remove/forget/adopt/orphans/prune
-- `workspace-command.*` — create/edit/delete/list/status/start/stop/restart/logs/clear
+- `bay-command.*` — create/edit/delete/list/status/start/stop/restart/logs/clear
 - `restore.*` — chooser/confirm/undo
 - `snapshot.*` — take/list/restore/pin/prune
 - `state.*` — namespaced key-value bus get/set

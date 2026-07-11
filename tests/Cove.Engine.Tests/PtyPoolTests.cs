@@ -1,4 +1,4 @@
-using Cove.Engine.Panes;
+using Cove.Engine.Nooks;
 using Cove.Platform.Pty;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;

@@ -24,7 +24,7 @@ public sealed class ScheduleRouteTests
 
     private static async Task<string> CreateCardAsync(FrameConnection ctl, CancellationToken ct)
     {
-        var resp = await SendAsync(ctl, "c", "cove://commands/task.create", P("""{"title":"sched card","workspaceId":"ws1","source":"user:test"}"""), ct);
+        var resp = await SendAsync(ctl, "c", "cove://commands/task.create", P("""{"title":"sched card","bayId":"ws1","source":"user:test"}"""), ct);
         return resp.Data!.Value.GetProperty("id").GetString()!;
     }
 

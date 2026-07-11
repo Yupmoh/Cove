@@ -14,14 +14,14 @@ public sealed class HookEmitClient
         _port = port;
     }
 
-    public async Task<HookEmitResult> EmitAsync(string adapter, string eventName, string payload, string? paneId = null, CancellationToken ct = default)
+    public async Task<HookEmitResult> EmitAsync(string adapter, string eventName, string payload, string? nookId = null, CancellationToken ct = default)
     {
         try
         {
             using var msg = new HttpRequestMessage(HttpMethod.Post, $"http://127.0.0.1:{_port}/api/adapter/{adapter}/{eventName}");
             msg.Content = new StringContent(payload, Encoding.UTF8, "application/json");
-            if (paneId is not null)
-                msg.Headers.Add("X-Cove-Pane-Id", paneId);
+            if (nookId is not null)
+                msg.Headers.Add("X-Cove-Nook-Id", nookId);
 
             var resp = await HttpClient.SendAsync(msg, ct).ConfigureAwait(false);
             var body = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);

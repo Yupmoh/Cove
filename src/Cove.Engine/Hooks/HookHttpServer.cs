@@ -127,7 +127,7 @@ public sealed class HookHttpServer : IDisposable
 
         var adapter = segments[2];
         var eventName = segments[3];
-        var paneId = ctx.Request.Headers["X-Cove-Pane-Id"];
+        var nookId = ctx.Request.Headers["X-Cove-Nook-Id"];
 
         JsonElement? payload = null;
         if (ctx.Request.HasEntityBody && ctx.Request.ContentLength64 > 0)
@@ -152,15 +152,15 @@ public sealed class HookHttpServer : IDisposable
         {
             Adapter = adapter,
             Event = eventName,
-            PaneId = paneId,
+            NookId = nookId,
             Payload = payload,
         };
 
         try { OnEvent?.Invoke(hookEvent); }
         catch (Exception ex) { _logger?.HookHandlerFailed(adapter, eventName, ex.Message); }
 
-        if (paneId is not null)
-            ctx.Response.Headers["X-Cove-Pane-Id"] = paneId;
+        if (nookId is not null)
+            ctx.Response.Headers["X-Cove-Nook-Id"] = nookId;
 
         ctx.Response.StatusCode = 200;
         ctx.Response.ContentType = "application/json";
@@ -185,7 +185,7 @@ public sealed class HookHttpServer : IDisposable
     {
         var adapter = ctx.Request.Headers["X-Cove-Adapter"];
         var eventName = ctx.Request.Headers["X-Cove-Event"];
-        var paneId = ctx.Request.Headers["X-Cove-Pane-Id"];
+        var nookId = ctx.Request.Headers["X-Cove-Nook-Id"];
 
         if (Injector is null || adapter is null || eventName is null)
         {
@@ -215,14 +215,14 @@ public sealed class HookHttpServer : IDisposable
         }
         else if (Aggregator is not null)
         {
-            var ambient = Aggregator.Get(eventName, paneId) ?? Aggregator.Get("session", paneId);
+            var ambient = Aggregator.Get(eventName, nookId) ?? Aggregator.Get("session", nookId);
             if (ambient is { } amb)
                 context = amb;
         }
 
         var rendered = Injector.Render(adapter, eventName, context);
-        if (paneId is not null)
-            ctx.Response.Headers["X-Cove-Pane-Id"] = paneId;
+        if (nookId is not null)
+            ctx.Response.Headers["X-Cove-Nook-Id"] = nookId;
         ctx.Response.StatusCode = 200;
         ctx.Response.ContentType = "application/json";
         var bytes = System.Text.Encoding.UTF8.GetBytes(rendered);

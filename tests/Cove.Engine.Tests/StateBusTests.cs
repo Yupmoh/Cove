@@ -75,9 +75,9 @@ public sealed class StateBusTests
         try
         {
             var bus = new StateBus(dir);
-            foreach (var scope in new[] { "app", "workspace", "tab", "pane" })
+            foreach (var scope in new[] { "app", "bay", "tab", "nook" })
                 bus.Write(scope, "ns", "key", "val");
-            foreach (var scope in new[] { "app", "workspace", "tab", "pane" })
+            foreach (var scope in new[] { "app", "bay", "tab", "nook" })
             {
                 var (exists, value) = bus.Read(scope, "ns", "key");
                 Assert.True(exists);
@@ -91,9 +91,9 @@ public sealed class StateBusTests
     public void IsValidScope_RejectsBogus()
     {
         Assert.True(StateBus.IsValidScope("app"));
-        Assert.True(StateBus.IsValidScope("workspace"));
+        Assert.True(StateBus.IsValidScope("bay"));
         Assert.True(StateBus.IsValidScope("tab"));
-        Assert.True(StateBus.IsValidScope("pane"));
+        Assert.True(StateBus.IsValidScope("nook"));
         Assert.False(StateBus.IsValidScope("bogus"));
     }
 

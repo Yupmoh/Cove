@@ -16,7 +16,7 @@ public sealed class MosaicSerializationTests : IDisposable
     {
         _dir = Path.Combine(Path.GetTempPath(), "cove-mosaic-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(_dir);
-        _path = Path.Combine(_dir, "workspace.json");
+        _path = Path.Combine(_dir, "bay.json");
     }
 
     public void Dispose()
@@ -24,15 +24,15 @@ public sealed class MosaicSerializationTests : IDisposable
         try { if (Directory.Exists(_dir)) Directory.Delete(_dir, recursive: true); } catch { }
     }
 
-    private static WorkspaceSnapshot Sample() => new WorkspaceSnapshot
+    private static BaySnapshot Sample() => new BaySnapshot
     {
         Id = "w1",
         Name = "demo",
         ProjectDir = "/tmp/demo",
-        ActiveRoomId = "r1",
-        Rooms = new[]
+        ActiveShoreId = "r1",
+        Shores = new[]
         {
-            new RoomSnapshot
+            new ShoreSnapshot
             {
                 Id = "r1",
                 Name = "main",
@@ -40,13 +40,13 @@ public sealed class MosaicSerializationTests : IDisposable
                 {
                     Orientation = SplitOrientation.Row,
                     Ratio = 0.6,
-                    ChildA = new PaneLeaf
+                    ChildA = new NookLeaf
                     {
-                        PaneId = "p1",
+                        NookId = "p1",
                         Subtabs = new[]
                         {
-                            new Subtab("d1", PaneType.Terminal, "zsh"),
-                            new Subtab("d2", PaneType.Terminal),
+                            new Subtab("d1", NookType.Terminal, "zsh"),
+                            new Subtab("d2", NookType.Terminal),
                         },
                         ActiveSubtab = 1,
                     },
@@ -54,15 +54,15 @@ public sealed class MosaicSerializationTests : IDisposable
                     {
                         Orientation = SplitOrientation.Column,
                         Ratio = 0.4,
-                        ChildA = new PaneLeaf
+                        ChildA = new NookLeaf
                         {
-                            PaneId = "p2",
-                            Subtabs = new[] { new Subtab("d3", PaneType.Terminal) },
+                            NookId = "p2",
+                            Subtabs = new[] { new Subtab("d3", NookType.Terminal) },
                         },
-                        ChildB = new PaneLeaf
+                        ChildB = new NookLeaf
                         {
-                            PaneId = "p3",
-                            Subtabs = new[] { new Subtab("d4", PaneType.Empty) },
+                            NookId = "p3",
+                            Subtabs = new[] { new Subtab("d4", NookType.Empty) },
                         },
                     },
                 },
@@ -74,22 +74,22 @@ public sealed class MosaicSerializationTests : IDisposable
     public void RoundTrip_NestedTree_IsByteIdentical()
     {
         var ws = Sample();
-        AtomicJsonStore.Write(_path, ws, CoveJsonContext.Default.WorkspaceSnapshot);
-        var read = AtomicJsonStore.Read<WorkspaceSnapshot>(_path, CoveJsonContext.Default.WorkspaceSnapshot, NullLogger.Instance);
+        AtomicJsonStore.Write(_path, ws, CoveJsonContext.Default.BaySnapshot);
+        var read = AtomicJsonStore.Read<BaySnapshot>(_path, CoveJsonContext.Default.BaySnapshot, NullLogger.Instance);
 
         Assert.NotNull(read);
-        var originalJson = JsonSerializer.Serialize(ws, CoveJsonContext.Default.WorkspaceSnapshot);
-        var roundTrippedJson = JsonSerializer.Serialize(read, CoveJsonContext.Default.WorkspaceSnapshot);
+        var originalJson = JsonSerializer.Serialize(ws, CoveJsonContext.Default.BaySnapshot);
+        var roundTrippedJson = JsonSerializer.Serialize(read, CoveJsonContext.Default.BaySnapshot);
         Assert.Equal(originalJson, roundTrippedJson);
     }
 
     [Fact]
     public void LegacyVanilla_NormalizesToTerminal()
     {
-        var json = "{\"documentId\":\"d1\",\"paneType\":\"vanilla\"}";
+        var json = "{\"documentId\":\"d1\",\"nookType\":\"vanilla\"}";
         var subtab = JsonSerializer.Deserialize(json, CoveJsonContext.Default.Subtab);
 
         Assert.NotNull(subtab);
-        Assert.Equal(PaneType.Terminal, subtab!.PaneType);
+        Assert.Equal(NookType.Terminal, subtab!.NookType);
     }
 }

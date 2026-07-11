@@ -25,8 +25,8 @@ public sealed class AtomicJsonStoreTests : IDisposable
 
     private static CoveState SampleA() => new CoveState
     {
-        FocusedWorkspace = "0192f0a0-7b2c-7e10-9a3b-2b7c4d5e6f70",
-        OpenWorkspaces = new[] { "0192f0a0-7b2c-7e10-9a3b-2b7c4d5e6f70" },
+        FocusedBay = "0192f0a0-7b2c-7e10-9a3b-2b7c4d5e6f70",
+        OpenBays = new[] { "0192f0a0-7b2c-7e10-9a3b-2b7c4d5e6f70" },
         WindowGeometry = new WindowGeometry(120, 80, 1440, 900),
     };
 
@@ -38,8 +38,8 @@ public sealed class AtomicJsonStoreTests : IDisposable
         var read = AtomicJsonStore.Read(_path, CoveJsonContext.Default.CoveState, NullLogger.Instance);
         Assert.NotNull(read);
         Assert.Equal(state.SchemaVersion, read!.SchemaVersion);
-        Assert.Equal(state.FocusedWorkspace, read.FocusedWorkspace);
-        Assert.Equal(state.OpenWorkspaces, read.OpenWorkspaces);
+        Assert.Equal(state.FocusedBay, read.FocusedBay);
+        Assert.Equal(state.OpenBays, read.OpenBays);
         Assert.Equal(state.WindowGeometry, read.WindowGeometry);
     }
 
@@ -55,7 +55,7 @@ public sealed class AtomicJsonStoreTests : IDisposable
     {
         AtomicJsonStore.Write(_path, SampleA(), CoveJsonContext.Default.CoveState);
         Assert.False(File.Exists(_path + ".bak"));
-        AtomicJsonStore.Write(_path, SampleA() with { FocusedWorkspace = "second" }, CoveJsonContext.Default.CoveState);
+        AtomicJsonStore.Write(_path, SampleA() with { FocusedBay = "second" }, CoveJsonContext.Default.CoveState);
         Assert.True(File.Exists(_path + ".bak"));
     }
 
@@ -63,11 +63,11 @@ public sealed class AtomicJsonStoreTests : IDisposable
     public void Read_CorruptMainFile_FallsBackToBak()
     {
         AtomicJsonStore.Write(_path, SampleA(), CoveJsonContext.Default.CoveState);
-        AtomicJsonStore.Write(_path, SampleA() with { FocusedWorkspace = "newer" }, CoveJsonContext.Default.CoveState);
+        AtomicJsonStore.Write(_path, SampleA() with { FocusedBay = "newer" }, CoveJsonContext.Default.CoveState);
         File.WriteAllText(_path, "{ not valid json ");
         var read = AtomicJsonStore.Read(_path, CoveJsonContext.Default.CoveState, NullLogger.Instance);
         Assert.NotNull(read);
-        Assert.Equal("0192f0a0-7b2c-7e10-9a3b-2b7c4d5e6f70", read!.FocusedWorkspace);
+        Assert.Equal("0192f0a0-7b2c-7e10-9a3b-2b7c4d5e6f70", read!.FocusedBay);
     }
 
     [Fact]

@@ -260,17 +260,17 @@ describe("introspection payloads and helpers", () => {
 
 describe("buildAutomationJs dispatch", () => {
   it("routes each new verb to its payload builder", () => {
-    expect(buildAutomationJs({ requestId: "r", paneId: "p", kind: "clear", ref: "e1" })).toContain("data-cove-ref");
-    expect(buildAutomationJs({ requestId: "r", paneId: "p", kind: "type", ref: "e1", value: "hi" })).toContain(JSON.stringify("hi"));
-    expect(buildAutomationJs({ requestId: "r", paneId: "p", kind: "press", ref: "e1", value: "Enter" })).toContain("KeyboardEvent");
-    expect(buildAutomationJs({ requestId: "r", paneId: "p", kind: "select", ref: "e1", value: "o" })).toContain("no matching option");
-    expect(buildAutomationJs({ requestId: "r", paneId: "p", kind: "scroll", value: JSON.stringify({ x: 0, y: 12 }) })).toContain("12");
-    expect(buildAutomationJs({ requestId: "r", paneId: "p", kind: "wait", ref: "e1", value: JSON.stringify({ timeoutMs: 1000 }) })).toContain("1000");
-    expect(buildAutomationJs({ requestId: "r", paneId: "p", kind: "get", ref: "e1", value: "text" })).toContain("data-cove-ref");
-    expect(buildAutomationJs({ requestId: "r", paneId: "p", kind: "is", ref: "e1", value: "visible" })).toContain("data-cove-ref");
+    expect(buildAutomationJs({ requestId: "r", nookId: "p", kind: "clear", ref: "e1" })).toContain("data-cove-ref");
+    expect(buildAutomationJs({ requestId: "r", nookId: "p", kind: "type", ref: "e1", value: "hi" })).toContain(JSON.stringify("hi"));
+    expect(buildAutomationJs({ requestId: "r", nookId: "p", kind: "press", ref: "e1", value: "Enter" })).toContain("KeyboardEvent");
+    expect(buildAutomationJs({ requestId: "r", nookId: "p", kind: "select", ref: "e1", value: "o" })).toContain("no matching option");
+    expect(buildAutomationJs({ requestId: "r", nookId: "p", kind: "scroll", value: JSON.stringify({ x: 0, y: 12 }) })).toContain("12");
+    expect(buildAutomationJs({ requestId: "r", nookId: "p", kind: "wait", ref: "e1", value: JSON.stringify({ timeoutMs: 1000 }) })).toContain("1000");
+    expect(buildAutomationJs({ requestId: "r", nookId: "p", kind: "get", ref: "e1", value: "text" })).toContain("data-cove-ref");
+    expect(buildAutomationJs({ requestId: "r", nookId: "p", kind: "is", ref: "e1", value: "visible" })).toContain("data-cove-ref");
   });
 
   it("throws on an unknown verb", () => {
-    expect(() => buildAutomationJs({ requestId: "r", paneId: "p", kind: "teleport" })).toThrow(/unknown automation kind/);
+    expect(() => buildAutomationJs({ requestId: "r", nookId: "p", kind: "teleport" })).toThrow(/unknown automation kind/);
   });
 });

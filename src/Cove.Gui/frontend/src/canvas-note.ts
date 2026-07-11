@@ -68,19 +68,19 @@ const COMPONENT_CATALOG: Record<string, string[]> = {
 };
 
 let currentNoteId: string | null = null;
-let currentWorkspaceId: string | null = null;
+let currentBayId: string | null = null;
 let canvasState: CanvasState = { root: { elements: [] }, state: {} };
 
-export async function renderCanvasNote(workspaceId: string, noteId: string): Promise<HTMLElement> {
+export async function renderCanvasNote(bayId: string, noteId: string): Promise<HTMLElement> {
   const el = document.createElement("div");
   el.className = "canvas-note-editor";
   el.style.cssText = "display:flex;flex-direction:column;height:100%;background:#0b1622;color:#e5e9f0;font-family:system-ui,sans-serif;";
 
   currentNoteId = noteId;
-  currentWorkspaceId = workspaceId;
+  currentBayId = bayId;
 
   try {
-    const result = await invoke<NoteReadResult>("cove://commands/note.read", { workspaceId, id: noteId });
+    const result = await invoke<NoteReadResult>("cove://commands/note.read", { bayId, id: noteId });
     try {
       canvasState = JSON.parse(result.content) as CanvasState;
     } catch {
@@ -398,7 +398,7 @@ async function dispatchAction(el: CanvasElement): Promise<void> {
     try {
       await invoke("cove://commands/canvas.action", {
         action: "send_to_agent",
-        targetPane: target,
+        targetNook: target,
         actionId,
         payload,
         state: canvasState.state,
@@ -483,10 +483,10 @@ function rerender(): void {
 }
 
 async function saveCanvas(): Promise<void> {
-  if (!currentWorkspaceId || !currentNoteId) return;
+  if (!currentBayId || !currentNoteId) return;
   try {
     await invoke("cove://commands/note.write", {
-      workspaceId: currentWorkspaceId,
+      bayId: currentBayId,
       id: currentNoteId,
       content: JSON.stringify(canvasState, null, 2),
     });

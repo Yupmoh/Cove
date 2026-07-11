@@ -26,41 +26,41 @@ describe("mapAgentState", () => {
 });
 
 describe("agentDisplayName", () => {
-  it("prefers name, then adapter, then a shortened pane id", () => {
-    expect(agentDisplayName({ paneId: "p", adapter: "claude", name: "Reviewer", status: "idle" })).toBe("Reviewer");
-    expect(agentDisplayName({ paneId: "p", adapter: "claude", name: "", status: "idle" })).toBe("claude");
-    expect(agentDisplayName({ paneId: "pane-1234567890", adapter: "", name: null, status: "idle" })).toBe("pane-123…");
+  it("prefers name, then adapter, then a shortened nook id", () => {
+    expect(agentDisplayName({ nookId: "p", adapter: "claude", name: "Reviewer", status: "idle" })).toBe("Reviewer");
+    expect(agentDisplayName({ nookId: "p", adapter: "claude", name: "", status: "idle" })).toBe("claude");
+    expect(agentDisplayName({ nookId: "nook-1234567890", adapter: "", name: null, status: "idle" })).toBe("nook-123…");
   });
 });
 
 describe("buildAgentRows", () => {
   const cards: AgentCard[] = [
-    { paneId: "a", adapter: "claude", name: "Zeta", status: "working" },
-    { paneId: "b", adapter: "codex", name: "Alpha", status: "idle" },
-    { paneId: "c", adapter: "gemini", name: "Beta", status: "stopped" },
+    { nookId: "a", adapter: "claude", name: "Zeta", status: "working" },
+    { nookId: "b", adapter: "codex", name: "Alpha", status: "idle" },
+    { nookId: "c", adapter: "gemini", name: "Beta", status: "stopped" },
   ];
 
   it("maps activity cards to rows sorted by state then name", () => {
     const rows = buildAgentRows(cards, new Set());
-    expect(rows.map((r) => r.paneId)).toEqual(["a", "b", "c"]);
+    expect(rows.map((r) => r.nookId)).toEqual(["a", "b", "c"]);
     expect(rows.map((r) => r.state)).toEqual(["running", "idle", "done"]);
   });
 
-  it("forces needs-input state for panes with a live blocked signal", () => {
+  it("forces needs-input state for nooks with a live blocked signal", () => {
     const rows = buildAgentRows(cards, new Set(["b"]));
-    const b = rows.find((r) => r.paneId === "b")!;
+    const b = rows.find((r) => r.nookId === "b")!;
     expect(b.state).toBe("needs-input");
-    expect(rows[0].paneId).toBe("b");
+    expect(rows[0].nookId).toBe("b");
   });
 });
 
 describe("sortAgentRows", () => {
   it("orders needs-input first, then running, idle, done", () => {
     const rows: AgentRow[] = [
-      { paneId: "1", name: "d", adapter: "", state: "done", rawStatus: "stopped" },
-      { paneId: "2", name: "i", adapter: "", state: "idle", rawStatus: "idle" },
-      { paneId: "3", name: "n", adapter: "", state: "needs-input", rawStatus: "waitingforinput" },
-      { paneId: "4", name: "r", adapter: "", state: "running", rawStatus: "working" },
+      { nookId: "1", name: "d", adapter: "", state: "done", rawStatus: "stopped" },
+      { nookId: "2", name: "i", adapter: "", state: "idle", rawStatus: "idle" },
+      { nookId: "3", name: "n", adapter: "", state: "needs-input", rawStatus: "waitingforinput" },
+      { nookId: "4", name: "r", adapter: "", state: "running", rawStatus: "working" },
     ];
     expect(sortAgentRows(rows).map((r) => r.state)).toEqual(["needs-input", "running", "idle", "done"]);
   });
@@ -70,9 +70,9 @@ describe("counts", () => {
   it("tallies states and the blocked total", () => {
     const rows = buildAgentRows(
       [
-        { paneId: "a", adapter: "x", name: "A", status: "working" },
-        { paneId: "b", adapter: "x", name: "B", status: "waitingforinput" },
-        { paneId: "c", adapter: "x", name: "C", status: "waitingforinput" },
+        { nookId: "a", adapter: "x", name: "A", status: "working" },
+        { nookId: "b", adapter: "x", name: "B", status: "waitingforinput" },
+        { nookId: "c", adapter: "x", name: "C", status: "waitingforinput" },
       ],
       new Set(),
     );

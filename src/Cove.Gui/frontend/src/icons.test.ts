@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ICONS, iconSvg, iconForPaneType, monogram } from "./icons";
+import { ICONS, iconSvg, iconForNookType, monogram } from "./icons";
 
 describe("iconSvg", () => {
   it("returns inline svg markup for known names", () => {
@@ -14,12 +14,12 @@ describe("iconSvg", () => {
   });
 });
 
-describe("iconForPaneType", () => {
-  it("maps engine pane type names including sourceControl", () => {
-    expect(iconForPaneType("sourceControl")).toBe(ICONS.git);
-    expect(iconForPaneType("git")).toBe(ICONS.git);
-    expect(iconForPaneType("tasks-list")).toBe(ICONS.tasks);
-    expect(iconForPaneType("unknown-pane")).toBe(ICONS.terminal);
+describe("iconForNookType", () => {
+  it("maps engine nook type names including sourceControl", () => {
+    expect(iconForNookType("sourceControl")).toBe(ICONS.git);
+    expect(iconForNookType("git")).toBe(ICONS.git);
+    expect(iconForNookType("tasks-list")).toBe(ICONS.tasks);
+    expect(iconForNookType("unknown-nook")).toBe(ICONS.terminal);
   });
 });
 

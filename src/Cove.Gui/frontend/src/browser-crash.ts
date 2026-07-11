@@ -1,4 +1,4 @@
-export type PaneLifecycle = "live" | "crashed";
+export type NookLifecycle = "live" | "crashed";
 
 export function crashReasonText(reason: string | null | undefined): string {
   const trimmed = (reason ?? "").trim();
@@ -6,11 +6,11 @@ export function crashReasonText(reason: string | null | undefined): string {
   return `The page process was terminated (${trimmed}).`;
 }
 
-export class PaneCrashState {
-  private state: PaneLifecycle = "live";
+export class NookCrashState {
+  private state: NookLifecycle = "live";
   private lastReason: string | null = null;
 
-  get lifecycle(): PaneLifecycle {
+  get lifecycle(): NookLifecycle {
     return this.state;
   }
 

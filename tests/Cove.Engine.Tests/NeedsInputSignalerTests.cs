@@ -16,16 +16,16 @@ public sealed class NeedsInputSignalerTests
         public int SignalsCleared { get; private set; }
         public int Delivered { get; private set; }
         public string? LastDeliveredId { get; private set; }
-        public string? LastDeliveredPaneId { get; private set; }
-        public void BroadcastNeedsInputSignal(string paneId, string adapter) => SignalsSent++;
-        public void BroadcastDockBadge(string paneId, string adapter) => BadgesSent++;
-        public void ClearNeedsInputSignal(string paneId) => SignalsCleared++;
+        public string? LastDeliveredNookId { get; private set; }
+        public void BroadcastNeedsInputSignal(string nookId, string adapter) => SignalsSent++;
+        public void BroadcastDockBadge(string nookId, string adapter) => BadgesSent++;
+        public void ClearNeedsInputSignal(string nookId) => SignalsCleared++;
         public void ClearDockBadge() => BadgesCleared++;
-        public void DeliverNotification(string id, string title, string body, string paneId)
+        public void DeliverNotification(string id, string title, string body, string nookId)
         {
             Delivered++;
             LastDeliveredId = id;
-            LastDeliveredPaneId = paneId;
+            LastDeliveredNookId = nookId;
         }
     }
 
@@ -42,40 +42,40 @@ public sealed class NeedsInputSignalerTests
         return new ActivityAggregate(router, agentRouter);
     }
 
-    private static HookEvent Ev(string paneId, string adapter, string evt) => new()
+    private static HookEvent Ev(string nookId, string adapter, string evt) => new()
     {
-        PaneId = paneId,
+        NookId = nookId,
         Adapter = adapter,
         Event = evt,
     };
 
     [Fact]
-    public void Signal_FiresOnNeedsInputTransition_WhenPaneNotFocused()
+    public void Signal_FiresOnNeedsInputTransition_WhenNookNotFocused()
     {
         var router = new HookEventRouter();
         var aggregate = NewAggregate(router);
         var bus = new CapturingBus();
         var signaler = new NeedsInputSignaler(aggregate, bus, () => null);
 
-        router.Route(Ev("pane-1", "claude-code", "session-start"));
-        router.Route(Ev("pane-1", "claude-code", "stop"));
-        signaler.CheckAndSignal("pane-1");
+        router.Route(Ev("nook-1", "claude-code", "session-start"));
+        router.Route(Ev("nook-1", "claude-code", "stop"));
+        signaler.CheckAndSignal("nook-1");
 
         Assert.Equal(1, bus.SignalsSent);
         Assert.Equal(1, bus.BadgesSent);
     }
 
     [Fact]
-    public void Signal_QuietWhenPaneFocused()
+    public void Signal_QuietWhenNookFocused()
     {
         var router = new HookEventRouter();
         var aggregate = NewAggregate(router);
         var bus = new CapturingBus();
-        var signaler = new NeedsInputSignaler(aggregate, bus, () => "pane-1");
+        var signaler = new NeedsInputSignaler(aggregate, bus, () => "nook-1");
 
-        router.Route(Ev("pane-1", "claude-code", "session-start"));
-        router.Route(Ev("pane-1", "claude-code", "stop"));
-        signaler.CheckAndSignal("pane-1");
+        router.Route(Ev("nook-1", "claude-code", "session-start"));
+        router.Route(Ev("nook-1", "claude-code", "stop"));
+        signaler.CheckAndSignal("nook-1");
 
         Assert.Equal(0, bus.SignalsSent);
     }
@@ -88,10 +88,10 @@ public sealed class NeedsInputSignalerTests
         var bus = new CapturingBus();
         var signaler = new NeedsInputSignaler(aggregate, bus, () => null);
 
-        router.Route(Ev("pane-1", "claude-code", "session-start"));
-        router.Route(Ev("pane-1", "claude-code", "stop"));
-        signaler.CheckAndSignal("pane-1");
-        signaler.CheckAndSignal("pane-1");
+        router.Route(Ev("nook-1", "claude-code", "session-start"));
+        router.Route(Ev("nook-1", "claude-code", "stop"));
+        signaler.CheckAndSignal("nook-1");
+        signaler.CheckAndSignal("nook-1");
 
         Assert.Equal(1, bus.SignalsSent);
     }
@@ -104,22 +104,22 @@ public sealed class NeedsInputSignalerTests
         var bus = new CapturingBus();
         var signaler = new NeedsInputSignaler(aggregate, bus, () => null);
 
-        router.Route(Ev("pane-1", "claude-code", "session-start"));
-        router.Route(Ev("pane-1", "claude-code", "stop"));
-        signaler.CheckAndSignal("pane-1");
+        router.Route(Ev("nook-1", "claude-code", "session-start"));
+        router.Route(Ev("nook-1", "claude-code", "stop"));
+        signaler.CheckAndSignal("nook-1");
 
-        router.Route(Ev("pane-1", "claude-code", "user-prompt-submit"));
-        signaler.ClearSignal("pane-1");
+        router.Route(Ev("nook-1", "claude-code", "user-prompt-submit"));
+        signaler.ClearSignal("nook-1");
         Assert.Equal(1, bus.BadgesCleared);
 
-        router.Route(Ev("pane-1", "claude-code", "stop"));
-        signaler.CheckAndSignal("pane-1");
+        router.Route(Ev("nook-1", "claude-code", "stop"));
+        signaler.CheckAndSignal("nook-1");
 
         Assert.Equal(2, bus.SignalsSent);
     }
 
     [Fact]
-    public void Deliver_FiresOsNotification_WhenPolicyAllows_CorrelatingWithPaneId()
+    public void Deliver_FiresOsNotification_WhenPolicyAllows_CorrelatingWithNookId()
     {
         var router = new HookEventRouter();
         var aggregate = NewAggregate(router);
@@ -127,13 +127,13 @@ public sealed class NeedsInputSignalerTests
         var policy = NewPolicy();
         var signaler = new NeedsInputSignaler(aggregate, bus, () => null, policy);
 
-        router.Route(Ev("pane-1", "claude-code", "session-start"));
-        router.Route(Ev("pane-1", "claude-code", "stop"));
-        signaler.CheckAndSignal("pane-1");
+        router.Route(Ev("nook-1", "claude-code", "session-start"));
+        router.Route(Ev("nook-1", "claude-code", "stop"));
+        signaler.CheckAndSignal("nook-1");
 
         Assert.Equal(1, bus.Delivered);
-        Assert.Equal("pane-1", bus.LastDeliveredId);
-        Assert.Equal("pane-1", bus.LastDeliveredPaneId);
+        Assert.Equal("nook-1", bus.LastDeliveredId);
+        Assert.Equal("nook-1", bus.LastDeliveredNookId);
     }
 
     [Fact]
@@ -146,9 +146,9 @@ public sealed class NeedsInputSignalerTests
         policy.SetTierEnabled(NotificationTier.OsNotification, false);
         var signaler = new NeedsInputSignaler(aggregate, bus, () => null, policy);
 
-        router.Route(Ev("pane-1", "claude-code", "session-start"));
-        router.Route(Ev("pane-1", "claude-code", "stop"));
-        signaler.CheckAndSignal("pane-1");
+        router.Route(Ev("nook-1", "claude-code", "session-start"));
+        router.Route(Ev("nook-1", "claude-code", "stop"));
+        signaler.CheckAndSignal("nook-1");
 
         Assert.Equal(1, bus.BadgesSent);
         Assert.Equal(0, bus.Delivered);
@@ -162,9 +162,9 @@ public sealed class NeedsInputSignalerTests
         var bus = new CapturingBus();
         var signaler = new NeedsInputSignaler(aggregate, bus, () => null);
 
-        router.Route(Ev("pane-1", "claude-code", "session-start"));
-        router.Route(Ev("pane-1", "claude-code", "stop"));
-        signaler.CheckAndSignal("pane-1");
+        router.Route(Ev("nook-1", "claude-code", "session-start"));
+        router.Route(Ev("nook-1", "claude-code", "stop"));
+        signaler.CheckAndSignal("nook-1");
 
         Assert.Equal(0, bus.Delivered);
     }

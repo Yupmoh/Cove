@@ -21,7 +21,7 @@ public sealed class SessionResumeOrchestratorTests
     }
 
     [Fact]
-    public void Dismiss_UnknownPane_LogsAndReturns()
+    public void Dismiss_UnknownNook_LogsAndReturns()
     {
         var orch = new SessionResumeOrchestrator();
         orch.Dismiss("nonexistent");
@@ -29,7 +29,7 @@ public sealed class SessionResumeOrchestratorTests
     }
 
     [Fact]
-    public void Background_DetachesFromRoom_KeepsPtyAlive()
+    public void Background_DetachesFromShore_KeepsPtyAlive()
     {
         var orch = new SessionResumeOrchestrator();
         orch.Register("p1", "claude-code", "session-abc");
@@ -42,7 +42,7 @@ public sealed class SessionResumeOrchestratorTests
     }
 
     [Fact]
-    public void Foreground_AttachesToRoom()
+    public void Foreground_AttachesToShore()
     {
         var orch = new SessionResumeOrchestrator();
         orch.Register("p1", "claude-code", "session-abc");
@@ -148,6 +148,6 @@ public sealed class SessionResumeOrchestratorTests
 
         var background = orch.ListBackground();
         Assert.Single(background);
-        Assert.Equal("p1", background.First().PaneId);
+        Assert.Equal("p1", background.First().NookId);
     }
 }

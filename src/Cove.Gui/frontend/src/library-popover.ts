@@ -2,9 +2,9 @@ import { invoke } from "./invoke";
 
 interface LibraryEntry {
   id: string;
-  workspaceId: string;
-  paneId: string;
-  paneType: string;
+  bayId: string;
+  nookId: string;
+  nookType: string;
   title: string | null;
   stateJson: string | null;
   scrollback: string | null;
@@ -14,7 +14,7 @@ interface LibraryEntry {
 
 interface LibraryListResult { entries: LibraryEntry[] }
 
-export async function renderLibraryPopover(workspaceId: string): Promise<HTMLElement> {
+export async function renderLibraryPopover(bayId: string): Promise<HTMLElement> {
   const el = document.createElement("div");
   el.className = "library-popover";
   el.style.cssText = "display:flex;flex-direction:column;height:100%;background:#0b1622;color:#e5e9f0;font-family:system-ui,sans-serif;";
@@ -55,7 +55,7 @@ export async function renderLibraryPopover(workspaceId: string): Promise<HTMLEle
 
   const refresh = async () => {
     try {
-      const result = await invoke<LibraryListResult>("cove://commands/library.list", { workspaceId, kind: currentKind });
+      const result = await invoke<LibraryListResult>("cove://commands/library.list", { bayId, kind: currentKind });
       allEntries = result.entries || [];
       renderList();
     } catch (e) {
@@ -71,7 +71,7 @@ export async function renderLibraryPopover(workspaceId: string): Promise<HTMLEle
       filtered = allEntries
         .map(e => ({
           entry: e,
-          score: fuzzyScore(e.title?.toLowerCase() || "", e.paneType.toLowerCase(), query, e.workspaceId === workspaceId),
+          score: fuzzyScore(e.title?.toLowerCase() || "", e.nookType.toLowerCase(), query, e.bayId === bayId),
         }))
         .filter(x => x.score > 0)
         .sort((a, b) => b.score - a.score)
@@ -87,7 +87,7 @@ export async function renderLibraryPopover(workspaceId: string): Promise<HTMLEle
     }
 
     for (const entry of filtered) {
-      list.appendChild(buildEntryRow(entry, workspaceId));
+      list.appendChild(buildEntryRow(entry, bayId));
     }
   };
 
@@ -115,7 +115,7 @@ export async function renderLibraryPopover(workspaceId: string): Promise<HTMLEle
   return el;
 }
 
-function buildEntryRow(entry: LibraryEntry, workspaceId: string): HTMLElement {
+function buildEntryRow(entry: LibraryEntry, bayId: string): HTMLElement {
   const row = document.createElement("div");
   row.style.cssText = "padding:8px 12px;border-bottom:1px solid #14202e;cursor:pointer;display:flex;gap:8px;align-items:center;";
   row.addEventListener("mouseenter", () => row.style.background = "#14202e");
@@ -123,7 +123,7 @@ function buildEntryRow(entry: LibraryEntry, workspaceId: string): HTMLElement {
 
   const icon = document.createElement("span");
   icon.style.cssText = "font-size:16px;";
-  icon.textContent = entry.paneType === "terminal" ? "💻" : entry.paneType === "browser" ? "🌐" : "📄";
+  icon.textContent = entry.nookType === "terminal" ? "💻" : entry.nookType === "browser" ? "🌐" : "📄";
   row.appendChild(icon);
 
   const info = document.createElement("div");
@@ -131,14 +131,14 @@ function buildEntryRow(entry: LibraryEntry, workspaceId: string): HTMLElement {
 
   const title = document.createElement("div");
   title.style.cssText = "font-size:13px;color:#e5e9f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;";
-  title.textContent = entry.title || entry.paneType;
+  title.textContent = entry.title || entry.nookType;
   info.appendChild(title);
 
   const meta = document.createElement("div");
   meta.style.cssText = "font-size:11px;color:#6b7d8f;";
   const date = new Date(entry.capturedAt);
-  meta.textContent = `${entry.paneType} · ${date.toLocaleDateString()}`;
-  if (entry.workspaceId === workspaceId) {
+  meta.textContent = `${entry.nookType} · ${date.toLocaleDateString()}`;
+  if (entry.bayId === bayId) {
     meta.textContent += " · active";
   }
   info.appendChild(meta);
@@ -146,7 +146,7 @@ function buildEntryRow(entry: LibraryEntry, workspaceId: string): HTMLElement {
   row.appendChild(info);
 
   row.addEventListener("click", () => {
-    invoke("cove://commands/library.materialize", { workspaceId, entryId: entry.id }).catch(e => {
+    invoke("cove://commands/library.materialize", { bayId, entryId: entry.id }).catch(e => {
       console.error("Materialize failed:", e);
     });
   });
@@ -154,7 +154,7 @@ function buildEntryRow(entry: LibraryEntry, workspaceId: string): HTMLElement {
   return row;
 }
 
-export function _testFuzzyScore(title: string, paneType: string, query: string, isActiveWorkspace: boolean): number {
+export function _testFuzzyScore(title: string, nookType: string, query: string, isActiveBay: boolean): number {
   let score = 0;
   let qi = 0;
   for (let i = 0; i < title.length && qi < query.length; i++) {
@@ -164,18 +164,18 @@ export function _testFuzzyScore(title: string, paneType: string, query: string, 
     }
   }
   if (qi < query.length) {
-    for (let i = 0; i < paneType.length && qi < query.length; i++) {
-      if (paneType[i] === query[qi]) {
+    for (let i = 0; i < nookType.length && qi < query.length; i++) {
+      if (nookType[i] === query[qi]) {
         score += 2;
         qi++;
       }
     }
   }
   if (qi < query.length) return 0;
-  if (isActiveWorkspace) score += 50;
+  if (isActiveBay) score += 50;
   return score;
 }
 
-function fuzzyScore(title: string, paneType: string, query: string, isActiveWorkspace: boolean): number {
-  return _testFuzzyScore(title, paneType, query, isActiveWorkspace);
+function fuzzyScore(title: string, nookType: string, query: string, isActiveBay: boolean): number {
+  return _testFuzzyScore(title, nookType, query, isActiveBay);
 }
