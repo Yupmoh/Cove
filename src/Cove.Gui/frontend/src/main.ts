@@ -34,7 +34,7 @@ import { nextWorkspaceName, type WorkspaceBoxInput } from "./workspace-boxes";
 import { clampMenuPosition, normalizeItems, firstSelectableIndex, moveSelection as ctxMoveSelection, activeItem, type ContextMenuItem, type ContextMenuModel } from "./context-menu";
 import { buildWorkspaceTree, workspaceTreeEmptyMessage, PANE_TYPE_LABELS, type TreeLeaf, type TreeRoomInput, type TreeRow } from "./workspace-tree";
 import { buildAgentRows, AGENT_STATE_META, type AgentCard, type AgentState } from "./agents-model";
-import { splitWorkspaceCards, workspaceAccent, sortFsEntries, joinPath, dirBasename, scmChipText, type FsEntry, type WorkspaceCardEntry, type ScmSummary } from "./workspace-cards";
+import { splitWorkspaceCards, workspaceAccent, sortFsEntries, joinPath, scmChipText, parseCollapsedCardIds, serializeCollapsedCardIds, toggleCardCollapsed, type FsEntry, type WorkspaceCardEntry, type ScmSummary } from "./workspace-cards";
 import { parseQuery, filterAndSort, MruTracker, cycleCategory, categoryLabel, type PaletteItem } from "./omni-palette";
 import { buildEmptyState, EmptyStateMessages } from "./empty-states";
 import { brandLogoAt, nextBrandIndex, parseBrandIndex } from "./brand";
@@ -1339,7 +1339,6 @@ async function closeRoom(roomId: string): Promise<void> {
 
 let sidebarModel: SidebarModel = initialSidebarModel();
 const collapsedTreeRooms = new Set<string>(JSON.parse(localStorage.getItem("cove.tree.collapsedRooms") ?? "[]"));
-let treeWorkspaceCollapsed = localStorage.getItem("cove.tree.workspaceCollapsed") === "true";
 let agentCards: AgentCard[] = [];
 const needsInputPanes = new Set<string>();
 let agentPollTimer: ReturnType<typeof setInterval> | null = null;
@@ -1516,7 +1515,7 @@ function roomLeaves(room: RoomSnapshot): TreeLeaf[] {
 }
 
 const fsExpandedDirs = new Set<string>(JSON.parse(localStorage.getItem("cove.files.expanded") ?? "[]"));
-let fsFilesCollapsed = localStorage.getItem("cove.files.collapsed") === "true";
+let filesExpandedWs = parseCollapsedCardIds(localStorage.getItem("cove.files.expandedWs"));
 const fsDirCache = new Map<string, { entries: FsEntry[]; truncated: boolean }>();
 const fsDirLoading = new Set<string>();
 const scmSummaryCache = new Map<string, ScmSummary>();
@@ -1540,6 +1539,36 @@ function requestScmSummary(dir: string): void {
       console.warn("git summary failed", dir, err);
       scmSummaryFetchedAt.set(dir, Date.now());
       scmSummaryFetching.delete(dir);
+    });
+}
+
+const wsSnapshotCache = new Map<string, WorkspaceSnapshot>();
+const wsSnapshotFetchedAt = new Map<string, number>();
+const wsSnapshotFetching = new Set<string>();
+const WS_SNAPSHOT_TTL_MS = 10000;
+
+function requestWorkspaceSnapshot(wsId: string): void {
+  if (!wsId || wsSnapshotFetching.has(wsId)) return;
+  if (Date.now() - (wsSnapshotFetchedAt.get(wsId) ?? 0) < WS_SNAPSHOT_TTL_MS) return;
+  wsSnapshotFetching.add(wsId);
+  void invoke<WorkspaceSnapshot>("cove://commands/layout.get", { workspaceId: wsId })
+    .then((snap) => {
+      if (snap.id !== wsId) {
+        console.warn("workspace snapshot id mismatch (daemon predates layout.get workspaceId)", wsId, snap.id);
+        wsSnapshotFetchedAt.set(wsId, Date.now());
+        wsSnapshotFetching.delete(wsId);
+        return;
+      }
+      const prev = wsSnapshotCache.get(wsId);
+      wsSnapshotCache.set(wsId, snap);
+      wsSnapshotFetchedAt.set(wsId, Date.now());
+      wsSnapshotFetching.delete(wsId);
+      if (JSON.stringify(prev ?? null) !== JSON.stringify(snap)) renderSidebarContent("left");
+    })
+    .catch((err) => {
+      console.warn("workspace snapshot fetch failed", wsId, err);
+      wsSnapshotFetchedAt.set(wsId, Date.now());
+      wsSnapshotFetching.delete(wsId);
     });
 }
 
@@ -1687,8 +1716,8 @@ function renderWorkspacesContent(container: HTMLElement): void {
   );
   const scroll = document.createElement("div");
   scroll.className = "sb-list ws-card-scroll";
-  if (cards.active) scroll.appendChild(renderActiveWorkspaceCard(cards.active));
-  for (const w of cards.others) scroll.appendChild(renderWorkspaceMiniCard(w));
+  if (cards.active) scroll.appendChild(renderWorkspaceCard(cards.active, true));
+  for (const w of cards.others) scroll.appendChild(renderWorkspaceCard(w, false));
   container.appendChild(scroll);
 }
 
@@ -1728,7 +1757,7 @@ function workspaceCardHead(ws: WorkspaceCardEntry, mini: boolean): HTMLElement {
   titles.appendChild(name);
   const dir = document.createElement("span");
   dir.className = "ws-card-dir";
-  dir.textContent = dirBasename(ws.projectDir) || "no directory";
+  dir.textContent = ws.projectDir || "no directory";
   dir.title = ws.projectDir;
   titles.appendChild(dir);
   head.appendChild(titles);
@@ -1747,11 +1776,11 @@ function workspaceCardHead(ws: WorkspaceCardEntry, mini: boolean): HTMLElement {
   return head;
 }
 
-function renderActiveWorkspaceCard(ws: WorkspaceCardEntry): HTMLElement {
+function renderWorkspaceCard(ws: WorkspaceCardEntry, isActive: boolean): HTMLElement {
   const card = document.createElement("div");
-  card.className = "ws-card ws-card-active" + (treeWorkspaceCollapsed ? " collapsed" : "");
+  card.className = "ws-card" + (isActive ? " ws-card-active" : "");
   card.style.setProperty("--ws-accent", workspaceAccent(ws.id));
-  const head = workspaceCardHead(ws, false);
+  const head = workspaceCardHead(ws, !isActive);
   if (ws.projectDir) {
     requestScmSummary(ws.projectDir);
     const summary = scmSummaryCache.get(ws.projectDir);
@@ -1772,18 +1801,23 @@ function renderActiveWorkspaceCard(ws: WorkspaceCardEntry): HTMLElement {
       head.appendChild(chip);
     }
   }
-  head.addEventListener("click", () => {
-    treeWorkspaceCollapsed = !treeWorkspaceCollapsed;
-    localStorage.setItem("cove.tree.workspaceCollapsed", String(treeWorkspaceCollapsed));
-    renderSidebarContent("left");
-  });
+  if (!isActive) head.addEventListener("click", () => void switchWorkspace(ws.id));
   card.appendChild(head);
   wireWorkspaceCardDrag(card, ws.id);
-  if (treeWorkspaceCollapsed) return card;
 
   const body = document.createElement("div");
   body.className = "ws-card-body";
-  const rooms: TreeRoomInput[] = (layout?.rooms ?? []).map((r) => ({ id: r.id, name: roomTabName(r), leaves: roomLeaves(r) }));
+  const roomsHost = document.createElement("div");
+  if (!isActive) {
+    requestWorkspaceSnapshot(ws.id);
+    roomsHost.addEventListener("click", (e) => {
+      e.stopPropagation();
+      void switchWorkspace(ws.id);
+    }, true);
+  }
+  body.appendChild(roomsHost);
+  const sourceRooms = isActive ? (layout?.rooms ?? []) : (wsSnapshotCache.get(ws.id)?.rooms ?? []);
+  const rooms: TreeRoomInput[] = sourceRooms.map((r) => ({ id: r.id, name: roomTabName(r), leaves: roomLeaves(r) }));
   const rows = buildWorkspaceTree({
     workspaceName: ws.name,
     activeRoomId,
@@ -1797,7 +1831,7 @@ function renderActiveWorkspaceCard(ws: WorkspaceCardEntry): HTMLElement {
   const paneStates = agentStateByPane();
   for (const row of rows) {
     if (row.kind === "pane" && row.paneId) {
-      body.appendChild(buildPaneCard(row, paneStates));
+      roomsHost.appendChild(buildPaneCard(row, paneStates));
       continue;
     }
     const rowEl = document.createElement("div");
@@ -1864,25 +1898,27 @@ function renderActiveWorkspaceCard(ws: WorkspaceCardEntry): HTMLElement {
         else if (id === "close") closeTreeRow(row.kind, row.roomId, row.paneId);
       });
     });
-    body.appendChild(rowEl);
+    roomsHost.appendChild(rowEl);
   }
 
+  const filesExpanded = filesExpandedWs.has(ws.id);
   const filesHead = document.createElement("div");
-  filesHead.className = "ws-files-head" + (fsFilesCollapsed ? " collapsed" : "");
+  filesHead.className = "ws-files-head" + (filesExpanded ? "" : " collapsed");
   const filesChev = document.createElement("span");
   filesChev.className = "tw-chevron";
-  filesChev.textContent = fsFilesCollapsed ? "▸" : "▾";
+  filesChev.textContent = filesExpanded ? "▾" : "▸";
   filesHead.appendChild(filesChev);
   const filesLabel = document.createElement("span");
   filesLabel.textContent = "Files";
   filesHead.appendChild(filesLabel);
-  filesHead.addEventListener("click", () => {
-    fsFilesCollapsed = !fsFilesCollapsed;
-    localStorage.setItem("cove.files.collapsed", String(fsFilesCollapsed));
+  filesHead.addEventListener("click", (e) => {
+    e.stopPropagation();
+    filesExpandedWs = toggleCardCollapsed(filesExpandedWs, ws.id);
+    localStorage.setItem("cove.files.expandedWs", serializeCollapsedCardIds(filesExpandedWs));
     renderSidebarContent("left");
   });
   body.appendChild(filesHead);
-  if (!fsFilesCollapsed) {
+  if (filesExpanded) {
     const filesHost = document.createElement("div");
     filesHost.className = "ws-files";
     if (ws.projectDir) renderFsLevel(filesHost, ws.projectDir, 0);
@@ -1898,21 +1934,9 @@ function renderActiveWorkspaceCard(ws: WorkspaceCardEntry): HTMLElement {
   return card;
 }
 
-function renderWorkspaceMiniCard(w: WorkspaceCardEntry): HTMLElement {
-  const mini = document.createElement("div");
-  mini.className = "ws-card ws-card-mini";
-  mini.style.setProperty("--ws-accent", workspaceAccent(w.id));
-  mini.appendChild(workspaceCardHead(w, true));
-  mini.addEventListener("click", () => void switchWorkspace(w.id));
-  wireWorkspaceCardDrag(mini, w.id);
-  return mini;
-}
-
 function onTreeRowClick(kind: string, roomId: string | null, paneId: string | null, expandable: boolean): void {
   if (kind === "workspace") {
-    treeWorkspaceCollapsed = !treeWorkspaceCollapsed;
-    localStorage.setItem("cove.tree.workspaceCollapsed", String(treeWorkspaceCollapsed));
-    renderSidebarContent("left");
+    console.warn("tree click: workspace rows are not rendered in card mode");
     return;
   }
   if (kind === "pane" && paneId) { revealPane(paneId); return; }

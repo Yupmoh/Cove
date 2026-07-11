@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   WORKSPACE_ACCENTS,
+  parseCollapsedCardIds,
+  serializeCollapsedCardIds,
+  toggleCardCollapsed,
   scmChipText,
   workspaceAccent,
   splitWorkspaceCards,
@@ -86,5 +89,28 @@ describe("scmChipText", () => {
   it("returns empty for failed summaries", () => {
     expect(scmChipText({ ok: false, error: "not_a_repo" })).toBe("");
     expect(scmChipText({ ok: true })).toBe("");
+  });
+});
+
+describe("workspace card collapse state", () => {
+  it("round-trips a set of collapsed ids through json", () => {
+    const set = new Set(["ws-a", "ws-b"]);
+    expect(parseCollapsedCardIds(serializeCollapsedCardIds(set))).toEqual(set);
+  });
+
+  it("returns an empty set for null, garbage, and non-array json", () => {
+    expect(parseCollapsedCardIds(null)).toEqual(new Set());
+    expect(parseCollapsedCardIds("not json")).toEqual(new Set());
+    expect(parseCollapsedCardIds('{"a":1}')).toEqual(new Set());
+    expect(parseCollapsedCardIds('[1,2]')).toEqual(new Set());
+  });
+
+  it("toggles an id in and out without mutating the input", () => {
+    const start = new Set(["ws-a"]);
+    const added = toggleCardCollapsed(start, "ws-b");
+    expect(added).toEqual(new Set(["ws-a", "ws-b"]));
+    const removed = toggleCardCollapsed(added, "ws-a");
+    expect(removed).toEqual(new Set(["ws-b"]));
+    expect(start).toEqual(new Set(["ws-a"]));
   });
 });

@@ -38,6 +38,27 @@ public sealed class LayoutRoutesTests
     }
 
     [Fact]
+    public async Task Get_WithWorkspaceId_ReturnsThatWorkspaceSnapshot()
+    {
+        var layout = new LayoutService();
+        layout.SetActiveWorkspace("ws-a");
+        await Route("cove://commands/layout.mutate", P(new LayoutMutateParams("createRoom", NewPaneId: "pa", Name: "alpha")), layout);
+        layout.SetActiveWorkspace("ws-b");
+        await Route("cove://commands/layout.mutate", P(new LayoutMutateParams("createRoom", NewPaneId: "pb", Name: "beta")), layout);
+
+        var prm = JsonSerializer.SerializeToElement(new LayoutGetParams("ws-a"), Cove.Protocol.CoveJsonContext.Default.LayoutGetParams);
+        var forA = await Route("cove://commands/layout.get", prm, layout);
+        Assert.True(forA!.Ok);
+        var snapA = forA.Data!.Value.Deserialize(Cove.Persistence.CoveJsonContext.Default.WorkspaceSnapshot);
+        Assert.Equal("ws-a", snapA!.Id);
+        Assert.Equal("alpha", snapA.Rooms.Single().Name);
+
+        var noParams = await Route("cove://commands/layout.get", null, layout);
+        var snapActive = noParams!.Data!.Value.Deserialize(Cove.Persistence.CoveJsonContext.Default.WorkspaceSnapshot);
+        Assert.Equal("ws-b", snapActive!.Id);
+    }
+
+    [Fact]
     public async Task Mutate_CreateSplitClose_DrivesLayout()
     {
         var layout = new LayoutService();

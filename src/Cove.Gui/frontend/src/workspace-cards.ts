@@ -57,6 +57,28 @@ export function scmChipText(s: ScmSummary): string {
   return parts.join(" ");
 }
 
+export function parseCollapsedCardIds(json: string | null): Set<string> {
+  if (!json) return new Set();
+  try {
+    const parsed = JSON.parse(json);
+    if (!Array.isArray(parsed)) return new Set();
+    return new Set(parsed.filter((v): v is string => typeof v === "string"));
+  } catch {
+    return new Set();
+  }
+}
+
+export function serializeCollapsedCardIds(ids: ReadonlySet<string>): string {
+  return JSON.stringify([...ids]);
+}
+
+export function toggleCardCollapsed(ids: ReadonlySet<string>, id: string): Set<string> {
+  const next = new Set(ids);
+  if (next.has(id)) next.delete(id);
+  else next.add(id);
+  return next;
+}
+
 export function dirBasename(p: string): string {
   const parts = p.split("/").filter((s) => s.length > 0);
   return parts.length > 0 ? parts[parts.length - 1] : "";

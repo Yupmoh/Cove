@@ -15,7 +15,13 @@ internal static class LayoutCommands
     {
         if (ctx.Layout is not { } layout)
             return Task.FromResult(ctx.Fail("not_ready", "layout service unavailable"));
-        return Task.FromResult(ctx.Ok(ActiveSnapshot(ctx, layout), Cove.Persistence.CoveJsonContext.Default.WorkspaceSnapshot));
+        var requestedWorkspaceId = ctx.Request.Params is JsonElement el
+            ? el.Deserialize(Cove.Protocol.CoveJsonContext.Default.LayoutGetParams)?.WorkspaceId
+            : null;
+        var snapshot = string.IsNullOrEmpty(requestedWorkspaceId)
+            ? ActiveSnapshot(ctx, layout)
+            : SnapshotFor(ctx, layout, requestedWorkspaceId);
+        return Task.FromResult(ctx.Ok(snapshot, Cove.Persistence.CoveJsonContext.Default.WorkspaceSnapshot));
     }
 
     [CoveCommand("cove://commands/layout.snapshot")]
@@ -24,6 +30,18 @@ internal static class LayoutCommands
         if (ctx.Layout is not { } layout)
             return Task.FromResult(ctx.Fail("not_ready", "layout service unavailable"));
         return Task.FromResult(ctx.Ok(ActiveSnapshot(ctx, layout), Cove.Persistence.CoveJsonContext.Default.WorkspaceSnapshot));
+    }
+
+    private static Cove.Persistence.WorkspaceSnapshot SnapshotFor(EngineDispatchContext ctx, Cove.Engine.Layout.LayoutService layout, string wsId)
+    {
+        var name = wsId;
+        var projectDir = Environment.CurrentDirectory;
+        if (ctx.Workspaces?.Get(wsId) is { } actor)
+        {
+            name = actor.State.Name;
+            projectDir = actor.State.ProjectDir;
+        }
+        return layout.ToSnapshot(wsId, name, projectDir);
     }
 
     private static Cove.Persistence.WorkspaceSnapshot ActiveSnapshot(EngineDispatchContext ctx, Cove.Engine.Layout.LayoutService layout)
