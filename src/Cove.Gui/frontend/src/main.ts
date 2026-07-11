@@ -405,7 +405,7 @@ function makePane(paneId: string, since: number): PaneView {
     const chord = normalizeChord(e);
     const action = overrides[chord];
     if (action && action.startsWith("send-text:")) { void invoke("app.paneWrite", { paneId, dataBase64: toBase64Utf8(action.slice("send-text:".length)) }); return false; }
-    if (e.shiftKey && e.key === "Enter") { void invoke("app.paneWrite", { paneId, dataBase64: toBase64Utf8("\n") }); return false; }
+    if (e.shiftKey && e.key === "Enter") { void invoke("app.paneWrite", { paneId, dataBase64: toBase64Utf8("\x1b\r") }); return false; }
     if (!e.metaKey || e.altKey || e.ctrlKey) return true;
     const k = e.key.toLowerCase();
     if (k === "c") {
@@ -1687,8 +1687,8 @@ function renderWorkspacesContent(container: HTMLElement): void {
   const scroll = document.createElement("div");
   scroll.className = "sb-list ws-card-scroll";
   if (cards.active) scroll.appendChild(renderActiveWorkspaceCard(cards.active));
+  for (const w of cards.others) scroll.appendChild(renderWorkspaceMiniCard(w));
   container.appendChild(scroll);
-  if (cards.others.length > 0) container.appendChild(renderWorkspaceDock(cards.others));
 }
 
 function wireWorkspaceCardDrag(el: HTMLElement, wid: string): void {
@@ -1897,19 +1897,14 @@ function renderActiveWorkspaceCard(ws: WorkspaceCardEntry): HTMLElement {
   return card;
 }
 
-function renderWorkspaceDock(others: WorkspaceCardEntry[]): HTMLElement {
-  const dock = document.createElement("div");
-  dock.className = "ws-dock";
-  for (const w of others) {
-    const mini = document.createElement("div");
-    mini.className = "ws-card ws-card-mini";
-    mini.style.setProperty("--ws-accent", workspaceAccent(w.id));
-    mini.appendChild(workspaceCardHead(w, true));
-    mini.addEventListener("click", () => void switchWorkspace(w.id));
-    wireWorkspaceCardDrag(mini, w.id);
-    dock.appendChild(mini);
-  }
-  return dock;
+function renderWorkspaceMiniCard(w: WorkspaceCardEntry): HTMLElement {
+  const mini = document.createElement("div");
+  mini.className = "ws-card ws-card-mini";
+  mini.style.setProperty("--ws-accent", workspaceAccent(w.id));
+  mini.appendChild(workspaceCardHead(w, true));
+  mini.addEventListener("click", () => void switchWorkspace(w.id));
+  wireWorkspaceCardDrag(mini, w.id);
+  return mini;
 }
 
 function onTreeRowClick(kind: string, roomId: string | null, paneId: string | null, expandable: boolean): void {
