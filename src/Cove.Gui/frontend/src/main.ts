@@ -49,7 +49,7 @@ import { NotificationBridge, type NotificationBridgeDeps, type NotificationDeliv
 import { buildMenu, menuChordSet } from "./menu-model";
 import { toolbarTiles } from "./toolbar-tiles";
 import { shouldShowLauncher, buildAdapterTiles, buildBuiltinTiles, isEmptyRoomTree, placeablePaneForAction, type LauncherAdapter, type LauncherBuiltin, type LauncherTile } from "./box-launcher";
-import { adapterAccent, toolAccent, assignHotkeys, detectedHarnessTiles, clampLauncherSelection, moveLauncherSelection, hotkeyTarget, resumableSessionsFor, mostRecentSession, shapeRecentSessions, tipAt, computeLauncherCols, type LauncherSelection, type LauncherGeometry, type LauncherSession, type LauncherArrowKey, type RecentSessionRow } from "./launcher-model";
+import { adapterAccent, toolAccent, assignHotkeys, detectedHarnessTiles, clampLauncherSelection, moveLauncherSelection, hotkeyTarget, shapeRecentSessions, tipAt, computeLauncherCols, type LauncherSelection, type LauncherGeometry, type LauncherArrowKey, type RecentSessionRow } from "./launcher-model";
 import { iconSvg, iconForPaneType, monogram } from "./icons";
 import { dropZoneFor, moveMutationFor, zoneOverlayRect } from "./pane-dnd";
 import { cssPath, buildFeedbackReport, feedbackSlug, harnessPrompt } from "./inspect-mode";
@@ -3736,19 +3736,13 @@ async function spawnAgentInto(roomId: string | null, placeholderId: string | nul
 }
 
 let launcherAdapters: LauncherAdapter[] = [];
-let launcherSessions: LauncherSession[] = [];
 let launcherRecents: RecentSessionRow[] = [];
-interface SessionListResult { sessions: LauncherSession[]; }
 interface SessionRecentResult { sessions: RecentSessionRow[]; }
 async function loadLauncherAdapters(): Promise<void> {
   try {
     const result = await invoke<AdapterListResult>("app.adapterList", {});
     launcherAdapters = (result.adapters ?? []).map((a) => ({ name: a.name, displayName: a.displayName, accent: a.accent, binary: a.binary }));
   } catch { launcherAdapters = []; }
-  try {
-    const res = await invoke<SessionListResult>("cove://commands/session.list", {});
-    launcherSessions = res.sessions ?? [];
-  } catch { launcherSessions = []; }
   await loadLauncherRecents();
   if ((layout?.rooms ?? []).length === 0) renderRoom();
 }
@@ -4035,45 +4029,35 @@ function renderCardExpansion(ctx: LauncherContext, tile: LauncherTile): HTMLElem
   yoloRow.appendChild(yoloLabel);
   body.appendChild(yoloRow);
 
-  const resumable = resumableSessionsFor(tile.adapterName, launcherSessions);
-  const recent = mostRecentSession(resumable);
-  if (recent) {
-    const picker = document.createElement("div");
-    picker.className = "cl-session-picker";
+  const recentRows = launcherRecents.filter((r) => r.adapter === tile.adapterName);
+  const shaped = shapeRecentSessions(recentRows, Date.now(), 8);
+  if (shaped.length > 0) {
+    const dd = document.createElement("div");
+    dd.className = "cl-resume-dd";
+    const trigger = document.createElement("button");
+    trigger.className = "cl-resume-trigger";
     const dot = document.createElement("span");
     dot.className = "cl-session-dot";
     dot.style.background = adapterAccent(tile.adapterName, tile.accent);
-    const label = document.createElement("span");
-    label.className = "cl-session-label";
-    label.textContent = "resume " + (recent.sessionId ?? "").slice(0, 8);
-    const edit = document.createElement("span");
-    edit.className = "cl-session-edit";
-    edit.textContent = "✎";
-    edit.title = "edit session";
-    const more = document.createElement("span");
-    more.className = "cl-session-more";
-    more.textContent = resumable.length > 1 ? `▾ ${resumable.length}` : "▾";
-    picker.appendChild(dot);
-    picker.appendChild(label);
-    picker.appendChild(more);
-    picker.appendChild(edit);
-    picker.addEventListener("click", (e) => { e.stopPropagation(); void resumeSessionInto(ctx, tile, recent); });
-    body.appendChild(picker);
-  }
-
-  const recentRows = launcherRecents.filter((r) => r.adapter === tile.adapterName);
-  const shaped = shapeRecentSessions(recentRows, Date.now(), 3);
-  if (shaped.length > 0) {
-    const list = document.createElement("div");
-    list.className = "cl-recent-list";
-    const heading = document.createElement("div");
-    heading.className = "cl-recent-heading";
-    heading.textContent = "recent";
-    list.appendChild(heading);
+    const triggerLabel = document.createElement("span");
+    triggerLabel.className = "cl-resume-label";
+    triggerLabel.textContent = "Resume session";
+    const count = document.createElement("span");
+    count.className = "cl-resume-count";
+    count.textContent = String(shaped.length);
+    const chev = document.createElement("span");
+    chev.className = "cl-resume-chev";
+    chev.textContent = "▾";
+    trigger.appendChild(dot);
+    trigger.appendChild(triggerLabel);
+    trigger.appendChild(count);
+    trigger.appendChild(chev);
+    dd.appendChild(trigger);
+    const menu = document.createElement("div");
+    menu.className = "cl-resume-menu";
     for (const s of shaped) {
       const row = document.createElement("div");
       row.className = "cl-recent-row";
-      row.style.cursor = "pointer";
       const base = document.createElement("span");
       base.className = "cl-recent-cwd";
       base.textContent = s.label;
@@ -4084,9 +4068,14 @@ function renderCardExpansion(ctx: LauncherContext, tile: LauncherTile): HTMLElem
       row.appendChild(base);
       row.appendChild(when);
       row.addEventListener("click", (e) => { e.stopPropagation(); void resumeRecentSession(s.adapter, s.sessionId, s.cwd, tile.label); });
-      list.appendChild(row);
+      menu.appendChild(row);
     }
-    body.appendChild(list);
+    dd.appendChild(menu);
+    trigger.addEventListener("click", (e) => {
+      e.stopPropagation();
+      dd.classList.toggle("open");
+    });
+    body.appendChild(dd);
   }
   return body;
 }
@@ -4271,12 +4260,6 @@ async function spawnFeedbackAgent(tile: LauncherTile, prompt: string, roomName: 
   activeRoomId = r.roomId;
   await reload();
   focusPane(sp);
-}
-
-async function resumeSessionInto(ctx: LauncherContext, tile: LauncherTile, session: LauncherSession): Promise<void> {
-  try { await invoke("cove://commands/session.foreground", { paneId: session.paneId }); } catch (err) { console.warn("session.foreground failed, falling back to new session", err); launchHarnessTile(ctx, tile); return; }
-  await reload();
-  focusPane(session.paneId);
 }
 
 function renderToolTile(ctx: LauncherContext, tile: LauncherTile, letter: string, selected: boolean): HTMLElement {
