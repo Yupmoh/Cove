@@ -1,4 +1,4 @@
-import { restoredSummaryText } from "./restore-summary";
+import { restoredSummaryText, shouldShowRestoreToast } from "./restore-summary";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
@@ -46,6 +46,7 @@ import { DEFAULT_DRAFT, draftFromTheme, themeFromDraft, cssVarsFromTheme, xtermT
 import { categorizeBindings, isReservedChord, isValidChord, chordDisplay, canRecordChord, normalizeChord as normalizeChordStr, type KeybindDto } from "./keyboard-editor";
 import { ONBOARDING_STEPS, INITIAL_ONBOARDING_STATE, nextStep, prevStep, dismiss as dismissOnboarding, currentStepData, isLastStep, isFirstStep, progressPercent, selectAdapter, setTelemetryOptIn, shouldShowOnboarding, onboardingSeenFromConfig, ONBOARDING_COMPLETED_KEY, type OnboardingState } from "./onboarding";
 import { initBackdrop, setBackdropMaterial, nextToggleMaterial, coerceMaterial, BACKDROP_PREF_KEY, type BackdropDeps, type BackdropMaterial } from "./backdrop";
+import { detectChimes, playChime } from "./chime";
 import { NotificationBridge, type NotificationBridgeDeps, type NotificationDeliverPayload } from "./notifications";
 import { buildMenu, menuChordSet } from "./menu-model";
 import { toolbarTiles } from "./toolbar-tiles";
@@ -1495,6 +1496,34 @@ async function reorderBays(fromId: string, toId: string): Promise<void> {
 
 let treeDragShoreId: string | null = null;
 
+function startShoreRename(shoreId: string, labelEl: HTMLElement | null, currentName: string): void {
+  if (!labelEl) { console.warn("shore rename: label element missing", shoreId); return; }
+  const input = document.createElement("input");
+  input.className = "prename";
+  input.value = currentName;
+  input.spellcheck = false;
+  labelEl.textContent = "";
+  labelEl.appendChild(input);
+  input.focus();
+  input.select();
+  let done = false;
+  const commit = async (save: boolean) => {
+    if (done) return;
+    done = true;
+    const newName = input.value.trim();
+    if (save && newName && newName !== currentName) {
+      try { await invoke("app.layoutMutate", { op: "rename", shoreId, name: newName, nookId: "", targetNookId: "", newNookId: "", orientation: "", dir: 0 }); }
+      catch (e) { console.warn("shore rename failed", shoreId, e); }
+      await reload();
+      return;
+    }
+    renderSidebarContent("left");
+  };
+  input.addEventListener("blur", () => void commit(true));
+  input.addEventListener("keydown", (e) => { e.stopPropagation(); if (e.key === "Enter") void commit(true); else if (e.key === "Escape") void commit(false); });
+  input.addEventListener("click", (e) => e.stopPropagation());
+}
+
 function startBayRename(wsId: string, boxEl: HTMLElement, currentName: string): void {
   const input = document.createElement("input");
   input.className = "prename";
@@ -2126,11 +2155,14 @@ function renderBayCard(ws: BayCardEntry, isActive: boolean): HTMLElement {
       });
     }
     rowEl.addEventListener("contextmenu", (e) => {
+      const renameable = row.kind === "shore" && !!row.shoreId;
       openContextMenuAt(e, [
         { id: "focus", label: "Go to" },
+        ...(renameable ? [{ id: "rename", label: "Rename" }] : []),
         { id: "close", label: "Close", danger: true },
       ], (id) => {
         if (id === "focus") focusTreeRow(row.kind, row.shoreId, row.nookId);
+        else if (id === "rename" && row.shoreId) startShoreRename(row.shoreId, rowEl.querySelector(".tw-label") as HTMLElement, row.label);
         else if (id === "close") closeTreeRow(row.kind, row.shoreId, row.nookId);
       });
     });
@@ -2209,11 +2241,22 @@ function closeTreeRow(kind: string, shoreId: string | null, nookId: string | nul
   if (kind === "shore" && shoreId) { void closeShore(shoreId); }
 }
 
+let prevAgentStates = new Map<string, string>();
+
+function agentChimesEnabled(): boolean {
+  return localStorage.getItem("cove.sound.agentChimes") !== "false";
+}
+
 async function refreshAgents(): Promise<void> {
   try {
     const res = await invoke<{ cards: AgentCard[] }>("cove://commands/activity.list", {});
     agentCards = res.cards ?? [];
   } catch { agentCards = []; }
+  const nextStates = new Map(agentCards.map((c) => [c.nookId, c.status]));
+  if (agentChimesEnabled()) {
+    for (const kind of detectChimes(prevAgentStates, nextStates)) playChime(kind);
+  }
+  prevAgentStates = nextStates;
   if (agentsVisible()) renderSidebarContent("left");
 }
 
@@ -4958,10 +5001,28 @@ function setupBadge(): void {
   engineEventHandlers.set("dock.badge.clear", () => { needsInputNooks.clear(); onNeedsInputChanged(); });
   engineEventHandlers.set("state.changed", () => { if (agentsVisible()) void refreshAgents(); });
   engineEventHandlers.set("restore.summary", (payload) => {
-    const p = payload as { restored?: number; fresh?: number; skipped?: number };
-    const text = restoredSummaryText(p.restored ?? 0, p.fresh ?? 0, p.skipped ?? 0);
-    if (text) showInAppToast("Sessions restored", text, () => {});
+    const p = payload as { restored?: number; fresh?: number; skipped?: number; bootedAt?: string };
+    presentRestoreToast(p.restored ?? 0, p.fresh ?? 0, p.skipped ?? 0, p.bootedAt ?? "");
   });
+}
+
+const RESTORE_SHOWN_KEY = "cove.restore.lastShownBoot";
+
+function presentRestoreToast(restored: number, fresh: number, skipped: number, bootedAt: string): void {
+  const text = restoredSummaryText(restored, fresh, skipped);
+  let lastShown: string | null = null;
+  try { lastShown = localStorage.getItem(RESTORE_SHOWN_KEY); } catch { lastShown = null; }
+  if (!shouldShowRestoreToast(bootedAt, lastShown, text)) return;
+  try { localStorage.setItem(RESTORE_SHOWN_KEY, bootedAt); } catch { void 0; }
+  showInAppToast("Sessions restored", text, () => {});
+}
+
+async function maybeShowRestoreToast(): Promise<void> {
+  try {
+    const r = await invoke<{ present?: boolean; restored?: number; fresh?: number; skipped?: number; bootedAt?: string }>("cove://commands/restore.summary.get", {});
+    if (!r?.present) return;
+    presentRestoreToast(r.restored ?? 0, r.fresh ?? 0, r.skipped ?? 0, r.bootedAt ?? "");
+  } catch (e) { console.warn("restore summary pull failed", e); }
 }
 
 let backdropMaterial: BackdropMaterial = "none";
@@ -5254,5 +5315,6 @@ async function createNote(): Promise<void> {
   void loadLauncherAdapters();
   await reload();
   startAgentPolling();
+  void maybeShowRestoreToast();
   void maybeShowOnboarding();
 })();

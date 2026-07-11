@@ -5,3 +5,9 @@ export function restoredSummaryText(restored: number, fresh: number, skipped: nu
   if (skipped > 0) parts.push(`${skipped} skipped`);
   return parts.join(" · ");
 }
+
+export function shouldShowRestoreToast(bootedAt: string, lastShownBoot: string | null, text: string): boolean {
+  if (!text) return false;
+  if (!bootedAt) return false;
+  return bootedAt !== lastShownBoot;
+}

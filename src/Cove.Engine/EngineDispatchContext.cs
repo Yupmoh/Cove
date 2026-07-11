@@ -76,7 +76,8 @@ public sealed class EngineDispatchContext
         Cove.Engine.Diagnostics.PerformanceBundleService? perfBundles = null,
         RecentSessionStore? recentSessions = null,
         Cove.Engine.Lsp.LspService? lspService = null,
-        Cove.Adapters.SessionService? sessionService = null)
+        Cove.Adapters.SessionService? sessionService = null,
+        string? baysDir = null)
     {
         Request = request;
         Nooks = nooks;
@@ -133,6 +134,7 @@ public sealed class EngineDispatchContext
         RecentSessions = recentSessions;
         LspService = lspService;
         SessionService = sessionService;
+        BaysDir = baysDir;
     }
 
     public ControlRequest Request { get; }
@@ -190,6 +192,7 @@ public sealed class EngineDispatchContext
     public RecentSessionStore? RecentSessions { get; }
     public Cove.Engine.Lsp.LspService? LspService { get; }
     public Cove.Adapters.SessionService? SessionService { get; }
+    public string? BaysDir { get; }
     public System.Func<ControlRequest, System.Threading.Tasks.Task<ControlResponse?>>? Redrive { get; set; }
 
     public ControlResponse Ok<T>(T data, JsonTypeInfo<T> typeInfo)

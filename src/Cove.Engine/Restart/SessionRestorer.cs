@@ -16,7 +16,9 @@ public sealed record RestorableNook(
 
 public sealed record RestoreSummary(int Restored, int Fresh, int Skipped);
 
-public sealed record RestorationSummaryEvent(int Restored, int Fresh, int Skipped);
+public sealed record RestorationSummaryEvent(int Restored, int Fresh, int Skipped, string BootedAt = "");
+
+public sealed record RestoreSummaryPullResult(bool Present, int Restored, int Fresh, int Skipped, string BootedAt);
 
 public interface IRestoreSpawner
 {
@@ -100,4 +102,5 @@ public sealed class SessionRestorer
 
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase, DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
 [JsonSerializable(typeof(RestorationSummaryEvent))]
+[JsonSerializable(typeof(RestoreSummaryPullResult))]
 public sealed partial class RestorationSummaryJsonContext : JsonSerializerContext { }

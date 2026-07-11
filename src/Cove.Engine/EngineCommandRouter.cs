@@ -73,6 +73,7 @@ public static class EngineCommandRouter
         RecentSessionStore? recentSessions = null,
         Cove.Engine.Lsp.LspService? lspService = null,
         Cove.Adapters.SessionService? sessionService = null,
+        string? baysDir = null,
         System.Threading.CancellationToken cancellationToken = default)
     {
         System.Func<EngineDispatchContext, System.Threading.Tasks.Task<ControlResponse>> typed;
@@ -94,8 +95,8 @@ public static class EngineCommandRouter
                 if (denied is not null)
                     return denied;
             }
-            var dispatchCtx = new EngineDispatchContext(request, nooks, layout, bays, runCommands, restoration, snapshots, skills, agents, launchProfiles, adapterEnv, hookServer, hookRouter, agentRouter, activity, sessions, lifecycle, launcher, taskService, dispatchSaga, resumeSaga, timeline, blackboard, noteFiles, memory, memoryRanker, proposals, consolidator, edits, corpus, vaultSettings, library, reviews, attribution, reviewDispatcher, nookTypes, browser, config, manifestStore, registry, omniChat, nookScopes, stateBus, extensions, captures, gitReadModel, searchService, themes, keybindings, browserAutomation, diagnostics, perfBundles, recentSessions, lspService, sessionService);
-            dispatchCtx.Redrive = subReq => RouteAsync(subReq, nooks, layout, bays, runCommands, restoration, snapshots, skills, agents, launchProfiles, adapterEnv, hookServer, hookRouter, agentRouter, activity, sessions, lifecycle, launcher, taskService, dispatchSaga, resumeSaga, timeline, blackboard, noteFiles, memory, memoryRanker, proposals, consolidator, edits, corpus, vaultSettings, library, reviews, attribution, reviewDispatcher, nookTypes, browser, config, manifestStore, registry, omniChat, nookScopes, stateBus, extensions, captures, gitReadModel, searchService, themes, keybindings, browserAutomation, diagnostics, perfBundles, recentSessions, lspService, sessionService, cancellationToken);
+            var dispatchCtx = new EngineDispatchContext(request, nooks, layout, bays, runCommands, restoration, snapshots, skills, agents, launchProfiles, adapterEnv, hookServer, hookRouter, agentRouter, activity, sessions, lifecycle, launcher, taskService, dispatchSaga, resumeSaga, timeline, blackboard, noteFiles, memory, memoryRanker, proposals, consolidator, edits, corpus, vaultSettings, library, reviews, attribution, reviewDispatcher, nookTypes, browser, config, manifestStore, registry, omniChat, nookScopes, stateBus, extensions, captures, gitReadModel, searchService, themes, keybindings, browserAutomation, diagnostics, perfBundles, recentSessions, lspService, sessionService, baysDir);
+            dispatchCtx.Redrive = subReq => RouteAsync(subReq, nooks, layout, bays, runCommands, restoration, snapshots, skills, agents, launchProfiles, adapterEnv, hookServer, hookRouter, agentRouter, activity, sessions, lifecycle, launcher, taskService, dispatchSaga, resumeSaga, timeline, blackboard, noteFiles, memory, memoryRanker, proposals, consolidator, edits, corpus, vaultSettings, library, reviews, attribution, reviewDispatcher, nookTypes, browser, config, manifestStore, registry, omniChat, nookScopes, stateBus, extensions, captures, gitReadModel, searchService, themes, keybindings, browserAutomation, diagnostics, perfBundles, recentSessions, lspService, sessionService, baysDir, cancellationToken);
             return await typed(dispatchCtx);
         }
         catch (System.Exception ex)

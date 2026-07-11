@@ -294,7 +294,7 @@ public sealed class DaemonHost
         }
         if (restoreTotals.Restored + restoreTotals.Fresh + restoreTotals.Skipped > 0)
         {
-            _restorationSummary = new Cove.Engine.Restart.RestorationSummaryEvent(restoreTotals.Restored, restoreTotals.Fresh, restoreTotals.Skipped);
+            _restorationSummary = new Cove.Engine.Restart.RestorationSummaryEvent(restoreTotals.Restored, restoreTotals.Fresh, restoreTotals.Skipped, _startedAtUtc.ToString("o"));
             logger.LogWarning("session restoration: restored={Restored} fresh={Fresh} skipped={Skipped}", restoreTotals.Restored, restoreTotals.Fresh, restoreTotals.Skipped);
         }
         _restoration.EmitProgress("default", "materialize_nooks", Cove.Engine.Restart.RestorePhase.NooksMaterialized);
@@ -479,7 +479,7 @@ public sealed class DaemonHost
             await WriteResponseAsync(conn, Fail(req.Id, "not_ready", "sys/hello required before commands"), cancellationToken).ConfigureAwait(false);
             return false;
         }
-        ControlResponse? generated = await Cove.Engine.EngineCommandRouter.RouteAsync(req, _nooks, _layout, _bays, _runCommands, _restoration, _snapshots, _skills, _agents, _launchProfiles, _adapterEnv, _hookServer, _hookRouter, _agentRouter, _activity, _sessions, _lifecycle, _launcher, _taskService, _dispatchSaga, _resumeSaga, _timeline, _blackboard, _noteFiles, _memory, _memoryRanker, _proposals, _consolidator, _edits, _corpus, _vaultSettings, _library, _reviews, _attribution, _reviewDispatcher, _nookTypes, _browser, _config, _manifestStore, _registry, _omniChat, _nookScopes, _stateBus, _extensions, _captures, _gitReadModel, _searchService, _themes, _keybindings, _browserAutomation, _diagnostics, _perfBundles, _recentSessions, _lspService, _sessionService, cancellationToken).ConfigureAwait(false);
+        ControlResponse? generated = await Cove.Engine.EngineCommandRouter.RouteAsync(req, _nooks, _layout, _bays, _runCommands, _restoration, _snapshots, _skills, _agents, _launchProfiles, _adapterEnv, _hookServer, _hookRouter, _agentRouter, _activity, _sessions, _lifecycle, _launcher, _taskService, _dispatchSaga, _resumeSaga, _timeline, _blackboard, _noteFiles, _memory, _memoryRanker, _proposals, _consolidator, _edits, _corpus, _vaultSettings, _library, _reviews, _attribution, _reviewDispatcher, _nookTypes, _browser, _config, _manifestStore, _registry, _omniChat, _nookScopes, _stateBus, _extensions, _captures, _gitReadModel, _searchService, _themes, _keybindings, _browserAutomation, _diagnostics, _perfBundles, _recentSessions, _lspService, _sessionService, System.IO.Path.Combine(_paths.DataDir.Root, "bays"), cancellationToken).ConfigureAwait(false);
         if (generated is not null)
         {
             if (generated.Ok && IsMutatingVerb(req.Uri))
@@ -531,6 +531,19 @@ public sealed class DaemonHost
                         ? Parse("{\"focused\":true}")
                         : Parse("{\"focused\":false,\"reason\":\"no_render_client\"}");
                     await WriteResponseAsync(conn, new ControlResponse(req.Id, true, data), cancellationToken).ConfigureAwait(false);
+                    return false;
+                }
+
+            case "cove://commands/restore.summary.get":
+                {
+                    var s = Volatile.Read(ref _restorationSummary);
+                    var result = new Cove.Engine.Restart.RestoreSummaryPullResult(
+                        s is not null,
+                        s?.Restored ?? 0,
+                        s?.Fresh ?? 0,
+                        s?.Skipped ?? 0,
+                        s?.BootedAt ?? _startedAtUtc.ToString("o"));
+                    await WriteResponseAsync(conn, new ControlResponse(req.Id, true, ToElement(result, Cove.Engine.Restart.RestorationSummaryJsonContext.Default.RestoreSummaryPullResult)), cancellationToken).ConfigureAwait(false);
                     return false;
                 }
 
@@ -896,7 +909,7 @@ public sealed class DaemonHost
     {
         lock (_guiLock)
             _guiConnections.Add(conn);
-        var summary = System.Threading.Interlocked.Exchange(ref _restorationSummary, null);
+        var summary = Volatile.Read(ref _restorationSummary);
         if (summary is not null)
             BroadcastEvent("restore.summary", summary, Cove.Engine.Restart.RestorationSummaryJsonContext.Default.RestorationSummaryEvent);
     }

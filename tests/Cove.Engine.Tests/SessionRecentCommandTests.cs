@@ -32,13 +32,23 @@ public sealed class SessionRecentCommandTests
             File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
     }
 
-    private static Task<ControlResponse?> Route(string adaptersRoot, SessionRecentParams p)
+    private static Task<ControlResponse?> Route(string adaptersRoot, SessionRecentParams p, string? baysDir = null)
     {
         var manifests = new AdapterManifestStore(adaptersRoot);
         var svc = new SessionService(new MethodRunner());
         var el = JsonSerializer.SerializeToElement(p, SessionRecentJsonContext.Default.SessionRecentParams);
         var request = new ControlRequest("1", "cove://commands/session.recent", el);
-        return EngineCommandRouter.RouteAsync(request, manifestStore: manifests, sessionService: svc);
+        return EngineCommandRouter.RouteAsync(request, manifestStore: manifests, sessionService: svc, baysDir: baysDir);
+    }
+
+    private static void WriteNookRecord(string baysDir, string bayId, string nookId, string title, string sessionId)
+    {
+        var wsDir = Path.Combine(baysDir, bayId);
+        var desc = new Cove.Persistence.NookDescriptor(nookId, "", Array.Empty<string>(), "/repo/work", title, "test-v2", null, sessionId, false);
+        Cove.Persistence.AtomicJsonStore.Write(
+            Path.Combine(wsDir, "nooks", nookId, "session.json"),
+            desc,
+            Cove.Persistence.CoveJsonContext.Default.NookDescriptor);
     }
 
     [Fact]
@@ -87,6 +97,95 @@ public sealed class SessionRecentCommandTests
             Assert.Equal(0, resp.Data!.Value.GetProperty("sessions").GetArrayLength());
         }
         finally { try { Directory.Delete(root, true); } catch { } }
+    }
+
+    [Fact]
+    public async Task Recent_PrefersNookTitleOverAdapterLabel()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var root = CopyFixture("test-v2");
+        var baysDir = Path.Combine(Path.GetTempPath(), "cove-recent-bays-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            WriteListScript(Path.Combine(root, "test-v2"), """
+            CWD="$1"
+            cat <<EOF
+            {"sessions":[
+              {"id":"real-s1","name":"claude summary","cwd":"$CWD","lastActive":"2024-01-01T00:00:00Z"}
+            ]}
+            EOF
+            """);
+            WriteNookRecord(baysDir, "bay-a", "n1", "cove-session", "real-s1");
+
+            var resp = await Route(root, new SessionRecentParams("test-v2", null, "/repo/work"), baysDir);
+
+            Assert.True(resp!.Ok);
+            var sessions = resp.Data!.Value.GetProperty("sessions");
+            Assert.Equal(1, sessions.GetArrayLength());
+            Assert.Equal("cove-session", sessions[0].GetProperty("label").GetString());
+        }
+        finally { try { Directory.Delete(root, true); } catch { } try { Directory.Delete(baysDir, true); } catch { } }
+    }
+
+    [Fact]
+    public async Task Recent_CollapsesIdenticalLabelLineageToNewest()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var root = CopyFixture("test-v2");
+        var baysDir = Path.Combine(Path.GetTempPath(), "cove-recent-bays-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            WriteListScript(Path.Combine(root, "test-v2"), """
+            CWD="$1"
+            cat <<EOF
+            {"sessions":[
+              {"id":"real-old","name":"whatever old","cwd":"$CWD","lastActive":"2024-01-01T00:00:00Z"},
+              {"id":"real-new","name":"whatever new","cwd":"$CWD","lastActive":"2024-06-01T00:00:00Z"}
+            ]}
+            EOF
+            """);
+            WriteNookRecord(baysDir, "bay-a", "n1", "cove-session", "real-old");
+            WriteNookRecord(baysDir, "bay-a", "n2", "cove-session", "real-new");
+
+            var resp = await Route(root, new SessionRecentParams("test-v2", null, "/repo/work"), baysDir);
+
+            Assert.True(resp!.Ok);
+            var sessions = resp.Data!.Value.GetProperty("sessions");
+            Assert.Equal(1, sessions.GetArrayLength());
+            Assert.Equal("real-new", sessions[0].GetProperty("sessionId").GetString());
+            Assert.Equal("cove-session", sessions[0].GetProperty("label").GetString());
+        }
+        finally { try { Directory.Delete(root, true); } catch { } try { Directory.Delete(baysDir, true); } catch { } }
+    }
+
+    [Fact]
+    public async Task Recent_KeepsDistinctLabels()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var root = CopyFixture("test-v2");
+        var baysDir = Path.Combine(Path.GetTempPath(), "cove-recent-bays-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            WriteListScript(Path.Combine(root, "test-v2"), """
+            CWD="$1"
+            cat <<EOF
+            {"sessions":[
+              {"id":"real-s1","name":"Fix the router","cwd":"$CWD","lastActive":"2024-01-01T00:00:00Z"},
+              {"id":"real-s2","name":"Add tests","cwd":"$CWD","lastActive":"2024-06-01T00:00:00Z"}
+            ]}
+            EOF
+            """);
+            WriteNookRecord(baysDir, "bay-a", "n1", "cove-session", "real-s2");
+
+            var resp = await Route(root, new SessionRecentParams("test-v2", null, "/repo/work"), baysDir);
+
+            Assert.True(resp!.Ok);
+            var sessions = resp.Data!.Value.GetProperty("sessions");
+            Assert.Equal(2, sessions.GetArrayLength());
+            Assert.Equal("cove-session", sessions[0].GetProperty("label").GetString());
+            Assert.Equal("Fix the router", sessions[1].GetProperty("label").GetString());
+        }
+        finally { try { Directory.Delete(root, true); } catch { } try { Directory.Delete(baysDir, true); } catch { } }
     }
 
     [Fact]
