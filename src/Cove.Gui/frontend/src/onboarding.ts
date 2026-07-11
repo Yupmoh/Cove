@@ -5,26 +5,32 @@ export interface OnboardingStep {
 }
 
 export const ONBOARDING_STEPS: ReadonlyArray<OnboardingStep> = [
-  { id: "welcome", title: "Welcome to Cove", body: "A free, open-source, AI-native terminal bay. Let's get you set up in a few steps." },
-  { id: "adapters", title: "Choose your adapter", body: "Adapters connect Cove to your AI coding tools. Pick one to start, or skip and configure later in Settings." },
-  { id: "telemetry", title: "Telemetry", body: "Cove collects anonymous usage data only if you opt in. No scrollback, file paths, or personal content is ever sent. You can change this anytime in Settings → Privacy." },
-  { id: "ready", title: "You're all set", body: "Press Cmd+T to create a new shore, Cmd+, for settings, or Cmd+Shift+P for the command palette." },
+  { id: "harness", title: "Detect your tools", body: "Cove scans your login shell for installed AI coding CLIs. Pick a default bay directory to work in." },
+  { id: "permissions", title: "Permission defaults", body: "Choose which adapters launch with bypass-permissions (YOLO) mode on by default. You can change this per session later." },
+  { id: "appearance", title: "Appearance", body: "Set the window backdrop material and colour theme. These apply immediately and are saved to your settings." },
+  { id: "sound", title: "Sound & notifications", body: "Agent chimes play a soft tone when an agent finishes or needs input. Toggle them and notifications here." },
 ];
 
 export interface OnboardingState {
   currentStep: number;
   completed: boolean;
   dismissed: boolean;
-  selectedAdapter: string | null;
-  telemetryOptIn: boolean;
+  defaultBayDir: string | null;
+  adapterYolo: Record<string, boolean>;
+  backdrop: string;
+  theme: string | null;
+  agentChimes: boolean;
 }
 
 export const INITIAL_ONBOARDING_STATE: OnboardingState = {
   currentStep: 0,
   completed: false,
   dismissed: false,
-  selectedAdapter: null,
-  telemetryOptIn: false,
+  defaultBayDir: null,
+  adapterYolo: {},
+  backdrop: "none",
+  theme: null,
+  agentChimes: true,
 };
 
 export function nextStep(state: OnboardingState): OnboardingState {
@@ -46,12 +52,24 @@ export function dismiss(state: OnboardingState): OnboardingState {
   return { ...state, dismissed: true, completed: true };
 }
 
-export function selectAdapter(state: OnboardingState, adapter: string | null): OnboardingState {
-  return { ...state, selectedAdapter: adapter };
+export function setDefaultBayDir(state: OnboardingState, dir: string | null): OnboardingState {
+  return { ...state, defaultBayDir: dir };
 }
 
-export function setTelemetryOptIn(state: OnboardingState, optIn: boolean): OnboardingState {
-  return { ...state, telemetryOptIn: optIn };
+export function setAdapterYolo(state: OnboardingState, adapter: string, on: boolean): OnboardingState {
+  return { ...state, adapterYolo: { ...state.adapterYolo, [adapter]: on } };
+}
+
+export function setBackdrop(state: OnboardingState, backdrop: string): OnboardingState {
+  return { ...state, backdrop };
+}
+
+export function setTheme(state: OnboardingState, theme: string | null): OnboardingState {
+  return { ...state, theme };
+}
+
+export function setAgentChimes(state: OnboardingState, on: boolean): OnboardingState {
+  return { ...state, agentChimes: on };
 }
 
 export function currentStepData(state: OnboardingState): OnboardingStep {

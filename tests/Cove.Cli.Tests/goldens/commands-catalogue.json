@@ -152,7 +152,31 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/adapter.install-local",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/adapter.list",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/adapter.remove",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/adapter.rescan",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/adapter.retention-get",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/adapter.retention-set",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/adapter.tools-list",
     "source": "core"
   },
   {

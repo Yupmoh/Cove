@@ -72,6 +72,21 @@ public sealed class RecentSessionStore
         return result;
     }
 
+    public int PurgeAdapter(string adapter)
+    {
+        if (string.IsNullOrEmpty(adapter))
+        {
+            _logger.LogWarning("recent session purge: skipped empty adapter");
+            return 0;
+        }
+        using var conn = new SqliteConnection($"Data Source={_dbPath}");
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "DELETE FROM sessions WHERE adapter = @adapter";
+        cmd.Parameters.AddWithValue("@adapter", adapter);
+        return cmd.ExecuteNonQuery();
+    }
+
     private void EnsureSchema()
     {
         using var conn = new SqliteConnection($"Data Source={_dbPath}");

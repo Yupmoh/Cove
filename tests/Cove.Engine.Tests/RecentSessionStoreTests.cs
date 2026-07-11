@@ -66,4 +66,30 @@ public sealed class RecentSessionStoreTests
         Assert.Single(rows);
         Assert.Equal("x1", rows[0].SessionId);
     }
+
+    [Fact]
+    public void PurgeAdapter_RemovesOnlyThatAdapter()
+    {
+        var store = new RecentSessionStore(NewDir(), NullLogger.Instance);
+        store.RecordStart("claude", "c1", "ws-1", "/a", Base);
+        store.RecordStart("claude", "c2", "ws-1", "/a", Base.AddMinutes(1));
+        store.RecordStart("codex", "x1", "ws-1", "/b", Base.AddMinutes(2));
+
+        var purged = store.PurgeAdapter("claude");
+
+        Assert.Equal(2, purged);
+        var rows = store.Recent(null, 10);
+        Assert.Single(rows);
+        Assert.Equal("x1", rows[0].SessionId);
+    }
+
+    [Fact]
+    public void PurgeAdapter_EmptyName_NoOp()
+    {
+        var store = new RecentSessionStore(NewDir(), NullLogger.Instance);
+        store.RecordStart("claude", "c1", "ws-1", "/a", Base);
+
+        Assert.Equal(0, store.PurgeAdapter(""));
+        Assert.Single(store.Recent(null, 10));
+    }
 }

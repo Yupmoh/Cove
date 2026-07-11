@@ -6,8 +6,11 @@ import {
   prevStep,
   goToStep,
   dismiss,
-  selectAdapter,
-  setTelemetryOptIn,
+  setDefaultBayDir,
+  setAdapterYolo,
+  setBackdrop,
+  setTheme,
+  setAgentChimes,
   currentStepData,
   isLastStep,
   isFirstStep,
@@ -18,12 +21,12 @@ import {
 } from "./onboarding";
 
 describe("ONBOARDING_STEPS", () => {
-  it("has 4 steps in correct order", () => {
+  it("has the 4 first-run wizard steps in spec order", () => {
     expect(ONBOARDING_STEPS.length).toBe(4);
-    expect(ONBOARDING_STEPS[0].id).toBe("welcome");
-    expect(ONBOARDING_STEPS[1].id).toBe("adapters");
-    expect(ONBOARDING_STEPS[2].id).toBe("telemetry");
-    expect(ONBOARDING_STEPS[3].id).toBe("ready");
+    expect(ONBOARDING_STEPS[0].id).toBe("harness");
+    expect(ONBOARDING_STEPS[1].id).toBe("permissions");
+    expect(ONBOARDING_STEPS[2].id).toBe("appearance");
+    expect(ONBOARDING_STEPS[3].id).toBe("sound");
   });
 });
 
@@ -68,29 +71,36 @@ describe("dismiss", () => {
   });
 });
 
-describe("selectAdapter / setTelemetryOptIn", () => {
-  it("sets the selected adapter", () => {
-    const s = selectAdapter(INITIAL_ONBOARDING_STATE, "claude");
-    expect(s.selectedAdapter).toBe("claude");
+describe("wizard field setters", () => {
+  it("sets the default bay directory", () => {
+    expect(setDefaultBayDir(INITIAL_ONBOARDING_STATE, "/home/moh/proj").defaultBayDir).toBe("/home/moh/proj");
+    expect(setDefaultBayDir({ ...INITIAL_ONBOARDING_STATE, defaultBayDir: "/x" }, null).defaultBayDir).toBeNull();
   });
-  it("can clear adapter selection", () => {
-    const s = selectAdapter({ ...INITIAL_ONBOARDING_STATE, selectedAdapter: "claude" }, null);
-    expect(s.selectedAdapter).toBeNull();
+
+  it("toggles per-adapter yolo without clobbering siblings", () => {
+    const a = setAdapterYolo(INITIAL_ONBOARDING_STATE, "claude-code", true);
+    const b = setAdapterYolo(a, "codex", false);
+    expect(b.adapterYolo).toEqual({ "claude-code": true, "codex": false });
+    const c = setAdapterYolo(b, "claude-code", false);
+    expect(c.adapterYolo["claude-code"]).toBe(false);
+    expect(c.adapterYolo["codex"]).toBe(false);
   });
-  it("sets telemetry opt-in", () => {
-    const s = setTelemetryOptIn(INITIAL_ONBOARDING_STATE, true);
-    expect(s.telemetryOptIn).toBe(true);
+
+  it("sets backdrop, theme and agent chimes", () => {
+    expect(setBackdrop(INITIAL_ONBOARDING_STATE, "blur").backdrop).toBe("blur");
+    expect(setTheme(INITIAL_ONBOARDING_STATE, "mocha").theme).toBe("mocha");
+    expect(setAgentChimes(INITIAL_ONBOARDING_STATE, false).agentChimes).toBe(false);
   });
 });
 
 describe("currentStepData", () => {
   it("returns the step data for the current index", () => {
     const s = { ...INITIAL_ONBOARDING_STATE, currentStep: 2 };
-    expect(currentStepData(s).id).toBe("telemetry");
+    expect(currentStepData(s).id).toBe("appearance");
   });
   it("falls back to first step for out-of-range", () => {
     const s = { ...INITIAL_ONBOARDING_STATE, currentStep: 99 };
-    expect(currentStepData(s).id).toBe("welcome");
+    expect(currentStepData(s).id).toBe("harness");
   });
 });
 

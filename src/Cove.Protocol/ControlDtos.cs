@@ -144,6 +144,28 @@ public sealed record AdapterListItemDto(string Name, string DisplayName, string 
 public sealed record AdapterListResult(System.Collections.Generic.IReadOnlyList<AdapterListItemDto> Adapters);
 public sealed record RegistryEntryDto(string Name, string DisplayName, string Version, bool Official);
 public sealed record RegistryFetchResult(RegistryEntryDto[] Adapters);
+
+public sealed record ToolsRetentionDto(bool Present, bool Editable, bool Hidden, string? Value, string? Recommended);
+public sealed record ToolsAdapterDto(
+    string Name,
+    string DisplayName,
+    string Accent,
+    string Binary,
+    string? Status,
+    string? Version,
+    string? BinaryPath,
+    string? IconSvg,
+    string InstallHint,
+    bool Bundled,
+    bool Removable,
+    ToolsRetentionDto Retention);
+public sealed record ToolsListResult(System.Collections.Generic.IReadOnlyList<ToolsAdapterDto> Adapters);
+public sealed record AdapterNameParams(string Name);
+public sealed record AdapterInstallLocalParams(string Path);
+public sealed record AdapterInstallLocalResult(string Name);
+public sealed record AdapterRemoveParams(string Name, bool PurgeSessions = false);
+public sealed record AdapterRemoveResult(string Name, int PurgedSessions);
+public sealed record AdapterRetentionSetParams(string Name, string Value);
 public sealed record NeedsInputSignalDto(string NookId, string Adapter);
 public sealed record NotificationDeliverDto(string Id, string Title, string Body, string NookId);
 public sealed record OmniChatAppendParams(string NookId, string Role, string Body);
@@ -515,6 +537,15 @@ public sealed record PerfBundleListResult(System.Collections.Generic.IReadOnlyLi
 [JsonSerializable(typeof(LauncherOverridesDto))]
 [JsonSerializable(typeof(AdapterListResult))]
 [JsonSerializable(typeof(RegistryFetchResult))]
+[JsonSerializable(typeof(ToolsListResult))]
+[JsonSerializable(typeof(ToolsAdapterDto))]
+[JsonSerializable(typeof(ToolsRetentionDto))]
+[JsonSerializable(typeof(AdapterNameParams))]
+[JsonSerializable(typeof(AdapterInstallLocalParams))]
+[JsonSerializable(typeof(AdapterInstallLocalResult))]
+[JsonSerializable(typeof(AdapterRemoveParams))]
+[JsonSerializable(typeof(AdapterRemoveResult))]
+[JsonSerializable(typeof(AdapterRetentionSetParams))]
 [JsonSerializable(typeof(NeedsInputSignalDto))]
 [JsonSerializable(typeof(NotificationDeliverDto))]
 [JsonSerializable(typeof(LauncherOptionsParams))]

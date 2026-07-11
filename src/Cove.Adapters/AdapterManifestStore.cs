@@ -16,7 +16,15 @@ public sealed class AdapterManifestStore
         _logger = logger;
     }
 
+    public string AdaptersRoot => _adaptersRoot;
+
     public string ResolveDir(string adapter) => Path.Combine(_adaptersRoot, adapter);
+
+    public void Invalidate(string adapter)
+    {
+        lock (_lock)
+            _cache.Remove(adapter);
+    }
 
     public AdapterManifest? Load(string adapter)
     {

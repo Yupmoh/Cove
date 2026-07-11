@@ -38,13 +38,14 @@ import { buildBayTree, bayTreeEmptyMessage, NOOK_TYPE_LABELS, type TreeLeaf, typ
 import { buildAgentRows, mapAgentState, AGENT_STATE_META, type AgentCard, type AgentState } from "./agents-model";
 import { resolveActiveBayId, bayAccent, sortFsEntries, joinPath, scmChipText, parseCollapsedCardIds, serializeCollapsedCardIds, toggleCardCollapsed, type FsEntry, type BayCardEntry, type ScmSummary } from "./bay-cards";
 import { BAY_ICON_CHOICES, bayGlyph } from "./bay-icons";
+import { orderSettingsTabs, settingsTabLabel, resolveActiveSettingsTab } from "./settings-tabs";
 import { parseQuery, filterAndSort, MruTracker, cycleCategory, categoryLabel, type PaletteItem } from "./omni-palette";
 import { buildEmptyState, EmptyStateMessages } from "./empty-states";
 import { brandLogoAt, nextBrandIndex, parseBrandIndex } from "./brand";
-import { adapterCardSubtitle, adapterStatusMeta } from "./tools-tab";
+import { adapterStatusMeta, toolsSubtitle, retentionChipVisible, retentionChipLabel, type ToolsAdapter } from "./tools-tab";
 import { DEFAULT_DRAFT, draftFromTheme, themeFromDraft, cssVarsFromTheme, xtermThemeFromDto, isCustom, isBuiltin, canSaveDraft, canDelete, isValidHex, contrastRatio, contrastTier, THEME_COLOR_FIELDS, type ThemeDto, type ThemeDraft } from "./theme-editor";
 import { categorizeBindings, isReservedChord, isValidChord, chordDisplay, canRecordChord, normalizeChord as normalizeChordStr, type KeybindDto } from "./keyboard-editor";
-import { ONBOARDING_STEPS, INITIAL_ONBOARDING_STATE, nextStep, prevStep, dismiss as dismissOnboarding, currentStepData, isLastStep, isFirstStep, progressPercent, selectAdapter, setTelemetryOptIn, shouldShowOnboarding, onboardingSeenFromConfig, ONBOARDING_COMPLETED_KEY, type OnboardingState } from "./onboarding";
+import { ONBOARDING_STEPS, INITIAL_ONBOARDING_STATE, nextStep, prevStep, dismiss as dismissOnboarding, currentStepData, isLastStep, isFirstStep, progressPercent, setDefaultBayDir, setAdapterYolo, setBackdrop as setOnboardingBackdrop, setTheme as setOnboardingTheme, setAgentChimes as setOnboardingAgentChimes, shouldShowOnboarding, onboardingSeenFromConfig, ONBOARDING_COMPLETED_KEY, type OnboardingState } from "./onboarding";
 import { initBackdrop, setBackdropMaterial, nextToggleMaterial, coerceMaterial, BACKDROP_PREF_KEY, type BackdropDeps, type BackdropMaterial } from "./backdrop";
 import { detectChimes, playChime, chimesEnabledFrom, chimePrefValue, AGENT_CHIMES_STORAGE_KEY } from "./chime";
 import { NotificationBridge, type NotificationBridgeDeps, type NotificationDeliverPayload } from "./notifications";
@@ -2902,20 +2903,24 @@ function isRealSetting(e: ConfigSchemaEntry): boolean {
 
 function renderSettings(): void {
   const schemaTabs = [...new Set(configSchema.filter(isRealSetting).map((e) => e.tab))].sort();
-  const tabs = schemaTabs.includes("theme") ? (schemaTabs.includes("keyboard") ? schemaTabs : ["theme", "keyboard", ...schemaTabs]) : (schemaTabs.includes("keyboard") ? ["theme", ...schemaTabs] : ["theme", "keyboard", ...schemaTabs]);
+  const tabs = orderSettingsTabs(schemaTabs);
   if (tabs.length === 0) {
     setTabsEl.innerHTML = "";
     setBodyEl.innerHTML = `<div style="padding:20px;color:var(--muted);text-align:center;">No settings available</div>`;
     return;
   }
-  if (!tabs.includes("tools")) tabs.push("tools");
-  if (!activeSettingsTab || !tabs.includes(activeSettingsTab)) activeSettingsTab = tabs[0];
+  activeSettingsTab = resolveActiveSettingsTab(tabs, activeSettingsTab);
 
   setTabsEl.innerHTML = "";
   for (const tab of tabs) {
     const el = document.createElement("div");
-    el.className = "set-tab" + (tab === activeSettingsTab ? " active" : "");
-    el.textContent = tab.charAt(0).toUpperCase() + tab.slice(1);
+    el.className = "set-nav-item" + (tab === activeSettingsTab ? " active" : "");
+    const dot = document.createElement("span");
+    dot.className = "set-nav-dot";
+    const label = document.createElement("span");
+    label.textContent = settingsTabLabel(tab);
+    el.appendChild(dot);
+    el.appendChild(label);
     el.addEventListener("click", () => { activeSettingsTab = tab; renderSettings(); });
     setTabsEl.appendChild(el);
   }
@@ -3012,14 +3017,40 @@ function renderAudioExtras(container: HTMLElement): void {
   container.appendChild(row);
 }
 
+interface ToolsListResponse { adapters: ToolsAdapter[]; }
+
 async function renderToolsTab(container: HTMLElement): Promise<void> {
   container.innerHTML = "";
-  let adapters: AdapterInfo[];
+
+  const actions = document.createElement("div");
+  actions.className = "tools-actions";
+  actions.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;";
+  const rescanBtn = document.createElement("button");
+  rescanBtn.className = "diag-btn";
+  rescanBtn.style.marginTop = "0";
+  rescanBtn.textContent = "Re-scan";
+  rescanBtn.addEventListener("click", () => void doRescanAdapters(container, rescanBtn));
+  const addBtn = document.createElement("button");
+  addBtn.className = "diag-btn";
+  addBtn.style.marginTop = "0";
+  addBtn.textContent = "Add adapter from folder…";
+  addBtn.addEventListener("click", () => void doAddAdapterFromFolder(container));
+  const wizardBtn = document.createElement("button");
+  wizardBtn.className = "diag-btn";
+  wizardBtn.style.marginTop = "0";
+  wizardBtn.textContent = "Re-run setup wizard";
+  wizardBtn.addEventListener("click", () => rerunOnboarding());
+  actions.appendChild(rescanBtn);
+  actions.appendChild(addBtn);
+  actions.appendChild(wizardBtn);
+  container.appendChild(actions);
+
+  let adapters: ToolsAdapter[];
   try {
-    const result = await invoke<AdapterListResult>("app.adapterList", {});
+    const result = await invoke<ToolsListResponse>("cove://commands/adapter.tools-list", {});
     adapters = result.adapters ?? [];
   } catch (err) {
-    console.warn("adapter.list failed for tools tab", err);
+    console.warn("adapter.tools-list failed for tools tab", err);
     const failed = document.createElement("div");
     failed.className = "tools-empty";
     failed.textContent = "adapter list unavailable";
@@ -3035,53 +3066,207 @@ async function renderToolsTab(container: HTMLElement): Promise<void> {
   }
   const list = document.createElement("div");
   list.className = "tools-list";
-  for (const a of adapters) {
-    const card = document.createElement("div");
-    card.className = "tools-card";
+  for (const a of adapters) list.appendChild(buildToolsCard(a, container));
+  container.appendChild(list);
+}
 
+function buildToolsCard(a: ToolsAdapter, container: HTMLElement): HTMLElement {
+  const card = document.createElement("div");
+  card.className = "tools-card";
+
+  if (a.iconSvg) {
+    const icon = document.createElement("span");
+    icon.className = "tools-icon";
+    icon.style.cssText = "width:18px;height:18px;display:inline-flex;color:" + (a.accent || "var(--accent)") + ";";
+    icon.innerHTML = a.iconSvg;
+    const svg = icon.querySelector("svg");
+    if (svg) { svg.setAttribute("width", "18"); svg.setAttribute("height", "18"); }
+    card.appendChild(icon);
+  } else {
     const swatch = document.createElement("span");
     swatch.className = "tools-accent";
     swatch.style.background = a.accent || "var(--accent)";
     card.appendChild(swatch);
-
-    const body = document.createElement("div");
-    body.className = "tools-body";
-
-    const titleRow = document.createElement("div");
-    titleRow.className = "tools-title-row";
-    const name = document.createElement("span");
-    name.className = "tools-name";
-    name.textContent = a.displayName || a.name;
-    titleRow.appendChild(name);
-
-    const meta = adapterStatusMeta(a.status);
-    const status = document.createElement("span");
-    status.className = "tools-status";
-    const dot = document.createElement("span");
-    dot.className = "tools-dot";
-    dot.style.background = meta.cssColor;
-    const statusLabel = document.createElement("span");
-    statusLabel.textContent = meta.label;
-    statusLabel.style.color = meta.cssColor;
-    status.appendChild(dot);
-    status.appendChild(statusLabel);
-    titleRow.appendChild(status);
-    body.appendChild(titleRow);
-
-    const subtitle = document.createElement("div");
-    subtitle.className = "tools-subtitle";
-    subtitle.textContent = adapterCardSubtitle(a.version, a.binaryPath);
-    body.appendChild(subtitle);
-
-    const manifestName = document.createElement("div");
-    manifestName.className = "tools-manifest";
-    manifestName.textContent = a.name;
-    body.appendChild(manifestName);
-
-    card.appendChild(body);
-    list.appendChild(card);
   }
-  container.appendChild(list);
+
+  const body = document.createElement("div");
+  body.className = "tools-body";
+
+  const titleRow = document.createElement("div");
+  titleRow.className = "tools-title-row";
+  const name = document.createElement("span");
+  name.className = "tools-name";
+  name.textContent = a.displayName || a.name;
+  titleRow.appendChild(name);
+
+  const meta = adapterStatusMeta(a.status);
+  const status = document.createElement("span");
+  status.className = "tools-status";
+  const dot = document.createElement("span");
+  dot.className = "tools-dot";
+  dot.style.background = meta.cssColor;
+  const statusLabel = document.createElement("span");
+  statusLabel.textContent = meta.label;
+  statusLabel.style.color = meta.cssColor;
+  status.appendChild(dot);
+  status.appendChild(statusLabel);
+  titleRow.appendChild(status);
+  body.appendChild(titleRow);
+
+  const subtitle = document.createElement("div");
+  subtitle.className = "tools-subtitle";
+  subtitle.textContent = toolsSubtitle(a.status, a.version, a.binaryPath, a.installHint);
+  body.appendChild(subtitle);
+
+  const manifestRow = document.createElement("div");
+  manifestRow.className = "tools-manifest";
+  manifestRow.style.cssText = "display:flex;align-items:center;gap:8px;justify-content:space-between;";
+  const manifestName = document.createElement("span");
+  manifestName.textContent = a.bundled ? `${a.name} · bundled` : a.name;
+  manifestRow.appendChild(manifestName);
+  if (a.removable) {
+    const removeBtn = document.createElement("button");
+    removeBtn.className = "diag-btn";
+    removeBtn.style.cssText = "margin-top:0;padding:2px 8px;font-size:11px;";
+    removeBtn.textContent = "Remove";
+    removeBtn.addEventListener("click", () => openRemoveAdapterDialog(a, container));
+    manifestRow.appendChild(removeBtn);
+  }
+  body.appendChild(manifestRow);
+
+  if (retentionChipVisible(a.retention)) body.appendChild(buildRetentionChip(a, container));
+
+  card.appendChild(body);
+  return card;
+}
+
+function buildRetentionChip(a: ToolsAdapter, container: HTMLElement): HTMLElement {
+  const chip = document.createElement("div");
+  chip.className = "tools-retention";
+  chip.style.cssText = "display:flex;align-items:center;gap:8px;margin-top:6px;";
+  const label = document.createElement("span");
+  label.className = "set-desc";
+  label.textContent = retentionChipLabel(a.retention);
+  chip.appendChild(label);
+
+  if (a.retention.editable) {
+    const input = document.createElement("input");
+    input.type = "text";
+    input.className = "diag-input";
+    input.style.cssText = "width:64px;padding:2px 6px;margin:0;";
+    input.value = a.retention.value ?? "";
+    input.placeholder = a.retention.recommended ?? "";
+    const save = document.createElement("button");
+    save.className = "diag-btn";
+    save.style.cssText = "margin-top:0;padding:2px 8px;font-size:11px;";
+    save.textContent = "Extend";
+    save.addEventListener("click", () => void doSetRetention(a.name, input.value, container));
+    chip.appendChild(input);
+    chip.appendChild(save);
+  }
+  return chip;
+}
+
+async function doRescanAdapters(container: HTMLElement, btn: HTMLButtonElement): Promise<void> {
+  btn.disabled = true;
+  try {
+    await invoke("cove://commands/adapter.rescan", {});
+  } catch (e) {
+    console.warn("adapter.rescan failed", e);
+    showInAppToast("Re-scan failed", (e as Error).message, () => {});
+  } finally {
+    btn.disabled = false;
+    await renderToolsTab(container);
+  }
+}
+
+async function doAddAdapterFromFolder(container: HTMLElement): Promise<void> {
+  let picked: unknown;
+  try {
+    picked = await window.__ryn.invoke("dialog.openFolder", { initialPath: activeProjectDir() || "/" });
+  } catch (e) {
+    console.warn("adapter folder picker failed", e);
+    return;
+  }
+  if (picked === null) return;
+  const path = typeof picked === "string" ? picked.trim() : "";
+  if (!path) { console.warn("adapter folder picker returned nothing", picked); return; }
+  try {
+    const res = await invoke<{ name: string }>("cove://commands/adapter.install-local", { path });
+    showInAppToast("Adapter added", `${res.name} installed from folder.`, () => {});
+  } catch (e) {
+    showInAppToast("Adapter not added", (e as Error).message, () => {});
+  }
+  await renderToolsTab(container);
+}
+
+function openRemoveAdapterDialog(a: ToolsAdapter, container: HTMLElement): void {
+  const scrim = document.createElement("div");
+  scrim.className = "modal-scrim open";
+  scrim.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;z-index:9999;";
+  const box = document.createElement("div");
+  box.style.cssText = "background:var(--surface,#1e1e2e);border:1px solid var(--border);border-radius:10px;padding:18px;width:320px;max-width:90vw;";
+  const title = document.createElement("div");
+  title.style.cssText = "font-weight:600;margin-bottom:8px;";
+  title.textContent = `Remove ${a.displayName || a.name}?`;
+  const desc = document.createElement("div");
+  desc.className = "set-desc";
+  desc.style.marginBottom = "12px";
+  desc.textContent = "This deletes the adapter folder. Bundled adapters are not affected.";
+  const purgeLabel = document.createElement("label");
+  purgeLabel.style.cssText = "display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:14px;";
+  const purge = document.createElement("input");
+  purge.type = "checkbox";
+  const purgeText = document.createElement("span");
+  purgeText.textContent = "Also delete session records for this adapter";
+  purgeLabel.appendChild(purge);
+  purgeLabel.appendChild(purgeText);
+  const btnRow = document.createElement("div");
+  btnRow.style.cssText = "display:flex;gap:8px;justify-content:flex-end;";
+  const cancel = document.createElement("button");
+  cancel.className = "diag-btn";
+  cancel.style.marginTop = "0";
+  cancel.textContent = "Cancel";
+  const confirm = document.createElement("button");
+  confirm.className = "diag-btn";
+  confirm.style.marginTop = "0";
+  confirm.textContent = "Remove";
+  const close = (): void => scrim.remove();
+  cancel.addEventListener("click", close);
+  scrim.addEventListener("mousedown", (e) => { if (e.target === scrim) close(); });
+  confirm.addEventListener("click", () => {
+    close();
+    void doRemoveAdapter(a.name, purge.checked, container);
+  });
+  btnRow.appendChild(cancel);
+  btnRow.appendChild(confirm);
+  box.appendChild(title);
+  box.appendChild(desc);
+  box.appendChild(purgeLabel);
+  box.appendChild(btnRow);
+  scrim.appendChild(box);
+  document.body.appendChild(scrim);
+}
+
+async function doRemoveAdapter(name: string, purgeSessions: boolean, container: HTMLElement): Promise<void> {
+  try {
+    const res = await invoke<{ name: string; purgedSessions: number }>("cove://commands/adapter.remove", { name, purgeSessions });
+    const suffix = res.purgedSessions > 0 ? ` (${res.purgedSessions} session records purged)` : "";
+    showInAppToast("Adapter removed", `${res.name} removed${suffix}.`, () => {});
+  } catch (e) {
+    showInAppToast("Remove failed", (e as Error).message, () => {});
+  }
+  await renderToolsTab(container);
+}
+
+async function doSetRetention(name: string, value: string, container: HTMLElement): Promise<void> {
+  try {
+    await invoke("cove://commands/adapter.retention-set", { name, value: value.trim() });
+    showInAppToast("Retention updated", `${name} retention set to ${value.trim()}.`, () => {});
+  } catch (e) {
+    showInAppToast("Retention not saved", (e as Error).message, () => {});
+  }
+  await renderToolsTab(container);
 }
 
 function diagnosticsSectionHeader(text: string): HTMLElement {
@@ -3776,8 +3961,10 @@ function renderOnboarding(): void {
   p.textContent = step.body;
   body.appendChild(p);
 
-  if (step.id === "adapters") { renderAdapterChoice(body); }
-  if (step.id === "telemetry") { renderTelemetryChoice(body); }
+  if (step.id === "harness") { void renderHarnessStep(body); }
+  if (step.id === "permissions") { void renderPermissionsStep(body); }
+  if (step.id === "appearance") { renderAppearanceStep(body); }
+  if (step.id === "sound") { renderSoundStep(body); }
 
   const prevBtn = onboardingEl.querySelector(".ob-prev") as HTMLButtonElement;
   const nextBtn = onboardingEl.querySelector(".ob-next") as HTMLButtonElement;
@@ -3785,41 +3972,166 @@ function renderOnboarding(): void {
   nextBtn.textContent = isLastStep(onboardingState) ? "Finish" : "Next";
 }
 
-function renderAdapterChoice(body: HTMLElement): void {
-  const list = document.createElement("div");
-  list.className = "ob-adapter-list";
-  const adapters = [
-    { id: "claude", name: "Claude Code" },
-    { id: "codex", name: "Codex" },
-    { id: "gemini", name: "Gemini CLI" },
-    { id: null, name: "Skip — configure later" },
-  ];
-  for (const a of adapters) {
-    const el = document.createElement("div");
-    el.className = "ob-adapter" + (onboardingState.selectedAdapter === a.id ? " selected" : "");
-    const name = document.createElement("span");
-    name.className = "ob-adapter-name";
-    name.textContent = a.name;
-    el.appendChild(name);
-    el.addEventListener("click", () => { onboardingState = selectAdapter(onboardingState, a.id); renderOnboarding(); });
-    list.appendChild(el);
+async function loadWizardAdapters(): Promise<ToolsAdapter[]> {
+  try {
+    const result = await invoke<ToolsListResponse>("cove://commands/adapter.tools-list", {});
+    return result.adapters ?? [];
+  } catch (e) {
+    console.warn("wizard adapter list failed", e);
+    return [];
   }
-  body.appendChild(list);
 }
 
-function renderTelemetryChoice(body: HTMLElement): void {
-  const toggle = document.createElement("div");
+async function renderHarnessStep(body: HTMLElement): Promise<void> {
+  const grid = document.createElement("div");
+  grid.className = "ob-adapter-list";
+  body.appendChild(grid);
+  const adapters = await loadWizardAdapters();
+  grid.className = "ob-adapter-list" + (adapters.length > 4 ? " ob-grid-2" : "");
+  if (adapters.length === 0) {
+    const none = document.createElement("div");
+    none.className = "ob-adapter";
+    none.textContent = "No tools detected yet — add one later from Settings → Tools.";
+    grid.appendChild(none);
+  }
+  for (const a of adapters) {
+    const el = document.createElement("div");
+    el.className = "ob-adapter";
+    const meta = adapterStatusMeta(a.status);
+    const name = document.createElement("span");
+    name.className = "ob-adapter-name";
+    name.textContent = a.displayName || a.name;
+    const dot = document.createElement("span");
+    dot.className = "tools-dot";
+    dot.style.cssText = `background:${meta.cssColor};margin-left:8px;`;
+    name.appendChild(dot);
+    el.appendChild(name);
+    grid.appendChild(el);
+  }
+
+  const dirRow = document.createElement("div");
+  dirRow.style.cssText = "display:flex;gap:8px;align-items:center;margin-top:12px;";
+  const dirInput = document.createElement("input");
+  dirInput.type = "text";
+  dirInput.className = "diag-input";
+  dirInput.style.cssText = "flex:1;margin:0;padding:4px 8px;";
+  dirInput.placeholder = "Default bay directory";
+  dirInput.value = onboardingState.defaultBayDir ?? "";
+  dirInput.addEventListener("input", () => { onboardingState = setDefaultBayDir(onboardingState, dirInput.value.trim() || null); });
+  const browse = document.createElement("button");
+  browse.className = "diag-btn";
+  browse.style.marginTop = "0";
+  browse.textContent = "Browse…";
+  browse.addEventListener("click", async () => {
+    try {
+      const picked = await window.__ryn.invoke("dialog.openFolder", { initialPath: dirInput.value.trim() || "/" });
+      if (typeof picked === "string" && picked.trim()) {
+        dirInput.value = picked.trim();
+        onboardingState = setDefaultBayDir(onboardingState, picked.trim());
+      }
+    } catch (e) { console.warn("wizard folder picker failed", e); }
+  });
+  dirRow.appendChild(dirInput);
+  dirRow.appendChild(browse);
+  body.appendChild(dirRow);
+}
+
+async function renderPermissionsStep(body: HTMLElement): Promise<void> {
+  const list = document.createElement("div");
+  list.className = "ob-adapter-list";
+  body.appendChild(list);
+  const adapters = await loadWizardAdapters();
+  if (adapters.length === 0) {
+    const none = document.createElement("div");
+    none.className = "ob-adapter";
+    none.textContent = "No adapters to configure yet.";
+    list.appendChild(none);
+    return;
+  }
+  for (const a of adapters) {
+    const row = document.createElement("label");
+    row.className = "ob-telemetry-toggle";
+    row.style.cssText = "display:flex;align-items:center;gap:8px;justify-content:space-between;";
+    const name = document.createElement("span");
+    name.textContent = `${a.displayName || a.name} — bypass permissions (YOLO)`;
+    name.style.fontSize = "12px";
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = onboardingState.adapterYolo[a.name] ?? launcherYolo(a.name);
+    cb.addEventListener("change", () => { onboardingState = setAdapterYolo(onboardingState, a.name, cb.checked); });
+    row.appendChild(name);
+    row.appendChild(cb);
+    list.appendChild(row);
+  }
+}
+
+function renderAppearanceStep(body: HTMLElement): void {
+  const backdropRow = document.createElement("div");
+  backdropRow.style.cssText = "display:flex;gap:8px;align-items:center;margin-top:10px;";
+  const backdropLabel = document.createElement("span");
+  backdropLabel.style.cssText = "font-size:12px;min-width:80px;";
+  backdropLabel.textContent = "Backdrop";
+  const backdropSel = document.createElement("select");
+  backdropSel.className = "diag-input";
+  backdropSel.style.cssText = "margin:0;padding:4px 8px;";
+  for (const m of ["none", "blur", "acrylic", "mica"]) {
+    const opt = document.createElement("option");
+    opt.value = m;
+    opt.textContent = m;
+    backdropSel.appendChild(opt);
+  }
+  backdropSel.value = onboardingState.backdrop || backdropMaterial;
+  backdropSel.addEventListener("change", () => {
+    onboardingState = setOnboardingBackdrop(onboardingState, backdropSel.value);
+    backdropMaterial = coerceMaterial(backdropSel.value);
+    void setBackdropMaterial(backdropMaterial, backdropDeps);
+  });
+  backdropRow.appendChild(backdropLabel);
+  backdropRow.appendChild(backdropSel);
+  body.appendChild(backdropRow);
+
+  const themeRow = document.createElement("div");
+  themeRow.style.cssText = "display:flex;gap:8px;align-items:center;margin-top:10px;";
+  const themeLabel = document.createElement("span");
+  themeLabel.style.cssText = "font-size:12px;min-width:80px;";
+  themeLabel.textContent = "Theme";
+  const themeSel = document.createElement("select");
+  themeSel.className = "diag-input";
+  themeSel.style.cssText = "margin:0;padding:4px 8px;";
+  themeRow.appendChild(themeLabel);
+  themeRow.appendChild(themeSel);
+  body.appendChild(themeRow);
+  void invoke<{ themes: ThemeDto[] }>("cove://commands/theme.list", {}).then((r) => {
+    for (const t of r.themes ?? []) {
+      const opt = document.createElement("option");
+      opt.value = t.name;
+      opt.textContent = t.name;
+      themeSel.appendChild(opt);
+    }
+    if (onboardingState.theme) themeSel.value = onboardingState.theme;
+    else if (themeActiveName) themeSel.value = themeActiveName;
+  }).catch(() => { void 0; });
+  themeSel.addEventListener("change", () => {
+    onboardingState = setOnboardingTheme(onboardingState, themeSel.value);
+    void invoke("cove://commands/theme.set-active", { name: themeSel.value }).catch((e) => console.warn("wizard theme set failed", e));
+  });
+}
+
+function renderSoundStep(body: HTMLElement): void {
+  const toggle = document.createElement("label");
   toggle.className = "ob-telemetry-toggle";
+  toggle.style.cssText = "display:flex;align-items:center;gap:8px;";
   const cb = document.createElement("input");
   cb.type = "checkbox";
-  cb.id = "ob-telemetry-cb";
-  cb.checked = onboardingState.telemetryOptIn;
-  const label = document.createElement("label");
-  label.htmlFor = "ob-telemetry-cb";
-  label.textContent = "Enable anonymous telemetry (optional)";
-  label.style.fontSize = "12px";
-  label.style.color = "var(--fg)";
-  cb.addEventListener("change", () => { onboardingState = setTelemetryOptIn(onboardingState, cb.checked); });
+  cb.checked = onboardingState.agentChimes;
+  const label = document.createElement("span");
+  label.textContent = "Agent chimes — soft tone when an agent finishes or needs input";
+  label.style.cssText = "font-size:12px;color:var(--fg);";
+  cb.addEventListener("change", () => {
+    onboardingState = setOnboardingAgentChimes(onboardingState, cb.checked);
+    setAgentChimesEnabled(cb.checked);
+    if (cb.checked) playChime("done");
+  });
   toggle.appendChild(cb);
   toggle.appendChild(label);
   body.appendChild(toggle);
@@ -3846,11 +4158,22 @@ async function onOnboardingSkip(): Promise<void> {
 
 async function completeOnboarding(): Promise<void> {
   onboardingEl.classList.remove("open");
+  for (const [adapter, on] of Object.entries(onboardingState.adapterYolo)) {
+    localStorage.setItem(launcherYoloKey(adapter), String(on));
+  }
+  setAgentChimesEnabled(onboardingState.agentChimes);
   try {
     await invoke("app.configSet", { key: ONBOARDING_COMPLETED_KEY, value: "true" });
-    if (onboardingState.telemetryOptIn) { await invoke("app.configSet", { key: "telemetry.enabled", value: "true" }); }
-    if (onboardingState.selectedAdapter) { await invoke("app.configSet", { key: "adapterCommands.default", value: onboardingState.selectedAdapter }); }
+    if (onboardingState.defaultBayDir) { await invoke("app.configSet", { key: "bays.defaultDir", value: onboardingState.defaultBayDir }); }
+    await invoke("app.configSet", { key: BACKDROP_PREF_KEY, value: onboardingState.backdrop });
+    if (onboardingState.theme) { await invoke("app.configSet", { key: "appearance.theme", value: onboardingState.theme }); }
   } catch (e) { console.warn("onboarding persist failed", e); }
+}
+
+function rerunOnboarding(): void {
+  onboardingState = { ...INITIAL_ONBOARDING_STATE, backdrop: backdropMaterial, theme: themeActiveName, agentChimes: agentChimesEnabled() };
+  onboardingEl.classList.add("open");
+  renderOnboarding();
 }
 
 (onboardingEl.querySelector(".ob-next") as HTMLButtonElement).addEventListener("click", () => void onOnboardingNext());
@@ -4173,7 +4496,7 @@ function renderConfigureAdapterCard(): HTMLElement {
 }
 
 function openAdapterSetup(): void {
-  onboardingState = { ...INITIAL_ONBOARDING_STATE, currentStep: 1 };
+  onboardingState = { ...INITIAL_ONBOARDING_STATE, backdrop: backdropMaterial, theme: themeActiveName, agentChimes: agentChimesEnabled() };
   onboardingEl.classList.add("open");
   renderOnboarding();
 }

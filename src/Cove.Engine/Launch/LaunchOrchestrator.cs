@@ -25,7 +25,7 @@ public sealed class LaunchOrchestrator
     private readonly AdapterManifestStore? _manifestStore;
     private readonly MethodRunner? _methodRunner;
     private readonly BinaryDiscoveryService? _binaryDiscovery;
-    private readonly string? _loginShellPath;
+    private string? _loginShellPath;
     private readonly Dictionary<string, LauncherOverrides> _nookOverrides = new();
     private readonly LauncherOverrideStore? _overrideStore;
     private readonly Microsoft.Extensions.Logging.ILogger? _logger;
@@ -90,6 +90,11 @@ public sealed class LaunchOrchestrator
 
         var cmd = BuildLaunchCommand(profile, overrides);
         return new AgentResumeResult(AgentResumeState.Succeeded, cmd, null, sessionId);
+    }
+
+    public void RefreshLoginShellPath()
+    {
+        _loginShellPath = Cove.Platform.LoginShellPath.Probe();
     }
 
     public BinaryDiscoveryResult DescribeAdapterBinary(AdapterManifest manifest)

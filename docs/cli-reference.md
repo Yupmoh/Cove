@@ -42,7 +42,13 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/adapter-env.list` | core |  |
 | `cove://commands/adapter-env.resolve` | core |  |
 | `cove://commands/adapter-env.save` | core |  |
+| `cove://commands/adapter.install-local` | core |  |
 | `cove://commands/adapter.list` | core |  |
+| `cove://commands/adapter.remove` | core |  |
+| `cove://commands/adapter.rescan` | core |  |
+| `cove://commands/adapter.retention-get` | core |  |
+| `cove://commands/adapter.retention-set` | core |  |
+| `cove://commands/adapter.tools-list` | core |  |
 | `cove://commands/agent.close` | core |  |
 | `cove://commands/agent.definition.delete` | core |  |
 | `cove://commands/agent.definition.list` | core |  |
@@ -458,4 +464,4 @@ Generated from the command registry. Do not edit by hand.
 | `viewer get-state` | cli |  |
 | `viewer open` | cli |  |
 
-Total: 453 commands
+Total: 459 commands

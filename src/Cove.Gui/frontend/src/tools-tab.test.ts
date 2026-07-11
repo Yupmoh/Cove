@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { adapterCardSubtitle, adapterStatusMeta } from "./tools-tab";
+import {
+  adapterCardSubtitle,
+  adapterStatusMeta,
+  toolsSubtitle,
+  retentionChipVisible,
+  retentionChipLabel,
+  type ToolsRetention,
+} from "./tools-tab";
 
 describe("adapterStatusMeta", () => {
   it("maps detected to a green swatch", () => {
@@ -35,5 +42,47 @@ describe("adapterCardSubtitle", () => {
 
   it("handles both missing", () => {
     expect(adapterCardSubtitle(null, undefined)).toBe("version unknown · binary not found");
+  });
+});
+
+describe("toolsSubtitle", () => {
+  it("shows version and path when detected", () => {
+    expect(toolsSubtitle("detected", "1.2.3", "/usr/local/bin/x", "hint")).toBe("v1.2.3 · /usr/local/bin/x");
+  });
+
+  it("shows the install hint when not detected", () => {
+    expect(toolsSubtitle("missing", null, null, "npm i -g x")).toBe("not found · npm i -g x");
+  });
+
+  it("falls back to plain not-found with no hint", () => {
+    expect(toolsSubtitle("broken", null, null, "   ")).toBe("not found");
+  });
+});
+
+describe("retentionChipVisible", () => {
+  const base: ToolsRetention = { present: true, editable: true, hidden: false, value: "7", recommended: "30" };
+
+  it("visible when present and not hidden", () => {
+    expect(retentionChipVisible(base)).toBe(true);
+  });
+
+  it("hidden at or above recommended", () => {
+    expect(retentionChipVisible({ ...base, hidden: true })).toBe(false);
+  });
+
+  it("absent when not present", () => {
+    expect(retentionChipVisible({ ...base, present: false })).toBe(false);
+    expect(retentionChipVisible(null)).toBe(false);
+    expect(retentionChipVisible(undefined)).toBe(false);
+  });
+});
+
+describe("retentionChipLabel", () => {
+  it("shows the current value", () => {
+    expect(retentionChipLabel({ present: true, editable: true, hidden: false, value: "7", recommended: "30" })).toBe("Retention: 7");
+  });
+
+  it("falls back to default when empty", () => {
+    expect(retentionChipLabel({ present: true, editable: false, hidden: false, value: null, recommended: null })).toBe("Retention: default");
   });
 });
