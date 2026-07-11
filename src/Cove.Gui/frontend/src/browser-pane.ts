@@ -70,11 +70,20 @@ export class BrowserNavState {
 
 export interface CssRect { x: number; y: number; width: number; height: number; }
 
-export function nativeWebviewBounds(rect: CssRect, windowInnerHeight: number): { x: number; y: number; width: number; height: number } {
-  const width = Math.max(1, Math.round(rect.width));
-  const height = Math.max(1, Math.round(rect.height));
-  const y = Math.max(0, Math.round(windowInnerHeight - rect.y - rect.height));
-  return { x: Math.round(rect.x), y, width, height };
+export function nativeWebviewBounds(rect: CssRect): { x: number; y: number; width: number; height: number } {
+  return {
+    x: Math.round(rect.x),
+    y: Math.max(0, Math.round(rect.y)),
+    width: Math.max(1, Math.round(rect.width)),
+    height: Math.max(1, Math.round(rect.height)),
+  };
+}
+
+export function themeBackgroundColor(cssValue: string): string | null {
+  const v = cssValue.trim();
+  if (/^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(v)) return v;
+  if (/^rgba?\(/i.test(v)) return v;
+  return null;
 }
 
 async function whenLaidOut(el: HTMLElement): Promise<void> {
@@ -234,20 +243,22 @@ export async function renderBrowserPane(paneId: string, initialUrl: string, user
     if (webviewId === null || crashState.isCrashed) return;
     const rect = contentArea.getBoundingClientRect();
     if (rect.width < 1 || rect.height < 1) return;
-    const bounds = nativeWebviewBounds(rect, window.innerHeight);
+    const bounds = nativeWebviewBounds(rect);
     void invoke("webviewPane.setBounds", { id: webviewId, x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height }).catch(() => void 0);
   };
 
   const openWebView = async (url: string) => {
     const storagePath = `/tmp/cove-webview-${paneId}`;
     await whenLaidOut(contentArea);
-    const bounds = nativeWebviewBounds(contentArea.getBoundingClientRect(), window.innerHeight);
+    const bounds = nativeWebviewBounds(contentArea.getBoundingClientRect());
     const openArgs: Record<string, unknown> = {
       url,
       x: bounds.x, y: bounds.y,
       width: bounds.width, height: bounds.height,
       storagePath, devTools: false, zoom: zoomLevel,
     };
+    const paneBackground = themeBackgroundColor(getComputedStyle(document.body).getPropertyValue("--bg"));
+    if (paneBackground) openArgs.background = paneBackground;
     if (userAgent && userAgent.length > 0) openArgs.userAgent = userAgent;
     const result = await invoke<unknown>("webviewPane.open", { options: openArgs });
     const id = extractWebviewId(result);

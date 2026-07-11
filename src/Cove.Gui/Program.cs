@@ -52,7 +52,6 @@ internal static class Program
                 s.AddRynBadge();
                 s.AddRynGlobalShortcut();
                 s.AddRynWebViewPane();
-                s.AddSingleton<IRynPlugin, WebViewShutdownPlugin>();
                 s.AddRynNotification();
                 s.AddRynDialog();
                 s.AddPerfResultsCommand();

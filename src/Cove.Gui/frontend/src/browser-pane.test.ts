@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { BrowserNavState, normalizeUrl, nativeWebviewBounds } from "./browser-pane";
+import { BrowserNavState, normalizeUrl, nativeWebviewBounds, themeBackgroundColor } from "./browser-pane";
 
 describe("normalizeUrl", () => {
   it("prepends https:// for bare domains", () => {
@@ -98,21 +98,35 @@ describe("BrowserNavState", () => {
 });
 
 describe("nativeWebviewBounds", () => {
-  it("flips css top-left coordinates into bottom-left native bounds", () => {
-    const b = nativeWebviewBounds({ x: 298, y: 90, width: 944, height: 790 }, 950);
-    expect(b).toEqual({ x: 298, y: 70, width: 944, height: 790 });
+  it("passes top-left css coordinates through per the ryn 0.23 contract", () => {
+    const b = nativeWebviewBounds({ x: 298, y: 90, width: 944, height: 790 });
+    expect(b).toEqual({ x: 298, y: 90, width: 944, height: 790 });
   });
 
-  it("rounds fractional rects and enforces a minimum size", () => {
-    const b = nativeWebviewBounds({ x: 10.4, y: 20.6, width: 0.2, height: 0.4 }, 500);
-    expect(b.x).toBe(10);
-    expect(b.width).toBe(1);
-    expect(b.height).toBe(1);
-    expect(b.y).toBe(479);
+  it("rounds fractional values and clamps to minimum size", () => {
+    const b = nativeWebviewBounds({ x: 10.4, y: 20.6, width: 0.2, height: 0.4 });
+    expect(b).toEqual({ x: 10, y: 21, width: 1, height: 1 });
   });
 
-  it("clamps the native y at zero when the rect overflows the window", () => {
-    const b = nativeWebviewBounds({ x: 0, y: 100, width: 200, height: 600 }, 500);
+  it("clamps negative y to zero", () => {
+    const b = nativeWebviewBounds({ x: 0, y: -5, width: 200, height: 600 });
     expect(b.y).toBe(0);
+  });
+});
+
+describe("themeBackgroundColor", () => {
+  it("accepts hex and rgb forms", () => {
+    expect(themeBackgroundColor("#1e1e2e")).toBe("#1e1e2e");
+    expect(themeBackgroundColor("  #abc  ")).toBe("#abc");
+    expect(themeBackgroundColor("#11223344")).toBe("#11223344");
+    expect(themeBackgroundColor("rgba(30, 30, 46, 0.5)")).toBe("rgba(30, 30, 46, 0.5)");
+    expect(themeBackgroundColor("rgb(30, 30, 46)")).toBe("rgb(30, 30, 46)");
+  });
+
+  it("rejects anything ryn would refuse", () => {
+    expect(themeBackgroundColor("")).toBeNull();
+    expect(themeBackgroundColor("var(--bg)")).toBeNull();
+    expect(themeBackgroundColor("#12345")).toBeNull();
+    expect(themeBackgroundColor("navy")).toBeNull();
   });
 });
