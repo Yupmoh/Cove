@@ -6,13 +6,13 @@ All configuration keys for Cove, grouped by settings tab.
 
 | Key | Label | Type | Control | Description |
 |-----|-------|------|---------|-------------|
-| `AppearanceSection.accent` | Accent Override | string | text |  |
-| `AppearanceSection.iconSet` | Icon Set | string | select |  |
-| `AppearanceSection.layoutGap` | Layout Gap | int | number |  |
-| `AppearanceSection.paneLight` | Pane Light | bool | toggle |  |
-| `AppearanceSection.uiScale` | UI Scale | double | number |  |
-| `AppearanceSection.wallpaper` | Wallpaper | string | text |  |
 | `appearance` | Appearance | object | section |  |
+| `appearance.accent` | Accent Override | string | text |  |
+| `appearance.iconSet` | Icon Set | string | select |  |
+| `appearance.layoutGap` | Layout Gap | int | number |  |
+| `appearance.paneLight` | Pane Light | bool | toggle |  |
+| `appearance.uiScale` | UI Scale | double | number |  |
+| `appearance.wallpaper` | Wallpaper | string | text |  |
 | `theme` | Theme | string | select |  |
 
 ## audio

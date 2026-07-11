@@ -210,6 +210,7 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/scm.blame` | core |  |
 | `cove://commands/scm.commit` | core |  |
 | `cove://commands/scm.diff` | core |  |
+| `cove://commands/scm.log` | core |  |
 | `cove://commands/scm.stage` | core |  |
 | `cove://commands/scm.status` | core |  |
 | `cove://commands/search.get-state` | core |  |
@@ -453,4 +454,4 @@ Generated from the command registry. Do not edit by hand.
 | `viewer get-state` | cli |  |
 | `viewer open` | cli |  |
 
-Total: 448 commands
+Total: 449 commands
