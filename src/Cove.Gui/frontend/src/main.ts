@@ -948,6 +948,30 @@ function renderSearchPaneWrapper(paneId: string): HTMLElement {
   });
   return placeholder;
 }
+function wrapToolPaneChrome(paneId: string, label: string, content: HTMLElement): HTMLElement {
+  const el = document.createElement("div");
+  el.className = "pane tool-pane";
+  el.style.flexGrow = "1";
+  const header = document.createElement("div");
+  header.className = "pane-header";
+  const title = document.createElement("span");
+  title.className = "pt";
+  title.textContent = label;
+  header.appendChild(title);
+  const closeBtn = document.createElement("button");
+  closeBtn.className = "pmore pclose";
+  closeBtn.textContent = "✕";
+  closeBtn.title = "Close pane";
+  closeBtn.addEventListener("click", (e) => { e.stopPropagation(); void closePaneById(paneId); });
+  header.appendChild(closeBtn);
+  el.appendChild(header);
+  content.style.flex = "1 1 0";
+  content.style.minWidth = "0";
+  content.style.minHeight = "0";
+  el.appendChild(content);
+  return el;
+}
+
 function renderBrowserPaneWrapper(paneId: string, url: string): HTMLElement {
   const placeholder = document.createElement("div");
   placeholder.className = "browser-pane-placeholder";
@@ -958,9 +982,10 @@ function renderBrowserPaneWrapper(paneId: string, url: string): HTMLElement {
     el.style.minHeight = "0";
     placeholder.replaceWith(el);
   }).catch(e => {
+    console.warn("browser pane load failed", paneId, e);
     placeholder.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to load browser: ${(e as Error).message}</div>`;
   });
-  return placeholder;
+  return wrapToolPaneChrome(paneId, "Browser", placeholder);
 }
 function renderDiffViewerPaneWrapper(paneId: string, refInput: string): HTMLElement {
   const placeholder = document.createElement("div");
@@ -3743,7 +3768,7 @@ interface SessionRecentResult { sessions: RecentSessionRow[]; }
 async function loadLauncherAdapters(): Promise<void> {
   try {
     const result = await invoke<AdapterListResult>("app.adapterList", {});
-    launcherAdapters = (result.adapters ?? []).map((a) => ({ name: a.name, displayName: a.displayName, accent: a.accent, binary: a.binary }));
+    launcherAdapters = (result.adapters ?? []).map((a) => ({ name: a.name, displayName: a.displayName, accent: a.accent, binary: a.binary, version: a.version ?? "" }));
   } catch { launcherAdapters = []; }
   await loadLauncherRecents();
   if ((layout?.rooms ?? []).length === 0) renderRoom();
@@ -3919,6 +3944,18 @@ function paintBoxLauncher(wrap: HTMLElement, ctx: LauncherContext): void {
   }
   wrap.appendChild(cards);
 
+  if (launcherSelection.section === "harness") {
+    const selTile = harness[launcherSelection.index];
+    if (selTile && !selTile.disabled) wrap.appendChild(renderDetailDock(ctx, selTile));
+  }
+
+  if (tools.length > 0) {
+    const toolLabel = document.createElement("div");
+    toolLabel.className = "cl-section-label";
+    toolLabel.textContent = "open a pane";
+    wrap.appendChild(toolLabel);
+  }
+
   const toolRow = document.createElement("div");
   toolRow.className = "cl-tool-row";
   tools.forEach((tile, i) => {
@@ -3958,45 +3995,47 @@ function renderHarnessCard(ctx: LauncherContext, tile: LauncherTile, letter: str
   const accent = adapterAccent(tile.adapterName, tile.accent);
   const el = document.createElement("div");
   el.className = "cl-card" + (tile.disabled ? " disabled" : "") + (selected ? " selected" : "");
-  if (selected && !tile.disabled) { el.classList.add("expanded"); el.style.setProperty("--card-accent", accent); }
   el.style.setProperty("--card-accent", accent);
 
   const top = document.createElement("div");
   top.className = "cl-card-top";
-  const key = document.createElement("span");
-  key.className = "cl-card-key";
-  key.textContent = letter;
-  const cta = document.createElement("span");
-  cta.className = "cl-card-cta";
-  cta.textContent = "⌘↵";
-  top.appendChild(key);
-  top.appendChild(cta);
-  el.appendChild(top);
-
   const badge = document.createElement("span");
   badge.className = "cl-card-badge";
   badge.textContent = monogram(tile.label);
-  el.appendChild(badge);
+  const key = document.createElement("span");
+  key.className = "cl-card-key";
+  key.textContent = letter;
+  top.appendChild(badge);
+  top.appendChild(key);
+  el.appendChild(top);
 
   const name = document.createElement("div");
   name.className = "cl-card-name";
   name.textContent = tile.label;
   el.appendChild(name);
 
-  if (tile.disabled) {
-    const note = document.createElement("div");
-    note.className = "cl-card-note";
-    note.textContent = tile.note || "not detected";
-    el.appendChild(note);
-    return el;
-  }
+  const status = document.createElement("div");
+  status.className = "cl-card-status" + (tile.disabled ? " off" : "");
+  const statusDot = document.createElement("span");
+  statusDot.className = "cl-card-status-dot";
+  const statusText = document.createElement("span");
+  statusText.className = "cl-card-status-text";
+  statusText.textContent = tile.disabled ? (tile.note || "not detected") : (tile.version ? tile.version : "ready");
+  status.appendChild(statusDot);
+  status.appendChild(statusText);
+  el.appendChild(status);
+
+  if (tile.disabled) return el;
+
+  const cta = document.createElement("span");
+  cta.className = "cl-card-cta";
+  cta.textContent = "⌘↵";
+  el.appendChild(cta);
 
   el.addEventListener("click", () => {
     if (selected) launchHarnessTile(ctx, tile);
     else { launcherSelection = { section: "harness", index: harnessIndexOf(tile) }; repaintActiveLauncher(); }
   });
-
-  if (selected) el.appendChild(renderCardExpansion(ctx, tile));
   return el;
 }
 
@@ -4013,27 +4052,36 @@ function repaintActiveLauncher(): void {
   wrap.focus();
 }
 
-function renderCardExpansion(ctx: LauncherContext, tile: LauncherTile): HTMLElement {
-  const body = document.createElement("div");
-  body.className = "cl-card-expand";
+function renderDetailDock(ctx: LauncherContext, tile: LauncherTile): HTMLElement {
+  const accent = adapterAccent(tile.adapterName, tile.accent);
+  const dock = document.createElement("div");
+  dock.className = "cl-dock";
+  dock.style.setProperty("--card-accent", accent);
+  dock.addEventListener("click", (e) => e.stopPropagation());
 
-  const chipRow = document.createElement("div");
-  chipRow.className = "cl-key-chip-row";
-  const chip = document.createElement("span");
-  chip.className = "cl-key-chip";
-  chip.textContent = "⌘↵ new session";
-  chipRow.appendChild(chip);
-  body.appendChild(chipRow);
+  const identity = document.createElement("div");
+  identity.className = "cl-dock-id";
+  const dot = document.createElement("span");
+  dot.className = "cl-dock-dot";
+  const idText = document.createElement("div");
+  idText.className = "cl-dock-id-text";
+  const idName = document.createElement("div");
+  idName.className = "cl-dock-id-name";
+  idName.textContent = tile.label;
+  const idSub = document.createElement("div");
+  idSub.className = "cl-dock-id-sub";
+  idSub.textContent = tile.version ? `${tile.version} · start a new session` : "start a new session";
+  idText.appendChild(idName);
+  idText.appendChild(idSub);
+  identity.appendChild(dot);
+  identity.appendChild(idText);
+  dock.appendChild(identity);
 
-  const newSession = document.createElement("button");
-  newSession.className = "cl-new-session";
-  newSession.textContent = "New session";
-  newSession.addEventListener("click", (e) => { e.stopPropagation(); launchHarnessTile(ctx, tile); });
-  body.appendChild(newSession);
+  const controls = document.createElement("div");
+  controls.className = "cl-dock-controls";
 
   const yoloRow = document.createElement("label");
   yoloRow.className = "cl-yolo-row";
-  yoloRow.addEventListener("click", (e) => e.stopPropagation());
   const yoloBox = document.createElement("input");
   yoloBox.type = "checkbox";
   yoloBox.checked = launcherYolo(tile.adapterName);
@@ -4042,7 +4090,7 @@ function renderCardExpansion(ctx: LauncherContext, tile: LauncherTile): HTMLElem
   yoloLabel.textContent = "skip permissions";
   yoloRow.appendChild(yoloBox);
   yoloRow.appendChild(yoloLabel);
-  body.appendChild(yoloRow);
+  controls.appendChild(yoloRow);
 
   const recentRows = launcherRecents.filter((r) => r.adapter === tile.adapterName);
   const shaped = shapeRecentSessions(recentRows, Date.now(), 8);
@@ -4051,19 +4099,15 @@ function renderCardExpansion(ctx: LauncherContext, tile: LauncherTile): HTMLElem
     dd.className = "cl-resume-dd";
     const trigger = document.createElement("button");
     trigger.className = "cl-resume-trigger";
-    const dot = document.createElement("span");
-    dot.className = "cl-session-dot";
-    dot.style.background = adapterAccent(tile.adapterName, tile.accent);
     const triggerLabel = document.createElement("span");
     triggerLabel.className = "cl-resume-label";
-    triggerLabel.textContent = "Resume session";
+    triggerLabel.textContent = "Resume";
     const count = document.createElement("span");
     count.className = "cl-resume-count";
     count.textContent = String(shaped.length);
     const chev = document.createElement("span");
     chev.className = "cl-resume-chev";
     chev.textContent = "▾";
-    trigger.appendChild(dot);
     trigger.appendChild(triggerLabel);
     trigger.appendChild(count);
     trigger.appendChild(chev);
@@ -4073,6 +4117,9 @@ function renderCardExpansion(ctx: LauncherContext, tile: LauncherTile): HTMLElem
     for (const s of shaped) {
       const row = document.createElement("div");
       row.className = "cl-recent-row";
+      const rowDot = document.createElement("span");
+      rowDot.className = "cl-session-dot";
+      rowDot.style.background = accent;
       const base = document.createElement("span");
       base.className = "cl-recent-cwd";
       base.textContent = s.label;
@@ -4080,6 +4127,7 @@ function renderCardExpansion(ctx: LauncherContext, tile: LauncherTile): HTMLElem
       const when = document.createElement("span");
       when.className = "cl-recent-when";
       when.textContent = s.relative;
+      row.appendChild(rowDot);
       row.appendChild(base);
       row.appendChild(when);
       row.addEventListener("click", (e) => { e.stopPropagation(); void resumeRecentSession(s.adapter, s.sessionId, s.cwd, tile.label); });
@@ -4090,9 +4138,23 @@ function renderCardExpansion(ctx: LauncherContext, tile: LauncherTile): HTMLElem
       e.stopPropagation();
       dd.classList.toggle("open");
     });
-    body.appendChild(dd);
+    controls.appendChild(dd);
   }
-  return body;
+
+  const newSession = document.createElement("button");
+  newSession.className = "cl-new-session";
+  const nsLabel = document.createElement("span");
+  nsLabel.textContent = "New session";
+  const nsKbd = document.createElement("kbd");
+  nsKbd.className = "cl-kbd";
+  nsKbd.textContent = "⌘↵";
+  newSession.appendChild(nsLabel);
+  newSession.appendChild(nsKbd);
+  newSession.addEventListener("click", (e) => { e.stopPropagation(); launchHarnessTile(ctx, tile); });
+  controls.appendChild(newSession);
+
+  dock.appendChild(controls);
+  return dock;
 }
 
 let inspectActive = false;

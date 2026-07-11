@@ -3,6 +3,7 @@ export interface LauncherAdapter {
   displayName: string;
   accent: string;
   binary: string;
+  version?: string;
 }
 
 export interface LauncherBuiltin {
@@ -23,6 +24,7 @@ export interface LauncherTile {
   action: string;
   adapterName: string;
   binary: string;
+  version: string;
   disabled: boolean;
   note: string;
 }
@@ -83,6 +85,7 @@ export function buildAdapterTiles(adapters: LauncherAdapter[]): LauncherTile[] {
       action: "",
       adapterName: a.name,
       binary: a.binary,
+      version: (a.version ?? "").trim(),
       disabled: !detected,
       note: detected ? "" : "not detected",
     };
@@ -99,6 +102,7 @@ export function buildBuiltinTiles(builtins: LauncherBuiltin[]): LauncherTile[] {
     action: b.action,
     adapterName: "",
     binary: "",
+    version: "",
     disabled: false,
     note: "",
   }));

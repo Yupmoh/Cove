@@ -144,7 +144,8 @@
     .tree-row .tw-dot { width: 6px; height: 6px; border-radius: 50%; background: #45475a; flex-shrink: 0; }
     .tree-row .tw-label { flex: 1; overflow: hidden; text-overflow: ellipsis; }
     .tree-row .tw-count { font-size: 10px; color: var(--muted); }
-    .ws-card-scroll { display: flex; flex-direction: column; gap: 8px; padding-top: 2px; }
+    .ws-card-scroll { display: flex; flex-direction: column; gap: 8px; padding-top: 2px; min-height: 0; }
+    .ws-card-scroll > .ws-card { flex-shrink: 0; }
     .ws-card {
       border-radius: 11px; overflow: hidden;
       background: color-mix(in srgb, var(--ws-accent) 3%, var(--panel-2));
@@ -429,70 +430,90 @@
     .launch-tile .ic { font-size: 20px; color: var(--accent); }
     .launch-tile .lbl { font-size: 12px; }
     .launch-hint { color: var(--muted); font-size: 11px; margin-top: 12px; }
-    .box-launcher { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 22px; padding: clamp(14px, 4vw, 40px); overflow-y: auto; overflow-x: hidden; outline: none; }
-    .box-launcher > * { width: 100%; max-width: 680px; min-width: 0; flex-shrink: 0; }
+    .box-launcher { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 16px; padding: clamp(16px, 4vw, 44px); overflow-y: auto; overflow-x: hidden; outline: none; }
+    .box-launcher > * { width: 100%; max-width: 620px; min-width: 0; flex-shrink: 0; }
     .box-launcher > :first-child { margin-top: auto; }
     .box-launcher > :last-child { margin-bottom: auto; }
-    .cl-header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 0 4px; }
+    .cl-header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 0 2px 2px; margin-bottom: 4px; }
     .cl-brand { font-size: 15px; font-weight: 600; letter-spacing: 0.02em; color: var(--fg); }
-    img.cl-brand-img { height: 20px; width: auto; display: block; -webkit-user-drag: none; user-select: none; }
-    .cl-tip { flex: 1; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: opacity 0.2s; }
-    .cl-hint { font-size: 10px; color: var(--muted); background: var(--panel-2); border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; white-space: nowrap; }
+    img.cl-brand-img { height: 20px; width: auto; display: block; -webkit-user-drag: none; user-select: none; opacity: 0.92; }
+    .cl-tip { flex: 1; min-width: 120px; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: opacity 0.2s; }
+    .cl-hint { font-size: 10px; letter-spacing: 0.01em; color: var(--muted); background: color-mix(in srgb, var(--panel-2) 70%, transparent); border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; white-space: nowrap; }
+    .cl-section-label { font-size: 9.5px; font-weight: 700; letter-spacing: 0.9px; text-transform: uppercase; color: color-mix(in srgb, var(--muted) 78%, transparent); padding: 4px 2px 0; }
     .cl-harness-row { display: grid; gap: 12px; justify-content: center; }
-    .cl-card { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 16px 16px 14px; background: var(--panel); border: 1px solid var(--border); border-radius: 14px; cursor: pointer; color: var(--fg); transition: border-color 0.15s, box-shadow 0.15s, transform 0.12s; }
-    .cl-card:hover { border-color: var(--card-accent, var(--accent-dim)); transform: translateY(-1px); }
-    .cl-card.selected { border-color: var(--card-accent, var(--accent)); box-shadow: 0 0 0 1px var(--card-accent, var(--accent)), 0 0 24px -6px var(--card-accent, var(--accent)); }
-    .cl-card.disabled { opacity: 0.42; cursor: default; }
+    .cl-card { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 15px 16px; min-height: 116px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; cursor: pointer; color: var(--fg); transition: border-color 0.14s, box-shadow 0.16s, transform 0.12s, background 0.14s; }
+    .cl-card::before { content: ""; position: absolute; inset: 0; border-radius: inherit; background: radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, var(--card-accent, var(--accent)) 10%, transparent), transparent 60%); opacity: 0; transition: opacity 0.16s; pointer-events: none; }
+    .cl-card:hover { border-color: color-mix(in srgb, var(--card-accent, var(--accent)) 55%, var(--border)); transform: translateY(-2px); }
+    .cl-card:hover::before { opacity: 1; }
+    .cl-card.selected { border-color: var(--card-accent, var(--accent)); box-shadow: inset 0 0 0 1px var(--card-accent, var(--accent)), 0 10px 30px -14px var(--card-accent, var(--accent)); }
+    .cl-card.selected::before { opacity: 1; }
+    .cl-card.disabled { opacity: 0.5; cursor: default; }
     .cl-card.disabled:hover { border-color: var(--border); transform: none; }
-    .cl-card-top { display: flex; justify-content: space-between; align-items: center; width: 100%; }
-    .cl-card-key { font-size: 10px; font-weight: 700; color: var(--muted); background: var(--panel-2); border-radius: 5px; min-width: 16px; height: 16px; display: inline-flex; align-items: center; justify-content: center; padding: 0 4px; }
-    .cl-card.selected .cl-card-key { color: var(--card-accent, var(--accent)); }
-    .cl-card-cta { font-size: 10px; color: var(--muted); opacity: 0; transition: opacity 0.15s; }
-    .cl-card:hover .cl-card-cta, .cl-card.selected .cl-card-cta { opacity: 1; }
+    .cl-card.disabled:hover::before { opacity: 0; }
+    .cl-card-top { display: flex; justify-content: space-between; align-items: flex-start; width: 100%; }
+    .cl-card-key { font-size: 10px; font-weight: 700; color: var(--muted); background: color-mix(in srgb, var(--panel-2) 80%, transparent); border: 1px solid color-mix(in srgb, var(--border) 60%, transparent); border-radius: 5px; min-width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; padding: 0 4px; }
+    .cl-card.selected .cl-card-key { color: #11111b; background: var(--card-accent, var(--accent)); border-color: transparent; }
+    .cl-card-cta { position: absolute; right: 14px; bottom: 13px; font-size: 11px; font-weight: 600; color: var(--card-accent, var(--accent)); opacity: 0; transform: translateY(2px); transition: opacity 0.15s, transform 0.15s; }
+    .cl-card:hover .cl-card-cta, .cl-card.selected .cl-card-cta { opacity: 1; transform: translateY(0); }
     .cl-card-badge {
-      width: 38px; height: 38px; display: inline-flex; align-items: center; justify-content: center;
-      border-radius: 11px; font-weight: 700; font-size: 15px; letter-spacing: 0.02em;
+      width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center;
+      border-radius: 10px; font-weight: 700; font-size: 14px; letter-spacing: 0.02em;
       color: var(--card-accent, var(--accent));
-      background: color-mix(in srgb, var(--card-accent, var(--accent)) 15%, transparent);
-      border: 1px solid color-mix(in srgb, var(--card-accent, var(--accent)) 32%, transparent);
+      background: color-mix(in srgb, var(--card-accent, var(--accent)) 16%, transparent);
+      border: 1px solid color-mix(in srgb, var(--card-accent, var(--accent)) 34%, transparent);
+      transition: background 0.14s, color 0.14s;
     }
-    .cl-card-badge svg { width: 20px; height: 20px; display: block; }
-    .cl-configure { align-items: center; text-align: center; gap: 10px; padding: 22px 18px; }
-    .cl-card-name { font-size: 13px; font-weight: 600; }
+    .cl-card.selected .cl-card-badge { background: var(--card-accent, var(--accent)); color: #11111b; border-color: transparent; }
+    .cl-card-badge svg { width: 19px; height: 19px; display: block; }
+    .cl-card-name { font-size: 13.5px; font-weight: 650; line-height: 1.2; }
+    .cl-card-status { display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--muted); }
+    .cl-card-status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--card-accent, var(--accent)); box-shadow: 0 0 6px color-mix(in srgb, var(--card-accent, var(--accent)) 60%, transparent); flex-shrink: 0; }
+    .cl-card-status.off .cl-card-status-dot { background: var(--border); box-shadow: none; }
+    .cl-configure { align-items: center; justify-content: center; text-align: center; gap: 10px; padding: 26px 20px; min-height: 150px; }
+    .cl-configure .cl-card-badge { width: 42px; height: 42px; border-radius: 12px; }
+    .cl-configure .cl-card-note { font-size: 11px; color: var(--muted); line-height: 1.45; max-width: 240px; }
     .cl-card-note { font-size: 10px; color: var(--muted); }
-    .cl-card-expand { display: flex; flex-direction: column; gap: 8px; width: 100%; margin-top: 4px; padding-top: 12px; border-top: 1px solid var(--border); }
-    .cl-key-chip-row { display: flex; }
-    .cl-key-chip { font-size: 10px; color: var(--card-accent, var(--accent)); background: var(--panel-2); border-radius: 999px; padding: 3px 9px; }
-    .cl-new-session { font-size: 12px; font-weight: 600; color: #11111b; background: var(--card-accent, var(--accent)); border: none; border-radius: 8px; padding: 8px 12px; text-align: center; cursor: pointer; }
-    .cl-new-session:hover { filter: brightness(1.08); }
-    .cl-yolo-row { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--muted); cursor: pointer; padding: 1px 2px; }
+    .cl-dock { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 14px; width: 100%; padding: 12px 14px; border-radius: 12px;
+      background: color-mix(in srgb, var(--card-accent, var(--accent)) 7%, var(--panel));
+      border: 1px solid color-mix(in srgb, var(--card-accent, var(--accent)) 32%, var(--border));
+      box-shadow: 0 12px 32px -18px color-mix(in srgb, var(--card-accent, var(--accent)) 70%, transparent);
+      animation: cl-dock-in 0.18s ease; }
+    @keyframes cl-dock-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+    .cl-dock-id { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .cl-dock-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--card-accent, var(--accent)); box-shadow: 0 0 8px color-mix(in srgb, var(--card-accent, var(--accent)) 70%, transparent); flex-shrink: 0; }
+    .cl-dock-id-text { min-width: 0; }
+    .cl-dock-id-name { font-size: 13px; font-weight: 650; color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .cl-dock-id-sub { font-size: 10.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .cl-dock-controls { display: flex; align-items: center; gap: 10px; margin-left: auto; flex-wrap: wrap; }
+    .cl-yolo-row { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--muted); cursor: pointer; user-select: none; }
     .cl-yolo-row:hover { color: var(--fg); }
-    .cl-resume-dd { position: relative; display: flex; flex-direction: column; width: 100%; }
-    .cl-resume-trigger { display: flex; align-items: center; gap: 8px; width: 100%; font-size: 11px; font-family: inherit; color: var(--fg); background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; cursor: pointer; }
-    .cl-resume-trigger:hover { border-color: var(--card-accent, var(--accent-dim)); }
-    .cl-resume-label { flex: 1; text-align: left; }
-    .cl-resume-count { color: var(--muted); font-size: 10px; background: var(--panel); border-radius: 8px; padding: 1px 6px; }
+    .cl-new-session { display: inline-flex; align-items: center; gap: 8px; height: 32px; font-size: 12px; font-weight: 650; font-family: inherit; color: #11111b; background: var(--card-accent, var(--accent)); border: none; border-radius: 8px; padding: 0 12px; cursor: pointer; transition: filter 0.12s, box-shadow 0.12s; }
+    .cl-new-session:hover { filter: brightness(1.06); box-shadow: 0 6px 18px -8px var(--card-accent, var(--accent)); }
+    .cl-kbd { font-size: 10px; font-weight: 700; padding: 2px 5px; border-radius: 5px; background: color-mix(in srgb, #11111b 22%, transparent); color: inherit; }
+    .cl-resume-dd { position: relative; display: flex; }
+    .cl-resume-trigger { display: inline-flex; align-items: center; gap: 8px; height: 32px; font-size: 12px; font-family: inherit; color: var(--fg); background: color-mix(in srgb, var(--panel-2) 80%, transparent); border: 1px solid var(--border); border-radius: 8px; padding: 0 11px; cursor: pointer; transition: border-color 0.12s, background 0.12s; }
+    .cl-resume-trigger:hover { border-color: color-mix(in srgb, var(--card-accent, var(--accent)) 55%, var(--border)); }
+    .cl-resume-label { text-align: left; }
+    .cl-resume-count { color: var(--muted); font-size: 10px; font-weight: 700; background: color-mix(in srgb, var(--panel) 70%, transparent); border-radius: 999px; padding: 1px 7px; }
     .cl-resume-chev { color: var(--muted); font-size: 9px; transition: transform 0.15s; }
     .cl-resume-dd.open .cl-resume-chev { transform: rotate(180deg); }
-    .cl-resume-menu { display: none; position: absolute; top: calc(100% + 5px); left: 0; right: 0; z-index: 60; flex-direction: column; gap: 2px; padding: 6px 8px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; max-height: 200px; overflow-y: auto; box-shadow: 0 14px 34px rgba(0,0,0,0.5); }
+    .cl-resume-menu { display: none; position: absolute; top: calc(100% + 6px); right: 0; z-index: 60; flex-direction: column; gap: 1px; min-width: 240px; max-width: 340px; padding: 6px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; max-height: 220px; overflow-y: auto; box-shadow: 0 14px 40px rgba(0,0,0,0.46); }
     .cl-resume-dd.open .cl-resume-menu { display: flex; }
-    .cl-resume-menu .cl-recent-row { cursor: pointer; padding: 4px 4px; border-radius: 5px; }
-    .cl-resume-menu .cl-recent-row:hover { background: color-mix(in srgb, var(--card-accent, var(--accent)) 12%, transparent); }
-    .cl-session-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-    .cl-recent-list { display: flex; flex-direction: column; gap: 4px; margin-top: 2px; }
-    .cl-recent-heading { font-size: 9px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); }
-    .cl-recent-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-size: 11px; color: var(--fg); }
-    .cl-recent-cwd { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .cl-session-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .cl-recent-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; font-size: 11.5px; color: var(--fg); cursor: pointer; transition: background 0.1s; }
+    .cl-recent-row:hover { background: color-mix(in srgb, var(--card-accent, var(--accent)) 14%, transparent); }
+    .cl-recent-cwd { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .cl-recent-when { color: var(--muted); font-size: 10px; flex-shrink: 0; }
-    .cl-recent-note { font-size: 9px; color: var(--muted); font-style: italic; }
     .cl-tool-row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
-    .cl-tool { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; width: 84px; height: 84px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; cursor: pointer; color: var(--fg); transition: border-color 0.15s, transform 0.12s; }
-    .cl-tool:hover { border-color: var(--tool-accent, var(--accent-dim)); transform: translateY(-1px); }
-    .cl-tool.selected { border-color: var(--tool-accent, var(--accent)); box-shadow: 0 0 0 1px var(--tool-accent, var(--accent)), 0 0 20px -8px var(--tool-accent, var(--accent)); }
+    .cl-tool { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; width: 88px; height: 82px; background: var(--panel); border: 1px solid var(--border); border-radius: 11px; cursor: pointer; color: var(--fg); transition: border-color 0.14s, transform 0.12s, background 0.14s; }
+    .cl-tool:hover { border-color: color-mix(in srgb, var(--tool-accent, var(--accent)) 55%, var(--border)); transform: translateY(-2px); background: color-mix(in srgb, var(--tool-accent, var(--accent)) 6%, var(--panel)); }
+    .cl-tool.selected { border-color: var(--tool-accent, var(--accent)); box-shadow: inset 0 0 0 1px var(--tool-accent, var(--accent)), 0 8px 22px -14px var(--tool-accent, var(--accent)); }
     .cl-tool-ic { line-height: 0; }
-    .cl-tool-ic svg { width: 20px; height: 20px; display: block; }
-    .cl-tool-lbl { font-size: 10px; color: var(--muted); text-align: center; }
-    .cl-tool-key { position: absolute; top: 5px; left: 6px; font-size: 9px; font-weight: 700; color: var(--muted); background: var(--panel-2); border-radius: 4px; min-width: 13px; text-align: center; padding: 0 3px; }
+    .cl-tool-ic svg { width: 21px; height: 21px; display: block; }
+    .cl-tool-lbl { font-size: 10.5px; color: var(--muted); text-align: center; }
+    .cl-tool.selected .cl-tool-lbl { color: var(--fg); }
+    .cl-tool-key { position: absolute; top: 6px; left: 7px; font-size: 9px; font-weight: 700; color: var(--muted); background: color-mix(in srgb, var(--panel-2) 80%, transparent); border-radius: 4px; min-width: 14px; height: 14px; display: inline-flex; align-items: center; justify-content: center; padding: 0 3px; }
+    .cl-tool.selected .cl-tool-key { color: #11111b; background: var(--tool-accent, var(--accent)); }
     .cl-tool.selected .cl-tool-key { color: var(--tool-accent, var(--accent)); }
     #toast-host { position: fixed; bottom: 16px; right: 16px; z-index: 1200; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
     .toast { pointer-events: auto; cursor: pointer; min-width: 220px; max-width: 340px; padding: 10px 13px; border-radius: 10px; background: var(--panel); border: 1px solid var(--border); box-shadow: 0 12px 32px rgba(0,0,0,0.45); border-left: 3px solid var(--accent); opacity: 0; transform: translateX(16px); transition: opacity 0.2s ease, transform 0.2s ease; }
@@ -573,10 +594,10 @@
     #rooms-row { height: 42px; padding: 6px 10px; }
     #rooms-row #room-tabs { border-radius: 11px; background: color-mix(in srgb, var(--panel) 55%, var(--panel-2)); }
     #grid { padding: 10px; }
-    .cl-card, .cl-tool { background: color-mix(in srgb, var(--panel-2) 32%, var(--panel)); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18); }
+    .cl-card, .cl-tool { background: color-mix(in srgb, var(--panel-2) 30%, var(--panel)); box-shadow: 0 6px 18px -8px rgba(0, 0, 0, 0.34); }
     .ctx-menu { border-radius: 11px; padding: 6px; background: color-mix(in srgb, var(--panel) 88%, var(--panel-2)); }
     .ctx-item { border-radius: 7px; padding: 7px 11px; }
-    .box-launcher { gap: 24px; }
+    .box-launcher { gap: 16px; }
     .tb-find-anything { transition: border-color 0.12s, color 0.12s; }
     .sb-head { padding-top: 15px; }
   </style>

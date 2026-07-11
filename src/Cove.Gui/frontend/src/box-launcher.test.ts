@@ -41,6 +41,13 @@ describe("buildAdapterTiles", () => {
     expect(tiles[1].disabled).toBe(true);
     expect(tiles[1].note).toBe("not detected");
   });
+  it("carries a trimmed detected version onto the tile, defaulting to empty", () => {
+    const withVersion: LauncherAdapter[] = [
+      { name: "claude", displayName: "Claude Code", accent: "", binary: "/x", version: "  1.2.3  " },
+    ];
+    expect(buildAdapterTiles(withVersion)[0].version).toBe("1.2.3");
+    expect(buildAdapterTiles(adapters)[0].version).toBe("");
+  });
 });
 
 describe("buildBuiltinTiles", () => {
@@ -54,6 +61,7 @@ describe("buildBuiltinTiles", () => {
     expect(tiles.every((t) => !t.disabled)).toBe(true);
     expect(tiles[0].action).toBe("room.new");
     expect(tiles[0].kind).toBe("builtin");
+    expect(tiles[0].version).toBe("");
   });
 });
 
