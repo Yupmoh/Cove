@@ -2,6 +2,7 @@ export interface BayBoxInput {
   id: string;
   name: string;
   projectDir?: string;
+  icon?: { kind: string; value: string } | null;
 }
 
 export interface BayBox {

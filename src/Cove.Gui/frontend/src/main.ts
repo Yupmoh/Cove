@@ -51,7 +51,7 @@ import { NotificationBridge, type NotificationBridgeDeps, type NotificationDeliv
 import { buildMenu, menuChordSet } from "./menu-model";
 import { toolbarTiles } from "./toolbar-tiles";
 import { shouldShowLauncher, buildAdapterTiles, buildBuiltinTiles, isEmptyShoreTree, placeableNookForAction, type LauncherAdapter, type LauncherBuiltin, type LauncherTile } from "./box-launcher";
-import { adapterAccent, toolAccent, assignHotkeys, detectedHarnessTiles, clampLauncherSelection, moveLauncherSelection, hotkeyTarget, shapeRecentSessions, tipAt, computeLauncherCols, type LauncherSelection, type LauncherGeometry, type LauncherArrowKey, type RecentSessionRow } from "./launcher-model";
+import { adapterAccent, toolAccent, assignHotkeys, detectedHarnessTiles, clampLauncherSelection, moveLauncherSelection, hotkeyTarget, shapeRecentSessions, tipAt, computeLauncherCols, resolveLauncherYolo, type LauncherSelection, type LauncherGeometry, type LauncherArrowKey, type RecentSessionRow } from "./launcher-model";
 import { iconSvg, iconForNookType, monogram } from "./icons";
 import { dropZoneFor, moveMutationFor, zoneOverlayRect } from "./nook-dnd";
 import { cssPath, buildFeedbackReport, feedbackSlug, harnessPrompt } from "./inspect-mode";
@@ -812,7 +812,7 @@ async function resumeRecentSession(adapter: string, sessionId: string, cwd: stri
   let action: ResumeAction;
   try {
     const result = await invoke<VaultResumeResult>("cove://commands/vault.resume", { adapter, sessionId, cwd, yolo: launcherYolo(adapter) });
-    action = resumeSpawnPlan(result, cwd, displayName, sessionId);
+    action = resumeSpawnPlan(result, cwd, displayName, sessionId, launcherYolo(adapter));
   } catch (e) {
     console.warn("vault.resume failed", adapter, sessionId, e);
     action = { kind: "error", toast: { title: "Resume failed", body: (e as Error).message } };
@@ -825,7 +825,7 @@ async function performResume(action: ResumeAction): Promise<void> {
     showInAppToast(action.toast.title, action.toast.body, () => {});
     return;
   }
-  const sp = (await invoke<{ nookId: string }>("app.nookSpawn", { command: action.command, args: action.args, cwd: action.cwd, inheritCwdFrom: "", cols: 80, rows: 24, adapter: action.adapter, agentName: action.shoreName, bay: "", shore: "", sessionId: action.sessionId ?? undefined })).nookId;
+  const sp = (await invoke<{ nookId: string }>("app.nookSpawn", { command: action.command, args: action.args, cwd: action.cwd, inheritCwdFrom: "", cols: 80, rows: 24, adapter: action.adapter, agentName: action.shoreName, bay: "", shore: "", sessionId: action.sessionId ?? undefined, yolo: action.yolo })).nookId;
   const r = await invoke<{ shoreId: string }>("app.layoutMutate", { op: "createShore", newNookId: sp, name: action.shoreName, shoreId: "", targetNookId: "", orientation: "", nookId: "", dir: 0, nookType: "terminal" });
   activeShoreId = r.shoreId;
   await reload();
@@ -1347,7 +1347,7 @@ async function splitActiveWith(dir: "row" | "col", kind: string): Promise<void> 
     const tile = detectedHarnessTiles(buildAdapterTiles(launcherAdapters)).find((t) => t.adapterName === name);
     if (!tile) { console.warn("split chooser: unknown adapter", name); return; }
     const launch = await buildAdapterLaunch({ name: tile.adapterName, displayName: tile.label, accent: tile.accent, binary: tile.binary });
-    nookId = (await invoke<{ nookId: string }>("app.nookSpawn", { command: launch.command, args: launch.args, cwd: "", inheritCwdFrom: target, cols: 80, rows: 24, adapter: tile.adapterName, agentName: tile.label, bay: "", shore: "" })).nookId;
+    nookId = (await invoke<{ nookId: string }>("app.nookSpawn", { command: launch.command, args: launch.args, cwd: "", inheritCwdFrom: target, cols: 80, rows: 24, adapter: tile.adapterName, agentName: tile.label, bay: "", shore: "", yolo: launch.yolo })).nookId;
   } else if (kind === "browser") {
     nookId = (await invoke<{ nookId: string; currentUrl: string }>("cove://commands/browser.create", { url: "https://duckduckgo.com" })).nookId;
     nookType = "browser";
@@ -1886,7 +1886,7 @@ function renderBaysContent(container: HTMLElement): void {
     container.appendChild(list);
     return;
   }
-  const entries = bayBoxItems.map((w) => ({ id: w.id, name: w.name, projectDir: w.projectDir ?? "" }));
+  const entries = bayBoxItems.map((w) => ({ id: w.id, name: w.name, projectDir: w.projectDir ?? "", icon: w.icon }));
   const activeId = resolveActiveBayId(entries, layout?.id ?? null);
   const scroll = document.createElement("div");
   scroll.className = "sb-list ws-card-scroll";
@@ -3867,24 +3867,23 @@ function launcherYoloKey(adapter: string): string {
 }
 
 function launcherYolo(adapter: string): boolean {
-  const stored = localStorage.getItem(launcherYoloKey(adapter));
-  if (stored !== null) return stored === "true";
-  return adapter === "claude-code";
+  return resolveLauncherYolo(localStorage.getItem(launcherYoloKey(adapter)), adapter);
 }
 
-async function buildAdapterLaunch(a: AdapterInfo): Promise<{ command: string; args: string[] }> {
+async function buildAdapterLaunch(a: AdapterInfo): Promise<{ command: string; args: string[]; yolo: boolean }> {
+  const yolo = launcherYolo(a.name);
   try {
     const built = await invoke<{ command: string; args: string[] }>("cove://commands/launch.build", {
-      adapter: a.name, profileSlug: "default", yolo: launcherYolo(a.name), workingDir: null, extraFlags: [], env: {},
+      adapter: a.name, profileSlug: "default", yolo, workingDir: null, extraFlags: [], env: {},
     });
-    if (built.command) return { command: built.command, args: built.args ?? [] };
+    if (built.command) return { command: built.command, args: built.args ?? [], yolo };
   } catch (err) { console.warn("launch.build failed, spawning raw binary", a.name, err); }
-  return { command: a.binary, args: [] };
+  return { command: a.binary, args: [], yolo };
 }
 
 async function spawnAgentInto(shoreId: string | null, placeholderId: string | null, a: AdapterInfo): Promise<void> {
   const launch = await buildAdapterLaunch(a);
-  const sp = (await invoke<{ nookId: string }>("app.nookSpawn", { command: launch.command, args: launch.args, cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: a.name, agentName: a.displayName, bay: "", shore: "" })).nookId;
+  const sp = (await invoke<{ nookId: string }>("app.nookSpawn", { command: launch.command, args: launch.args, cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: a.name, agentName: a.displayName, bay: "", shore: "", yolo: launch.yolo })).nookId;
   if (shoreId) {
     if (placeholderId) {
       await invoke("app.layoutMutate", { op: "replace", shoreId, targetNookId: placeholderId, newNookId: sp, orientation: "", name: "", nookId: "", dir: 0, nookType: "terminal" });
@@ -4468,7 +4467,7 @@ async function submitInspectFeedback(
 
 async function spawnFeedbackAgent(tile: LauncherTile, prompt: string, shoreName: string): Promise<void> {
   const launch = await buildAdapterLaunch({ name: tile.adapterName, displayName: tile.label, accent: tile.accent, binary: tile.binary });
-  const sp = (await invoke<{ nookId: string }>("app.nookSpawn", { command: launch.command, args: [...launch.args, prompt], cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: tile.adapterName, agentName: tile.label, bay: "", shore: "" })).nookId;
+  const sp = (await invoke<{ nookId: string }>("app.nookSpawn", { command: launch.command, args: [...launch.args, prompt], cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: tile.adapterName, agentName: tile.label, bay: "", shore: "", yolo: launch.yolo })).nookId;
   const r = await invoke<{ shoreId: string }>("app.layoutMutate", { op: "createShore", newNookId: sp, name: shoreName, shoreId: "", targetNookId: "", orientation: "", nookId: "", dir: 0, nookType: "terminal" });
   activeShoreId = r.shoreId;
   await reload();
