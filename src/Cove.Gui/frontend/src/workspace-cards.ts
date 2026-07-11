@@ -19,10 +19,9 @@ export function workspaceAccent(id: string): string {
   return WORKSPACE_ACCENTS[hash % WORKSPACE_ACCENTS.length];
 }
 
-export function splitWorkspaceCards(items: WorkspaceCardEntry[], activeId: string | null): { active: WorkspaceCardEntry | null; others: WorkspaceCardEntry[] } {
-  if (items.length === 0) return { active: null, others: [] };
-  const active = items.find((w) => w.id === activeId) ?? items[0];
-  return { active, others: items.filter((w) => w.id !== active.id) };
+export function resolveActiveWorkspaceId(items: WorkspaceCardEntry[], activeId: string | null): string | null {
+  if (items.length === 0) return null;
+  return (items.find((w) => w.id === activeId) ?? items[0]).id;
 }
 
 export function sortFsEntries(entries: FsEntry[]): FsEntry[] {

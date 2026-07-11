@@ -35,7 +35,7 @@ import { nextWorkspaceName, type WorkspaceBoxInput } from "./workspace-boxes";
 import { clampMenuPosition, normalizeItems, firstSelectableIndex, moveSelection as ctxMoveSelection, activeItem, type ContextMenuItem, type ContextMenuModel } from "./context-menu";
 import { buildWorkspaceTree, workspaceTreeEmptyMessage, PANE_TYPE_LABELS, type TreeLeaf, type TreeRoomInput, type TreeRow } from "./workspace-tree";
 import { buildAgentRows, AGENT_STATE_META, type AgentCard, type AgentState } from "./agents-model";
-import { splitWorkspaceCards, workspaceAccent, sortFsEntries, joinPath, scmChipText, parseCollapsedCardIds, serializeCollapsedCardIds, toggleCardCollapsed, type FsEntry, type WorkspaceCardEntry, type ScmSummary } from "./workspace-cards";
+import { resolveActiveWorkspaceId, workspaceAccent, sortFsEntries, joinPath, scmChipText, parseCollapsedCardIds, serializeCollapsedCardIds, toggleCardCollapsed, type FsEntry, type WorkspaceCardEntry, type ScmSummary } from "./workspace-cards";
 import { parseQuery, filterAndSort, MruTracker, cycleCategory, categoryLabel, type PaletteItem } from "./omni-palette";
 import { buildEmptyState, EmptyStateMessages } from "./empty-states";
 import { brandLogoAt, nextBrandIndex, parseBrandIndex } from "./brand";
@@ -467,6 +467,7 @@ function makePane(paneId: string, since: number): PaneView {
       const newTitle = commit ? input.value.trim() : pv.customTitle;
       if (commit && newTitle !== pv.customTitle) {
         pv.customTitle = newTitle;
+        rememberPaneTitle(paneId, newTitle || pv.title);
         void invoke("app.paneRename", { paneId, title: newTitle }).catch(() => void 0);
       }
       input.replaceWith(titleSpan);
@@ -489,7 +490,7 @@ function makePane(paneId: string, since: number): PaneView {
     mk("Close Others", () => { void closeOthers(paneId); });
     header.appendChild(menu);
   });
-  term.onTitleChange((t) => { pv.title = t; setTitle(); refreshTitles(); });
+  term.onTitleChange((t) => { pv.title = t; rememberPaneTitle(paneId, pv.customTitle || t); setTitle(); refreshTitles(); });
   panes.set(paneId, pv);
   return pv;
 }
@@ -1596,7 +1597,7 @@ function roomLeaves(room: RoomSnapshot): TreeLeaf[] {
       const subs = node.subtabs.length > 0 ? node.subtabs : [{ documentId: node.paneId, paneType: "terminal", title: null }];
       return subs.map((s) => {
         const pv = panes.get(s.documentId);
-        return { paneId: s.documentId, paneType: s.paneType, title: (pv && (pv.customTitle || pv.title)) || s.title || "" };
+        return { paneId: s.documentId, paneType: s.paneType, title: (pv && (pv.customTitle || pv.title)) || paneTitleCache.get(s.documentId) || s.title || "" };
       });
     }
     return [...collect(node.childA), ...collect(node.childB)];
@@ -1630,6 +1631,24 @@ function requestScmSummary(dir: string): void {
       scmSummaryFetchedAt.set(dir, Date.now());
       scmSummaryFetching.delete(dir);
     });
+}
+
+function loadPaneTitleCache(): Map<string, string> {
+  try {
+    return new Map(Object.entries(JSON.parse(localStorage.getItem("cove.paneTitles") ?? "{}") as Record<string, string>));
+  } catch (err) {
+    console.warn("pane title cache unreadable, starting empty", err);
+    return new Map();
+  }
+}
+const paneTitleCache = loadPaneTitleCache();
+
+function rememberPaneTitle(paneId: string, title: string): void {
+  if (!title) return;
+  if (paneTitleCache.get(paneId) === title) return;
+  paneTitleCache.set(paneId, title);
+  while (paneTitleCache.size > 300) paneTitleCache.delete(paneTitleCache.keys().next().value!);
+  localStorage.setItem("cove.paneTitles", JSON.stringify(Object.fromEntries(paneTitleCache)));
 }
 
 const wsSnapshotCache = new Map<string, WorkspaceSnapshot>();
@@ -1800,14 +1819,11 @@ function renderWorkspacesContent(container: HTMLElement): void {
     container.appendChild(list);
     return;
   }
-  const cards = splitWorkspaceCards(
-    workspaceBoxItems.map((w) => ({ id: w.id, name: w.name, projectDir: w.projectDir ?? "" })),
-    layout?.id ?? null,
-  );
+  const entries = workspaceBoxItems.map((w) => ({ id: w.id, name: w.name, projectDir: w.projectDir ?? "" }));
+  const activeId = resolveActiveWorkspaceId(entries, layout?.id ?? null);
   const scroll = document.createElement("div");
   scroll.className = "sb-list ws-card-scroll";
-  if (cards.active) scroll.appendChild(renderWorkspaceCard(cards.active, true));
-  for (const w of cards.others) scroll.appendChild(renderWorkspaceCard(w, false));
+  for (const w of entries) scroll.appendChild(renderWorkspaceCard(w, w.id === activeId));
   container.appendChild(scroll);
 }
 

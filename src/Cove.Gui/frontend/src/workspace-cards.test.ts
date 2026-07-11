@@ -6,7 +6,7 @@ import {
   toggleCardCollapsed,
   scmChipText,
   workspaceAccent,
-  splitWorkspaceCards,
+  resolveActiveWorkspaceId,
   sortFsEntries,
   joinPath,
   dirBasename,
@@ -28,24 +28,20 @@ describe("workspaceAccent", () => {
   });
 });
 
-describe("splitWorkspaceCards", () => {
-  it("picks the active workspace by id and keeps the rest in order", () => {
-    const items = [ws("one"), ws("two"), ws("three")];
-    const r = splitWorkspaceCards(items, "two");
-    expect(r.active?.id).toBe("two");
-    expect(r.others.map((w) => w.id)).toEqual(["one", "three"]);
+describe("resolveActiveWorkspaceId", () => {
+  const items = [ws("one"), ws("two"), ws("three")];
+
+  it("returns the matching id without reordering anything", () => {
+    expect(resolveActiveWorkspaceId(items, "two")).toBe("two");
   });
 
-  it("falls back to the first workspace when activeId is null or unknown", () => {
-    const items = [ws("one"), ws("two")];
-    expect(splitWorkspaceCards(items, null).active?.id).toBe("one");
-    expect(splitWorkspaceCards(items, "missing").active?.id).toBe("one");
+  it("falls back to the first workspace for null or unknown ids", () => {
+    expect(resolveActiveWorkspaceId(items, null)).toBe("one");
+    expect(resolveActiveWorkspaceId(items, "missing")).toBe("one");
   });
 
-  it("returns null active and no others for an empty list", () => {
-    const r = splitWorkspaceCards([], "x");
-    expect(r.active).toBeNull();
-    expect(r.others).toEqual([]);
+  it("returns null for an empty list", () => {
+    expect(resolveActiveWorkspaceId([], "x")).toBeNull();
   });
 });
 
