@@ -64,6 +64,8 @@ public sealed class CoveConfig
     public LspSection Lsp { get; set; } = new();
     [Setting("Adapter Commands", "tools", "section", "Custom adapter commands")]
     public AdapterCommandsSection AdapterCommands { get; set; } = new();
+    [Setting("Sessions", "workspace", "section", "Session restoration settings")]
+    public SessionSection Session { get; set; } = new();
 
     public Dictionary<string, JsonElement> Extra { get; } = new();
 
@@ -119,6 +121,9 @@ public sealed class CoveConfig
                     break;
                 case "adapterCommands":
                     cfg.AdapterCommands = AdapterCommandsSection.Read(prop.Value);
+                    break;
+                case "session":
+                    cfg.Session = SessionSection.Read(prop.Value);
                     break;
                 default:
                     if (!TryRouteDottedKey(cfg, prop.Name, prop.Value))
@@ -211,6 +216,12 @@ public sealed class CoveConfig
                     case "label": cfg.PushToTalk.Label = ConfigValueCoercion.AsString(value, cfg.PushToTalk.Label); return true;
                 }
                 return false;
+            case "session":
+                switch (sub)
+                {
+                    case "restoreOnLaunch": cfg.Session.RestoreOnLaunch = ConfigValueCoercion.AsBool(value, cfg.Session.RestoreOnLaunch); return true;
+                }
+                return false;
             case "speech":
                 switch (sub)
                 {
@@ -256,6 +267,8 @@ public sealed class CoveConfig
         Lsp.WriteTo(writer);
         writer.WritePropertyName("adapterCommands");
         AdapterCommands.WriteTo(writer);
+        writer.WritePropertyName("session");
+        Session.WriteTo(writer);
         foreach (var kv in Extra)
         {
             writer.WritePropertyName(kv.Key);
@@ -837,6 +850,33 @@ public sealed class LspSection
             writer.WriteEndObject();
         }
         writer.WriteEndArray();
+        writer.WriteEndObject();
+    }
+}
+
+public sealed class SessionSection
+{
+    [Setting("Restore On Launch", "workspace", "toggle", "Respawn terminal and agent panes when the daemon restarts")]
+    public bool RestoreOnLaunch { get; set; } = true;
+
+    public static SessionSection Read(JsonElement el)
+    {
+        var s = new SessionSection();
+        if (el.ValueKind != JsonValueKind.Object) return s;
+        foreach (var prop in el.EnumerateObject())
+        {
+            switch (prop.Name)
+            {
+                case "restoreOnLaunch": s.RestoreOnLaunch = ConfigValueCoercion.AsBool(prop.Value, s.RestoreOnLaunch); break;
+            }
+        }
+        return s;
+    }
+
+    public void WriteTo(Utf8JsonWriter writer)
+    {
+        writer.WriteStartObject();
+        writer.WriteBoolean("restoreOnLaunch", RestoreOnLaunch);
         writer.WriteEndObject();
     }
 }

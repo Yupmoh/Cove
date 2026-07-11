@@ -112,6 +112,8 @@ All configuration keys for Cove, grouped by settings tab.
 
 | Key | Label | Type | Control | Description |
 |-----|-------|------|---------|-------------|
+| `session` | Sessions | object | section |  |
+| `session.restoreOnLaunch` | Restore On Launch | bool | toggle |  |
 | `worktree` | Worktree | object | section |  |
 | `worktree.defaultLocationPattern` | Default Location Pattern | string | text |  |
 | `worktree.postCreateCommands` | Post-Create Commands | object | text |  |

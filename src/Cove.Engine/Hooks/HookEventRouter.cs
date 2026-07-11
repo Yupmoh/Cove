@@ -11,7 +11,8 @@ public sealed record PaneAgentState(
     string Status,
     int ActiveSubagents,
     System.DateTimeOffset LastEventAt,
-    string? StopReason = null)
+    string? StopReason = null,
+    string? SessionId = null)
 {
     public PaneAgentState WithStatus(string status) => this with { Status = status, LastEventAt = System.DateTimeOffset.UtcNow };
     public PaneAgentState WithStop(string? reason) => this with { Status = "error", StopReason = reason, LastEventAt = System.DateTimeOffset.UtcNow };
@@ -44,6 +45,8 @@ public sealed class HookEventRouter
 
     public event Action<string, bool>? NeedsInputTransition;
 
+    public event Action<string, string, string>? SessionStarted;
+
     public void Route(HookEvent ev)
     {
         if (ev.PaneId is null)
@@ -67,7 +70,11 @@ public sealed class HookEventRouter
         switch (ev.Event)
         {
             case "session-start":
-                _paneStates[ev.PaneId] = new PaneAgentState(ev.PaneId, ev.Adapter, "active", 0, System.DateTimeOffset.UtcNow);
+                var sessionId = ExtractSessionId(ev.Payload);
+                var priorSessionId = _paneStates.TryGetValue(ev.PaneId, out var prior) ? prior.SessionId : null;
+                _paneStates[ev.PaneId] = new PaneAgentState(ev.PaneId, ev.Adapter, "active", 0, System.DateTimeOffset.UtcNow, SessionId: sessionId ?? priorSessionId);
+                if (sessionId is not null)
+                    SessionStarted?.Invoke(ev.PaneId, ev.Adapter, sessionId);
                 break;
             case "session-end":
                 UpdateState(ev.PaneId, s => s with { Status = "idle", StopReason = null, LastEventAt = System.DateTimeOffset.UtcNow });
@@ -103,6 +110,22 @@ public sealed class HookEventRouter
                 NeedsInputTransition?.Invoke(ev.PaneId, true);
                 break;
         }
+    }
+
+    private static string? ExtractSessionId(JsonElement? payload)
+    {
+        if (payload is not { } el || el.ValueKind != JsonValueKind.Object)
+            return null;
+        foreach (var key in new[] { "session_id", "sessionId" })
+        {
+            if (el.TryGetProperty(key, out var idEl) && idEl.ValueKind == JsonValueKind.String)
+            {
+                var id = idEl.GetString();
+                if (!string.IsNullOrEmpty(id))
+                    return id;
+            }
+        }
+        return null;
     }
 
     private static string? ExtractStopReason(JsonElement? payload)

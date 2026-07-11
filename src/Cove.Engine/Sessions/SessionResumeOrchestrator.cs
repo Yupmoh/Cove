@@ -35,6 +35,14 @@ public sealed class SessionResumeOrchestrator
         _states[paneId] = new SessionState { PaneId = paneId, Adapter = adapter, SessionId = sessionId, Lifecycle = SessionLifecycle.Active, Resumable = true };
     }
 
+    public void SetSessionId(string paneId, string adapter, string sessionId)
+    {
+        if (_states.TryGetValue(paneId, out var state))
+            _states[paneId] = state with { SessionId = sessionId };
+        else
+            _states[paneId] = new SessionState { PaneId = paneId, Adapter = adapter, SessionId = sessionId, Lifecycle = SessionLifecycle.Active, Resumable = true };
+    }
+
     public void Unregister(string paneId)
     {
         _states.Remove(paneId);

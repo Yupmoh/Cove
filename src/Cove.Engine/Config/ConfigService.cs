@@ -47,6 +47,7 @@ public sealed class ConfigService : System.IDisposable
     public IReadOnlyDictionary<string, JsonElement> GetLspServers() { lock (_lock) return _config.LspServers.Servers; }
     public IReadOnlyList<LspConfigServerEntry> GetLspServerEntries() { lock (_lock) return _config.Lsp.Servers; }
     public IReadOnlyDictionary<string, JsonElement> GetAdapterCommands() { lock (_lock) return _config.AdapterCommands.Commands; }
+    public bool GetSessionRestoreOnLaunch() { lock (_lock) return _config.Session.RestoreOnLaunch; }
 
     public void SetTheme(string value) { if (!TrySet(() => _config.Theme = value, "theme")) return; }
     public void SetTerminalFontSize(int value) { if (!TrySet(() => _config.Terminal.FontSize = value, "terminal.fontSize")) return; }
@@ -139,6 +140,7 @@ public sealed class ConfigService : System.IDisposable
             "diagnostics.flushIntervalMs" => (true, _config.Diagnostics.FlushIntervalMs),
             "worktree.defaultLocationPattern" => (true, _config.Worktree.DefaultLocationPattern),
             "telemetry.coreTelemetryDisclosed" => (true, _config.Telemetry.CoreTelemetryDisclosed),
+            "session.restoreOnLaunch" => (true, _config.Session.RestoreOnLaunch),
             _ => _config.Extra.TryGetValue(key, out var extra) ? (true, (object?)extra) : (false, null),
         };
     }
@@ -203,6 +205,7 @@ public sealed class ConfigService : System.IDisposable
                 case "diagnostics.flushIntervalMs": _config.Diagnostics.FlushIntervalMs = AutoDetectInt(value); break;
                 case "worktree.defaultLocationPattern": _config.Worktree.DefaultLocationPattern = value; break;
                 case "telemetry.coreTelemetryDisclosed": _config.Telemetry.CoreTelemetryDisclosed = AutoDetectBool(value); break;
+                case "session.restoreOnLaunch": _config.Session.RestoreOnLaunch = AutoDetectBool(value); break;
                 default:
                     _config.Extra[key] = AutoDetectJson(value);
                     break;
@@ -374,6 +377,7 @@ public sealed class ConfigService : System.IDisposable
         d["speech.gain"] = _config.Speech.Gain.ToString(System.Globalization.CultureInfo.InvariantCulture);
         d["speech.inputDevice"] = _config.Speech.InputDevice ?? "";
         d["speech.onDeviceRecognition"] = _config.Speech.OnDeviceRecognition.ToString();
+        d["session.restoreOnLaunch"] = _config.Session.RestoreOnLaunch.ToString();
         foreach (var kv in _config.Keybindings.Bindings)
             d["keybindings." + kv.Key] = kv.Value.GetRawText();
         foreach (var kv in _config.LspServers.Servers)

@@ -26,6 +26,7 @@ public sealed class DaemonHost
     private int _totalConnections;
     private int _activeConnections;
     private long _lastActivityTicks;
+    private Cove.Engine.Restart.RestorationSummaryEvent? _restorationSummary;
 
     private IPtyHost? _ptyHost;
     private PaneRegistry? _panes;
@@ -244,39 +245,32 @@ public sealed class DaemonHost
         _restoration.MarkLaunching();
         _restoration.EmitProgress("default", "load_workspace", Cove.Engine.Restart.RestorePhase.Started, wasClean ? "clean" : "unclean");
         _layout!.OnChanged = () => PersistActiveWorkspace(workspacesRoot, logger);
+        _hookRouter.SessionStarted += (paneId, adapter, sessionId) =>
+        {
+            _sessions?.SetSessionId(paneId, adapter, sessionId);
+            PersistActiveWorkspace(workspacesRoot, logger);
+        };
         var loadedWorkspaces = Cove.Engine.Layout.WorkspaceStartup.Enumerate(workspacesRoot, logger);
         var fallbackProjectDir = System.Environment.CurrentDirectory;
+        var restoreEnabled = _config?.GetSessionRestoreOnLaunch() ?? true;
+        Cove.Engine.Restart.ResumeCommand BuildResume(string adapter, string sessionId, Cove.Engine.Restart.LauncherOverrides o)
+            => resumeProtocol.BuildResumeCommandAsync(adapter, sessionId, o).GetAwaiter().GetResult();
+        var restoreTotals = new Cove.Engine.Restart.RestoreSummary(0, 0, 0);
         foreach (var entry in loadedWorkspaces)
         {
             var sl = entry.Snapshot;
+            var restorables = new List<Cove.Engine.Restart.RestorablePane?>();
             foreach (var room in sl.Rooms)
                 foreach (var leaf in Cove.Engine.Layout.MosaicOps.Leaves(room.LayoutTree))
                     if (entry.Sessions.TryGetValue(leaf.PaneId, out var d))
-                    {
-                        try
-                        {
-                            var command = d.Command;
-                            var args = d.Args;
-                            if (!string.IsNullOrEmpty(d.Adapter) && !string.IsNullOrEmpty(d.SessionId) && _resumeProtocol is { } rp)
-                            {
-                                try
-                                {
-                                    var rc = rp.BuildResumeCommandAsync(d.Adapter!, d.SessionId!, new Cove.Engine.Restart.LauncherOverrides { WorkingDir = d.Cwd }).GetAwaiter().GetResult();
-                                    command = rc.Command;
-                                    args = System.Linq.Enumerable.ToArray(rc.Args);
-                                }
-                                catch (System.Exception ex) { logger.LogWarning(ex, "resume command build failed for {PaneId}, respawning stored command", d.PaneId); }
-                            }
-                            _panes!.RespawnAs(d.PaneId, command, args, d.Cwd, 80, 24, Cove.Engine.Layout.WorkspacePersistence.LoadScrollback(d.PaneId, entry.WorkspaceDir), d.Adapter, d.AgentName);
-                            if (!string.IsNullOrEmpty(d.Title)) _panes!.Rename(d.PaneId, d.Title!);
-                            if (!string.IsNullOrEmpty(d.Adapter))
-                            {
-                                _agentRouter?.Register(d.PaneId, d.Adapter!, d.AgentName, sl.Id);
-                                _sessions?.Register(d.PaneId, d.Adapter!, d.SessionId);
-                            }
-                        }
-                        catch (System.Exception ex) { logger.LogWarning(ex, "respawn on restore failed for {PaneId}", d.PaneId); }
-                    }
+                        restorables.Add(new Cove.Engine.Restart.RestorablePane(d.PaneId, d.Command, d.Args, d.Cwd, d.Title, d.Adapter, d.AgentName, d.SessionId, d.Yolo));
+            var spawner = new RestoreSpawner(_panes!, entry.WorkspaceDir, sl.Id, _agentRouter, _sessions, logger);
+            var restorer = new Cove.Engine.Restart.SessionRestorer(spawner, BuildResume, logger);
+            var summary = restorer.Restore(restorables, restoreEnabled);
+            restoreTotals = new Cove.Engine.Restart.RestoreSummary(
+                restoreTotals.Restored + summary.Restored,
+                restoreTotals.Fresh + summary.Fresh,
+                restoreTotals.Skipped + summary.Skipped);
             _layout!.LoadSnapshot(sl);
             var displayName = Cove.Engine.Layout.WorkspaceStartup.DisplayName(sl, fallbackProjectDir);
             var projectDir = string.IsNullOrWhiteSpace(sl.ProjectDir) ? fallbackProjectDir : sl.ProjectDir;
@@ -297,6 +291,11 @@ public sealed class DaemonHost
             _layout!.SetActiveWorkspace(focused);
             if (_workspaces.Get(focused) is { } focusedActor && !string.IsNullOrEmpty(focusedActor.State.ProjectDir))
                 _panes!.ProjectDir = focusedActor.State.ProjectDir;
+        }
+        if (restoreTotals.Restored + restoreTotals.Fresh + restoreTotals.Skipped > 0)
+        {
+            _restorationSummary = new Cove.Engine.Restart.RestorationSummaryEvent(restoreTotals.Restored, restoreTotals.Fresh, restoreTotals.Skipped);
+            logger.LogWarning("session restoration: restored={Restored} fresh={Fresh} skipped={Skipped}", restoreTotals.Restored, restoreTotals.Fresh, restoreTotals.Skipped);
         }
         _restoration.EmitProgress("default", "materialize_panes", Cove.Engine.Restart.RestorePhase.PanesMaterialized);
         try { if (_runCommands is not null) await _runCommands.RelaunchPreviouslyRunningAsync().ConfigureAwait(false); }
@@ -722,7 +721,16 @@ public sealed class DaemonHost
             var leafIds = new System.Collections.Generic.HashSet<string>(layout.LeafPaneIds(wsId), System.StringComparer.Ordinal);
             var descs = panes.Descriptors()
                 .Where(d => leafIds.Contains(d.PaneId))
-                .Select(d => _sessions?.GetState(d.PaneId) is { } ss && !string.IsNullOrEmpty(ss.SessionId) ? d with { SessionId = ss.SessionId } : d)
+                .Select(d =>
+                {
+                    var sid = _sessions?.GetState(d.PaneId)?.SessionId;
+                    var yolo = _launcher?.GetOverrides(d.PaneId)?.Yolo ?? d.Yolo;
+                    return d with
+                    {
+                        SessionId = string.IsNullOrEmpty(sid) ? d.SessionId : sid,
+                        Yolo = yolo,
+                    };
+                })
                 .ToArray();
             Cove.Engine.Layout.WorkspacePersistence.Save(snap, descs, wsDir);
         }
@@ -888,6 +896,9 @@ public sealed class DaemonHost
     {
         lock (_guiLock)
             _guiConnections.Add(conn);
+        var summary = System.Threading.Interlocked.Exchange(ref _restorationSummary, null);
+        if (summary is not null)
+            BroadcastEvent("restore.summary", summary, Cove.Engine.Restart.RestorationSummaryJsonContext.Default.RestorationSummaryEvent);
     }
 
     private void UnregisterGui(FrameConnection conn)
@@ -915,6 +926,43 @@ public sealed class DaemonHost
     {
         public bool HelloDone;
         public bool IsGui;
+    }
+
+    private sealed class RestoreSpawner : Cove.Engine.Restart.IRestoreSpawner
+    {
+        private readonly PaneRegistry _panes;
+        private readonly string _workspaceDir;
+        private readonly string _workspaceId;
+        private readonly Cove.Engine.Agents.AgentMessageRouter? _agentRouter;
+        private readonly Cove.Engine.Sessions.SessionResumeOrchestrator? _sessions;
+        private readonly ILogger _logger;
+
+        public RestoreSpawner(PaneRegistry panes, string workspaceDir, string workspaceId, Cove.Engine.Agents.AgentMessageRouter? agentRouter, Cove.Engine.Sessions.SessionResumeOrchestrator? sessions, ILogger logger)
+        {
+            _panes = panes;
+            _workspaceDir = workspaceDir;
+            _workspaceId = workspaceId;
+            _agentRouter = agentRouter;
+            _sessions = sessions;
+            _logger = logger;
+        }
+
+        public void Respawn(Cove.Engine.Restart.RestorablePane pane, string command, string[] args, string cwd)
+        {
+            try
+            {
+                var scrollback = Cove.Engine.Layout.WorkspacePersistence.LoadScrollback(pane.PaneId, _workspaceDir);
+                _panes.RespawnAs(pane.PaneId, command, args, cwd, 80, 24, scrollback, pane.Adapter, pane.AgentName);
+                if (!string.IsNullOrEmpty(pane.Title))
+                    _panes.Rename(pane.PaneId, pane.Title!);
+                if (!string.IsNullOrEmpty(pane.Adapter))
+                {
+                    _agentRouter?.Register(pane.PaneId, pane.Adapter!, pane.AgentName, _workspaceId);
+                    _sessions?.Register(pane.PaneId, pane.Adapter!, pane.SessionId);
+                }
+            }
+            catch (System.Exception ex) { _logger.LogWarning(ex, "respawn on restore failed for {PaneId}", pane.PaneId); }
+        }
     }
 
     private sealed class DaemonNotificationBus : Cove.Engine.Hooks.INotificationBus

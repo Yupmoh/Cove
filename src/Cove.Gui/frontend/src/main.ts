@@ -1,3 +1,4 @@
+import { restoredSummaryText } from "./restore-summary";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
@@ -4785,6 +4786,11 @@ function setupBadge(): void {
   });
   engineEventHandlers.set("dock.badge.clear", () => { needsInputPanes.clear(); onNeedsInputChanged(); });
   engineEventHandlers.set("state.changed", () => { if (agentsVisible()) void refreshAgents(); });
+  engineEventHandlers.set("restore.summary", (payload) => {
+    const p = payload as { restored?: number; fresh?: number; skipped?: number };
+    const text = restoredSummaryText(p.restored ?? 0, p.fresh ?? 0, p.skipped ?? 0);
+    if (text) showInAppToast("Sessions restored", text, () => {});
+  });
 }
 
 let backdropMaterial: BackdropMaterial = "none";

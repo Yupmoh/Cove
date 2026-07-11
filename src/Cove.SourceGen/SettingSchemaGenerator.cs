@@ -82,6 +82,7 @@ public sealed class SettingSchemaGenerator : IIncrementalGenerator
             "LspServersSection" => "lspServers",
             "LspSection" => "lsp",
             "AdapterCommandsSection" => "adapterCommands",
+            "SessionSection" => "session",
             _ => sectionName
         };
 
