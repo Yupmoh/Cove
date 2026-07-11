@@ -2,6 +2,11 @@
 set -euo pipefail
 
 SESSION_ID="${1:?Usage: build_resume_command.sh <session_id> [flags_json]}"
+FLAGS_JSON="${2:-}"
+
+flag_true() {
+  printf '%s' "$FLAGS_JSON" | grep -q "\"$1\"[[:space:]]*:[[:space:]]*true"
+}
 
 resolve_binary() {
   local name="$1"; shift
@@ -17,4 +22,16 @@ resolve_binary() {
 }
 
 bin="$(resolve_binary claude "$HOME/.claude/local/claude" /opt/homebrew/bin/claude /usr/local/bin/claude)"
-printf '{"command":["%s","--resume","%s"]}\n' "$bin" "$SESSION_ID"
+
+args=("$bin" "--resume" "$SESSION_ID")
+if flag_true "dangerouslySkipPermissions"; then
+  args+=("--dangerously-skip-permissions")
+fi
+
+out='{"command":['
+for i in "${!args[@]}"; do
+  [ "$i" -gt 0 ] && out+=','
+  out+="\"${args[$i]}\""
+done
+out+=']}'
+printf '%s\n' "$out"

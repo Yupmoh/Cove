@@ -1,64 +1,96 @@
 using System;
-using System.Linq;
+using System.IO;
 using System.Text.Json;
-using System.Text.Json.Serialization.Metadata;
+using System.Threading.Tasks;
+using Cove.Adapters;
 using Cove.Engine;
 using Cove.Engine.Sessions;
 using Cove.Protocol;
-using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace Cove.Engine.Tests;
 
 public sealed class SessionRecentCommandTests
 {
-    private static string NewDir()
+    private static string CopyFixture(string name)
     {
-        var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"cove-recent-cmd-{Guid.NewGuid():N}");
-        System.IO.Directory.CreateDirectory(dir);
-        return dir;
+        var root = Path.Combine(Path.GetTempPath(), "cove-recent-cmd-" + Guid.NewGuid().ToString("N"));
+        var dir = Path.Combine(root, name);
+        Directory.CreateDirectory(dir);
+        var src = Path.Combine(Directory.GetCurrentDirectory(), "..", "..", "..", "..", "..",
+            "tests", "fixtures", "adapters", name);
+        foreach (var f in Directory.GetFiles(src))
+            File.Copy(f, Path.Combine(dir, Path.GetFileName(f)), true);
+        return root;
     }
 
-    private static Task<ControlResponse?> Route(RecentSessionStore store, JsonElement? prm) =>
-        EngineCommandRouter.RouteAsync(new ControlRequest("1", "cove://commands/session.recent", prm), recentSessions: store);
-
-    private static JsonElement El<T>(T v, JsonTypeInfo<T> ti) => JsonSerializer.SerializeToElement(v, ti);
-
-    [Fact]
-    public async Task Recent_ReturnsNewestFirst()
+    private static void WriteListScript(string adapterDir, string body)
     {
-        var store = new RecentSessionStore(NewDir(), NullLogger.Instance);
-        var b = new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero);
-        store.RecordStart("claude", "s1", "ws-1", "/a", b);
-        store.RecordStart("claude", "s2", "ws-1", "/b", b.AddMinutes(5));
-
-        var resp = await Route(store, El(new SessionRecentParams(null, null), SessionRecentJsonContext.Default.SessionRecentParams));
-
-        Assert.True(resp!.Ok);
-        var sessions = resp.Data!.Value.GetProperty("sessions");
-        Assert.Equal("s2", sessions[0].GetProperty("sessionId").GetString());
-        Assert.Equal("s1", sessions[1].GetProperty("sessionId").GetString());
+        var path = Path.Combine(adapterDir, "list_recent_sessions.sh");
+        File.WriteAllText(path, "#!/usr/bin/env bash\nset -euo pipefail\n" + body);
+        if (!OperatingSystem.IsWindows())
+            File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
     }
 
-    [Fact]
-    public async Task Recent_HonoursAdapterAndLimit()
+    private static Task<ControlResponse?> Route(string adaptersRoot, SessionRecentParams p)
     {
-        var store = new RecentSessionStore(NewDir(), NullLogger.Instance);
-        var b = new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero);
-        store.RecordStart("claude", "c1", "ws-1", "/a", b);
-        store.RecordStart("claude", "c2", "ws-1", "/b", b.AddMinutes(1));
-        store.RecordStart("codex", "x1", "ws-1", "/c", b.AddMinutes(2));
-
-        var resp = await Route(store, El(new SessionRecentParams("claude", 1), SessionRecentJsonContext.Default.SessionRecentParams));
-
-        Assert.True(resp!.Ok);
-        var sessions = resp.Data!.Value.GetProperty("sessions");
-        Assert.Equal(1, sessions.GetArrayLength());
-        Assert.Equal("c2", sessions[0].GetProperty("sessionId").GetString());
+        var manifests = new AdapterManifestStore(adaptersRoot);
+        var svc = new SessionService(new MethodRunner());
+        var el = JsonSerializer.SerializeToElement(p, SessionRecentJsonContext.Default.SessionRecentParams);
+        var request = new ControlRequest("1", "cove://commands/session.recent", el);
+        return EngineCommandRouter.RouteAsync(request, manifestStore: manifests, sessionService: svc);
     }
 
     [Fact]
-    public async Task Recent_NoStore_IsNotReady()
+    public async Task Recent_ReturnsAdapterSessionIdsAndLabels_NewestFirst()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var root = CopyFixture("test-v2");
+        try
+        {
+            WriteListScript(Path.Combine(root, "test-v2"), """
+            CWD="$1"
+            cat <<EOF
+            {"sessions":[
+              {"id":"real-s1","name":"Fix the router","cwd":"$CWD","lastActive":"2024-01-01T00:00:00Z"},
+              {"id":"real-s2","name":"Add tests","cwd":"$CWD","lastActive":"2024-06-01T00:00:00Z"}
+            ]}
+            EOF
+            """);
+
+            var resp = await Route(root, new SessionRecentParams("test-v2", null, "/repo/work"));
+
+            Assert.True(resp!.Ok);
+            var sessions = resp.Data!.Value.GetProperty("sessions");
+            Assert.Equal(2, sessions.GetArrayLength());
+            Assert.Equal("real-s2", sessions[0].GetProperty("sessionId").GetString());
+            Assert.Equal("Add tests", sessions[0].GetProperty("label").GetString());
+            Assert.Equal("real-s1", sessions[1].GetProperty("sessionId").GetString());
+            Assert.Equal("Fix the router", sessions[1].GetProperty("label").GetString());
+            Assert.Equal("/repo/work", sessions[0].GetProperty("cwd").GetString());
+        }
+        finally { try { Directory.Delete(root, true); } catch { } }
+    }
+
+    [Fact]
+    public async Task Recent_FailingAdapter_DegradesToEmpty_NotError()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var root = CopyFixture("test-v2");
+        try
+        {
+            WriteListScript(Path.Combine(root, "test-v2"), "exit 3\n");
+
+            var resp = await Route(root, new SessionRecentParams("test-v2", null, "/repo/work"));
+
+            Assert.True(resp!.Ok);
+            Assert.Equal(0, resp.Data!.Value.GetProperty("sessions").GetArrayLength());
+        }
+        finally { try { Directory.Delete(root, true); } catch { } }
+    }
+
+    [Fact]
+    public async Task Recent_NoSessionService_IsNotReady()
     {
         var resp = await EngineCommandRouter.RouteAsync(new ControlRequest("1", "cove://commands/session.recent", null));
         Assert.False(resp!.Ok);

@@ -67,6 +67,42 @@ public sealed class VaultResumeTests
     }
 
     [Fact]
+    public async Task VaultResume_Yolo_AddsSkipPermissionsFlag()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var root = WriteFixtures("test-v2");
+        try
+        {
+            var ctx = Context(root, new VaultResumeParams("test-v2", "sess-123", "/tmp/work", Yolo: true));
+            var resp = await KnowledgeCommands.VaultResume(ctx);
+
+            Assert.True(resp.Ok);
+            var result = Deserialize(resp);
+            Assert.True(result.Ok);
+            Assert.Equal("none", result.Fallback);
+            Assert.Equal(new[] { "test-v2", "resume", "sess-123", "--dangerously-skip-permissions" }, result.Command);
+        }
+        finally { try { Directory.Delete(root, true); } catch { } }
+    }
+
+    [Fact]
+    public async Task VaultResume_NoYolo_OmitsSkipPermissionsFlag()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var root = WriteFixtures("test-v2");
+        try
+        {
+            var ctx = Context(root, new VaultResumeParams("test-v2", "sess-123", "/tmp/work", Yolo: false));
+            var resp = await KnowledgeCommands.VaultResume(ctx);
+
+            Assert.True(resp.Ok);
+            var result = Deserialize(resp);
+            Assert.Equal(new[] { "test-v2", "resume", "sess-123" }, result.Command);
+        }
+        finally { try { Directory.Delete(root, true); } catch { } }
+    }
+
+    [Fact]
     public async Task VaultResume_AdapterWithoutResumeMethod_FallsBackToFreshLaunch()
     {
         if (OperatingSystem.IsWindows()) return;

@@ -19,6 +19,7 @@ export interface RecentSessionEntry {
   sessionId: string;
   cwd: string;
   label: string;
+  relative: string;
 }
 
 export interface AdapterSessionGroup {
@@ -76,6 +77,7 @@ export function groupRecentsByAdapter(
       sessionId: r.sessionId,
       cwd: r.cwd,
       label: sessionLabel(r, nowMs),
+      relative: relativeTime(r.startedAt, nowMs),
     });
   }
   return order.map((name) => ({

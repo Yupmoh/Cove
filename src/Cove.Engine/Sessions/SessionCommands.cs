@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Cove.Generated;
@@ -74,30 +77,56 @@ public static class SessionCommands
     }
 
     [CoveCommand("cove://commands/session.recent")]
-    public static Task<ControlResponse> Recent(EngineDispatchContext ctx)
+    public static async Task<ControlResponse> Recent(EngineDispatchContext ctx)
     {
-        if (ctx.RecentSessions is not { } store)
-            return Task.FromResult(ctx.Fail("not_ready", "recent session store not available"));
+        if (ctx.SessionService is not { } sessions)
+            return ctx.Fail("not_ready", "session service not available");
+        if (ctx.ManifestStore is not { } manifests)
+            return ctx.Fail("not_ready", "adapter manifest store not available");
 
         string? adapter = null;
+        var cwd = "";
         var limit = 20;
         if (ctx.Request.Params is JsonElement el
             && el.Deserialize(SessionRecentJsonContext.Default.SessionRecentParams) is { } p)
         {
             adapter = string.IsNullOrWhiteSpace(p.Adapter) ? null : p.Adapter;
+            cwd = p.Cwd ?? "";
             if (p.Limit is { } l && l > 0)
                 limit = l;
         }
 
-        var rows = store.Recent(adapter, limit)
-            .Select(r => new RecentSessionDto(r.Adapter, r.SessionId, r.WorkspaceId, r.Cwd, r.StartedAt.ToString("o")))
-            .ToList();
-        return Task.FromResult(ctx.Ok(new SessionRecentResult(rows), SessionRecentJsonContext.Default.SessionRecentResult));
+        var names = adapter is null
+            ? manifests.LoadAll().Select(m => m.Name).ToList()
+            : new List<string> { adapter };
+
+        var rows = new List<RecentSessionDto>();
+        foreach (var name in names)
+        {
+            var dir = manifests.ResolveDir(name);
+            List<Cove.Adapters.RecentSession> found;
+            try
+            {
+                found = await sessions.ListRecentSessionsAsync(dir, cwd).ConfigureAwait(false);
+            }
+            catch (Exception)
+            {
+                continue;
+            }
+            foreach (var s in found)
+                rows.Add(new RecentSessionDto(name, s.Id, "", s.Cwd ?? cwd, (s.LastActive ?? DateTimeOffset.MinValue).ToString("o"), s.Name));
+        }
+
+        rows.Sort((a, b) => string.CompareOrdinal(b.StartedAt, a.StartedAt));
+        if (limit > 0 && rows.Count > limit)
+            rows = rows.GetRange(0, limit);
+
+        return ctx.Ok(new SessionRecentResult(rows), SessionRecentJsonContext.Default.SessionRecentResult);
     }
 }
 
-public sealed record SessionRecentParams(string? Adapter = null, int? Limit = null);
-public sealed record RecentSessionDto(string Adapter, string SessionId, string WorkspaceId, string Cwd, string StartedAt);
+public sealed record SessionRecentParams(string? Adapter = null, int? Limit = null, string? Cwd = null);
+public sealed record RecentSessionDto(string Adapter, string SessionId, string WorkspaceId, string Cwd, string StartedAt, string? Label = null);
 public sealed record SessionRecentResult(System.Collections.Generic.IReadOnlyList<RecentSessionDto> Sessions);
 
 [JsonSourceGenerationOptions(

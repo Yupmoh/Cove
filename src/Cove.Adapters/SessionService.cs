@@ -22,13 +22,15 @@ public sealed class SessionService
 {
     private readonly MethodRunner _runner;
     private readonly TimeSpan _cacheTtl;
+    private readonly TimeSpan _listTimeout;
     private readonly Dictionary<(string adapter, string cwd), (List<RecentSession> sessions, DateTimeOffset at)> _cache = new();
     private readonly Dictionary<string, int> _schemaVersions = new();
 
-    public SessionService(MethodRunner runner, TimeSpan? cacheTtl = null)
+    public SessionService(MethodRunner runner, TimeSpan? cacheTtl = null, TimeSpan? listTimeout = null)
     {
         _runner = runner;
         _cacheTtl = cacheTtl ?? TimeSpan.FromSeconds(2);
+        _listTimeout = listTimeout ?? TimeSpan.FromSeconds(3);
     }
 
     public async Task<List<RecentSession>> ListRecentSessionsAsync(string adapterDir, string cwd, CancellationToken ct = default)
@@ -37,7 +39,7 @@ public sealed class SessionService
         if (_cache.TryGetValue(key, out var entry) && DateTimeOffset.UtcNow - entry.at < _cacheTtl)
             return entry.sessions;
 
-        var result = await _runner.RunAsync(adapterDir, "list_recent_sessions.sh", [cwd], TimeSpan.FromMilliseconds(50), null, ct);
+        var result = await _runner.RunAsync(adapterDir, "list_recent_sessions.sh", [cwd], _listTimeout, null, ct);
 
         List<RecentSession> sessions;
         if (result.Ok && result.Json is { } json)

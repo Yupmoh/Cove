@@ -798,7 +798,7 @@ function renderSessionPickerPane(paneId: string): HTMLElement {
 async function resumeRecentSession(adapter: string, sessionId: string, cwd: string, displayName: string): Promise<void> {
   let action: ResumeAction;
   try {
-    const result = await invoke<VaultResumeResult>("cove://commands/vault.resume", { adapter, sessionId, cwd });
+    const result = await invoke<VaultResumeResult>("cove://commands/vault.resume", { adapter, sessionId, cwd, yolo: launcherYolo(adapter) });
     action = resumeSpawnPlan(result, cwd, displayName);
   } catch (e) {
     console.warn("vault.resume failed", adapter, sessionId, e);
@@ -1192,6 +1192,7 @@ async function reload(): Promise<WorkspaceSnapshot> {
   if (!focusedPaneId || !leaves.includes(focusedPaneId)) {
     focusedPaneId = leaves[0] ?? null;
   }
+  if (activeProjectDir() !== launcherRecentsCwd) await loadLauncherRecents();
   renderRoom();
   renderRoomTabs();
   renderSidebar();
@@ -3739,11 +3740,18 @@ async function loadLauncherAdapters(): Promise<void> {
     const res = await invoke<SessionListResult>("cove://commands/session.list", {});
     launcherSessions = res.sessions ?? [];
   } catch { launcherSessions = []; }
+  await loadLauncherRecents();
+  if ((layout?.rooms ?? []).length === 0) renderRoom();
+}
+
+let launcherRecentsCwd: string | null = null;
+async function loadLauncherRecents(): Promise<void> {
+  const cwd = activeProjectDir();
   try {
-    const res = await invoke<SessionRecentResult>("cove://commands/session.recent", { limit: 30 });
+    const res = await invoke<SessionRecentResult>("cove://commands/session.recent", { cwd, limit: 50 });
     launcherRecents = res.sessions ?? [];
   } catch { launcherRecents = []; }
-  if ((layout?.rooms ?? []).length === 0) renderRoom();
+  launcherRecentsCwd = cwd;
 }
 
 function builtinLauncherDefs(): LauncherBuiltin[] {
@@ -4059,8 +4067,8 @@ function renderCardExpansion(ctx: LauncherContext, tile: LauncherTile): HTMLElem
       row.style.cursor = "pointer";
       const base = document.createElement("span");
       base.className = "cl-recent-cwd";
-      base.textContent = s.cwdBase;
-      base.title = s.cwd;
+      base.textContent = s.label;
+      base.title = s.label;
       const when = document.createElement("span");
       when.className = "cl-recent-when";
       when.textContent = s.relative;

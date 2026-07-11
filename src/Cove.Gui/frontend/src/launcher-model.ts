@@ -150,6 +150,7 @@ export interface RecentSessionRow {
   workspaceId: string;
   cwd: string;
   startedAt: string;
+  label?: string;
 }
 
 export interface RecentSessionView {
@@ -158,6 +159,7 @@ export interface RecentSessionView {
   cwd: string;
   cwdBase: string;
   relative: string;
+  label: string;
 }
 
 export function cwdBasename(cwd: string): string {
@@ -182,13 +184,19 @@ export function relativeTime(startedAt: string, nowMs: number): string {
 }
 
 export function shapeRecentSessions(rows: RecentSessionRow[], nowMs: number, limit: number): RecentSessionView[] {
-  return rows.slice(0, Math.max(0, limit)).map((r) => ({
-    adapter: r.adapter,
-    sessionId: r.sessionId,
-    cwd: r.cwd,
-    cwdBase: cwdBasename(r.cwd),
-    relative: relativeTime(r.startedAt, nowMs),
-  }));
+  return rows.slice(0, Math.max(0, limit)).map((r) => {
+    const rel = relativeTime(r.startedAt, nowMs);
+    const trimmed = (r.label ?? "").trim();
+    const label = trimmed.length > 0 ? trimmed : rel ? `${rel} session` : "session";
+    return {
+      adapter: r.adapter,
+      sessionId: r.sessionId,
+      cwd: r.cwd,
+      cwdBase: cwdBasename(r.cwd),
+      relative: rel,
+      label,
+    };
+  });
 }
 
 export const LAUNCHER_TIPS = [

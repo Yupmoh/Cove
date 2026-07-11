@@ -111,6 +111,16 @@ describe("groupRecentsByAdapter", () => {
     const groups = groupRecentsByAdapter([row({ adapter: "mystery", cwd: "/p" })], "/p", [], Date.now());
     expect(groups[0].displayName).toBe("mystery");
   });
+
+  it("carries the adapter-provided label and a relative time on each entry", () => {
+    const nowMs = Date.parse("2026-07-11T12:00:00Z");
+    const rows = [
+      { ...row({ adapter: "claude-code", sessionId: "a", cwd: "/p", startedAt: "2026-07-11T09:00:00Z" }), label: "Refactor the router" } as RecentSessionRow,
+    ];
+    const groups = groupRecentsByAdapter(rows, "/p", [{ name: "claude-code", displayName: "Claude Code" }], nowMs);
+    expect(groups[0].sessions[0].label).toBe("Refactor the router");
+    expect(groups[0].sessions[0].relative).toBe("3h ago");
+  });
 });
 
 describe("sessionLabel", () => {

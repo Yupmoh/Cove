@@ -440,7 +440,7 @@ public static class KnowledgeCommands
         if (manifests.Load(p.Adapter) is null)
             return ctx.Fail("not_found", $"unknown adapter: {p.Adapter}");
 
-        var overrides = new Cove.Engine.Restart.LauncherOverrides { WorkingDir = p.Cwd };
+        var overrides = new Cove.Engine.Restart.LauncherOverrides { WorkingDir = p.Cwd, Yolo = p.Yolo };
         var protocol = new Cove.Engine.Launch.AdapterResumeProtocol(manifests, new Cove.Adapters.MethodRunner());
         try
         {

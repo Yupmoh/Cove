@@ -313,7 +313,7 @@ public sealed record EditRecordDto(string SessionId, string FilePath, string? To
 public sealed record VaultSearchParams(string WorkspaceId, string Query, int? Limit);
 public sealed record VaultSearchResult(System.Collections.Generic.IReadOnlyList<SessionCorpusEntryDto> Entries);
 public sealed record SessionCorpusEntryDto(string Id, string WorkspaceId, string Adapter, string StartedAt, string? EndedAt, string? ExtractorVersion);
-public sealed record VaultResumeParams(string Adapter, string SessionId, string Cwd);
+public sealed record VaultResumeParams(string Adapter, string SessionId, string Cwd, bool Yolo = false);
 public sealed record VaultResumeResult(bool Ok, string Adapter, string[] Command, string Cwd, string Fallback, string? Error);
 public sealed record VaultSetSettingParams(string WorkspaceId, string Key, string Value);
 public sealed record VaultReindexParams(string WorkspaceId);

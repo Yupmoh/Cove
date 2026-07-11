@@ -75,7 +75,8 @@ public sealed class EngineDispatchContext
         Cove.Engine.Diagnostics.DiagnosticsHub? diagnostics = null,
         Cove.Engine.Diagnostics.PerformanceBundleService? perfBundles = null,
         RecentSessionStore? recentSessions = null,
-        Cove.Engine.Lsp.LspService? lspService = null)
+        Cove.Engine.Lsp.LspService? lspService = null,
+        Cove.Adapters.SessionService? sessionService = null)
     {
         Request = request;
         Panes = panes;
@@ -131,6 +132,7 @@ public sealed class EngineDispatchContext
         PerfBundles = perfBundles;
         RecentSessions = recentSessions;
         LspService = lspService;
+        SessionService = sessionService;
     }
 
     public ControlRequest Request { get; }
@@ -187,6 +189,7 @@ public sealed class EngineDispatchContext
     public Cove.Engine.Diagnostics.PerformanceBundleService? PerfBundles { get; }
     public RecentSessionStore? RecentSessions { get; }
     public Cove.Engine.Lsp.LspService? LspService { get; }
+    public Cove.Adapters.SessionService? SessionService { get; }
     public System.Func<ControlRequest, System.Threading.Tasks.Task<ControlResponse?>>? Redrive { get; set; }
 
     public ControlResponse Ok<T>(T data, JsonTypeInfo<T> typeInfo)
