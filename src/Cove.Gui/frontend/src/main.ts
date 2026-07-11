@@ -46,7 +46,7 @@ import { DEFAULT_DRAFT, draftFromTheme, themeFromDraft, cssVarsFromTheme, xtermT
 import { categorizeBindings, isReservedChord, isValidChord, chordDisplay, canRecordChord, normalizeChord as normalizeChordStr, type KeybindDto } from "./keyboard-editor";
 import { ONBOARDING_STEPS, INITIAL_ONBOARDING_STATE, nextStep, prevStep, dismiss as dismissOnboarding, currentStepData, isLastStep, isFirstStep, progressPercent, selectAdapter, setTelemetryOptIn, shouldShowOnboarding, onboardingSeenFromConfig, ONBOARDING_COMPLETED_KEY, type OnboardingState } from "./onboarding";
 import { initBackdrop, setBackdropMaterial, nextToggleMaterial, coerceMaterial, BACKDROP_PREF_KEY, type BackdropDeps, type BackdropMaterial } from "./backdrop";
-import { detectChimes, playChime } from "./chime";
+import { detectChimes, playChime, chimesEnabledFrom, chimePrefValue, AGENT_CHIMES_STORAGE_KEY } from "./chime";
 import { NotificationBridge, type NotificationBridgeDeps, type NotificationDeliverPayload } from "./notifications";
 import { buildMenu, menuChordSet } from "./menu-model";
 import { toolbarTiles } from "./toolbar-tiles";
@@ -2244,7 +2244,11 @@ function closeTreeRow(kind: string, shoreId: string | null, nookId: string | nul
 let prevAgentStates = new Map<string, string>();
 
 function agentChimesEnabled(): boolean {
-  return localStorage.getItem("cove.sound.agentChimes") !== "false";
+  return chimesEnabledFrom(localStorage.getItem(AGENT_CHIMES_STORAGE_KEY));
+}
+
+function setAgentChimesEnabled(enabled: boolean): void {
+  localStorage.setItem(AGENT_CHIMES_STORAGE_KEY, chimePrefValue(enabled));
 }
 
 async function refreshAgents(): Promise<void> {
@@ -2958,6 +2962,54 @@ function renderSettings(): void {
   }
   if (activeSettingsTab === "diagnostics") renderDiagnosticsExtras(setBodyEl);
   if (activeSettingsTab === "updates") renderUpdatesExtras(setBodyEl);
+  if (activeSettingsTab === "audio") renderAudioExtras(setBodyEl);
+}
+
+function renderAudioExtras(container: HTMLElement): void {
+  const header = document.createElement("div");
+  header.className = "set-section-header";
+  header.style.cssText = "padding:12px 0 4px;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border);";
+  header.textContent = "Sound";
+  container.appendChild(header);
+
+  const row = document.createElement("div");
+  row.className = "set-row";
+  const label = document.createElement("label");
+  const labelText = document.createElement("span");
+  labelText.textContent = "Agent chimes";
+  const desc = document.createElement("span");
+  desc.className = "set-desc";
+  desc.textContent = "Play a soft tone when an agent finishes or needs input. On by default.";
+  label.appendChild(labelText);
+  label.appendChild(desc);
+
+  const controls = document.createElement("div");
+  controls.style.cssText = "display:flex;align-items:center;gap:8px;";
+  const preview = document.createElement("button");
+  preview.className = "diag-btn";
+  preview.style.marginTop = "0";
+  preview.textContent = "Preview";
+  preview.addEventListener("click", () => playChime("done"));
+  const toggle = document.createElement("button");
+  const paint = (): void => {
+    const on = agentChimesEnabled();
+    toggle.className = "diag-toggle" + (on ? " on" : "");
+    toggle.textContent = on ? "On" : "Off";
+    preview.disabled = !on;
+  };
+  toggle.addEventListener("click", () => {
+    const next = !agentChimesEnabled();
+    setAgentChimesEnabled(next);
+    if (next) playChime("done");
+    paint();
+  });
+  paint();
+  controls.appendChild(preview);
+  controls.appendChild(toggle);
+
+  row.appendChild(label);
+  row.appendChild(controls);
+  container.appendChild(row);
 }
 
 async function renderToolsTab(container: HTMLElement): Promise<void> {

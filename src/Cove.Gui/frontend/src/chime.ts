@@ -1,5 +1,15 @@
 export type ChimeKind = "done" | "needs-input";
 
+export const AGENT_CHIMES_STORAGE_KEY = "cove.sound.agentChimes";
+
+export function chimesEnabledFrom(raw: string | null): boolean {
+  return raw !== "false";
+}
+
+export function chimePrefValue(enabled: boolean): string {
+  return enabled ? "true" : "false";
+}
+
 export interface ChimeNote {
   freq: number;
   start: number;

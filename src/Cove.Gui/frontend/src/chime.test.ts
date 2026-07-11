@@ -1,6 +1,30 @@
 import { describe, expect, it } from "vitest";
-import { chimePlan, detectChimes, type ChimeKind } from "./chime";
+import { chimePlan, detectChimes, chimesEnabledFrom, chimePrefValue, AGENT_CHIMES_STORAGE_KEY, type ChimeKind } from "./chime";
 import { mapAgentState } from "./agents-model";
+
+describe("agent chime preference", () => {
+  it("defaults to enabled when nothing is stored", () => {
+    expect(chimesEnabledFrom(null)).toBe(true);
+  });
+
+  it("stays enabled for any value other than the off sentinel", () => {
+    expect(chimesEnabledFrom("true")).toBe(true);
+    expect(chimesEnabledFrom("")).toBe(true);
+  });
+
+  it("is disabled only for the explicit off sentinel", () => {
+    expect(chimesEnabledFrom("false")).toBe(false);
+  });
+
+  it("round-trips the stored value through the enabled flag", () => {
+    expect(chimesEnabledFrom(chimePrefValue(true))).toBe(true);
+    expect(chimesEnabledFrom(chimePrefValue(false))).toBe(false);
+  });
+
+  it("keys off the shared localStorage slot", () => {
+    expect(AGENT_CHIMES_STORAGE_KEY).toBe("cove.sound.agentChimes");
+  });
+});
 
 describe("chimePlan", () => {
   it("gives done a rising two-note plan", () => {
