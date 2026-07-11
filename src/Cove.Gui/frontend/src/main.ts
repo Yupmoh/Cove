@@ -315,6 +315,8 @@ function attachWs(pane: PaneView) {
       else if (m.t === "resync") { pane.term.reset(); pane.consumed = m.base; pane.lastAck = m.base; }
       else if (m.t === "end") {
         pane.term.write(`\r\n\x1b[38;5;244m[process exited: ${m.code}]\x1b[0m\r\n`);
+        launcherRecentsAt = 0;
+        void refreshLauncherRecents();
         window.setTimeout(() => { void closePaneById(pane.paneId); }, 400);
       }
       return;
@@ -3748,13 +3750,25 @@ async function loadLauncherAdapters(): Promise<void> {
 }
 
 let launcherRecentsCwd: string | null = null;
+let launcherRecentsAt = 0;
 async function loadLauncherRecents(): Promise<void> {
   const cwd = activeProjectDir();
   try {
     const res = await invoke<SessionRecentResult>("cove://commands/session.recent", { cwd, limit: 50 });
     launcherRecents = res.sessions ?? [];
-  } catch { launcherRecents = []; }
+  } catch (err) {
+    console.warn("session.recent failed", cwd, err);
+    launcherRecents = [];
+  }
   launcherRecentsCwd = cwd;
+  launcherRecentsAt = Date.now();
+}
+
+async function refreshLauncherRecents(): Promise<void> {
+  if (activeProjectDir() === launcherRecentsCwd && Date.now() - launcherRecentsAt < 4000) return;
+  const before = JSON.stringify(launcherRecents);
+  await loadLauncherRecents();
+  if (JSON.stringify(launcherRecents) !== before) renderRoom();
 }
 
 function builtinLauncherDefs(): LauncherBuiltin[] {
@@ -3796,6 +3810,7 @@ function activateLauncherSelection(ctx: LauncherContext, harness: LauncherTile[]
 }
 
 function renderBoxLauncher(targetRoomId: string | null, targetPlaceholderId: string | null): HTMLElement {
+  void refreshLauncherRecents();
   const ctx: LauncherContext = { targetRoomId, targetPlaceholderId };
   const wrap = document.createElement("div");
   wrap.className = "box-launcher";
