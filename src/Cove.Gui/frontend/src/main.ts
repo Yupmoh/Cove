@@ -37,6 +37,7 @@ import { clampMenuPosition, normalizeItems, firstSelectableIndex, moveSelection 
 import { buildWorkspaceTree, workspaceTreeEmptyMessage, PANE_TYPE_LABELS, type TreeLeaf, type TreeRoomInput, type TreeRow } from "./workspace-tree";
 import { buildAgentRows, AGENT_STATE_META, type AgentCard, type AgentState } from "./agents-model";
 import { resolveActiveWorkspaceId, workspaceAccent, sortFsEntries, joinPath, scmChipText, parseCollapsedCardIds, serializeCollapsedCardIds, toggleCardCollapsed, type FsEntry, type WorkspaceCardEntry, type ScmSummary } from "./workspace-cards";
+import { WORKSPACE_ICON_CHOICES, workspaceGlyph } from "./workspace-icons";
 import { parseQuery, filterAndSort, MruTracker, cycleCategory, categoryLabel, type PaletteItem } from "./omni-palette";
 import { buildEmptyState, EmptyStateMessages } from "./empty-states";
 import { brandLogoAt, nextBrandIndex, parseBrandIndex } from "./brand";
@@ -1474,8 +1475,8 @@ let workspaceBoxItems: WorkspaceBoxInput[] = [];
 
 async function loadWorkspaceBoxes(): Promise<void> {
   try {
-    const res = await invoke<{ workspaces: { id: string; name: string; projectDir?: string }[] }>("cove://commands/workspace.list", {});
-    workspaceBoxItems = (res.workspaces ?? []).map((w) => ({ id: w.id, name: w.name, projectDir: w.projectDir }));
+    const res = await invoke<{ workspaces: { id: string; name: string; projectDir?: string; iconKind?: string | null; iconValue?: string | null }[] }>("cove://commands/workspace.list", {});
+    workspaceBoxItems = (res.workspaces ?? []).map((w) => ({ id: w.id, name: w.name, projectDir: w.projectDir, icon: w.iconKind ? { kind: w.iconKind, value: w.iconValue ?? "" } : null }));
   } catch { workspaceBoxItems = []; }
   renderSidebarContent("left");
 }
@@ -1886,11 +1887,90 @@ function wireWorkspaceCardDrag(el: HTMLElement, wid: string): void {
   });
 }
 
+function buildWorkspaceIconGrid(selected: string | null, onSelect: (emoji: string | null) => void): HTMLElement {
+  const grid = document.createElement("div");
+  grid.className = "ws-icon-grid";
+  const cells: HTMLElement[] = [];
+  const addCell = (value: string | null) => {
+    const cell = document.createElement("button");
+    cell.type = "button";
+    cell.className = "ws-icon-cell" + (selected === value ? " sel" : "");
+    if (value === null) {
+      const dot = document.createElement("span");
+      dot.className = "ws-icon-none-dot";
+      cell.appendChild(dot);
+      cell.title = "No icon";
+    } else {
+      cell.textContent = value;
+    }
+    cell.addEventListener("click", () => {
+      selected = value;
+      for (const c of cells) c.classList.remove("sel");
+      cell.classList.add("sel");
+      onSelect(value);
+    });
+    cells.push(cell);
+    grid.appendChild(cell);
+  };
+  addCell(null);
+  for (const emoji of WORKSPACE_ICON_CHOICES) addCell(emoji);
+  return grid;
+}
+
+let workspaceIconPopoverEl: HTMLElement | null = null;
+let workspaceIconPopoverAway: ((e: MouseEvent) => void) | null = null;
+let workspaceIconPopoverKey: ((e: KeyboardEvent) => void) | null = null;
+
+function closeWorkspaceIconPopover(): void {
+  if (workspaceIconPopoverAway) { document.removeEventListener("mousedown", workspaceIconPopoverAway, true); workspaceIconPopoverAway = null; }
+  if (workspaceIconPopoverKey) { document.removeEventListener("keydown", workspaceIconPopoverKey, true); workspaceIconPopoverKey = null; }
+  workspaceIconPopoverEl?.remove();
+  workspaceIconPopoverEl = null;
+}
+
+function openWorkspaceIconPopover(anchor: HTMLElement, ws: WorkspaceCardEntry): void {
+  closeWorkspaceIconPopover();
+  const pop = document.createElement("div");
+  pop.className = "ws-icon-popover";
+  pop.appendChild(buildWorkspaceIconGrid(workspaceGlyph(ws.icon), (emoji) => {
+    closeWorkspaceIconPopover();
+    void changeWorkspaceIcon(ws.id, emoji);
+  }));
+  pop.style.cssText = "position:fixed;left:-9999px;top:-9999px;";
+  document.body.appendChild(pop);
+  const rect = anchor.getBoundingClientRect();
+  const size = { width: pop.offsetWidth, height: pop.offsetHeight };
+  const pos = clampMenuPosition({ x: rect.left, y: rect.bottom + 4 }, size, { width: window.innerWidth, height: window.innerHeight });
+  pop.style.left = `${pos.x}px`;
+  pop.style.top = `${pos.y}px`;
+  workspaceIconPopoverEl = pop;
+  workspaceIconPopoverKey = (e) => { if (e.key === "Escape") { e.preventDefault(); closeWorkspaceIconPopover(); } };
+  document.addEventListener("keydown", workspaceIconPopoverKey, true);
+  workspaceIconPopoverAway = (ev) => { if (workspaceIconPopoverEl && !workspaceIconPopoverEl.contains(ev.target as Node)) closeWorkspaceIconPopover(); };
+  setTimeout(() => { if (workspaceIconPopoverAway) document.addEventListener("mousedown", workspaceIconPopoverAway, true); }, 0);
+}
+
+async function changeWorkspaceIcon(wsId: string, emoji: string | null): Promise<void> {
+  try {
+    if (emoji) await invoke("cove://commands/workspace.set-icon", { id: wsId, kind: "emoji", value: emoji });
+    else await invoke("cove://commands/workspace.set-icon", { id: wsId, kind: "", value: "" });
+    await loadWorkspaceBoxes();
+  } catch (e) {
+    console.warn("workspace.set-icon failed", wsId, e);
+    showInAppToast("Icon not changed", "Could not update the workspace icon.", () => {});
+  }
+}
+
 function workspaceCardHead(ws: WorkspaceCardEntry, mini: boolean): HTMLElement {
   const head = document.createElement("div");
   head.className = "ws-card-head";
   const swatch = document.createElement("span");
   swatch.className = "ws-card-swatch";
+  const glyph = workspaceGlyph(ws.icon);
+  if (glyph) {
+    swatch.classList.add("has-glyph");
+    swatch.textContent = glyph;
+  }
   head.appendChild(swatch);
   const titles = document.createElement("div");
   titles.className = "ws-card-titles";
@@ -1911,11 +1991,13 @@ function workspaceCardHead(ws: WorkspaceCardEntry, mini: boolean): HTMLElement {
     openContextMenuAt(e, [
       { id: "new-room", label: "New room", disabled: mini },
       { id: "rename", label: "Rename" },
+      { id: "change-icon", label: "Change icon" },
       { id: "sep", label: "", separator: true },
       { id: "close-ws", label: "Close workspace", danger: true },
     ], (id) => {
       if (id === "new-room") void newRoom();
       else if (id === "rename") startWorkspaceRename(ws.id, name, ws.name);
+      else if (id === "change-icon") openWorkspaceIconPopover(swatch, ws);
       else if (id === "close-ws") void deleteWorkspace(ws.id);
     });
   });
@@ -4451,6 +4533,15 @@ const wscNameEl = document.getElementById("wsc-name") as HTMLInputElement;
 const wscPathEl = document.getElementById("wsc-path") as HTMLInputElement;
 const wscErrorEl = document.getElementById("wsc-error")!;
 
+let wscSelectedIcon: string | null = null;
+
+function renderWscIconGrid(): void {
+  const host = document.getElementById("wsc-icon-grid");
+  if (!host) { console.warn("wsc-icon-grid element missing"); return; }
+  host.textContent = "";
+  host.appendChild(buildWorkspaceIconGrid(wscSelectedIcon, (emoji) => { wscSelectedIcon = emoji; }));
+}
+
 function closeWorkspaceDialog(): void {
   wsCreateEl.classList.remove("open");
 }
@@ -4459,6 +4550,8 @@ function newWorkspace(): void {
   wscNameEl.value = "";
   wscPathEl.value = "";
   wscErrorEl.textContent = "";
+  wscSelectedIcon = null;
+  renderWscIconGrid();
   wsCreateEl.classList.add("open");
   wscNameEl.focus();
 }
@@ -4481,8 +4574,15 @@ async function submitWorkspaceDialog(): Promise<void> {
   if (!name) { wscErrorEl.textContent = "Name is required."; wscNameEl.focus(); return; }
   if (!path) { wscErrorEl.textContent = "Directory is required."; wscPathEl.focus(); return; }
   try {
-    await invoke("cove://commands/workspace.create", { name, projectDir: path, collectionId: "" });
+    const created = await invoke<{ id: string }>("cove://commands/workspace.create", { name, projectDir: path, collectionId: "" });
     closeWorkspaceDialog();
+    if (wscSelectedIcon && created?.id) {
+      try { await invoke("cove://commands/workspace.set-icon", { id: created.id, kind: "emoji", value: wscSelectedIcon }); }
+      catch (iconErr) {
+        console.warn("workspace.set-icon failed", created.id, iconErr);
+        showInAppToast("Icon not set", "Workspace created without the chosen icon.", () => {});
+      }
+    }
     await loadWorkspaceBoxes();
     await reload();
   } catch (e) {

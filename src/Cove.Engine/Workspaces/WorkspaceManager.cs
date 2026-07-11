@@ -176,7 +176,7 @@ public sealed class WorkspaceManager : IAsyncDisposable
             if (actor is null)
                 continue;
             var w = actor.State;
-            result.Add(new WorkspaceSummary(w.Id, w.Name, w.ProjectDir, w.CollectionId, w.IsWorktree, w.Id == focused, w.Hidden));
+            result.Add(new WorkspaceSummary(w.Id, w.Name, w.ProjectDir, w.CollectionId, w.IsWorktree, w.Id == focused, w.Hidden, w.Icon?.Kind, w.Icon?.Value));
         }
         return result;
     }

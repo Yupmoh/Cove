@@ -1,7 +1,10 @@
+import type { WorkspaceIcon } from "./workspace-icons";
+
 export interface WorkspaceCardEntry {
   id: string;
   name: string;
   projectDir: string;
+  icon?: WorkspaceIcon | null;
 }
 
 export interface FsEntry {

@@ -84,7 +84,7 @@ public sealed record RegistryModel
     public string ActiveCollectionId { get => _activeCollectionId ?? WorkspaceModel.DefaultCollectionId; init => _activeCollectionId = value; }
 }
 
-public sealed record WorkspaceSummary(string Id, string Name, string ProjectDir, string CollectionId, bool IsWorktree, bool Active, bool Hidden = false);
+public sealed record WorkspaceSummary(string Id, string Name, string ProjectDir, string CollectionId, bool IsWorktree, bool Active, bool Hidden = false, string? IconKind = null, string? IconValue = null);
 
 public sealed record WorkspaceCreateParams(string Name, string ProjectDir, string? CollectionId = null);
 
