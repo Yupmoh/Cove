@@ -545,6 +545,22 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/lsp.definition",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/lsp.diagnostics",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/lsp.hover",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/lsp.status",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/memory.add",
     "source": "core"
   },

@@ -92,6 +92,8 @@ All configuration keys for Cove, grouped by settings tab.
 |-----|-------|------|---------|-------------|
 | `adapterCommands` | Adapter Commands | object | section |  |
 | `adapterCommands.commands` | Adapter Commands | object | text |  |
+| `lsp` | Language Servers | object | section |  |
+| `lsp.servers` | Servers | object | text |  |
 | `lspServers` | LSP Servers | object | section |  |
 | `lspServers.servers` | LSP Servers | object | text |  |
 

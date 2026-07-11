@@ -136,6 +136,10 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/library.list` | core |  |
 | `cove://commands/library.materialize` | core |  |
 | `cove://commands/list_windows` | core | mcp-bridge list_windows (PL-30, render-bound) |
+| `cove://commands/lsp.definition` | core |  |
+| `cove://commands/lsp.diagnostics` | core |  |
+| `cove://commands/lsp.hover` | core |  |
+| `cove://commands/lsp.status` | core |  |
 | `cove://commands/memory.add` | core |  |
 | `cove://commands/memory.consolidate` | core |  |
 | `cove://commands/memory.proposal.transition` | core |  |
@@ -454,4 +458,4 @@ Generated from the command registry. Do not edit by hand.
 | `viewer get-state` | cli |  |
 | `viewer open` | cli |  |
 
-Total: 449 commands
+Total: 453 commands

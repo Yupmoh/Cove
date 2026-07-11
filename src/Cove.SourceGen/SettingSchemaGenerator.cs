@@ -80,6 +80,7 @@ public sealed class SettingSchemaGenerator : IIncrementalGenerator
             "PushToTalkSection" => "pushToTalk",
             "SpeechSection" => "speech",
             "LspServersSection" => "lspServers",
+            "LspSection" => "lsp",
             "AdapterCommandsSection" => "adapterCommands",
             _ => sectionName
         };

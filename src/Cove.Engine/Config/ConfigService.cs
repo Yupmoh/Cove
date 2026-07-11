@@ -45,6 +45,7 @@ public sealed class ConfigService : System.IDisposable
     public bool GetPushToTalkEnabled() { lock (_lock) return _config.PushToTalk.Enabled; }
     public double GetSpeechGain() { lock (_lock) return _config.Speech.Gain; }
     public IReadOnlyDictionary<string, JsonElement> GetLspServers() { lock (_lock) return _config.LspServers.Servers; }
+    public IReadOnlyList<LspConfigServerEntry> GetLspServerEntries() { lock (_lock) return _config.Lsp.Servers; }
     public IReadOnlyDictionary<string, JsonElement> GetAdapterCommands() { lock (_lock) return _config.AdapterCommands.Commands; }
 
     public void SetTheme(string value) { if (!TrySet(() => _config.Theme = value, "theme")) return; }
@@ -377,6 +378,11 @@ public sealed class ConfigService : System.IDisposable
             d["keybindings." + kv.Key] = kv.Value.GetRawText();
         foreach (var kv in _config.LspServers.Servers)
             d["lspServers." + kv.Key] = kv.Value.GetRawText();
+        for (var i = 0; i < _config.Lsp.Servers.Count; i++)
+        {
+            var entry = _config.Lsp.Servers[i];
+            d["lsp.servers." + i] = string.Join(",", entry.Languages) + " " + entry.Command + " " + string.Join(",", entry.Args);
+        }
         foreach (var kv in _config.AdapterCommands.Commands)
             d["adapterCommands." + kv.Key] = kv.Value.GetRawText();
         foreach (var kv in _config.Extra)

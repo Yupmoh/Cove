@@ -17,6 +17,13 @@ import {
   formatBlameHover,
   type BlameLineLike,
 } from "./git-decorations";
+import { diagnosticsToMarkers, lspLanguageForPath, type LspDiagnosticLike } from "./lsp-markers";
+
+interface LspDiagnosticsResult {
+  available: boolean;
+  language?: string | null;
+  diagnostics: LspDiagnosticLike[];
+}
 
 interface ScmDiffResult {
   filePath: string;
@@ -239,13 +246,52 @@ export async function renderEditorPane(paneId: string, filePath: string): Promis
   let dirty = false;
   let saveTimer: ReturnType<typeof setTimeout> | undefined;
 
+  let lspUnavailableLogged = false;
+  let lspTimer: ReturnType<typeof setTimeout> | undefined;
+  const lspRootSlash = filePath.replace(/\\/g, "/").lastIndexOf("/");
+  const lspRootDir = lspRootSlash > 0 ? filePath.slice(0, lspRootSlash) : filePath;
+
+  const refreshLspDiagnostics = async () => {
+    if (lspLanguageForPath(filePath) === null) return;
+    try {
+      const result = await invoke<LspDiagnosticsResult>("cove://commands/lsp.diagnostics", {
+        filePath,
+        content: model.getValue(),
+        rootDir: lspRootDir,
+      });
+      if (!result.available) {
+        monaco.editor.setModelMarkers(model, "cove-lsp", []);
+        if (!lspUnavailableLogged) {
+          lspUnavailableLogged = true;
+          console.warn(`lsp diagnostics unavailable for ${filePath}`);
+        }
+        return;
+      }
+      monaco.editor.setModelMarkers(model, "cove-lsp", diagnosticsToMarkers(result.diagnostics ?? []) as Monaco.editor.IMarkerData[]);
+    } catch (e) {
+      monaco.editor.setModelMarkers(model, "cove-lsp", []);
+      if (!lspUnavailableLogged) {
+        lspUnavailableLogged = true;
+        console.warn(`lsp diagnostics failed for ${filePath}: ${(e as Error).message}`);
+      }
+    }
+  };
+
+  const scheduleLspDiagnostics = () => {
+    clearTimeout(lspTimer);
+    lspTimer = setTimeout(() => { void refreshLspDiagnostics(); }, 500);
+  };
+
   model.onDidChangeContent(() => {
     dirty = true;
     saveStatus.textContent = "Modified";
     saveStatus.style.color = "#cca766";
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => { void doSave(); }, 2000);
+    scheduleLspDiagnostics();
   });
+
+  void refreshLspDiagnostics();
 
   editor.onDidChangeCursorPosition((e: Monaco.editor.ICursorPositionChangedEvent) => {
     cursorPos.textContent = `Ln ${e.position.lineNumber}, Col ${e.position.column}`;

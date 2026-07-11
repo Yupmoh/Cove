@@ -60,6 +60,8 @@ public sealed class CoveConfig
     public SpeechSection Speech { get; set; } = new();
     [Setting("LSP Servers", "tools", "section", "Language server configurations")]
     public LspServersSection LspServers { get; set; } = new();
+    [Setting("Language Servers", "tools", "section", "Registered language servers")]
+    public LspSection Lsp { get; set; } = new();
     [Setting("Adapter Commands", "tools", "section", "Custom adapter commands")]
     public AdapterCommandsSection AdapterCommands { get; set; } = new();
 
@@ -111,6 +113,9 @@ public sealed class CoveConfig
                     break;
                 case "lspServers":
                     cfg.LspServers = LspServersSection.Read(prop.Value);
+                    break;
+                case "lsp":
+                    cfg.Lsp = LspSection.Read(prop.Value);
                     break;
                 case "adapterCommands":
                     cfg.AdapterCommands = AdapterCommandsSection.Read(prop.Value);
@@ -247,6 +252,8 @@ public sealed class CoveConfig
         Speech.WriteTo(writer);
         writer.WritePropertyName("lspServers");
         LspServers.WriteTo(writer);
+        writer.WritePropertyName("lsp");
+        Lsp.WriteTo(writer);
         writer.WritePropertyName("adapterCommands");
         AdapterCommands.WriteTo(writer);
         foreach (var kv in Extra)
@@ -756,6 +763,80 @@ public sealed class LspServersSection
             writer.WritePropertyName(kv.Key);
             kv.Value.WriteTo(writer);
         }
+        writer.WriteEndObject();
+    }
+}
+
+public sealed class LspConfigServerEntry
+{
+    public List<string> Languages { get; set; } = new();
+    public string Command { get; set; } = "";
+    public List<string> Args { get; set; } = new();
+}
+
+public sealed class LspSection
+{
+    [Setting("Servers", "tools", "text", "Language server entries ({languages, command, args}); entries override built-ins for the same language")]
+    public List<LspConfigServerEntry> Servers { get; set; } = new();
+
+    public static LspSection Read(JsonElement el)
+    {
+        var s = new LspSection();
+        if (el.ValueKind != JsonValueKind.Object) return s;
+        foreach (var prop in el.EnumerateObject())
+        {
+            if (prop.Name != "servers" || prop.Value.ValueKind != JsonValueKind.Array) continue;
+            foreach (var item in prop.Value.EnumerateArray())
+            {
+                if (item.ValueKind != JsonValueKind.Object) continue;
+                var entry = new LspConfigServerEntry();
+                foreach (var field in item.EnumerateObject())
+                {
+                    switch (field.Name)
+                    {
+                        case "languages":
+                            if (field.Value.ValueKind == JsonValueKind.Array)
+                                foreach (var lang in field.Value.EnumerateArray())
+                                    if (lang.ValueKind == JsonValueKind.String)
+                                        entry.Languages.Add(lang.GetString() ?? "");
+                            break;
+                        case "command":
+                            entry.Command = ConfigValueCoercion.AsString(field.Value, entry.Command);
+                            break;
+                        case "args":
+                            if (field.Value.ValueKind == JsonValueKind.Array)
+                                foreach (var arg in field.Value.EnumerateArray())
+                                    if (arg.ValueKind == JsonValueKind.String)
+                                        entry.Args.Add(arg.GetString() ?? "");
+                            break;
+                    }
+                }
+                if (entry.Command.Length > 0 && entry.Languages.Count > 0)
+                    s.Servers.Add(entry);
+            }
+        }
+        return s;
+    }
+
+    public void WriteTo(Utf8JsonWriter writer)
+    {
+        writer.WriteStartObject();
+        writer.WriteStartArray("servers");
+        foreach (var entry in Servers)
+        {
+            writer.WriteStartObject();
+            writer.WriteStartArray("languages");
+            foreach (var lang in entry.Languages)
+                writer.WriteStringValue(lang);
+            writer.WriteEndArray();
+            writer.WriteString("command", entry.Command);
+            writer.WriteStartArray("args");
+            foreach (var arg in entry.Args)
+                writer.WriteStringValue(arg);
+            writer.WriteEndArray();
+            writer.WriteEndObject();
+        }
+        writer.WriteEndArray();
         writer.WriteEndObject();
     }
 }
