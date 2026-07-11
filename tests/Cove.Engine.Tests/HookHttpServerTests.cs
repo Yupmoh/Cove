@@ -16,7 +16,24 @@ public class HookHttpServerTests
     private static string NewDir() => Path.Combine(Path.GetTempPath(), "cove-hook-" + Guid.NewGuid().ToString("N"));
 
     [Fact]
-    public async Task Start_WritesPortToFile()
+    public async Task Start_DoesNotWritePortFile_BeforePublish()
+    {
+        var dir = NewDir();
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var portFile = Path.Combine(dir, "hook-port");
+            await File.WriteAllTextAsync(portFile, "51525");
+            using var server = new HookHttpServer(dir);
+            await server.StartAsync();
+
+            Assert.Equal("51525", File.ReadAllText(portFile));
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
+
+    [Fact]
+    public async Task PublishPort_WritesBoundPortToFile()
     {
         var dir = NewDir();
         Directory.CreateDirectory(dir);
@@ -25,6 +42,7 @@ public class HookHttpServerTests
             var portFile = Path.Combine(dir, "hook-port");
             using var server = new HookHttpServer(dir);
             await server.StartAsync();
+            await server.PublishPortAsync();
 
             Assert.True(File.Exists(portFile));
             var port = int.Parse(File.ReadAllText(portFile).Trim());

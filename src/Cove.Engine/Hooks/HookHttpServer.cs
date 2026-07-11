@@ -55,11 +55,17 @@ public sealed class HookHttpServer : IDisposable
         if (_listener is null)
             throw new InvalidOperationException("failed to start hook HTTP server after 3 attempts");
 
-        var portFile = Path.Combine(_dataDir, "hook-port");
-        await File.WriteAllTextAsync(portFile, Port.ToString());
-
         _cts = new CancellationTokenSource();
         _listenTask = ListenLoop(_cts.Token);
+        await Task.CompletedTask;
+    }
+
+    public async Task PublishPortAsync()
+    {
+        if (!IsRunning)
+            throw new InvalidOperationException("hook HTTP server must be started before publishing its port");
+        var portFile = Path.Combine(_dataDir, "hook-port");
+        await File.WriteAllTextAsync(portFile, Port.ToString());
     }
 
     private static int PickFreePort()

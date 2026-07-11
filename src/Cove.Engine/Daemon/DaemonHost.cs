@@ -308,6 +308,7 @@ public sealed class DaemonHost
             if (_endpoint.TryProbe(250))
             {
                 DaemonLog.Write(_paths, "stale_reclaim_conflict on channel " + _paths.Channel);
+                logger.LogWarning("daemon already running on channel {Channel}, exiting without publishing hook port", _paths.Channel);
                 guard.Dispose();
                 return 1;
             }
@@ -323,11 +324,13 @@ public sealed class DaemonHost
         catch (Exception ex)
         {
             DaemonLog.Write(_paths, "bind failed (already running?): " + ex.Message);
+            logger.LogWarning(ex, "daemon already running on channel {Channel}, control bind failed, exiting without publishing hook port", _paths.Channel);
             guard.Dispose();
             return 0;
         }
 
         guard.WritePid(Environment.ProcessId);
+        await _hookServer.PublishPortAsync().ConfigureAwait(false);
         _lastActivityTicks = DateTimeOffset.UtcNow.Ticks;
         DaemonLog.Write(_paths, $"daemon up pid={Environment.ProcessId} channel={_paths.Channel} addr={_endpoint.Address}");
         logger.DaemonStarted(System.Environment.ProcessId, _paths.Channel);
