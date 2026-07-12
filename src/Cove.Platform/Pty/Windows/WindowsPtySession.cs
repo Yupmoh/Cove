@@ -8,9 +8,9 @@ namespace Cove.Platform.Pty.Windows;
 
 public sealed class WindowsPtySession : IPtySession
 {
-    private const int ConsoleRenderSettleMilliseconds = 500;
+    private const int PostExitFlushMilliseconds = 1000;
     private const int OutputQuiesceMilliseconds = 150;
-    private const int PostExitDrainCapMilliseconds = 2000;
+    private const int PostExitDrainCapMilliseconds = 3000;
 
     private readonly ILogger _logger;
     private readonly SafeFileHandle _outputRead;
@@ -77,6 +77,8 @@ public sealed class WindowsPtySession : IPtySession
     {
         if (buffer.IsEmpty)
             return 0;
+        if (Volatile.Read(ref _disposed) != 0)
+            return 0;
         if (ConPtyNative.ReadFile(_outputRead, buffer, buffer.Length, out int read, IntPtr.Zero))
         {
             if (read > 0)
@@ -96,6 +98,8 @@ public sealed class WindowsPtySession : IPtySession
             _logger.WinReadEof(SessionId, error);
             return 0;
         }
+        if (Volatile.Read(ref _disposed) != 0)
+            return 0;
         _logger.WinReadFailed(SessionId, error);
         throw new PtyIoException($"conpty read failed (session {SessionId}, error {error}).", error);
     }
@@ -191,23 +195,27 @@ public sealed class WindowsPtySession : IPtySession
         _logger.WinExitObserved(SessionId, _exitCode);
         _logger.SessionExited(SessionId, _exitCode);
         if (!_suppressWatcherClose && Volatile.Read(ref _disposed) == 0)
-            WaitForOutputQuiescenceThenClose();
+            DrainPostExitThenClose();
     }
 
-    private void WaitForOutputQuiescenceThenClose()
+    private void DrainPostExitThenClose()
     {
-        if (ConsoleRenderSettleMilliseconds > 0)
-            _disposeRequested.Wait(ConsoleRenderSettleMilliseconds);
-        long deadline = Environment.TickCount64 + PostExitDrainCapMilliseconds;
+        long exitTicks = Environment.TickCount64;
+        long deadline = exitTicks + PostExitDrainCapMilliseconds;
         while (Volatile.Read(ref _disposed) == 0)
         {
-            long lastRead = Volatile.Read(ref _lastReadTicks);
             long now = Environment.TickCount64;
-            if (lastRead == 0 || now - lastRead >= OutputQuiesceMilliseconds)
+            long elapsedSinceExit = now - exitTicks;
+            long lastRead = Volatile.Read(ref _lastReadTicks);
+            long quietFor = lastRead == 0 ? elapsedSinceExit : now - lastRead;
+            bool minFlushMet = elapsedSinceExit >= PostExitFlushMilliseconds;
+            bool outputQuiesced = quietFor >= OutputQuiesceMilliseconds;
+            if (minFlushMet && outputQuiesced)
                 break;
             if (now >= deadline)
                 break;
-            _disposeRequested.Wait(Math.Min(OutputQuiesceMilliseconds, 25));
+            int wait = (int)Math.Min(25, Math.Max(1, deadline - now));
+            _disposeRequested.Wait(wait);
         }
         CloseConsole();
     }
@@ -243,10 +251,10 @@ public sealed class WindowsPtySession : IPtySession
             _logger.WinDisposeHandlesClosed(SessionId);
         }
 
-        _outputRead.Dispose();
         _inputWrite.Dispose();
         _conptyInputRead?.Dispose();
         _conptyOutputWrite?.Dispose();
+        _outputRead.Dispose();
         _disposeRequested.Dispose();
     }
 }
