@@ -112,9 +112,10 @@ public sealed class DaemonHost
 
     public async Task<int> RunAsync(CancellationToken externalCancellation)
     {
-        CoveTree.Ensure(_paths.DataDir);
-        var minimumLevel = ResolveMinimumLogLevel();
+        System.IO.Directory.CreateDirectory(_paths.DataDir.Root);
+        System.IO.Directory.CreateDirectory(_paths.DataDir.IpcDir);
         System.IO.Directory.CreateDirectory(_paths.DataDir.LogsDir);
+        var minimumLevel = ResolveMinimumLogLevel();
         var logPath = System.IO.Path.Combine(_paths.DataDir.LogsDir, $"{_paths.Channel}.log");
         using var loggerFactory = LoggerFactory.Create(builder =>
         {
@@ -126,18 +127,31 @@ public sealed class DaemonHost
         _logger = logger;
         logger.LogLevelResolved(minimumLevel.ToString(), System.Environment.GetEnvironmentVariable("COVE_LOG_LEVEL") ?? "");
 
+        SingleInstanceGuard? dataDirLock = SingleInstanceGuard.TryAcquire(_paths.DaemonLockPath);
+        if (dataDirLock is null)
+        {
+            int? ownerPid = PidFile.Read(_paths.DaemonLockPath);
+            DaemonLog.Write(_paths, "daemon already owns data dir " + _paths.DataDir.Root + (ownerPid is { } dp ? " pid=" + dp : ""));
+            logger.LogWarning("daemon already owns this data dir (pid {Pid}), exiting before touching shared state", ownerPid?.ToString() ?? "unknown");
+            return 1;
+        }
+        dataDirLock.WritePid(Environment.ProcessId);
+
+        CoveTree.Ensure(_paths.DataDir);
+
         SingleInstanceGuard? guard = SingleInstanceGuard.TryAcquire(_paths.PidFilePath);
         if (guard is null)
         {
             DaemonLog.Write(_paths, "daemon already running on channel " + _paths.Channel);
             logger.LogWarning("daemon already running on channel {Channel}, exiting before touching shared state", _paths.Channel);
+            dataDirLock.Dispose();
             return 0;
         }
 
         _ptyHost = PtyHostFactory.Create(logger);
         var probedPath = Cove.Platform.LoginShellPath.Probe(logger);
         var dataDir = _paths.DataDir.Root;
-        var cliPath = CliBinLink.Ensure(dataDir, System.Environment.ProcessPath, logger);
+        var cliPath = CliBinLink.LinkPath(dataDir);
         var spawnEnv = new SpawnEnvironment(probedPath, dataDir, cliPath, "default");
         var shellDir = ShellIntegration.Install(dataDir);
         _nooks = new NookRegistry(_ptyHost, logger, spawnEnv, shellDir);
@@ -322,6 +336,7 @@ public sealed class DaemonHost
                 DaemonLog.Write(_paths, "stale_reclaim_conflict on channel " + _paths.Channel);
                 logger.LogWarning("daemon already running on channel {Channel}, exiting without publishing hook port", _paths.Channel);
                 guard.Dispose();
+                dataDirLock.Dispose();
                 return 1;
             }
             try { File.Delete(_paths.SocketPath); }
@@ -338,10 +353,12 @@ public sealed class DaemonHost
             DaemonLog.Write(_paths, "bind failed (already running?): " + ex.Message);
             logger.LogWarning(ex, "daemon already running on channel {Channel}, control bind failed, exiting without publishing hook port", _paths.Channel);
             guard.Dispose();
+            dataDirLock.Dispose();
             return 0;
         }
 
         guard.WritePid(Environment.ProcessId);
+        CliBinLink.Ensure(dataDir, System.Environment.ProcessPath, logger);
         await _hookServer.PublishPortAsync().ConfigureAwait(false);
         var seedReport = Cove.Adapters.BundledAdapterSeeder.SeedFromBinaryLocation(adaptersRoot, logger);
         if (seedReport.Copied.Count + seedReport.Refreshed.Count > 0)
@@ -385,6 +402,7 @@ public sealed class DaemonHost
         }
         PidFile.Delete(_paths.PidFilePath);
         guard.Dispose();
+        dataDirLock.Dispose();
         if (idle is not null)
         {
             try { await idle.ConfigureAwait(false); } catch { }

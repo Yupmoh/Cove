@@ -4,10 +4,16 @@ namespace Cove.Engine.Daemon;
 
 public static class CliBinLink
 {
-    public static string Ensure(string dataDir, string? processPath, ILogger logger)
+    public static string LinkPath(string dataDir)
     {
         var binDir = System.IO.Path.Combine(dataDir, "bin");
-        var linkPath = System.IO.Path.Combine(binDir, OperatingSystem.IsWindows() ? "cove.exe" : "cove");
+        return System.IO.Path.Combine(binDir, OperatingSystem.IsWindows() ? "cove.exe" : "cove");
+    }
+
+    public static string Ensure(string dataDir, string? processPath, ILogger logger)
+    {
+        var linkPath = LinkPath(dataDir);
+        var binDir = System.IO.Path.GetDirectoryName(linkPath)!;
         if (string.IsNullOrEmpty(processPath) || !System.IO.File.Exists(processPath))
         {
             logger.LogWarning("cli bin link skipped: process path {Path} not found", processPath ?? "<null>");

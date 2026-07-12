@@ -8,6 +8,7 @@ public sealed class DaemonPaths
     public string Channel { get; }
     public string SocketPath => DataDir.SocketPath;
     public string PidFilePath { get; }
+    public string DaemonLockPath { get; }
     public string SpawnLockPath { get; }
     public string DaemonLogPath { get; }
 
@@ -16,6 +17,7 @@ public sealed class DaemonPaths
         DataDir = dataDir;
         Channel = Path.GetFileNameWithoutExtension(dataDir.SocketPath);
         PidFilePath = Path.Combine(dataDir.IpcDir, Channel + ".pid");
+        DaemonLockPath = Path.Combine(dataDir.IpcDir, "daemon.lock");
         SpawnLockPath = Path.Combine(dataDir.IpcDir, Channel + ".spawn.lock");
         DaemonLogPath = Path.Combine(dataDir.LogsDir, Channel + "-daemon.log");
     }
