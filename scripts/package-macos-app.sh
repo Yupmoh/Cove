@@ -21,6 +21,21 @@ cp "$ENGINE_DIR/cove" "$MACOS/cove"
 cp "$ENGINE_DIR/libcove_pty.dylib" "$MACOS/libcove_pty.dylib"
 rm -rf "$ENGINE_DIR"
 
+rm -rf "$MACOS/adapters"
+cp -R "$ROOT/adapters" "$MACOS/adapters"
+
+RG_DIR="$MACOS/tools/rg/$RID"
+if [ ! -x "$RG_DIR/rg" ]; then
+  RG_SYS="$(command -v rg || true)"
+  if [ -n "$RG_SYS" ]; then
+    mkdir -p "$RG_DIR"
+    cp "$RG_SYS" "$RG_DIR/rg"
+    chmod +x "$RG_DIR/rg"
+  else
+    echo "warning: no rg binary found to vendor; packaged search requires system ripgrep" >&2
+  fi
+fi
+
 find "$MACOS" -maxdepth 1 -name '*.pdb' -delete
 find "$MACOS" -maxdepth 1 -name '*.dbg' -delete
 rm -f "$MACOS/covptygen"
