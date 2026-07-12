@@ -8,7 +8,9 @@ namespace Cove.Platform.Pty.Windows;
 
 public sealed class WindowsPtySession : IPtySession
 {
-    private const int ConsoleRenderSettleMilliseconds = 250;
+    private const int ConsoleRenderSettleMilliseconds = 500;
+    private const int OutputQuiesceMilliseconds = 150;
+    private const int PostExitDrainCapMilliseconds = 2000;
 
     private readonly ILogger _logger;
     private readonly SafeFileHandle _outputRead;
@@ -31,6 +33,7 @@ public sealed class WindowsPtySession : IPtySession
     private int _handlesClosed;
     private int _disposed;
     private int _firstReadLogged;
+    private long _lastReadTicks;
 
     internal WindowsPtySession(
         long sessionId,
@@ -76,6 +79,8 @@ public sealed class WindowsPtySession : IPtySession
             return 0;
         if (ConPtyNative.ReadFile(_outputRead, buffer, buffer.Length, out int read, IntPtr.Zero))
         {
+            if (read > 0)
+                Volatile.Write(ref _lastReadTicks, Environment.TickCount64);
             if (Interlocked.Exchange(ref _firstReadLogged, 1) == 0)
                 _logger.WinFirstRead(SessionId, read);
             else
@@ -185,10 +190,26 @@ public sealed class WindowsPtySession : IPtySession
         _exitEvent.Set();
         _logger.WinExitObserved(SessionId, _exitCode);
         _logger.SessionExited(SessionId, _exitCode);
-        if (ConsoleRenderSettleMilliseconds > 0 && Volatile.Read(ref _disposed) == 0)
+        if (!_suppressWatcherClose && Volatile.Read(ref _disposed) == 0)
+            WaitForOutputQuiescenceThenClose();
+    }
+
+    private void WaitForOutputQuiescenceThenClose()
+    {
+        if (ConsoleRenderSettleMilliseconds > 0)
             _disposeRequested.Wait(ConsoleRenderSettleMilliseconds);
-        if (!_suppressWatcherClose)
-            CloseConsole();
+        long deadline = Environment.TickCount64 + PostExitDrainCapMilliseconds;
+        while (Volatile.Read(ref _disposed) == 0)
+        {
+            long lastRead = Volatile.Read(ref _lastReadTicks);
+            long now = Environment.TickCount64;
+            if (lastRead == 0 || now - lastRead >= OutputQuiesceMilliseconds)
+                break;
+            if (now >= deadline)
+                break;
+            _disposeRequested.Wait(Math.Min(OutputQuiesceMilliseconds, 25));
+        }
+        CloseConsole();
     }
 
     private void CloseConsole()
