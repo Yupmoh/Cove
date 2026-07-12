@@ -69,6 +69,7 @@ internal static class Program
                     o.GitHubOwner = "Yupmoh";
                     o.GitHubRepo = "Cove";
                     o.CurrentVersion = version;
+                    o.PublicKey = UpdateKeys.PublicKey;
                 });
                 s.AddPerfResultsCommand();
             })
