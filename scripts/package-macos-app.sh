@@ -17,7 +17,7 @@ dotnet publish "$ROOT/src/Cove.Gui/Cove.Gui.csproj" -c Release -r "$RID" --self-
 ENGINE_DIR="$(mktemp -d)"
 dotnet publish "$ROOT/src/Cove.Cli/Cove.Cli.csproj" -c Release -r "$RID" -p:PublishAot=true --self-contained true -o "$ENGINE_DIR"
 bash "$ROOT/native/cove_pty/build-unix.sh" "$ENGINE_DIR"
-cp "$ENGINE_DIR/cove" "$MACOS/cove"
+cp "$ENGINE_DIR/cove" "$MACOS/cove-engine"
 cp "$ENGINE_DIR/libcove_pty.dylib" "$MACOS/libcove_pty.dylib"
 rm -rf "$ENGINE_DIR"
 
@@ -40,7 +40,7 @@ find "$MACOS" -maxdepth 1 -name '*.pdb' -delete
 find "$MACOS" -maxdepth 1 -name '*.dbg' -delete
 rm -f "$MACOS/covptygen"
 rm -rf "$MACOS/cove.dSYM"
-chmod +x "$MACOS/Cove" "$MACOS/cove"
+chmod +x "$MACOS/Cove" "$MACOS/cove-engine"
 
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>

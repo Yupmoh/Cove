@@ -66,11 +66,14 @@ public static class GuiEngineLauncher
         string? overridePath = Environment.GetEnvironmentVariable("COVE_ENGINE");
         if (!string.IsNullOrEmpty(overridePath) && File.Exists(overridePath))
             return overridePath;
-        string exeName = OperatingSystem.IsWindows() ? "cove.exe" : "cove";
-        string bundled = Path.Combine(AppContext.BaseDirectory, exeName);
-        if (File.Exists(bundled))
+        string suffix = OperatingSystem.IsWindows() ? ".exe" : "";
+        string renamed = Path.Combine(AppContext.BaseDirectory, "cove-engine" + suffix);
+        if (File.Exists(renamed))
+            return renamed;
+        string bundled = Path.Combine(AppContext.BaseDirectory, "cove" + suffix);
+        if (File.Exists(bundled) && !string.Equals(Path.GetFullPath(bundled), Environment.ProcessPath, StringComparison.OrdinalIgnoreCase))
             return bundled;
         throw new FileNotFoundException(
-            $"cove engine not found; set COVE_ENGINE or place {exeName} next to the app");
+            $"cove engine not found; set COVE_ENGINE or place cove-engine{suffix} next to the app");
     }
 }
