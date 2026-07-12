@@ -67,6 +67,15 @@ installConsoleCapture((level, message) => {
   window.__ryn.invoke("app.frontendLog", { level, message }).catch(() => {});
 });
 
+function keyDebugOn(): boolean {
+  return localStorage.getItem("cove.debug.keys") === "true" || navigator.userAgent.includes("Windows");
+}
+document.addEventListener("keydown", (e) => {
+  if (!keyDebugOn()) return;
+  const t = e.target as HTMLElement | null;
+  console.warn(`[keydbg] doc keydown key=${e.key} target=${t?.tagName ?? "?"}.${t?.className?.toString().slice(0, 40) ?? ""} prevented=${e.defaultPrevented}`);
+}, true);
+
 const RYN_MENUBAR_EVENTS_BROKEN = false;
 import { initHud, toggleHud, recordFrame, hudMetrics, readJsHeapBytes, hudLines, type HudState, type JsHeapProbe } from "./perf-hud";
 import { parseSnapshotExport, snapshotRows, summarizeSnapshots, formatBytes as formatSnapshotBytes, type DiagnosticsSnapshot } from "./diagnostics-snapshot";
@@ -348,7 +357,7 @@ function attachWs(nook: NookView) {
     });
   };
   setInterval(sendAck, 100);
-  nook.term.onData((d) => { nook.replaying = false; void enqueueNookWrite(nook.nookId, toBase64Utf8(d), (nookId, dataBase64) => invoke("app.nookWrite", { nookId, dataBase64 })); });
+  nook.term.onData((d) => { if (keyDebugOn()) console.warn(`[keydbg] onData len=${d.length} codes=${Array.from(d).slice(0, 8).map((c) => c.charCodeAt(0)).join(",")}`); nook.replaying = false; void enqueueNookWrite(nook.nookId, toBase64Utf8(d), (nookId, dataBase64) => invoke("app.nookWrite", { nookId, dataBase64 })); });
   nook.term.onResize(({ cols, rows }) => { void invoke("app.nookResize", { nookId: nook.nookId, cols, rows }); });
 }
 
@@ -431,6 +440,7 @@ function makeNook(nookId: string, since: number): NookView {
   attachWs(pv);
   const overrides = loadKeybindings();
   term.attachCustomKeyEventHandler((e) => {
+    if (keyDebugOn()) console.warn(`[keydbg] xterm ${e.type} key=${e.key} prevented=${e.defaultPrevented}`);
     if (e.type !== "keydown") return true;
     if (e.key === "Tab") { e.preventDefault(); return true; }
     const chord = normalizeChord(e);
