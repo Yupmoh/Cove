@@ -48,6 +48,12 @@ internal static partial class ConPtyNative
 
     internal const int STARTF_USESTDHANDLES = 0x00000100;
     internal const uint EXTENDED_STARTUPINFO_PRESENT = 0x00080000;
+    internal const uint CREATE_UNICODE_ENVIRONMENT = 0x00000400;
+    internal const uint Infinite = 0xFFFFFFFF;
+    internal const int ErrorBrokenPipe = 109;
+    internal const int ErrorHandleEof = 38;
+    internal const int ErrorOperationAborted = 995;
+    internal const int ErrorNoData = 232;
     internal static readonly IntPtr PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE = (IntPtr)0x00020016;
 
     [LibraryImport("kernel32.dll", SetLastError = true)]
@@ -93,4 +99,11 @@ internal static partial class ConPtyNative
 
     [LibraryImport("kernel32.dll", SetLastError = true)]
     internal static partial uint WaitForSingleObject(IntPtr handle, uint milliseconds);
+
+    [LibraryImport("kernel32.dll")]
+    internal static partial void DeleteProcThreadAttributeList(IntPtr list);
+
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool CloseHandle(IntPtr handle);
 }
