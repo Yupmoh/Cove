@@ -12,18 +12,27 @@ public sealed class SingleInstanceGuard : IDisposable
 
     public static SingleInstanceGuard? TryAcquire(string pidFilePath)
     {
-        FileStream fs = new FileStream(pidFilePath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite);
-        if (!OperatingSystem.IsWindows())
+        if (OperatingSystem.IsWindows())
         {
-            try { File.SetUnixFileMode(pidFilePath, UnixFileMode.UserRead | UnixFileMode.UserWrite); }
-            catch { }
-            int fd = (int)fs.SafeFileHandle.DangerousGetHandle();
-            int rc = NativeFlock.Flock(fd, NativeFlock.LockEx | NativeFlock.LockNb);
-            if (rc != 0)
+            try
             {
-                fs.Dispose();
+                FileStream win = new FileStream(pidFilePath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.Read);
+                return new SingleInstanceGuard(win);
+            }
+            catch (IOException)
+            {
                 return null;
             }
+        }
+        FileStream fs = new FileStream(pidFilePath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite);
+        try { File.SetUnixFileMode(pidFilePath, UnixFileMode.UserRead | UnixFileMode.UserWrite); }
+        catch { }
+        int fd = (int)fs.SafeFileHandle.DangerousGetHandle();
+        int rc = NativeFlock.Flock(fd, NativeFlock.LockEx | NativeFlock.LockNb);
+        if (rc != 0)
+        {
+            fs.Dispose();
+            return null;
         }
         return new SingleInstanceGuard(fs);
     }

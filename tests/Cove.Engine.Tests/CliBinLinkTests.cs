@@ -9,6 +9,9 @@ public sealed class CliBinLinkTests
 {
     private static string NewDir() => Path.Combine(Path.GetTempPath(), "cove-bin-" + System.Guid.NewGuid().ToString("N"));
 
+    private static string ExpectedLink(string dataDir) =>
+        Path.Combine(dataDir, "bin", OperatingSystem.IsWindows() ? "cove.exe" : "cove");
+
     [Fact]
     public void Ensure_CreatesLinkToProcessBinary()
     {
@@ -22,7 +25,7 @@ public sealed class CliBinLinkTests
 
             var linkPath = CliBinLink.Ensure(dataDir, source, NullLogger.Instance);
 
-            Assert.Equal(Path.Combine(dataDir, "bin", "cove"), linkPath);
+            Assert.Equal(ExpectedLink(dataDir), linkPath);
             Assert.True(File.Exists(linkPath));
             Assert.Equal("binary", File.ReadAllText(linkPath));
         }
@@ -67,7 +70,7 @@ public sealed class CliBinLinkTests
         try
         {
             var linkPath = CliBinLink.Ensure(dataDir, Path.Combine(dataDir, "nope"), NullLogger.Instance);
-            Assert.Equal(Path.Combine(dataDir, "bin", "cove"), linkPath);
+            Assert.Equal(ExpectedLink(dataDir), linkPath);
         }
         finally { try { Directory.Delete(dataDir, true); } catch { } }
     }
