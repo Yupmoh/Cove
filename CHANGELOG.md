@@ -7,14 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-13
+
 ### Added
+- Bay / Shore / Nook workspace model across the app, protocol, storage, and adapter SDK
+- In-shore launcher with harness cards, tool tiles, session resume dropdown, and recents
+- Session resume scoped to the working directory, with user-given session names as labels
+- Restore-on-boot: sessions, bypass-permissions choice, and hook wiring survive daemon restarts and reboots
+- Bundled adapters (claude-code, codex, omp) seeded into the data dir at first boot
+- Tools tab: adapter cards with live binary detection, re-scan, add-from-folder, guarded remove, retention chip
+- Four-step first-run wizard (harness detection, permissions, appearance, sound)
+- Editor panes wired to LSP (diagnostics, hover, definitions) with config-registrable servers
+- Real updater flow with ECDSA-signed release assets and fail-closed verification
+- Agent state chimes with a settings toggle and preview
+- Settings dialog redesigned with a vertical navigation column
+- Windows ConPTY terminal host (experimental) and Windows named-pipe control plane
+- Comprehensive structured logging with a COVE_LOG_LEVEL switch and a GUI log file
+
+### Fixed
+- Hook port publication race between competing daemon instances
+- Second daemon instance on Windows can no longer clobber a live daemon's state
+- Workspace sidebar scrolling, pane title persistence, bay emoji icons
+
+### Added (pre-0.4 foundation)
 - Headless-first daemon engine owning PTYs, sessions, bays, and SQLite state
 - `cove://` control plane with framed protocol and source-generated JSON serialization
 - Lossless flow-controlled PTY transport (credit/ack backpressure, ring buffer, replay-since-offset)
 - Nook mosaic model (binary-tree splits, subtabs, resize, focus cycling, dock slots)
 - Bay model (bays, shores, wings, collections, worktrees, run-commands)
 - Agent & adapter system (manifest, install, launch-profiles, agent-definitions, skills, sigils)
-- Task cards, kanban, dispatch sages, signaling, scheduling, loops, exports
+- Task cards, kanban, dispatch sagas, signaling, scheduling, loops, exports
 - Knowledge domain (timeline, memory, notes, reviews, canvas, vault, library, captures)
 - Browser nook chrome (open/navigate/back/forward/reload/close) + BrowserStore (history, annotations)
 - CDP client library + browser automation verb logic (eval, navigate, click, fill, type, screenshot, snapshot, refs, cookies, console)

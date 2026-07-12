@@ -63,8 +63,9 @@ dotnet run --project src/Cove.Gui
 ## Platform support
 
 The engine, control channel, and persistence run on macOS, Linux, and Windows.
-Interactive PTY nooks are supported on macOS and Linux; the Windows PTY backend
-is not yet implemented.
+Interactive PTY nooks are fully supported on macOS and Linux. Windows ships a
+ConPTY-backed terminal host and is currently experimental: the engine, GUI, and
+adapters run, while terminal output streaming is still being hardened.
 
 ## License
 
