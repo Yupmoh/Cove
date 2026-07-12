@@ -125,6 +125,17 @@ async function invoke<T>(cmd: string, args: unknown): Promise<T> {
   return JSON.parse(result as string) as T;
 }
 
+async function spawnNook(params: Record<string, unknown>): Promise<{ nookId: string }> {
+  const r = await invoke<{ nookId?: string; error?: { code?: string; message?: string } }>("app.nookSpawn", params);
+  if (!r?.nookId) {
+    const msg = r?.error?.message ?? "the engine could not start this terminal";
+    console.warn("nook spawn failed", params, r);
+    showInAppToast("Couldn't open terminal", msg, () => {});
+    throw new Error(msg);
+  }
+  return { nookId: r.nookId };
+}
+
 interface Subtab {
   documentId: string;
   nookType: string;
@@ -612,7 +623,7 @@ async function addSubtab(termNookId: string): Promise<void> {
   if (!shore || !activeShoreId) return;
   const leafId = findLeafId(shore.layoutTree, termNookId);
   if (!leafId) return;
-  const sp = (await invoke<{ nookId: string }>("app.nookSpawn", { command: "", cwd: "", inheritCwdFrom: termNookId, cols: 80, rows: 24, adapter: "", agentName: "", bay: "", shore: "" })).nookId;
+  const sp = (await spawnNook({ command: "", cwd: "", inheritCwdFrom: termNookId, cols: 80, rows: 24, adapter: "", agentName: "", bay: "", shore: "" })).nookId;
   await invoke("app.layoutMutate", { op: "addSubtab", shoreId: activeShoreId, nookId: leafId, newNookId: sp, targetNookId: "", orientation: "", name: "", dir: 0 });
   await reload();
   focusNook(sp);
@@ -648,7 +659,7 @@ function emptyNookStrip(nookId: string): HTMLElement {
 
 async function spawnIntoNook(nookId: string): Promise<void> {
   if (!activeShoreId) return;
-  const sp = (await invoke<{ nookId: string }>("app.nookSpawn", { command: "", cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: "", agentName: "", bay: "", shore: "" })).nookId;
+  const sp = (await spawnNook({ command: "", cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: "", agentName: "", bay: "", shore: "" })).nookId;
   await invoke("app.layoutMutate", { op: "addSubtab", shoreId: activeShoreId, nookId: nookId, newNookId: sp, targetNookId: "", orientation: "", name: "", dir: 0 });
   await reload();
 }
@@ -826,7 +837,7 @@ async function performResume(action: ResumeAction): Promise<void> {
     showInAppToast(action.toast.title, action.toast.body, () => {});
     return;
   }
-  const sp = (await invoke<{ nookId: string }>("app.nookSpawn", { command: action.command, args: action.args, cwd: action.cwd, inheritCwdFrom: "", cols: 80, rows: 24, adapter: action.adapter, agentName: action.shoreName, bay: "", shore: "", sessionId: action.sessionId ?? undefined, yolo: action.yolo })).nookId;
+  const sp = (await spawnNook({ command: action.command, args: action.args, cwd: action.cwd, inheritCwdFrom: "", cols: 80, rows: 24, adapter: action.adapter, agentName: action.shoreName, bay: "", shore: "", sessionId: action.sessionId ?? undefined, yolo: action.yolo })).nookId;
   const r = await invoke<{ shoreId: string }>("app.layoutMutate", { op: "createShore", newNookId: sp, name: action.shoreName, shoreId: "", targetNookId: "", orientation: "", nookId: "", dir: 0, nookType: "terminal" });
   activeShoreId = r.shoreId;
   await reload();
@@ -1249,7 +1260,7 @@ async function splitActive(dir: "row" | "col"): Promise<void> {
   }
   const src = focusedNookId;
   if (!src) return;
-  const sp = (await invoke<{ nookId: string }>("app.nookSpawn", { command: "", cwd: "", inheritCwdFrom: src, cols: 80, rows: 24, adapter: "", agentName: "", bay: "", shore: "" })).nookId;
+  const sp = (await spawnNook({ command: "", cwd: "", inheritCwdFrom: src, cols: 80, rows: 24, adapter: "", agentName: "", bay: "", shore: "" })).nookId;
   await invoke("app.layoutMutate", { op: "split", shoreId: activeShoreId, targetNookId: src, newNookId: sp, orientation: dir, name: "", nookId: "", dir: 0 });
   await reload();
   focusNook(sp);
@@ -1342,18 +1353,18 @@ async function splitActiveWith(dir: "row" | "col", kind: string): Promise<void> 
   let nookId: string;
   let nookType = "terminal";
   if (kind === "terminal") {
-    nookId = (await invoke<{ nookId: string }>("app.nookSpawn", { command: "", cwd: "", inheritCwdFrom: target, cols: 80, rows: 24, adapter: "", agentName: "", bay: "", shore: "" })).nookId;
+    nookId = (await spawnNook({ command: "", cwd: "", inheritCwdFrom: target, cols: 80, rows: 24, adapter: "", agentName: "", bay: "", shore: "" })).nookId;
   } else if (kind.startsWith("adapter:")) {
     const name = kind.slice("adapter:".length);
     const tile = detectedHarnessTiles(buildAdapterTiles(launcherAdapters)).find((t) => t.adapterName === name);
     if (!tile) { console.warn("split chooser: unknown adapter", name); return; }
     const launch = await buildAdapterLaunch({ name: tile.adapterName, displayName: tile.label, accent: tile.accent, binary: tile.binary });
-    nookId = (await invoke<{ nookId: string }>("app.nookSpawn", { command: launch.command, args: launch.args, cwd: "", inheritCwdFrom: target, cols: 80, rows: 24, adapter: tile.adapterName, agentName: tile.label, bay: "", shore: "", yolo: launch.yolo })).nookId;
+    nookId = (await spawnNook({ command: launch.command, args: launch.args, cwd: "", inheritCwdFrom: target, cols: 80, rows: 24, adapter: tile.adapterName, agentName: tile.label, bay: "", shore: "", yolo: launch.yolo })).nookId;
   } else if (kind === "browser") {
     nookId = (await invoke<{ nookId: string; currentUrl: string }>("cove://commands/browser.create", { url: "https://duckduckgo.com" })).nookId;
     nookType = "browser";
   } else {
-    nookId = (await invoke<{ nookId: string }>("app.nookSpawn", { command: "", cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: "", agentName: "", bay: "", shore: "" })).nookId;
+    nookId = (await spawnNook({ command: "", cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: "", agentName: "", bay: "", shore: "" })).nookId;
     nookType = kind;
   }
   await invoke("app.layoutMutate", { op: "split", shoreId: activeShoreId, targetNookId: target, newNookId: nookId, orientation: dir, name: "", nookId: "", dir: 0, nookType });
@@ -1435,7 +1446,7 @@ async function launchTileInto(shoreId: string | null, placeholderId: string | nu
     const bp = await invoke<{ nookId: string; currentUrl: string }>("cove://commands/browser.create", { url: "https://duckduckgo.com" });
     nookId = bp.nookId;
   } else {
-    nookId = (await invoke<{ nookId: string }>("app.nookSpawn", { command: "", cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: "", agentName: "", bay: "", shore: "" })).nookId;
+    nookId = (await spawnNook({ command: "", cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: "", agentName: "", bay: "", shore: "" })).nookId;
   }
   if (shoreId) {
     await placeNookIntoShore(shoreId, placeholderId, nookId, placeable.nookType, placeable.shoreName);
@@ -2809,7 +2820,7 @@ async function switchBay(wsId: string): Promise<void> {
 
 async function openTaskInNook(taskId: string): Promise<void> {
   try {
-    const sp = (await invoke<{ nookId: string }>("app.nookSpawn", { command: "", cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: "", agentName: "", bay: "", shore: "" })).nookId;
+    const sp = (await spawnNook({ command: "", cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: "", agentName: "", bay: "", shore: "" })).nookId;
     const r = await invoke<{ shoreId: string }>("app.layoutMutate", { op: "createShore", newNookId: sp, name: "Task", shoreId: "", targetNookId: "", orientation: "", nookId: "", dir: 0, nookType: "tasks-kanban" });
     activeShoreId = r.shoreId;
     nookFilePaths.set(sp, taskId);
@@ -2820,7 +2831,7 @@ async function openTaskInNook(taskId: string): Promise<void> {
 
 async function openFileInEditor(filePath: string): Promise<void> {
   try {
-    const sp = (await invoke<{ nookId: string }>("app.nookSpawn", { command: "", cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: "", agentName: "", bay: "", shore: "" })).nookId;
+    const sp = (await spawnNook({ command: "", cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: "", agentName: "", bay: "", shore: "" })).nookId;
     const r = await invoke<{ shoreId: string }>("app.layoutMutate", { op: "createShore", newNookId: sp, name: filePath.split("/").pop() || "Editor", shoreId: "", targetNookId: "", orientation: "", nookId: "", dir: 0, nookType: "editor" });
     activeShoreId = r.shoreId;
     nookFilePaths.set(sp, filePath);
@@ -4258,7 +4269,7 @@ async function buildAdapterLaunch(a: AdapterInfo): Promise<{ command: string; ar
 
 async function spawnAgentInto(shoreId: string | null, placeholderId: string | null, a: AdapterInfo): Promise<void> {
   const launch = await buildAdapterLaunch(a);
-  const sp = (await invoke<{ nookId: string }>("app.nookSpawn", { command: launch.command, args: launch.args, cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: a.name, agentName: a.displayName, bay: "", shore: "", yolo: launch.yolo })).nookId;
+  const sp = (await spawnNook({ command: launch.command, args: launch.args, cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: a.name, agentName: a.displayName, bay: "", shore: "", yolo: launch.yolo })).nookId;
   if (shoreId) {
     if (placeholderId) {
       await invoke("app.layoutMutate", { op: "replace", shoreId, targetNookId: placeholderId, newNookId: sp, orientation: "", name: "", nookId: "", dir: 0, nookType: "terminal" });
@@ -4842,7 +4853,7 @@ async function submitInspectFeedback(
 
 async function spawnFeedbackAgent(tile: LauncherTile, prompt: string, shoreName: string): Promise<void> {
   const launch = await buildAdapterLaunch({ name: tile.adapterName, displayName: tile.label, accent: tile.accent, binary: tile.binary });
-  const sp = (await invoke<{ nookId: string }>("app.nookSpawn", { command: launch.command, args: [...launch.args, prompt], cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: tile.adapterName, agentName: tile.label, bay: "", shore: "", yolo: launch.yolo })).nookId;
+  const sp = (await spawnNook({ command: launch.command, args: [...launch.args, prompt], cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: tile.adapterName, agentName: tile.label, bay: "", shore: "", yolo: launch.yolo })).nookId;
   const r = await invoke<{ shoreId: string }>("app.layoutMutate", { op: "createShore", newNookId: sp, name: shoreName, shoreId: "", targetNookId: "", orientation: "", nookId: "", dir: 0, nookType: "terminal" });
   activeShoreId = r.shoreId;
   await reload();
@@ -4911,7 +4922,7 @@ window.addEventListener("resize", () => fitAll());
 
 async function openToolShore(nookType: string, name: string): Promise<void> {
   try {
-    const sp = (await invoke<{ nookId: string }>("app.nookSpawn", { command: "", cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: "", agentName: "", bay: "", shore: "" })).nookId;
+    const sp = (await spawnNook({ command: "", cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: "", agentName: "", bay: "", shore: "" })).nookId;
     const r = await invoke<{ shoreId: string }>("app.layoutMutate", { op: "createShore", newNookId: sp, name, shoreId: "", targetNookId: "", orientation: "", nookId: "", dir: 0, nookType });
     activeShoreId = r.shoreId;
     await reload();
@@ -5640,7 +5651,7 @@ function onNotepadKey(e: KeyboardEvent): void {
 
 async function openNoteInNook(noteId: string, bayId: string): Promise<void> {
   try {
-    const sp = (await invoke<{ nookId: string }>("app.nookSpawn", { command: "", cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: "", agentName: "", bay: "", shore: "" })).nookId;
+    const sp = (await spawnNook({ command: "", cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: "", agentName: "", bay: "", shore: "" })).nookId;
     const r = await invoke<{ shoreId: string }>("app.layoutMutate", { op: "createShore", newNookId: sp, name: "Note", shoreId: "", targetNookId: "", orientation: "", nookId: "", dir: 0, nookType: "notepad" });
     activeShoreId = r.shoreId;
     await reload();
