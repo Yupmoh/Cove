@@ -1,7 +1,7 @@
 using System.Text.Json;
+using Cove.Engine.Bays;
 using Cove.Engine.Knowledge;
 using Cove.Engine.Restart;
-using Cove.Engine.Bays;
 using Xunit;
 
 namespace Cove.Engine.Tests;
