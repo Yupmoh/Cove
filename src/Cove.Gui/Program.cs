@@ -16,8 +16,9 @@ internal static class Program
     [STAThread]
     private static void Main()
     {
-        const string channel = "dev";
-        const string version = "0.1.0";
+        var channelEnv = Environment.GetEnvironmentVariable("COVE_CHANNEL");
+        var channel = string.IsNullOrEmpty(channelEnv) ? "stable" : channelEnv;
+        const string version = "0.4.0";
         var page = Environment.GetEnvironmentVariable("COVE_GUI_PAGE");
         var startPath = string.IsNullOrEmpty(page) ? "" : "/" + page;
 

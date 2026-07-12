@@ -42,6 +42,20 @@ rm -f "$MACOS/covptygen"
 rm -rf "$MACOS/cove.dSYM"
 chmod +x "$MACOS/Cove" "$MACOS/cove-engine"
 
+if [ -f "$ROOT/src/Cove.Gui/assets/app-icon.png" ]; then
+  RESOURCES="$APP/Contents/Resources"
+  mkdir -p "$RESOURCES"
+  ICONSET="$(mktemp -d)/AppIcon.iconset"
+  mkdir -p "$ICONSET"
+  for size in 16 32 128 256 512; do
+    sips -z "$size" "$size" "$ROOT/src/Cove.Gui/assets/app-icon.png" --out "$ICONSET/icon_${size}x${size}.png" >/dev/null
+    double=$((size * 2))
+    sips -z "$double" "$double" "$ROOT/src/Cove.Gui/assets/app-icon.png" --out "$ICONSET/icon_${size}x${size}@2x.png" >/dev/null
+  done
+  iconutil -c icns "$ICONSET" -o "$RESOURCES/AppIcon.icns"
+  rm -rf "$(dirname "$ICONSET")"
+fi
+
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -59,6 +73,8 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <string>${VERSION}</string>
   <key>CFBundleExecutable</key>
   <string>Cove</string>
+  <key>CFBundleIconFile</key>
+  <string>AppIcon</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>LSMinimumSystemVersion</key>
