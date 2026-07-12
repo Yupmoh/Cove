@@ -85,7 +85,27 @@ jobs:
             (cd "$d" && zip -r "../${name}.zip" .)
           done
           ls -la
+      - name: Sign release archives
+        env:
+          COVE_UPDATE_SIGNING_KEY: ${{ secrets.COVE_UPDATE_SIGNING_KEY }}
+        run: |
+          if [ -z "$COVE_UPDATE_SIGNING_KEY" ]; then
+            echo "COVE_UPDATE_SIGNING_KEY is not set; refusing to publish an unsigned release." >&2
+            exit 1
+          fi
+          key="$(mktemp)"
+          pub="$(mktemp)"
+          printf '%s' "$COVE_UPDATE_SIGNING_KEY" > "$key"
+          openssl pkey -in "$key" -pubout -out "$pub"
+          for z in dist/*.zip; do
+            openssl dgst -sha256 -sign "$key" -out "$z.sigder" "$z"
+            openssl base64 -A -in "$z.sigder" -out "$z.sig"
+            openssl dgst -sha256 -verify "$pub" -signature "$z.sigder" "$z"
+            rm -f "$z.sigder"
+          done
+          rm -f "$key" "$pub"
+          ls -la dist
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "${{ github.ref_name }}" dist/*.zip --repo "${{ github.repository }}" --title "${{ github.ref_name }}" --generate-notes
+        run: gh release create "${{ github.ref_name }}" dist/*.zip dist/*.zip.sig --repo "${{ github.repository }}" --title "${{ github.ref_name }}" --generate-notes
