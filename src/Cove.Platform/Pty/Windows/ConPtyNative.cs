@@ -57,6 +57,7 @@ internal static partial class ConPtyNative
     internal const int STARTF_USESTDHANDLES = 0x00000100;
     internal const uint EXTENDED_STARTUPINFO_PRESENT = 0x00080000;
     internal const uint CREATE_UNICODE_ENVIRONMENT = 0x00000400;
+    internal const uint PSEUDOCONSOLE_INHERIT_CURSOR = 0x00000001;
     internal const uint Infinite = 0xFFFFFFFF;
     internal const int ErrorBrokenPipe = 109;
     internal const int ErrorHandleEof = 38;

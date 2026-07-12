@@ -13,6 +13,9 @@ public sealed class WindowsPtySession : IPtySession
     private readonly ILogger _logger;
     private readonly SafeFileHandle _outputRead;
     private readonly SafeFileHandle _inputWrite;
+    private readonly bool _suppressWatcherClose;
+    private readonly SafeFileHandle? _conptyInputRead;
+    private readonly SafeFileHandle? _conptyOutputWrite;
     private readonly IntPtr _pseudoConsole;
     private readonly IntPtr _processHandle;
     private readonly IntPtr _threadHandle;
@@ -37,12 +40,18 @@ public sealed class WindowsPtySession : IPtySession
         IntPtr processHandle,
         IntPtr threadHandle,
         int processId,
-        ILogger logger)
+        ILogger logger,
+        bool suppressWatcherClose = false,
+        SafeFileHandle? conptyInputRead = null,
+        SafeFileHandle? conptyOutputWrite = null)
     {
         SessionId = sessionId;
         _pseudoConsole = pseudoConsole;
         _outputRead = outputRead;
         _inputWrite = inputWrite;
+        _suppressWatcherClose = suppressWatcherClose;
+        _conptyInputRead = conptyInputRead;
+        _conptyOutputWrite = conptyOutputWrite;
         _processHandle = processHandle;
         _threadHandle = threadHandle;
         _processId = processId;
@@ -178,7 +187,8 @@ public sealed class WindowsPtySession : IPtySession
         _logger.SessionExited(SessionId, _exitCode);
         if (ConsoleRenderSettleMilliseconds > 0 && Volatile.Read(ref _disposed) == 0)
             _disposeRequested.Wait(ConsoleRenderSettleMilliseconds);
-        CloseConsole();
+        if (!_suppressWatcherClose)
+            CloseConsole();
     }
 
     private void CloseConsole()
@@ -214,6 +224,8 @@ public sealed class WindowsPtySession : IPtySession
 
         _outputRead.Dispose();
         _inputWrite.Dispose();
+        _conptyInputRead?.Dispose();
+        _conptyOutputWrite?.Dispose();
         _disposeRequested.Dispose();
     }
 }

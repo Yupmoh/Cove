@@ -14,6 +14,7 @@ namespace Cove.Pty.Harness;
 public sealed class ConPtyDiagnosticMatrix
 {
     private const int CaptureMilliseconds = 2000;
+    private const int LongCaptureMilliseconds = 4000;
 
     [Trait("Category", "PtyInteractive")]
     [Fact]
@@ -22,34 +23,42 @@ public sealed class ConPtyDiagnosticMatrix
         if (!OperatingSystem.IsWindows())
             return;
 
-        var variants = new (string Id, string Description, ConPtyDiagnosticOptions Options)[]
+        var cmdArgs = new[] { "/c", "echo hello" };
+        var variants = new (string Id, string Description, string Command, string[] Args, int CaptureMs, ConPtyDiagnosticOptions Options)[]
         {
-            ("A", "production baseline", new ConPtyDiagnosticOptions()),
-            ("B", "inherit parent env, no CREATE_UNICODE_ENVIRONMENT", new ConPtyDiagnosticOptions { InheritParentEnvironment = true, IncludeUnicodeEnvironmentFlag = false }),
-            ("C", "inherit parent env, keep CREATE_UNICODE_ENVIRONMENT", new ConPtyDiagnosticOptions { InheritParentEnvironment = true, IncludeUnicodeEnvironmentFlag = true }),
-            ("D", "production env, literal command line (no quoting)", new ConPtyDiagnosticOptions { CommandLineOverride = "cmd.exe /c echo hello" }),
-            ("E", "production path, explicitly zeroed stdio fields", new ConPtyDiagnosticOptions { ExplicitZeroStdHandles = true }),
-            ("F", "explicit non-inheritable pipe security attributes", new ConPtyDiagnosticOptions { ExplicitNonInheritablePipes = true }),
+            ("A", "production baseline", "cmd.exe", cmdArgs, CaptureMilliseconds, new ConPtyDiagnosticOptions()),
+            ("B", "inherit parent env, no CREATE_UNICODE_ENVIRONMENT", "cmd.exe", cmdArgs, CaptureMilliseconds, new ConPtyDiagnosticOptions { InheritParentEnvironment = true, IncludeUnicodeEnvironmentFlag = false }),
+            ("C", "inherit parent env, keep CREATE_UNICODE_ENVIRONMENT", "cmd.exe", cmdArgs, CaptureMilliseconds, new ConPtyDiagnosticOptions { InheritParentEnvironment = true, IncludeUnicodeEnvironmentFlag = true }),
+            ("D", "production env, literal command line (no quoting)", "cmd.exe", cmdArgs, CaptureMilliseconds, new ConPtyDiagnosticOptions { CommandLineOverride = "cmd.exe /c echo hello" }),
+            ("E", "production path, explicitly zeroed stdio fields", "cmd.exe", cmdArgs, CaptureMilliseconds, new ConPtyDiagnosticOptions { ExplicitZeroStdHandles = true }),
+            ("F", "explicit non-inheritable pipe security attributes", "cmd.exe", cmdArgs, CaptureMilliseconds, new ConPtyDiagnosticOptions { ExplicitNonInheritablePipes = true }),
+            ("G", "EchoCon-faithful: keep conpty-side pipe ends alive until close", "cmd.exe", cmdArgs, CaptureMilliseconds, new ConPtyDiagnosticOptions { KeepConptySideHandles = true }),
+            ("H", "no watcher close: only dispose closes the pseudoconsole", "cmd.exe", cmdArgs, CaptureMilliseconds, new ConPtyDiagnosticOptions { SuppressWatcherClose = true }),
+            ("I", "long-lived child: ping.exe -n 3 127.0.0.1, production options", "ping.exe", new[] { "-n", "3", "127.0.0.1" }, LongCaptureMilliseconds, new ConPtyDiagnosticOptions()),
+            ("J", "cmd via full path, production options", @"C:\Windows\System32\cmd.exe", cmdArgs, CaptureMilliseconds, new ConPtyDiagnosticOptions()),
+            ("K", "G+H: keep conpty handles AND never watcher-close", "cmd.exe", cmdArgs, CaptureMilliseconds, new ConPtyDiagnosticOptions { KeepConptySideHandles = true, SuppressWatcherClose = true }),
+            ("L", "powershell.exe -NoProfile -Command Write-Output hello", "powershell.exe", new[] { "-NoProfile", "-Command", "Write-Output hello" }, LongCaptureMilliseconds, new ConPtyDiagnosticOptions()),
+            ("M", "CreatePseudoConsole with PSEUDOCONSOLE_INHERIT_CURSOR", "cmd.exe", cmdArgs, CaptureMilliseconds, new ConPtyDiagnosticOptions { InheritCursor = true }),
         };
 
         var report = new StringBuilder();
-        report.Append("ConPtyDiagnosticMatrix: spawned `cmd.exe /c echo hello` under ").Append(variants.Length).Append(" variants (~2s capture each).\n");
+        report.Append("ConPtyDiagnosticMatrix: spawned per-variant children under ").Append(variants.Length).Append(" variants.\n");
 
         foreach (var variant in variants)
         {
-            report.Append('\n').Append(RunVariant(variant.Id, variant.Description, variant.Options));
+            report.Append('\n').Append(RunVariant(variant.Id, variant.Description, variant.Command, variant.Args, variant.CaptureMs, variant.Options));
         }
 
         Assert.Fail(report.ToString());
     }
 
-    private static string RunVariant(string id, string description, ConPtyDiagnosticOptions options)
+    private static string RunVariant(string id, string description, string command, string[] args, int captureMs, ConPtyDiagnosticOptions options)
     {
         var logger = NullLogger.Instance;
         var request = new PtySpawnRequest
         {
-            Command = "cmd.exe",
-            Args = new[] { "/c", "echo hello" },
+            Command = command,
+            Args = args,
             Cols = 80,
             Rows = 24,
             Environment = new Dictionary<string, string> { ["COVE_NOOK_ID"] = "conpty-matrix" },
@@ -73,7 +82,7 @@ public sealed class ConPtyDiagnosticMatrix
         try
         {
             var sw = Stopwatch.StartNew();
-            while (sw.ElapsedMilliseconds < CaptureMilliseconds)
+            while (sw.ElapsedMilliseconds < captureMs)
                 Thread.Sleep(10);
 
             var cursor = new PtyClientCursor();
@@ -92,6 +101,9 @@ public sealed class ConPtyDiagnosticMatrix
             line.Append(" exitCode=").Append(reader.ExitCode).Append('\n');
             line.Append("      creationFlags=0x").Append(spawn.CreationFlags.ToString("x8"));
             line.Append(" envInherited=").Append(spawn.EnvironmentInherited).Append('\n');
+            line.Append("      hpconSize=").Append(spawn.PseudoConsoleCols).Append('x').Append(spawn.PseudoConsoleRows);
+            line.Append(" hpconValid=").Append(spawn.PseudoConsoleValid);
+            line.Append(" updateAttrLastError=").Append(spawn.UpdateAttributeLastError).Append('\n');
             line.Append("      startupInfo.dwFlags=").Append(spawn.StartupFlags);
             line.Append(" hStdIn=").Append(spawn.StdInput);
             line.Append(" hStdOut=").Append(spawn.StdOutput);

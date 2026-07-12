@@ -12,6 +12,9 @@ internal sealed class ConPtyDiagnosticOptions
     public string? CommandLineOverride { get; init; }
     public bool ExplicitZeroStdHandles { get; init; }
     public bool ExplicitNonInheritablePipes { get; init; }
+    public bool KeepConptySideHandles { get; init; }
+    public bool SuppressWatcherClose { get; init; }
+    public bool InheritCursor { get; init; }
 
     public static readonly ConPtyDiagnosticOptions Production = new();
 }
@@ -26,4 +29,8 @@ internal readonly struct ConPtyDiagnosticSpawn
     public uint CreationFlags { get; init; }
     public bool EnvironmentInherited { get; init; }
     public string CommandLine { get; init; }
+    public int PseudoConsoleCols { get; init; }
+    public int PseudoConsoleRows { get; init; }
+    public bool PseudoConsoleValid { get; init; }
+    public int UpdateAttributeLastError { get; init; }
 }

@@ -60,12 +60,22 @@ public sealed class WindowsPtyHost : IPtyHost
         }
 
         var size = new ConPtyNative.Coord { X = (short)cols, Y = (short)rows };
-        int hr = ConPtyNative.CreatePseudoConsole(size, inputRead, outputWrite, 0, out IntPtr pseudoConsole);
-        inputRead.Dispose();
-        outputWrite.Dispose();
-        logger.WinPseudoConsoleCreated(hr, pseudoConsole != IntPtr.Zero);
+        uint pseudoConsoleFlags = options.InheritCursor ? ConPtyNative.PSEUDOCONSOLE_INHERIT_CURSOR : 0;
+        int hr = ConPtyNative.CreatePseudoConsole(size, inputRead, outputWrite, pseudoConsoleFlags, out IntPtr pseudoConsole);
+        bool pseudoConsoleValid = pseudoConsole != IntPtr.Zero;
+        if (!options.KeepConptySideHandles)
+        {
+            inputRead.Dispose();
+            outputWrite.Dispose();
+        }
+        logger.WinPseudoConsoleCreated(hr, pseudoConsoleValid);
         if (hr != 0)
         {
+            if (options.KeepConptySideHandles)
+            {
+                inputRead.Dispose();
+                outputWrite.Dispose();
+            }
             inputWrite.Dispose();
             outputRead.Dispose();
             logger.WinPseudoConsoleFailed(request.Command, hr);
@@ -75,7 +85,7 @@ public sealed class WindowsPtyHost : IPtyHost
         IntPtr attributeList = IntPtr.Zero;
         try
         {
-            attributeList = AllocateAttributeList(pseudoConsole, request, logger);
+            attributeList = AllocateAttributeList(pseudoConsole, request, logger, out int updateAttributeLastError);
 
             var startupInfo = new ConPtyNative.StartupInfoEx
             {
@@ -136,6 +146,11 @@ public sealed class WindowsPtyHost : IPtyHost
             {
                 int error = Marshal.GetLastPInvokeError();
                 ConPtyNative.ClosePseudoConsole(pseudoConsole);
+                if (options.KeepConptySideHandles)
+                {
+                    inputRead.Dispose();
+                    outputWrite.Dispose();
+                }
                 inputWrite.Dispose();
                 outputRead.Dispose();
                 logger.WinCreateProcessFailed(request.Command, error);
@@ -153,7 +168,10 @@ public sealed class WindowsPtyHost : IPtyHost
                 processInfo.hProcess,
                 processInfo.hThread,
                 processInfo.dwProcessId,
-                logger);
+                logger,
+                options.SuppressWatcherClose,
+                options.KeepConptySideHandles ? inputRead : null,
+                options.KeepConptySideHandles ? outputWrite : null);
 
             return new ConPtyDiagnosticSpawn
             {
@@ -165,6 +183,10 @@ public sealed class WindowsPtyHost : IPtyHost
                 CreationFlags = creationFlags,
                 EnvironmentInherited = environmentBlock is null,
                 CommandLine = commandLine,
+                PseudoConsoleCols = cols,
+                PseudoConsoleRows = rows,
+                PseudoConsoleValid = pseudoConsoleValid,
+                UpdateAttributeLastError = updateAttributeLastError,
             };
         }
         finally
@@ -177,8 +199,9 @@ public sealed class WindowsPtyHost : IPtyHost
         }
     }
 
-    private static IntPtr AllocateAttributeList(IntPtr pseudoConsole, PtySpawnRequest request, ILogger logger)
+    private static IntPtr AllocateAttributeList(IntPtr pseudoConsole, PtySpawnRequest request, ILogger logger, out int updateLastError)
     {
+        updateLastError = 0;
         nint listSize = 0;
         ConPtyNative.InitializeProcThreadAttributeList(IntPtr.Zero, 1, 0, ref listSize);
         logger.WinAttributeListInitialized(listSize);
@@ -207,6 +230,7 @@ public sealed class WindowsPtyHost : IPtyHost
             logger.WinAttributeListUpdateFailed(request.Command, error);
             throw new PtySpawnException($"UpdateProcThreadAttribute failed for '{request.Command}' (error {error}).");
         }
+        updateLastError = Marshal.GetLastPInvokeError();
         logger.WinAttributeListUpdated(request.Command);
         return attributeList;
     }
