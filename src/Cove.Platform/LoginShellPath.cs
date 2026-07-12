@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Cove.Platform;
 
@@ -7,6 +8,7 @@ public static class LoginShellPath
 {
     public static string Probe(ILogger? logger = null)
     {
+        ILogger log = logger ?? NullLogger.Instance;
         var processPath = System.Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
         if (System.OperatingSystem.IsWindows())
             return processPath;
@@ -16,6 +18,7 @@ public static class LoginShellPath
             var shell = System.Environment.GetEnvironmentVariable("SHELL");
             if (string.IsNullOrEmpty(shell) || !System.IO.File.Exists(shell))
                 shell = System.IO.File.Exists("/bin/zsh") ? "/bin/zsh" : "/bin/bash";
+            log.LoginShellProbeBegin(shell);
 
             var psi = new ProcessStartInfo(shell)
             {
@@ -28,21 +31,32 @@ public static class LoginShellPath
 
             using var proc = Process.Start(psi);
             if (proc is null)
+            {
+                log.LoginShellProbeFailed("Process.Start returned null");
                 return processPath;
+            }
 
             var outText = proc!.StandardOutput.ReadToEnd();
             if (!proc.WaitForExit(3000))
             {
-                try { proc.Kill(true); } catch { }
+                log.LoginShellProbeTimeout(shell);
+                try { proc.Kill(true); }
+                catch (Exception killEx) { log.LoginShellKillFailed(killEx.Message); }
                 return processPath;
             }
 
             outText = outText.Trim();
-            return string.IsNullOrEmpty(outText) ? processPath : outText;
+            if (string.IsNullOrEmpty(outText))
+            {
+                log.LoginShellProbeEmpty(shell);
+                return processPath;
+            }
+            log.LoginShellResolved(outText.Length);
+            return outText;
         }
         catch (Exception ex)
         {
-            logger?.LogWarning("Login shell PATH probe failed; falling back to process PATH. {Error}", ex);
+            log.LoginShellProbeFailed(ex.Message);
             return processPath;
         }
     }

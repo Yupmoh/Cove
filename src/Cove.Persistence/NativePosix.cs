@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using Microsoft.Extensions.Logging;
 
 namespace Cove.Persistence;
 
@@ -15,11 +16,19 @@ internal static partial class NativePosix
     [LibraryImport("libc", SetLastError = true)]
     private static partial int close(int fd);
 
-    public static void FsyncDir(string dir)
+    public static void FsyncDir(string dir, ILogger? logger = null)
     {
         int fd = open(dir, O_RDONLY);
-        if (fd < 0) return;
-        try { fsync(fd); }
+        if (fd < 0)
+        {
+            logger?.FsyncDirOpenFailed(dir, Marshal.GetLastPInvokeError());
+            return;
+        }
+        try
+        {
+            if (fsync(fd) != 0)
+                logger?.FsyncDirFailed(dir, Marshal.GetLastPInvokeError());
+        }
         finally { close(fd); }
     }
 }

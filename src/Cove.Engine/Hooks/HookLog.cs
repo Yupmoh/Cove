@@ -39,4 +39,10 @@ internal static partial class HookLog
     public static partial void AmbientRunCommandFailed(this ILogger logger, string error);
     [ZLoggerMessage(LogLevel.Warning, "context injection failed adapter={adapter} event={eventName} error={error}")]
     public static partial void ContextInjectionFailed(this ILogger logger, string adapter, string eventName, string error);
+
+    [ZLoggerMessage(3400, LogLevel.Debug, "hook event received nook={nookId} adapter={adapter} event={eventName}")]
+    public static partial void HookEventReceived(this ILogger logger, string nookId, string adapter, string eventName);
+
+    [ZLoggerMessage(3401, LogLevel.Information, "hook state transition nook={nookId} adapter={adapter} event={eventName} status={status}")]
+    public static partial void HookStateTransition(this ILogger logger, string nookId, string adapter, string eventName, string status);
 }

@@ -1,5 +1,6 @@
 using Cove.Gui;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Ryn.Core;
 using Ryn.Ipc;
 using Ryn.Plugins.Badge;
@@ -20,12 +21,19 @@ internal static class Program
         var page = Environment.GetEnvironmentVariable("COVE_GUI_PAGE");
         var startPath = string.IsNullOrEmpty(page) ? "" : "/" + page;
 
+        var loggerFactory = GuiLogging.CreateFactory();
+        GuiEngineLauncher.Logger = loggerFactory.CreateLogger("Cove.Gui.GuiEngineLauncher");
+        var startupLog = loggerFactory.CreateLogger("Cove.Gui.Program");
+        var url = $"http://localhost:{LoopbackServer.DefaultPort}{startPath}";
+        startupLog.AppStarting(channel, version, url, Environment.GetEnvironmentVariable("COVE_ENGINE") ?? "bundled");
+
         Func<CancellationToken, Task<Stream>> dial = ct => GuiEngineLauncher.ConnectOrSpawnAsync(channel, ct);
         var webRoot = Path.Combine(AppContext.BaseDirectory, "wwwroot");
         var server = new LoopbackServer(webRoot, dial, version, channel);
         server.Start();
 
         var link = new EngineLink(dial, version, channel);
+        link.SetLogger(loggerFactory.CreateLogger<EngineLink>());
 
         RynApplication.CreateBuilder()
             .ConfigureOptions(o =>
@@ -43,6 +51,7 @@ internal static class Program
             })
             .ConfigureServices(s =>
             {
+                s.AddSingleton<ILoggerFactory>(loggerFactory);
                 s.AddSingleton(link);
                 s.AddSingleton<EngineEventForwarder>();
                 s.AddSingleton<CoveGuiCommands>();

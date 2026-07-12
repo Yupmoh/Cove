@@ -68,19 +68,29 @@ public sealed class LaunchOrchestrator
 
         if (manifest.Methods.TryGetValue("build_launch_command", out var method) && method.Script is not null)
         {
+            _logger?.LaunchBuildCommand(profile.Adapter, "build_launch_command");
+            var startTimestamp = System.Diagnostics.Stopwatch.GetTimestamp();
             var result = await _methodRunner.RunAsync(adapterDir, method.Script, new[] { flagsJson }, TimeSpan.FromSeconds(5), cancellationToken: cancellationToken).ConfigureAwait(false);
+            _logger?.LaunchMethodRunner(profile.Adapter, "build_launch_command", System.Diagnostics.Stopwatch.GetElapsedTime(startTimestamp).TotalMilliseconds, result.ExitCode, result.Ok);
             if (result.Ok && result.Json is { } json)
-                return ParseCommand(json, overrides.WorkingDir);
+            {
+                var composed = ParseCommand(json, overrides.WorkingDir);
+                _logger?.LaunchCommandComposed(profile.Adapter, composed.Command, System.Linq.Enumerable.Count(composed.Args), composed.Cwd);
+                return composed;
+            }
             if (result.GracefulFailure)
                 throw new ResumeFailedException($"adapter {profile.Adapter} cannot build launch command: {result.Stderr}");
             throw new ResumeFailedException($"adapter {profile.Adapter} build_launch_command failed (exit {result.ExitCode}): {result.Stderr}");
         }
 
+        _logger?.LaunchBuildCommand(profile.Adapter, "fallback");
         var binaryPath = await ResolveBinaryAsync(manifest, adapterDir, cancellationToken).ConfigureAwait(false);
         if (binaryPath is null)
             throw new ResumeFailedException($"binary not found for adapter {profile.Adapter}");
 
-        return BuildFallbackCommand(binaryPath, profile, overrides);
+        var fallback = BuildFallbackCommand(binaryPath, profile, overrides);
+        _logger?.LaunchCommandComposed(profile.Adapter, fallback.Command, System.Linq.Enumerable.Count(fallback.Args), fallback.Cwd);
+        return fallback;
     }
 
     public async Task<AgentResumeResult> ResumeAsync(LaunchProfile profile, string sessionId, LauncherOverrides overrides, System.Threading.CancellationToken cancellationToken = default)
@@ -104,7 +114,9 @@ public sealed class LaunchOrchestrator
             _logger?.AdapterBinaryDiscoveryUnavailable(manifest.Name);
             return new BinaryDiscoveryResult(AdapterDetectionState.Missing, null, null);
         }
-        return _binaryDiscovery.Discover(discovery, manifest.WellKnownPaths, _loginShellPath);
+        var describe = _binaryDiscovery.Discover(discovery, manifest.WellKnownPaths, _loginShellPath);
+        _logger?.LaunchBinaryDiscovery(manifest.Name, describe.State.ToString(), describe.BinaryPath ?? "");
+        return describe;
     }
 
     private async Task<string?> ResolveBinaryAsync(AdapterManifest manifest, string adapterDir, System.Threading.CancellationToken cancellationToken)
@@ -112,6 +124,7 @@ public sealed class LaunchOrchestrator
         if (manifest.BinaryDiscovery is { } discovery)
         {
             var result = _binaryDiscovery!.Discover(discovery, manifest.WellKnownPaths, _loginShellPath);
+            _logger?.LaunchBinaryDiscovery(manifest.Name, result.State.ToString(), result.BinaryPath ?? "");
             if (result.State == AdapterDetectionState.Detected && !string.IsNullOrEmpty(result.BinaryPath))
                 return result.BinaryPath;
             return null;
@@ -119,7 +132,9 @@ public sealed class LaunchOrchestrator
 
         if (manifest.Methods.TryGetValue("detect_binary", out var method) && method.Script is not null && _methodRunner is not null)
         {
+            var startTimestamp = System.Diagnostics.Stopwatch.GetTimestamp();
             var result = await _methodRunner.RunAsync(adapterDir, method.Script, Array.Empty<string>(), TimeSpan.FromSeconds(5), cancellationToken: cancellationToken).ConfigureAwait(false);
+            _logger?.LaunchMethodRunner(manifest.Name, "detect_binary", System.Diagnostics.Stopwatch.GetElapsedTime(startTimestamp).TotalMilliseconds, result.ExitCode, result.Ok);
             if (result.Ok && result.Json is { } json && json.TryGetProperty("path", out var pathProp))
             {
                 var path = pathProp.GetString();
@@ -285,4 +300,16 @@ internal static partial class LauncherOptionsLog
 
     [ZLoggerMessage(LogLevel.Warning, "adapter binary discovery unavailable adapter={adapter}")]
     public static partial void AdapterBinaryDiscoveryUnavailable(this Microsoft.Extensions.Logging.ILogger logger, string adapter);
+
+    [ZLoggerMessage(3200, LogLevel.Debug, "launch build command adapter={adapter} route={route}")]
+    public static partial void LaunchBuildCommand(this Microsoft.Extensions.Logging.ILogger logger, string adapter, string route);
+
+    [ZLoggerMessage(3201, LogLevel.Debug, "launch method runner adapter={adapter} method={method} durationMs={durationMs} exit={exit} ok={ok}")]
+    public static partial void LaunchMethodRunner(this Microsoft.Extensions.Logging.ILogger logger, string adapter, string method, double durationMs, int exit, bool ok);
+
+    [ZLoggerMessage(3202, LogLevel.Debug, "launch binary discovery adapter={adapter} state={state} path={path}")]
+    public static partial void LaunchBinaryDiscovery(this Microsoft.Extensions.Logging.ILogger logger, string adapter, string state, string path);
+
+    [ZLoggerMessage(3203, LogLevel.Debug, "launch command composed adapter={adapter} binary={binary} argCount={argCount} cwd={cwd}")]
+    public static partial void LaunchCommandComposed(this Microsoft.Extensions.Logging.ILogger logger, string adapter, string binary, int argCount, string cwd);
 }

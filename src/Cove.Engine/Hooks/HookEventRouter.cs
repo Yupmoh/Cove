@@ -65,6 +65,8 @@ public sealed class HookEventRouter
             return;
         }
 
+        _logger?.HookEventReceived(ev.NookId, ev.Adapter, ev.Event);
+
         if (!DeclaredEvents.Contains(ev.Event))
         {
             _logger?.HookEventUnknown(ev.Adapter, ev.Event);
@@ -120,6 +122,9 @@ public sealed class HookEventRouter
                 NeedsInputTransition?.Invoke(ev.NookId, true);
                 break;
         }
+
+        if (_logger is { } log && _nookStates.TryGetValue(ev.NookId, out var updated))
+            log.HookStateTransition(ev.NookId, ev.Adapter, ev.Event, updated.Status);
     }
 
     private static string? ExtractSessionId(JsonElement? payload)

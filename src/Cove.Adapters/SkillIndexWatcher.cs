@@ -70,7 +70,7 @@ public sealed class SkillIndexWatcher : IDisposable
 
     private void OnFileEvent(object sender, FileSystemEventArgs e) => ScheduleRebuild();
     private void OnRenamed(object sender, RenamedEventArgs e) => ScheduleRebuild();
-    private void OnError(object sender, ErrorEventArgs e) { }
+    private void OnError(object sender, ErrorEventArgs e) => _logger?.SkillWatcherError(e.GetException().Message);
 
     private void ScheduleRebuild()
     {

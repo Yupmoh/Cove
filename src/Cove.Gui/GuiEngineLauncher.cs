@@ -1,13 +1,19 @@
 using System.Diagnostics;
 using Cove.Protocol;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Cove.Gui;
 
 public static class GuiEngineLauncher
 {
+    public static ILogger Logger { get; set; } = NullLogger.Instance;
+
     public static async Task<Stream> ConnectOrSpawnAsync(string channel, CancellationToken ct)
     {
-        Stream? s = await TryDialAsync(channel, ct).ConfigureAwait(false);
+        var target = GuiLogging.EndpointFor(channel);
+        Logger.LauncherDialAttempt(channel, target);
+        Stream? s = await TryDialAsync(channel, target, ct).ConfigureAwait(false);
         if (s is not null)
             return s;
 
@@ -17,21 +23,23 @@ public static class GuiEngineLauncher
         while (sw.ElapsedMilliseconds < ProtocolConstants.ReadinessTimeoutMs)
         {
             await Task.Delay(ProtocolConstants.SpawnPollMs, ct).ConfigureAwait(false);
-            s = await TryDialAsync(channel, ct).ConfigureAwait(false);
+            s = await TryDialAsync(channel, target, ct).ConfigureAwait(false);
             if (s is not null)
                 return s;
         }
+        Logger.LauncherSpawnTimeout(channel, target, sw.ElapsedMilliseconds);
         throw new InvalidOperationException($"cove engine did not become connectable on channel {channel}");
     }
 
-    private static async Task<Stream?> TryDialAsync(string channel, CancellationToken ct)
+    private static async Task<Stream?> TryDialAsync(string channel, string target, CancellationToken ct)
     {
         try
         {
             return await EndpointDialer.DialAsync(channel, ct).ConfigureAwait(false);
         }
-        catch
+        catch (Exception ex)
         {
+            Logger.LauncherDialFailed(channel, target, ex.Message);
             return null;
         }
     }
@@ -39,6 +47,7 @@ public static class GuiEngineLauncher
     private static void SpawnEngine(string channel)
     {
         string exe = ResolveEnginePath();
+        Logger.LauncherSpawn(channel, exe);
         var psi = new ProcessStartInfo
         {
             FileName = exe,

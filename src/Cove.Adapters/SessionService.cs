@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.Extensions.Logging;
 
 namespace Cove.Adapters;
 
@@ -23,21 +24,30 @@ public sealed class SessionService
     private readonly MethodRunner _runner;
     private readonly TimeSpan _cacheTtl;
     private readonly TimeSpan _listTimeout;
+    private readonly ILogger? _logger;
     private readonly Dictionary<(string adapter, string cwd), (List<RecentSession> sessions, DateTimeOffset at)> _cache = new();
     private readonly Dictionary<string, int> _schemaVersions = new();
 
-    public SessionService(MethodRunner runner, TimeSpan? cacheTtl = null, TimeSpan? listTimeout = null)
+    public SessionService(MethodRunner runner, TimeSpan? cacheTtl = null, TimeSpan? listTimeout = null, ILogger? logger = null)
     {
         _runner = runner;
         _cacheTtl = cacheTtl ?? TimeSpan.FromSeconds(2);
         _listTimeout = listTimeout ?? TimeSpan.FromSeconds(3);
+        _logger = logger;
     }
+
+    private static string AdapterNameOf(string adapterDir)
+        => Path.GetFileName(adapterDir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
 
     public async Task<List<RecentSession>> ListRecentSessionsAsync(string adapterDir, string cwd, CancellationToken ct = default)
     {
+        var adapter = AdapterNameOf(adapterDir);
         var key = (adapterDir, cwd);
         if (_cache.TryGetValue(key, out var entry) && DateTimeOffset.UtcNow - entry.at < _cacheTtl)
+        {
+            _logger?.SessionListCacheHit(adapter, cwd, entry.sessions.Count);
             return entry.sessions;
+        }
 
         var result = await _runner.RunAsync(adapterDir, "list_recent_sessions.sh", [cwd], _listTimeout, null, ct);
 
@@ -49,16 +59,20 @@ public sealed class SessionService
                 sessions = json.GetProperty("sessions").Deserialize(AdaptersJsonContext.Default.ListRecentSession) ?? new();
                 sessions.Sort((a, b) => (b.LastActive ?? DateTimeOffset.MinValue).CompareTo(a.LastActive ?? DateTimeOffset.MinValue));
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                _logger?.SessionListParseFailed(adapter, ex.Message);
                 sessions = new();
             }
         }
         else
         {
+            if (!result.Ok)
+                _logger?.SessionListFailed(adapter, cwd, result.ExitCode);
             sessions = new();
         }
 
+        _logger?.SessionListCompleted(adapter, cwd, sessions.Count);
         _cache[key] = (sessions, DateTimeOffset.UtcNow);
         return sessions;
     }
@@ -79,9 +93,13 @@ public sealed class SessionService
             null,
             ct);
 
+        var adapter = AdapterNameOf(adapterDir);
         var events = new List<CanonicalEvent>();
         if (!result.Ok)
+        {
+            _logger?.SessionExtractFailed(adapter, script, result.ExitCode);
             return events;
+        }
 
         foreach (var line in result.Stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries))
         {
@@ -103,7 +121,7 @@ public sealed class SessionService
                         Raw: root.Clone()));
                 }
             }
-            catch (JsonException) { }
+            catch (JsonException ex) { _logger?.SessionEventParseFailed(adapter, ex.Message); }
         }
 
         return events;

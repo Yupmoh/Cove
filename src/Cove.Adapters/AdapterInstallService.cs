@@ -31,14 +31,14 @@ public sealed class AdapterInstallService
         var finalDir = Path.Combine(adaptersRoot, name);
         var tempDir = Path.Combine(adaptersRoot, ".installing-" + name);
 
-        CleanupDir(tempDir);
+        CleanupDir(tempDir, _logger);
         Directory.CreateDirectory(tempDir);
 
         try
         {
             await fetcher.FetchIntoAsync(tempDir, ct).ConfigureAwait(false);
 
-            SetExecutableBits(tempDir);
+            SetExecutableBits(tempDir, _logger);
 
             var manifestPath = Path.Combine(tempDir, "adapter.json");
             if (!File.Exists(manifestPath))
@@ -56,7 +56,7 @@ public sealed class AdapterInstallService
                 throw new AdapterInstallException($"adapter.json is invalid for {name}", ex);
             }
 
-            var errors = ManifestValidator.Validate(manifest);
+            var errors = ManifestValidator.Validate(manifest, _logger);
             if (errors.Count > 0)
             {
                 _logger?.ManifestValidationFailed(name, errors[0].Field, errors[0].Code);
@@ -83,7 +83,7 @@ public sealed class AdapterInstallService
         }
         catch
         {
-            CleanupDir(tempDir);
+            CleanupDir(tempDir, _logger);
             throw;
         }
     }
@@ -194,13 +194,14 @@ public sealed class AdapterInstallService
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
-            try { process.Kill(entireProcessTree: true); } catch { }
+            try { process.Kill(entireProcessTree: true); }
+            catch (Exception ex) { _logger?.AdapterHookKillFailed(adapterName, @event, ex.Message); }
             if (@event == "uninstall")
                 _logger?.UninstallHookTimeout(adapterName, adapterDir);
         }
     }
 
-    private static void SetExecutableBits(string dir)
+    private static void SetExecutableBits(string dir, ILogger? logger)
     {
         if (OperatingSystem.IsWindows()) return;
         foreach (var file in Directory.EnumerateFiles(dir, "*.sh", SearchOption.AllDirectories))
@@ -209,17 +210,17 @@ public sealed class AdapterInstallService
             {
                 System.IO.File.SetUnixFileMode(file, System.IO.UnixFileMode.UserRead | System.IO.UnixFileMode.UserWrite | System.IO.UnixFileMode.UserExecute | System.IO.UnixFileMode.GroupRead | System.IO.UnixFileMode.OtherRead);
             }
-            catch (IOException) { }
+            catch (IOException ex) { logger?.AdapterSetExecutableFailed(file, ex.Message); }
         }
     }
 
-    private static void CleanupDir(string dir)
+    private static void CleanupDir(string dir, ILogger? logger)
     {
         try
         {
             if (Directory.Exists(dir))
                 Directory.Delete(dir, recursive: true);
         }
-        catch (IOException) { }
+        catch (IOException ex) { logger?.AdapterCleanupDirFailed(dir, ex.Message); }
     }
 }

@@ -6,7 +6,7 @@ namespace Cove.Persistence;
 
 public static class AtomicJsonStore
 {
-    public static void Write<T>(string path, T value, JsonTypeInfo<T> typeInfo)
+    public static void Write<T>(string path, T value, JsonTypeInfo<T> typeInfo, ILogger? logger = null)
     {
         var fullPath = Path.GetFullPath(path);
         var dir = Path.GetDirectoryName(fullPath)!;
@@ -24,22 +24,26 @@ public static class AtomicJsonStore
         if (!OperatingSystem.IsWindows())
             File.SetUnixFileMode(temp, UnixFileMode.UserRead | UnixFileMode.UserWrite);
 
-        if (File.Exists(fullPath))
+        var backup = File.Exists(fullPath);
+        if (backup)
             File.Copy(fullPath, fullPath + ".bak", overwrite: true);
 
         File.Move(temp, fullPath, overwrite: true);
 
         if (!OperatingSystem.IsWindows())
-            NativePosix.FsyncDir(dir);
+            NativePosix.FsyncDir(dir, logger);
+
+        logger?.AtomicWrite(fullPath, bytes.Length, backup);
     }
 
-    public static void WriteBytes(string path, ReadOnlySpan<byte> bytes)
+    public static void WriteBytes(string path, ReadOnlySpan<byte> bytes, ILogger? logger = null)
     {
         var fullPath = Path.GetFullPath(path);
         var dir = Path.GetDirectoryName(fullPath)!;
         Directory.CreateDirectory(dir);
 
         var temp = Path.Combine(dir, $".{Path.GetFileName(fullPath)}.tmp-{Guid.NewGuid():N}");
+        var byteCount = bytes.Length;
         using (var fs = new FileStream(temp, FileMode.CreateNew, FileAccess.Write, FileShare.None))
         {
             fs.Write(bytes);
@@ -49,36 +53,45 @@ public static class AtomicJsonStore
         if (!OperatingSystem.IsWindows())
             File.SetUnixFileMode(temp, UnixFileMode.UserRead | UnixFileMode.UserWrite);
 
-        if (File.Exists(fullPath))
+        var backup = File.Exists(fullPath);
+        if (backup)
             File.Copy(fullPath, fullPath + ".bak", overwrite: true);
 
         File.Move(temp, fullPath, overwrite: true);
 
         if (!OperatingSystem.IsWindows())
-            NativePosix.FsyncDir(dir);
+            NativePosix.FsyncDir(dir, logger);
+
+        logger?.AtomicWrite(fullPath, byteCount, backup);
     }
 
-    public static void WriteRawText(string path, string content)
+    public static void WriteRawText(string path, string content, ILogger? logger = null)
     {
         var fullPath = Path.GetFullPath(path);
         var dir = Path.GetDirectoryName(fullPath)!;
         Directory.CreateDirectory(dir);
         var temp = Path.Combine(dir, $".{Path.GetFileName(fullPath)}.tmp-{Guid.NewGuid():N}");
+        var bytes = System.Text.Encoding.UTF8.GetBytes(content);
         using (var fs = new FileStream(temp, FileMode.CreateNew, FileAccess.Write, FileShare.None))
         {
-            var bytes = System.Text.Encoding.UTF8.GetBytes(content);
             fs.Write(bytes);
             fs.Flush(flushToDisk: true);
         }
         File.Move(temp, fullPath, overwrite: true);
         if (!OperatingSystem.IsWindows())
-            NativePosix.FsyncDir(dir);
+            NativePosix.FsyncDir(dir, logger);
+
+        logger?.AtomicWrite(fullPath, bytes.Length, false);
     }
 
     public static T? Read<T>(string path, JsonTypeInfo<T> typeInfo, ILogger logger) where T : class
     {
         if (!File.Exists(path))
+        {
+            logger.AtomicRead(path, false);
             return null;
+        }
+        logger.AtomicRead(path, true);
         try
         {
             using var fs = File.OpenRead(path);

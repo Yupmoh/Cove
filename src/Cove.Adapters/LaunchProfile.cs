@@ -93,7 +93,7 @@ public sealed class LaunchProfileStore
                 if (profile is not null)
                     profiles.Add(profile);
             }
-            catch (JsonException) { }
+            catch (JsonException ex) { _logger?.LaunchProfileParseFailed(file, ex.Message); }
         }
         return profiles;
     }
@@ -212,7 +212,7 @@ public sealed class LaunchProfileStore
             var store = JsonSerializer.Deserialize(content, AdaptersJsonContext.Default.NookSelectionStore);
             return store ?? new NookSelectionStore(new Dictionary<string, NookSelection>(), null);
         }
-        catch (JsonException) { }
+        catch (JsonException ex) { _logger?.NookSelectionParseFailed(adapter, path, ex.Message); }
         return new NookSelectionStore(new Dictionary<string, NookSelection>(), null);
     }
 

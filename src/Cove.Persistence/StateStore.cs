@@ -76,7 +76,7 @@ public sealed class StateStore : IDisposable
             try
             {
                 var bytes = reg.Serialize();
-                AtomicJsonStore.WriteBytes(reg.Path, bytes);
+                AtomicJsonStore.WriteBytes(reg.Path, bytes, _logger);
                 AppendJournal(key, bytes);
             }
             catch (Exception ex)

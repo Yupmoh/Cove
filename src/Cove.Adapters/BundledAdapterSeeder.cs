@@ -85,7 +85,7 @@ public static class BundledAdapterSeeder
 
             if (!Directory.Exists(targetDir))
             {
-                CopyRecursive(sourceDir, targetDir);
+                CopyRecursive(sourceDir, targetDir, logger);
                 WriteStamp(targetDir, sourceHash);
                 copied.Add(name);
                 logger?.BundledAdapterSeeded(name);
@@ -100,11 +100,11 @@ public static class BundledAdapterSeeder
                 continue;
             }
 
-            var existing = ReadStamp(stampPath);
+            var existing = ReadStamp(stampPath, logger);
             if (!string.Equals(existing, sourceHash, StringComparison.Ordinal))
             {
                 Directory.Delete(targetDir, recursive: true);
-                CopyRecursive(sourceDir, targetDir);
+                CopyRecursive(sourceDir, targetDir, logger);
                 WriteStamp(targetDir, sourceHash);
                 refreshed.Add(name);
                 logger?.BundledAdapterRefreshed(name);
@@ -117,13 +117,13 @@ public static class BundledAdapterSeeder
     private static void WriteStamp(string adapterDir, string hash)
         => File.WriteAllText(Path.Combine(adapterDir, StampFileName), hash);
 
-    private static string ReadStamp(string stampPath)
+    private static string ReadStamp(string stampPath, ILogger? logger)
     {
         try { return File.ReadAllText(stampPath).Trim(); }
-        catch (IOException) { return string.Empty; }
+        catch (IOException ex) { logger?.BundledStampReadFailed(stampPath, ex.Message); return string.Empty; }
     }
 
-    private static void CopyRecursive(string source, string dest)
+    private static void CopyRecursive(string source, string dest, ILogger? logger)
     {
         Directory.CreateDirectory(dest);
         foreach (var dir in Directory.EnumerateDirectories(source))
@@ -131,7 +131,7 @@ public static class BundledAdapterSeeder
             var name = Path.GetFileName(dir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
             if (name is ".git" or "node_modules")
                 continue;
-            CopyRecursive(dir, Path.Combine(dest, name));
+            CopyRecursive(dir, Path.Combine(dest, name), logger);
         }
         foreach (var file in Directory.EnumerateFiles(source))
         {
@@ -139,11 +139,11 @@ public static class BundledAdapterSeeder
                 continue;
             var destFile = Path.Combine(dest, Path.GetFileName(file));
             File.Copy(file, destFile, overwrite: true);
-            SetExecutableBitIfScript(destFile);
+            SetExecutableBitIfScript(destFile, logger);
         }
     }
 
-    private static void SetExecutableBitIfScript(string file)
+    private static void SetExecutableBitIfScript(string file, ILogger? logger)
     {
         if (OperatingSystem.IsWindows())
             return;
@@ -153,7 +153,7 @@ public static class BundledAdapterSeeder
         {
             File.SetUnixFileMode(file, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute | UnixFileMode.GroupRead | UnixFileMode.OtherRead);
         }
-        catch (IOException) { }
+        catch (IOException ex) { logger?.BundledSetExecutableFailed(file, ex.Message); }
     }
 
     private static string RelativePosixPath(string root, string full)

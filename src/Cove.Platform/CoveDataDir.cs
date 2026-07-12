@@ -1,5 +1,8 @@
 namespace Cove.Platform;
 
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+
 public enum CoveChannel { Stable, Beta, Dev }
 
 public sealed class CoveDataDir
@@ -13,16 +16,23 @@ public sealed class CoveDataDir
         Root = root;
     }
 
-    public static CoveDataDir ForRoot(CoveChannel channel, string root)
+    public static CoveDataDir ForRoot(CoveChannel channel, string root, ILogger? logger = null)
     {
-        return new CoveDataDir(channel, Path.GetFullPath(ExpandHome(root)));
+        var dir = new CoveDataDir(channel, Path.GetFullPath(ExpandHome(root)));
+        (logger ?? NullLogger.Instance).CoveDataDirResolved(dir.ChannelName, dir.Root, "explicit-root");
+        return dir;
     }
 
-    public static CoveDataDir Resolve(CoveChannel channel)
+    public static CoveDataDir Resolve(CoveChannel channel, ILogger? logger = null)
     {
+        ILogger log = logger ?? NullLogger.Instance;
         var overrideDir = Environment.GetEnvironmentVariable("COVE_DATA_DIR");
         if (!string.IsNullOrWhiteSpace(overrideDir))
-            return new CoveDataDir(channel, Path.GetFullPath(ExpandHome(overrideDir)));
+        {
+            var overridden = new CoveDataDir(channel, Path.GetFullPath(ExpandHome(overrideDir)));
+            log.CoveDataDirResolved(overridden.ChannelName, overridden.Root, "COVE_DATA_DIR");
+            return overridden;
+        }
 
         var home = OperatingSystem.IsWindows()
             ? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)
@@ -36,7 +46,9 @@ public sealed class CoveDataDir
             CoveChannel.Dev => ".cove-dev",
             _ => throw new ArgumentOutOfRangeException(nameof(channel), channel, "unknown channel")
         };
-        return new CoveDataDir(channel, Path.Combine(home, dirName));
+        var resolved = new CoveDataDir(channel, Path.Combine(home, dirName));
+        log.CoveDataDirResolved(resolved.ChannelName, resolved.Root, "home");
+        return resolved;
     }
 
     private static string ExpandHome(string path)

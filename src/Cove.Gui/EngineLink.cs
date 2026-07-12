@@ -1,6 +1,9 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Text.Json;
 using Cove.Protocol;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Cove.Gui;
 
@@ -9,16 +12,21 @@ public sealed class EngineLink : IAsyncDisposable
     private readonly Func<CancellationToken, Task<Stream>> _dial;
     private readonly string _clientVersion;
     private readonly string _channel;
+    private readonly string _endpoint;
     private readonly SemaphoreSlim _connectGate = new(1, 1);
     private readonly SemaphoreSlim _writeGate = new(1, 1);
     private readonly ConcurrentDictionary<string, TaskCompletionSource<ControlResponse>> _pending = new();
+    private ILogger _log = NullLogger.Instance;
     private System.Action<string, JsonElement>? _onEngineEvent;
     private Stream? _stream;
+    private bool _everConnected;
     private uint _seq;
     private int _idCounter;
 
     public EngineLink(Func<CancellationToken, Task<Stream>> dial, string clientVersion, string channel)
-    { _dial = dial; _clientVersion = clientVersion; _channel = channel; }
+    { _dial = dial; _clientVersion = clientVersion; _channel = channel; _endpoint = GuiLogging.EndpointFor(channel); }
+
+    public void SetLogger(ILogger logger) => _log = logger;
 
     public string Channel => _channel;
 
@@ -37,14 +45,23 @@ public sealed class EngineLink : IAsyncDisposable
         try
         {
             if (_stream is not null) return _stream;
+            if (_everConnected) _log.EngineReconnecting(_channel, _endpoint);
+            else _log.EngineConnecting(_channel, _endpoint);
             var s = await _dial(ct);
             _ = Task.Run(() => ReadPumpAsync(s));
             var helloEl = JsonSerializer.SerializeToElement(
                 new HelloParams(ProtocolConstants.SemanticProtocolVersion, "gui", _clientVersion, _channel),
                 CoveJsonContext.Default.HelloParams);
             var hello = await SendRequestAsync(s, "cove://sys/hello", helloEl, ct);
-            if (!hello.Ok) throw new InvalidOperationException($"hello failed: {hello.Error?.Code}");
+            if (!hello.Ok)
+            {
+                _log.EngineHelloRejected(_channel, _endpoint, hello.Error?.Code ?? "unknown");
+                throw new InvalidOperationException($"hello failed: {hello.Error?.Code}");
+            }
             _stream = s;
+            _everConnected = true;
+            var engineVersion = hello.Data is { } hd && hd.TryGetProperty("engineVersion", out var ev) ? ev.GetString() ?? "" : "";
+            _log.EngineConnected(_channel, _endpoint, engineVersion);
             return s;
         }
         finally { _connectGate.Release(); }
@@ -58,11 +75,25 @@ public sealed class EngineLink : IAsyncDisposable
         var req = new ControlRequest(id, uri, paramsEl, "user:gui");
         var bytes = JsonSerializer.SerializeToUtf8Bytes(req, CoveJsonContext.Default.ControlRequest);
         var seq = Interlocked.Increment(ref _seq);
-        await FrameIo.WriteAsync(s, _writeGate, FrameType.Request, 0, seq, bytes, ct);
-        using var timeout = new CancellationTokenSource(ProtocolConstants.ControlRequestTimeoutMs);
-        using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, timeout.Token);
-        await using (linked.Token.Register(() => tcs.TrySetCanceled()))
-            return await tcs.Task;
+        var sw = Stopwatch.StartNew();
+        try
+        {
+            await FrameIo.WriteAsync(s, _writeGate, FrameType.Request, 0, seq, bytes, ct);
+            using var timeout = new CancellationTokenSource(ProtocolConstants.ControlRequestTimeoutMs);
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, timeout.Token);
+            await using (linked.Token.Register(() => tcs.TrySetCanceled()))
+            {
+                var response = await tcs.Task;
+                _log.EngineRequest(uri, sw.ElapsedMilliseconds);
+                return response;
+            }
+        }
+        catch (Exception ex)
+        {
+            _pending.TryRemove(id, out _);
+            _log.EngineRequestFailed(uri, ex.Message);
+            throw;
+        }
     }
 
     private async Task ReadPumpAsync(Stream s)
@@ -80,7 +111,7 @@ public sealed class EngineLink : IAsyncDisposable
                 else if (f.Type == FrameType.Error)
                 {
                     var e = JsonSerializer.Deserialize(f.Payload, CoveJsonContext.Default.ControlErrorFrame)!;
-                    Console.Error.WriteLine($"control error frame: {e.Code} {e.Message}");
+                    _log.EngineControlError(e.Code, e.Message, e.StreamId?.ToString() ?? "");
                     if (e.StreamId is null) break;
                 }
                 else if (f.Type == FrameType.Event)
@@ -90,11 +121,11 @@ public sealed class EngineLink : IAsyncDisposable
                         var evt = JsonSerializer.Deserialize(f.Payload, CoveJsonContext.Default.ControlEvent);
                         if (evt is not null) _onEngineEvent?.Invoke(evt.Channel, evt.Payload);
                     }
-                    catch (Exception ex) { Console.Error.WriteLine($"event forward failed: {ex.Message}"); }
+                    catch (Exception ex) { _log.EngineEventDeserializeFailed(ex.Message); }
                 }
             }
         }
-        catch (Exception ex) { Console.Error.WriteLine($"control read pump ended: {ex.Message}"); }
+        catch (Exception ex) { _log.EngineReadPumpEnded(ex.Message); }
         foreach (var kv in _pending) kv.Value.TrySetException(new IOException("control connection closed"));
         _pending.Clear();
         _stream = null;

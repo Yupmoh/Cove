@@ -28,4 +28,22 @@ internal static partial class PersistenceLog
 
     [ZLoggerMessage(LogLevel.Warning, "flat-json file {path} failed to parse and no .bak exists: {error}")]
     public static partial void FlatJsonParseFailedNoBak(this ILogger logger, string path, string error);
+
+    [ZLoggerMessage(LogLevel.Debug, "atomic json write path={path} bytes={bytes} backup={backup}")]
+    public static partial void AtomicWrite(this ILogger logger, string path, int bytes, bool backup);
+
+    [ZLoggerMessage(LogLevel.Debug, "atomic json read path={path} found={found}")]
+    public static partial void AtomicRead(this ILogger logger, string path, bool found);
+
+    [ZLoggerMessage(LogLevel.Information, "sqlite migration applied version={version}")]
+    public static partial void SqliteMigrationApplied(this ILogger logger, int version);
+
+    [ZLoggerMessage(LogLevel.Information, "sqlite migrations complete fromVersion={fromVersion} toVersion={toVersion} applied={applied}")]
+    public static partial void SqliteMigrationsComplete(this ILogger logger, long fromVersion, long toVersion, int applied);
+
+    [ZLoggerMessage(LogLevel.Warning, "fsync dir open failed dir={dir} errno={errno}")]
+    public static partial void FsyncDirOpenFailed(this ILogger logger, string dir, int errno);
+
+    [ZLoggerMessage(LogLevel.Warning, "fsync dir failed dir={dir} errno={errno}")]
+    public static partial void FsyncDirFailed(this ILogger logger, string dir, int errno);
 }

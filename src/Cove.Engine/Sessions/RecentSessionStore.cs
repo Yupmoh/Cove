@@ -46,6 +46,7 @@ public sealed class RecentSessionStore
         cmd.Parameters.AddWithValue("@cwd", cwd ?? "");
         cmd.Parameters.AddWithValue("@ts", startedAt.ToString("o"));
         cmd.ExecuteNonQuery();
+        _logger.LogDebug("recent session recorded adapter={Adapter} sessionId={SessionId} bay={BayId}", adapter, sessionId, bayId ?? "");
     }
 
     public IReadOnlyList<RecentSession> Recent(string? adapter, int limit)

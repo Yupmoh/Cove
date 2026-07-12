@@ -9,6 +9,7 @@ using Cove.Platform.Ipc;
 using Cove.Platform.Pty;
 using Cove.Protocol;
 using Microsoft.Extensions.Logging;
+using ZLogger;
 
 namespace Cove.Engine.Daemon;
 
@@ -28,6 +29,7 @@ public sealed class DaemonHost
     private long _lastActivityTicks;
     private Cove.Engine.Restart.RestorationSummaryEvent? _restorationSummary;
 
+    private ILogger? _logger;
     private IPtyHost? _ptyHost;
     private NookRegistry? _nooks;
     private Cove.Engine.Layout.LayoutService? _layout;
@@ -111,8 +113,18 @@ public sealed class DaemonHost
     public async Task<int> RunAsync(CancellationToken externalCancellation)
     {
         CoveTree.Ensure(_paths.DataDir);
-        using var loggerFactory = Cove.Platform.CoveLog.CreateEngineLoggerFactory(_paths.DataDir.LogsDir, _paths.Channel);
+        var minimumLevel = ResolveMinimumLogLevel();
+        System.IO.Directory.CreateDirectory(_paths.DataDir.LogsDir);
+        var logPath = System.IO.Path.Combine(_paths.DataDir.LogsDir, $"{_paths.Channel}.log");
+        using var loggerFactory = LoggerFactory.Create(builder =>
+        {
+            builder.SetMinimumLevel(minimumLevel);
+            builder.AddZLoggerConsole();
+            builder.AddZLoggerFile(logPath);
+        });
         var logger = loggerFactory.CreateLogger<DaemonHost>();
+        _logger = logger;
+        logger.LogLevelResolved(minimumLevel.ToString(), System.Environment.GetEnvironmentVariable("COVE_LOG_LEVEL") ?? "");
 
         SingleInstanceGuard? guard = SingleInstanceGuard.TryAcquire(_paths.PidFilePath);
         if (guard is null)
@@ -147,7 +159,7 @@ public sealed class DaemonHost
         _recentSessions = new Cove.Engine.Sessions.RecentSessionStore(dataDir, logger);
         _lifecycle = new Cove.Engine.Lifecycle.AgentLifecycleController(logger);
         _manifestStore = new Cove.Adapters.AdapterManifestStore(System.IO.Path.Combine(dataDir, "adapters"), logger);
-        _sessionService = new Cove.Adapters.SessionService(new Cove.Adapters.MethodRunner());
+        _sessionService = new Cove.Adapters.SessionService(new Cove.Adapters.MethodRunner(logger: logger), logger: logger);
         var registryCachePath = System.IO.Path.Combine(dataDir, "adapters", "registry.json");
         var repoRoot = System.IO.Path.GetFullPath(System.IO.Path.Combine(System.AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
         var devRegistryPath = System.IO.Path.Combine(repoRoot, "..", "atrium-adapters", "registry.json");
@@ -155,10 +167,10 @@ public sealed class DaemonHost
             ? new Cove.Adapters.FileRegistryFetcher(devRegistryPath, logger)
             : new Cove.Adapters.HttpRegistryFetcher(Cove.Adapters.RegistryConstants.RegistryContentsUrl, logger);
         _registry = new Cove.Adapters.RegistryService(registryCachePath, fetcher);
-        var resumeProtocol = new Cove.Engine.Launch.AdapterResumeProtocol(_manifestStore, new Cove.Adapters.MethodRunner(), logger);
+        var resumeProtocol = new Cove.Engine.Launch.AdapterResumeProtocol(_manifestStore, new Cove.Adapters.MethodRunner(logger: logger), logger);
         _resumeProtocol = resumeProtocol;
         var resumeService = new Cove.Engine.Restart.AgentResumeService(resumeProtocol);
-        _launcher = new Cove.Engine.Launch.LaunchOrchestrator(_manifestStore, new Cove.Adapters.MethodRunner(), new Cove.Adapters.BinaryDiscoveryService(), probedPath, resumeService, new Cove.Engine.Launch.LauncherOverrideStore(System.IO.Path.Combine(dataDir, "launcher-overrides"), logger), logger);
+        _launcher = new Cove.Engine.Launch.LaunchOrchestrator(_manifestStore, new Cove.Adapters.MethodRunner(logger: logger), new Cove.Adapters.BinaryDiscoveryService(logger), probedPath, resumeService, new Cove.Engine.Launch.LauncherOverrideStore(System.IO.Path.Combine(dataDir, "launcher-overrides"), logger), logger);
         _taskService = new Cove.Tasks.TaskService(dataDir, logger);
         _ = _taskService.StartAsync();
         var knowledgeKernel = new Knowledge.KnowledgePersistenceKernel(dataDir, logger);
@@ -382,6 +394,22 @@ public sealed class DaemonHost
         return 0;
     }
 
+    private static LogLevel ResolveMinimumLogLevel()
+    {
+        var raw = System.Environment.GetEnvironmentVariable("COVE_LOG_LEVEL");
+        if (string.IsNullOrWhiteSpace(raw))
+            return LogLevel.Information;
+        return raw.Trim().ToLowerInvariant() switch
+        {
+            "trace" => LogLevel.Trace,
+            "debug" => LogLevel.Debug,
+            "info" or "information" => LogLevel.Information,
+            "warn" or "warning" => LogLevel.Warning,
+            "error" => LogLevel.Error,
+            _ => LogLevel.Information,
+        };
+    }
+
     private async Task AcceptLoopAsync(IControlListener listener, CancellationToken cancellationToken)
     {
         while (!cancellationToken.IsCancellationRequested)
@@ -488,9 +516,14 @@ public sealed class DaemonHost
             await WriteResponseAsync(conn, Fail(req.Id, "not_ready", "sys/hello required before commands"), cancellationToken).ConfigureAwait(false);
             return false;
         }
+        long dispatchStart = System.Diagnostics.Stopwatch.GetTimestamp();
         ControlResponse? generated = await Cove.Engine.EngineCommandRouter.RouteAsync(req, _nooks, _layout, _bays, _runCommands, _restoration, _snapshots, _skills, _agents, _launchProfiles, _adapterEnv, _hookServer, _hookRouter, _agentRouter, _activity, _sessions, _lifecycle, _launcher, _taskService, _dispatchSaga, _resumeSaga, _timeline, _blackboard, _noteFiles, _memory, _memoryRanker, _proposals, _consolidator, _edits, _corpus, _vaultSettings, _library, _reviews, _attribution, _reviewDispatcher, _nookTypes, _browser, _config, _manifestStore, _registry, _omniChat, _nookScopes, _stateBus, _extensions, _captures, _gitReadModel, _searchService, _themes, _keybindings, _browserAutomation, _diagnostics, _perfBundles, _recentSessions, _lspService, _sessionService, System.IO.Path.Combine(_paths.DataDir.Root, "bays"), cancellationToken).ConfigureAwait(false);
         if (generated is not null)
         {
+            double dispatchMs = System.Diagnostics.Stopwatch.GetElapsedTime(dispatchStart).TotalMilliseconds;
+            _logger?.ControlDispatch(req.Uri, dispatchMs, generated.Ok);
+            if (!generated.Ok)
+                _logger?.ControlDispatchFailed(req.Uri, generated.Error?.Code ?? "", generated.Error?.Message ?? "");
             if (generated.Ok && IsMutatingVerb(req.Uri))
             {
                 BroadcastEvent("state.changed", new StateChangedEvent(req.Uri), Cove.Protocol.CoveJsonContext.Default.StateChangedEvent);
@@ -561,6 +594,7 @@ public sealed class DaemonHost
                 return true;
 
             default:
+                _logger?.ControlDispatchFailed(req.Uri, "not_found", "unknown command");
                 await WriteResponseAsync(conn, Fail(req.Id, "not_found", $"unknown command {req.Uri}"), cancellationToken).ConfigureAwait(false);
                 return false;
         }
@@ -624,6 +658,7 @@ public sealed class DaemonHost
         }
         if (!_nooks.TryGet(sp.NookId, out NookSession nook))
         {
+            _logger?.SubscribeUnknownNook(sp.NookId);
             await WriteResponseAsync(conn, Fail(req.Id, "not_found", $"unknown nook {sp.NookId}"), cancellationToken).ConfigureAwait(false);
             return;
         }
@@ -632,11 +667,12 @@ public sealed class DaemonHost
         long head = nook.Ring.Head;
         long tail = nook.Ring.Tail;
         long baseOffset = Math.Clamp((long)sp.SinceOffset, tail, head);
+        _logger?.SubscribeStarted(sp.NookId, baseOffset, head, tail);
         var subResult = new SubscribeResult(streamId, (ulong)baseOffset, ProtocolConstants.FlowWindow);
         await WriteResponseAsync(conn, new ControlResponse(req.Id, true, ToElement(subResult, CoveJsonContext.Default.SubscribeResult)), cancellationToken).ConfigureAwait(false);
 
         var sink = new SocketByteStreamSink(stream);
-        var sender = new PtyStreamSender(streamId, nook.Session.SessionId, nook.Ring, baseOffset, sink);
+        var sender = new PtyStreamSender(streamId, nook.Session.SessionId, nook.Ring, baseOffset, sink, sp.NookId, _logger);
         var gate = new object();
         bool childMarked = false;
 
@@ -660,8 +696,9 @@ public sealed class DaemonHost
                     nook.Signal.Set();
                 }
             }
-            catch
+            catch (System.Exception ex)
             {
+                _logger?.SubscribeCreditLoopClosed(sp.NookId, ex.Message);
             }
             finally
             {
@@ -692,8 +729,9 @@ public sealed class DaemonHost
         }
         finally
         {
+            _logger?.SubscribeEnded(sp.NookId, sender.Ended, sender.Faulted);
             streamCts.Cancel();
-            try { await creditLoop.ConfigureAwait(false); } catch { }
+            try { await creditLoop.ConfigureAwait(false); } catch (System.Exception ex) { _logger?.SubscribeCreditLoopClosed(sp.NookId, ex.Message); }
         }
     }
 

@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text.Json.Serialization;
+using Microsoft.Extensions.Logging;
 
 namespace Cove.Adapters;
 
@@ -24,12 +25,21 @@ public sealed class SkillScanner
 {
     private const int MaxDepth = 2;
     private const int MaxDescriptionLength = 1024;
+    private readonly ILogger? _logger;
+
+    public SkillScanner(ILogger? logger = null)
+    {
+        _logger = logger;
+    }
 
     public List<SkillEntry> ScanRoot(string root, SkillSource source, string? adapterName = null)
     {
         var skills = new List<SkillEntry>();
         if (!Directory.Exists(root))
+        {
+            _logger?.SkillScanDirMissing(root);
             return skills;
+        }
 
         var provenance = source switch
         {
@@ -52,7 +62,7 @@ public sealed class SkillScanner
         var skillPath = Path.Combine(dir, "SKILL.md");
         if (File.Exists(skillPath))
         {
-            var entry = ParseSkill(skillPath, dir, source, adapterName, provenance);
+            var entry = ParseSkill(skillPath, dir, source, adapterName, provenance, _logger);
             if (entry is not null)
                 skills.Add(entry);
             return;
@@ -65,23 +75,29 @@ public sealed class SkillScanner
                 ScanDirectory(subdir, source, adapterName, provenance, skills, depth + 1);
             }
         }
-        catch (UnauthorizedAccessException) { }
-        catch (DirectoryNotFoundException) { }
+        catch (UnauthorizedAccessException ex) { _logger?.SkillScanAccessDenied(dir, ex.Message); }
+        catch (DirectoryNotFoundException) { _logger?.SkillScanDirMissing(dir); }
     }
 
-    private static SkillEntry? ParseSkill(string skillPath, string dir, SkillSource source, string? adapterName, string provenance)
+    private static SkillEntry? ParseSkill(string skillPath, string dir, SkillSource source, string? adapterName, string provenance, ILogger? logger)
     {
         try
         {
             var content = File.ReadAllText(skillPath);
             var (name, description, body) = ParseFrontmatter(content, dir);
             if (name is null || description is null)
+            {
+                logger?.SkillParseNoFrontmatter(skillPath);
                 return null;
+            }
             if (description.Length > MaxDescriptionLength)
+            {
+                logger?.SkillParseFailed(skillPath, "description exceeds max length");
                 return null;
+            }
             return new SkillEntry(name, description, skillPath, source, provenance, adapterName, body);
         }
-        catch (IOException) { return null; }
+        catch (IOException ex) { logger?.SkillParseFailed(skillPath, ex.Message); return null; }
     }
 
     private static (string? name, string? description, string? body) ParseFrontmatter(string content, string dir)
@@ -120,7 +136,14 @@ public sealed class SkillScanner
 
 public sealed class SkillIndex
 {
+    private readonly ILogger? _logger;
     private readonly List<(string root, SkillSource source, string? adapterName)> _roots = new();
+
+    public SkillIndex(ILogger? logger = null)
+    {
+        _logger = logger;
+    }
+
     private Dictionary<string, SkillEntry> _byName = new(StringComparer.OrdinalIgnoreCase);
     private Dictionary<(string name, SkillSource source, string? adapter), SkillEntry> _byScope = new(new ScopeKeyComparer());
     private List<SkillEntry> _all = new();
@@ -136,7 +159,7 @@ public sealed class SkillIndex
         var byScope = new Dictionary<(string, SkillSource, string?), SkillEntry>(new ScopeKeyComparer());
         var byName = new Dictionary<string, SkillEntry>(StringComparer.OrdinalIgnoreCase);
         var all = new List<SkillEntry>();
-        var scanner = new SkillScanner();
+        var scanner = new SkillScanner(_logger);
         foreach (var (root, source, adapterName) in _roots)
         {
             var skills = scanner.ScanRoot(root, source, adapterName);

@@ -1,6 +1,8 @@
 namespace Cove.Platform;
 
 using Cove.Persistence;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 public static class CoveTree
 {
@@ -10,21 +12,27 @@ public static class CoveTree
         "themes", "library", "run-commands", "skills"
     };
 
-    public static void Ensure(CoveDataDir dataDir)
+    public static void Ensure(CoveDataDir dataDir, ILogger? logger = null)
     {
-        CreateDir(dataDir.Root);
+        ILogger log = logger ?? NullLogger.Instance;
+        log.CoveTreeEnsureBegin(dataDir.Root);
+        CreateDir(dataDir.Root, log);
         foreach (var name in SkeletonDirs)
-            CreateDir(Path.Combine(dataDir.Root, name));
+            CreateDir(Path.Combine(dataDir.Root, name), log);
 
         if (!File.Exists(dataDir.GitIgnore))
+        {
             AtomicJsonStore.WriteRawText(dataDir.GitIgnore, CoveGitIgnore.Content);
+            log.CoveTreeGitIgnoreWritten(dataDir.GitIgnore);
+        }
 
         if (!File.Exists(dataDir.MetaJson))
-            DataDirMetaStore.WriteInitial(dataDir);
+            DataDirMetaStore.WriteInitial(dataDir, log);
     }
 
-    private static void CreateDir(string path)
+    private static void CreateDir(string path, ILogger logger)
     {
+        bool existed = Directory.Exists(path);
         if (OperatingSystem.IsWindows())
         {
             Directory.CreateDirectory(path);
@@ -35,5 +43,7 @@ public static class CoveTree
             File.SetUnixFileMode(path,
                 UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
         }
+        if (!existed)
+            logger.CoveTreeDirCreated(path);
     }
 }

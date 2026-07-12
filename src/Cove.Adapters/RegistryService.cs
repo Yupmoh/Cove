@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.Extensions.Logging;
 
 namespace Cove.Adapters;
 
@@ -34,27 +35,31 @@ public sealed class RegistryService
     private readonly TimeSpan _cacheTtl;
     private readonly string? _cachePath;
     private readonly IRegistryFetcher? _fetcher;
+    private readonly ILogger? _logger;
 
-    public RegistryService(TimeSpan? cacheTtl = null)
+    public RegistryService(TimeSpan? cacheTtl = null, ILogger? logger = null)
     {
         _cacheTtl = cacheTtl ?? TimeSpan.FromHours(1);
+        _logger = logger;
     }
 
-    public RegistryService(string cachePath, IRegistryFetcher fetcher, TimeSpan? cacheTtl = null)
+    public RegistryService(string cachePath, IRegistryFetcher fetcher, TimeSpan? cacheTtl = null, ILogger? logger = null)
     {
         _cachePath = cachePath;
         _fetcher = fetcher;
         _cacheTtl = cacheTtl ?? TimeSpan.FromHours(1);
+        _logger = logger;
     }
 
-    public static Registry? ParseRegistry(string json)
+    public static Registry? ParseRegistry(string json, ILogger? logger = null)
     {
         try
         {
             return JsonSerializer.Deserialize(json, AdaptersJsonContext.Default.Registry);
         }
-        catch (JsonException)
+        catch (JsonException ex)
         {
+            logger?.RegistryParseFailed(ex.Message);
             return null;
         }
     }
@@ -70,7 +75,10 @@ public sealed class RegistryService
     public async Task<Registry?> FetchAsync(CancellationToken cancellationToken = default)
     {
         if (GetCached() is { } memCached)
+        {
+            _logger?.RegistryServedFromCache("memory");
             return memCached;
+        }
 
         Registry? diskCached = null;
         if (_cachePath is not null && File.Exists(_cachePath))
@@ -81,15 +89,16 @@ public sealed class RegistryService
                 if (diskAge < _cacheTtl)
                 {
                     var diskJson = await File.ReadAllTextAsync(_cachePath, cancellationToken).ConfigureAwait(false);
-                    diskCached = ParseRegistry(diskJson);
+                    diskCached = ParseRegistry(diskJson, _logger);
                     if (diskCached is not null)
                     {
                         SetCache(diskCached);
+                        _logger?.RegistryServedFromCache("disk");
                         return diskCached;
                     }
                 }
             }
-            catch (IOException) { }
+            catch (IOException ex) { _logger?.RegistryDiskReadFailed(_cachePath, ex.Message); }
         }
 
         if (_fetcher is not null)
@@ -101,14 +110,15 @@ public sealed class RegistryService
                 fetchedJson = await _fetcher.FetchAsync(cancellationToken).ConfigureAwait(false);
                 fetchSucceeded = fetchedJson is not null;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                _logger?.RegistryFetchThrew(ex.Message);
                 fetchSucceeded = false;
             }
 
             if (fetchSucceeded && fetchedJson is not null)
             {
-                var reg = ParseRegistry(fetchedJson);
+                var reg = ParseRegistry(fetchedJson, _logger);
                 if (reg is not null)
                 {
                     SetCache(reg);
@@ -120,7 +130,7 @@ public sealed class RegistryService
                             if (dir is not null) Directory.CreateDirectory(dir);
                             await File.WriteAllTextAsync(_cachePath, fetchedJson, cancellationToken).ConfigureAwait(false);
                         }
-                        catch (IOException) { }
+                        catch (IOException ex) { _logger?.RegistryCacheWriteFailed(_cachePath, ex.Message); }
                     }
                     return reg;
                 }
@@ -133,14 +143,15 @@ public sealed class RegistryService
                 try
                 {
                     var staleJson = await File.ReadAllTextAsync(_cachePath, cancellationToken).ConfigureAwait(false);
-                    var staleReg = ParseRegistry(staleJson);
+                    var staleReg = ParseRegistry(staleJson, _logger);
                     if (staleReg is not null)
                     {
                         SetCache(staleReg);
+                        _logger?.RegistryServedFromCache("stale-disk");
                         return staleReg;
                     }
                 }
-                catch (IOException) { }
+                catch (IOException ex) { _logger?.RegistryStaleReadFailed(_cachePath, ex.Message); }
             }
             if (_cached is not null)
                 return _cached;

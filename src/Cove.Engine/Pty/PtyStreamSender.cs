@@ -1,5 +1,6 @@
 using System;
 using Cove.Protocol;
+using Microsoft.Extensions.Logging;
 
 namespace Cove.Engine.Pty;
 
@@ -10,6 +11,8 @@ public sealed class PtyStreamSender
     private readonly PtyRingBuffer _ring;
     private readonly IByteStreamFrameSink _sink;
     private readonly byte[] _scratch;
+    private readonly ILogger? _logger;
+    private readonly string _nookId;
 
     private long _sentOffset;
     private long _ackOffset;
@@ -17,8 +20,9 @@ public sealed class PtyStreamSender
     private int _exitCode = -1;
     private bool _ended;
     private bool _faulted;
+    private bool _firstDelivered;
 
-    public PtyStreamSender(ulong streamId, long sessionId, PtyRingBuffer ring, long baseOffset, IByteStreamFrameSink sink)
+    public PtyStreamSender(ulong streamId, long sessionId, PtyRingBuffer ring, long baseOffset, IByteStreamFrameSink sink, string? nookId = null, ILogger? logger = null)
     {
         if (streamId == 0)
             throw new ArgumentOutOfRangeException(nameof(streamId), "byte-stream id must be >= 1.");
@@ -30,6 +34,8 @@ public sealed class PtyStreamSender
         _sessionId = sessionId;
         _ring = ring;
         _sink = sink;
+        _logger = logger;
+        _nookId = string.IsNullOrEmpty(nookId) ? sessionId.ToString(System.Globalization.CultureInfo.InvariantCulture) : nookId!;
         _scratch = new byte[ProtocolConstants.StreamDataMaxRawBytes];
         _sentOffset = baseOffset;
         _ackOffset = baseOffset;
@@ -56,8 +62,9 @@ public sealed class PtyStreamSender
         if (ack < _ackOffset || ack > _sentOffset)
         {
             _faulted = true;
-            _sink.SendError(_streamId, "invalid_credit",
-                $"ackOffset {ack} out of range [{_ackOffset},{_sentOffset}] on stream {_streamId}");
+            var message = $"ackOffset {ack} out of range [{_ackOffset},{_sentOffset}] on stream {_streamId}";
+            _logger?.DeliveryError(_nookId, _streamId, "invalid_credit", message);
+            _sink.SendError(_streamId, "invalid_credit", message);
             return;
         }
         _ackOffset = ack;
@@ -77,6 +84,7 @@ public sealed class PtyStreamSender
             if (_sentOffset < tail)
             {
                 long newBase = tail;
+                _logger?.DeliveryResync(_nookId, _streamId, (ulong)newBase);
                 _sink.SendResync(_streamId, (ulong)newBase);
                 _sentOffset = newBase;
                 _ackOffset = newBase;
@@ -95,6 +103,7 @@ public sealed class PtyStreamSender
                 if (result.Underrun)
                 {
                     long nb = result.NextOffset;
+                    _logger?.DeliveryResync(_nookId, _streamId, (ulong)nb);
                     _sink.SendResync(_streamId, (ulong)nb);
                     _sentOffset = nb;
                     _ackOffset = nb;
@@ -102,6 +111,15 @@ public sealed class PtyStreamSender
                 }
                 if (result.BytesCopied == 0)
                     return;
+                if (!_firstDelivered)
+                {
+                    _firstDelivered = true;
+                    _logger?.DeliveryFirst(_nookId, _streamId, (ulong)_sentOffset, result.BytesCopied);
+                }
+                else
+                {
+                    _logger?.DeliveryData(_nookId, _streamId, (ulong)_sentOffset, result.BytesCopied);
+                }
                 _sink.SendStreamData(_streamId, (ulong)_sentOffset, _scratch.AsSpan(0, result.BytesCopied));
                 _sentOffset = result.NextOffset;
                 continue;
@@ -109,6 +127,7 @@ public sealed class PtyStreamSender
 
             if (_childExited)
             {
+                _logger?.DeliveryEnd(_nookId, _streamId, (ulong)head, _exitCode);
                 _sink.SendStreamEnd(_streamId, (ulong)head, _exitCode);
                 _ended = true;
             }

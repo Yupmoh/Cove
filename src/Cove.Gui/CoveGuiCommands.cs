@@ -1,13 +1,16 @@
 using System.Text.Json;
 using Cove.Protocol;
+using Microsoft.Extensions.Logging;
 using Ryn.Ipc;
 
 namespace Cove.Gui;
 
 public sealed class CoveGuiCommands
 {
+    private const int MaxFrontendMessageLength = 2000;
     private readonly EngineLink _link;
-    public CoveGuiCommands(EngineLink link) => _link = link;
+    private readonly ILogger<CoveGuiCommands> _log;
+    public CoveGuiCommands(EngineLink link, ILogger<CoveGuiCommands> log) { _link = link; _log = log; }
 
     [RynCommand("app.nookList")]
     public async ValueTask<string> NookList(CancellationToken ct)
@@ -30,8 +33,28 @@ public sealed class CoveGuiCommands
         var stamp = System.DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmss");
         var safeSlug = string.IsNullOrWhiteSpace(slug) ? "ui-feedback" : slug;
         var path = System.IO.Path.Combine(dir, $"{stamp}-{safeSlug}.json");
-        System.IO.File.WriteAllText(path, json);
+        try
+        {
+            System.IO.File.WriteAllText(path, json);
+        }
+        catch (System.Exception ex)
+        {
+            _log.FeedbackSaveFailed(safeSlug, ex.Message);
+            throw;
+        }
         return ValueTask.FromResult($"{{\"path\":\"{System.Text.Json.JsonEncodedText.Encode(path)}\"}}");
+    }
+
+    [RynCommand("app.frontendLog")]
+    public void FrontendLog(string level, string message)
+    {
+        var safe = message.Length > MaxFrontendMessageLength ? message[..MaxFrontendMessageLength] : message;
+        switch (level)
+        {
+            case "error": _log.FrontendError(safe); break;
+            case "warn": _log.FrontendWarn(safe); break;
+            default: _log.FrontendInfo(safe); break;
+        }
     }
 
     private static Cove.Platform.CoveChannel ParseChannel(string channel) => channel switch
@@ -143,14 +166,22 @@ public sealed class CoveGuiCommands
             using var doc = JsonDocument.Parse(argsJson);
             args = doc.RootElement.Clone();
         }
+        _log.CommandInvoked(uri);
         var r = await _link.RequestAsync(uri, args, ct);
         if (!r.Ok)
-            throw new InvalidOperationException(r.Error?.Message ?? r.Error?.Code ?? "engine_error");
+        {
+            var error = r.Error?.Message ?? r.Error?.Code ?? "engine_error";
+            _log.CommandEngineFailed(uri, error);
+            throw new InvalidOperationException(error);
+        }
         return r.Data is { } d ? d.GetRawText() : "{}";
     }
     private async ValueTask<string> Call(string uri, JsonElement? p, CancellationToken ct)
     {
+        _log.CommandInvoked(uri);
         var r = await _link.RequestAsync(uri, p, ct);
+        if (!r.Ok)
+            _log.CommandEngineFailed(uri, r.Error?.Message ?? r.Error?.Code ?? "engine_error");
         return r.Data is { } d ? d.GetRawText() : "{}";
     }
 }

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Microsoft.Extensions.Logging;
 
 namespace Cove.Adapters;
 
@@ -11,7 +12,7 @@ public static class ManifestValidator
     private static readonly Regex AccentRegex = new(@"^#[0-9A-Fa-f]{6}$", RegexOptions.Compiled);
     private static readonly Regex SemverRegex = new(@"^\d+\.\d+\.\d+", RegexOptions.Compiled);
 
-    public static List<ValidationError> Validate(AdapterManifest m)
+    public static List<ValidationError> Validate(AdapterManifest m, ILogger? logger = null)
     {
         var errors = new List<ValidationError>();
 
@@ -50,21 +51,30 @@ public static class ManifestValidator
                     || (!string.IsNullOrEmpty(kv.Value.Script) && !string.IsNullOrEmpty(kv.Value.Static)))
                     errors.Add(new ValidationError($"methods.{kv.Key}", "script_xor_static", "method must have script XOR static"));
 
+        var adapterName = string.IsNullOrWhiteSpace(m.Name) ? "(unnamed)" : m.Name;
+        foreach (var error in errors)
+            logger?.ManifestValidationRuleFailed(adapterName, error.Field, error.Code);
+        logger?.ManifestValidationSummary(adapterName, errors.Count);
+
         return errors;
     }
 
-    public static (AdapterManifest? Manifest, List<ValidationError> Errors) Parse(string json)
+    public static (AdapterManifest? Manifest, List<ValidationError> Errors) Parse(string json, ILogger? logger = null)
     {
         try
         {
             var manifest = JsonSerializer.Deserialize(json, AdaptersJsonContext.Default.AdapterManifest);
             if (manifest is null)
+            {
+                logger?.ManifestParseFailed("manifest parsed to null");
                 return (null, [new ValidationError("root", "null", "manifest parsed to null")]);
-            var errors = Validate(manifest);
+            }
+            var errors = Validate(manifest, logger);
             return errors.Count > 0 ? (null, errors) : (manifest, errors);
         }
         catch (JsonException ex)
         {
+            logger?.ManifestParseFailed(ex.Message);
             return (null, [new ValidationError("root", "json_error", ex.Message)]);
         }
     }

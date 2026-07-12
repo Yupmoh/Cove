@@ -1,4 +1,5 @@
 using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.Logging;
 
 namespace Cove.Persistence;
 
@@ -10,7 +11,7 @@ public sealed class SqliteMigration
 
 public static class SqliteMigrationRunner
 {
-    public static int Apply(SqliteConnection connection, IReadOnlyList<SqliteMigration> migrations)
+    public static int Apply(SqliteConnection connection, IReadOnlyList<SqliteMigration> migrations, ILogger? logger = null)
     {
         var ordered = new List<SqliteMigration>(migrations);
         ordered.Sort(static (a, b) => a.Version.CompareTo(b.Version));
@@ -22,6 +23,7 @@ public static class SqliteMigrationRunner
             current = Convert.ToInt64(read.ExecuteScalar() ?? 0L);
         }
 
+        var startVersion = current;
         int applied = 0;
         foreach (var migration in ordered)
         {
@@ -44,8 +46,10 @@ public static class SqliteMigrationRunner
             transaction.Commit();
             current = migration.Version;
             applied++;
+            logger?.SqliteMigrationApplied(migration.Version);
         }
 
+        logger?.SqliteMigrationsComplete(startVersion, current, applied);
         return applied;
     }
 }

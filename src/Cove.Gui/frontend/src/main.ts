@@ -61,6 +61,11 @@ import { nextUpdateState, updateButtonLabel, updateAffordanceVisible, type Updat
 import { initialZenState, toggleZen, type ChromeVisibility, type ZenState } from "./zen-mode";
 import { eventToChord, buildChordMap, resolveDispatch, defaultBindings, type ResolvedBinding } from "./keymap-dispatch";
 import { enqueueNookWrite } from "./write-queue";
+import { installConsoleCapture } from "./console-capture";
+
+installConsoleCapture((level, message) => {
+  window.__ryn.invoke("app.frontendLog", { level, message }).catch(() => {});
+});
 
 const RYN_MENUBAR_EVENTS_BROKEN = false;
 import { initHud, toggleHud, recordFrame, hudMetrics, readJsHeapBytes, hudLines, type HudState, type JsHeapProbe } from "./perf-hud";

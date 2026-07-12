@@ -26,23 +26,31 @@ public sealed class UnixPtyHost : IPtyHost
             throw new PlatformNotSupportedException(
                 "cove_pty native shim not found or ABI mismatch; expected libcove_pty next to the binary.");
 
-        string path = ResolveExecutable(request.Command);
+        ushort cols = (ushort)Math.Clamp(request.Cols, PtyConstants.MinCols, PtyConstants.MaxCols);
+        ushort rows = (ushort)Math.Clamp(request.Rows, PtyConstants.MinRows, PtyConstants.MaxRows);
+        _logger.UnixSpawnBegin(request.Command, request.WorkingDirectory, cols, rows);
+
+        string path = ResolveExecutable(request.Command, _logger);
         var argv = new List<string> { request.Command };
         argv.AddRange(request.Args);
         var envp = BuildEnvironment(request.Environment);
-
-        ushort cols = (ushort)Math.Clamp(request.Cols, PtyConstants.MinCols, PtyConstants.MaxCols);
-        ushort rows = (ushort)Math.Clamp(request.Rows, PtyConstants.MinRows, PtyConstants.MaxRows);
+        _logger.UnixEnvironmentBuilt(envp.Count);
 
         using var argvNative = new NativeStringArray(argv);
         using var envpNative = new NativeStringArray(envp);
 
+        _logger.UnixForkptyBegin(path);
         int rc = CovePtyNative.Spawn(path, argvNative.Pointer, envpNative.Pointer,
             request.WorkingDirectory, cols, rows, out int masterFd, out int pid);
         if (rc != 0)
+        {
+            _logger.UnixForkptyFailed(path, -rc);
             throw new PtySpawnException($"forkpty failed for '{path}' (errno {-rc}).");
+        }
 
         long id = Interlocked.Increment(ref _nextSessionId);
+        _logger.UnixMasterFdReady(id, masterFd >= 0);
+        _logger.SessionSpawned(id, request.Command, request.WorkingDirectory, pid, cols, rows);
         return new UnixPtySession(id, masterFd, pid, _logger);
     }
 
@@ -53,24 +61,29 @@ public sealed class UnixPtyHost : IPtyHost
             int v = CovePtyNative.AbiVersion();
             if (v != PtyConstants.AbiVersion)
             {
-                logger.LogError("cove_pty ABI mismatch: got {Got}, expected {Expected}.", v, PtyConstants.AbiVersion);
+                logger.UnixAbiMismatch(v, PtyConstants.AbiVersion);
                 return false;
             }
+            logger.UnixAbiOk(v);
             return true;
         }
         catch (DllNotFoundException ex)
         {
-            logger.LogError(ex, "cove_pty native shim not found next to the binary.");
+            logger.UnixNativeLibNotFound(ex.Message);
             return false;
         }
     }
 
-    private static string ResolveExecutable(string command)
+    private static string ResolveExecutable(string command, ILogger logger)
     {
         if (Path.IsPathRooted(command))
         {
             if (!File.Exists(command))
+            {
+                logger.UnixExecutableNotFound(command, "rooted path does not exist");
                 throw new PtySpawnException($"executable not found: {command}");
+            }
+            logger.UnixExecutableResolved(command, command);
             return command;
         }
 
@@ -82,9 +95,13 @@ public sealed class UnixPtyHost : IPtyHost
                 if (dir.Length == 0) continue;
                 string candidate = Path.Combine(dir, command);
                 if (File.Exists(candidate))
+                {
+                    logger.UnixExecutableResolved(command, candidate);
                     return candidate;
+                }
             }
         }
+        logger.UnixExecutableNotFound(command, "not found on PATH");
         throw new PtySpawnException($"executable '{command}' not found on PATH.");
     }
 

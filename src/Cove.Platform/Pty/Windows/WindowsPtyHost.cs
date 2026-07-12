@@ -24,32 +24,36 @@ public sealed class WindowsPtyHost : IPtyHost
 
         ushort cols = (ushort)Math.Clamp(request.Cols, PtyConstants.MinCols, PtyConstants.MaxCols);
         ushort rows = (ushort)Math.Clamp(request.Rows, PtyConstants.MinRows, PtyConstants.MaxRows);
+        _logger.WinSpawnBegin(request.Command, request.WorkingDirectory, cols, rows);
 
         if (!ConPtyNative.CreatePipe(out SafeFileHandle inputRead, out SafeFileHandle inputWrite, IntPtr.Zero, 0))
             throw SpawnFailure(request, "CreatePipe(input)");
+        _logger.WinPipeCreated("input", !inputRead.IsInvalid && !inputWrite.IsInvalid);
         if (!ConPtyNative.CreatePipe(out SafeFileHandle outputRead, out SafeFileHandle outputWrite, IntPtr.Zero, 0))
         {
             inputRead.Dispose();
             inputWrite.Dispose();
             throw SpawnFailure(request, "CreatePipe(output)");
         }
+        _logger.WinPipeCreated("output", !outputRead.IsInvalid && !outputWrite.IsInvalid);
 
         var size = new ConPtyNative.Coord { X = (short)cols, Y = (short)rows };
         int hr = ConPtyNative.CreatePseudoConsole(size, inputRead, outputWrite, 0, out IntPtr pseudoConsole);
         inputRead.Dispose();
         outputWrite.Dispose();
+        _logger.WinPseudoConsoleCreated(hr, pseudoConsole != IntPtr.Zero);
         if (hr != 0)
         {
             inputWrite.Dispose();
             outputRead.Dispose();
-            _logger.LogError("conpty CreatePseudoConsole failed for '{Command}' (hr 0x{Hr:X8}).", request.Command, hr);
+            _logger.WinPseudoConsoleFailed(request.Command, hr);
             throw new PtySpawnException($"CreatePseudoConsole failed for '{request.Command}' (hr 0x{hr:X8}).");
         }
 
         IntPtr attributeList = IntPtr.Zero;
         try
         {
-            attributeList = AllocateAttributeList(pseudoConsole, request);
+            attributeList = AllocateAttributeList(pseudoConsole, request, _logger);
 
             var startupInfo = new ConPtyNative.StartupInfoEx
             {
@@ -62,6 +66,7 @@ public sealed class WindowsPtyHost : IPtyHost
             string commandLine = WindowsCommandLine.Build(argv);
             char[] environmentBlock = WindowsEnvironmentBlock.BuildBlock(request.Environment);
             uint creationFlags = ConPtyNative.EXTENDED_STARTUPINFO_PRESENT | ConPtyNative.CREATE_UNICODE_ENVIRONMENT;
+            _logger.WinCreateProcessBegin(commandLine.Length, creationFlags);
 
             bool created;
             ConPtyNative.ProcessInformation processInfo;
@@ -89,11 +94,13 @@ public sealed class WindowsPtyHost : IPtyHost
                 ConPtyNative.ClosePseudoConsole(pseudoConsole);
                 inputWrite.Dispose();
                 outputRead.Dispose();
-                _logger.LogError("conpty CreateProcessW failed for '{Command}' (error {Error}).", request.Command, error);
+                _logger.WinCreateProcessFailed(request.Command, error);
                 throw new PtySpawnException($"CreateProcessW failed for '{request.Command}' (error {error}).");
             }
 
+            _logger.WinCreateProcessSucceeded(request.Command, processInfo.dwProcessId);
             long id = Interlocked.Increment(ref _nextSessionId);
+            _logger.SessionSpawned(id, request.Command, request.WorkingDirectory, processInfo.dwProcessId, cols, rows);
             return new WindowsPtySession(
                 id,
                 pseudoConsole,
@@ -114,16 +121,18 @@ public sealed class WindowsPtyHost : IPtyHost
         }
     }
 
-    private static IntPtr AllocateAttributeList(IntPtr pseudoConsole, PtySpawnRequest request)
+    private static IntPtr AllocateAttributeList(IntPtr pseudoConsole, PtySpawnRequest request, ILogger logger)
     {
         nint listSize = 0;
         ConPtyNative.InitializeProcThreadAttributeList(IntPtr.Zero, 1, 0, ref listSize);
+        logger.WinAttributeListInitialized(listSize);
         IntPtr attributeList = Marshal.AllocHGlobal(listSize);
         if (!ConPtyNative.InitializeProcThreadAttributeList(attributeList, 1, 0, ref listSize))
         {
             int error = Marshal.GetLastPInvokeError();
             Marshal.FreeHGlobal(attributeList);
             ConPtyNative.ClosePseudoConsole(pseudoConsole);
+            logger.WinAttributeListInitFailed(request.Command, error);
             throw new PtySpawnException($"InitializeProcThreadAttributeList failed for '{request.Command}' (error {error}).");
         }
         if (!ConPtyNative.UpdateProcThreadAttribute(
@@ -139,15 +148,17 @@ public sealed class WindowsPtyHost : IPtyHost
             ConPtyNative.DeleteProcThreadAttributeList(attributeList);
             Marshal.FreeHGlobal(attributeList);
             ConPtyNative.ClosePseudoConsole(pseudoConsole);
+            logger.WinAttributeListUpdateFailed(request.Command, error);
             throw new PtySpawnException($"UpdateProcThreadAttribute failed for '{request.Command}' (error {error}).");
         }
+        logger.WinAttributeListUpdated(request.Command);
         return attributeList;
     }
 
     private PtySpawnException SpawnFailure(PtySpawnRequest request, string stage)
     {
         int error = Marshal.GetLastPInvokeError();
-        _logger.LogError("conpty {Stage} failed for '{Command}' (error {Error}).", stage, request.Command, error);
+        _logger.WinPipeCreateFailed(stage, request.Command, error);
         return new PtySpawnException($"{stage} failed for '{request.Command}' (error {error}).");
     }
 }

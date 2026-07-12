@@ -55,6 +55,7 @@ public sealed class NookRegistry : IDisposable, Cove.Engine.Agents.INookWriter
         string? inherited = (!string.IsNullOrEmpty(p.InheritCwdFrom) && TryGet(p.InheritCwdFrom!, out var src)) ? src.Cwd : null;
         string? fallback = !string.IsNullOrEmpty(defaultCwd) ? defaultCwd : _projectDir;
         string cwd = ResolveWorkingDirectory(inherited, p.Cwd, fallback);
+        _logger.NookSpawn(nookId, p.Command, p.Adapter ?? "", p.Yolo, !string.IsNullOrEmpty(p.SessionId), p.Cols, p.Rows);
         var info = SpawnCore(nookId, p.Command, p.Args ?? System.Array.Empty<string>(), cwd, p.Cols, p.Rows, p.Env);
         Tag(nookId, p.Adapter, p.AgentName);
         return info;
@@ -62,6 +63,7 @@ public sealed class NookRegistry : IDisposable, Cove.Engine.Agents.INookWriter
 
     public NookInfo RespawnAs(string nookId, string command, string[] args, string cwd, int cols, int rows, byte[]? priorScrollback = null, string? adapter = null, string? agentName = null)
     {
+        _logger.NookRespawn(nookId, command, adapter ?? "");
         var info = SpawnCore(nookId, command, args, cwd, cols, rows, null, priorScrollback);
         Tag(nookId, adapter, agentName);
         return info;
@@ -96,11 +98,12 @@ public sealed class NookRegistry : IDisposable, Cove.Engine.Agents.INookWriter
             Rows = rows,
         };
         IPtySession session = _host.Spawn(request);
+        _logger.NookSpawnEnv(nookId, envDict?.Count ?? 0, args.Length, cwd);
         var ring = new PtyRingBuffer();
         if (priorScrollback is { Length: > 0 })
             ring.Append(priorScrollback);
         var signal = new PtyRingSignal();
-        var reader = new PtySessionReader(session, ring, signal, _logger);
+        var reader = new PtySessionReader(session, ring, signal, _logger, nookId);
         var nook = new NookSession
         {
             NookId = nookId,
@@ -165,7 +168,11 @@ public sealed class NookRegistry : IDisposable, Cove.Engine.Agents.INookWriter
     public bool Write(string nookId, ReadOnlySpan<byte> data)
     {
         if (!TryGet(nookId, out NookSession nook))
+        {
+            _logger.NookWriteUnknown(nookId);
             return false;
+        }
+        _logger.NookWrite(nookId, data.Length);
         nook.Session.Write(data);
         return true;
     }
@@ -173,7 +180,10 @@ public sealed class NookRegistry : IDisposable, Cove.Engine.Agents.INookWriter
     public bool Resize(string nookId, int cols, int rows)
     {
         if (!TryGet(nookId, out NookSession nook))
+        {
+            _logger.NookResizeUnknown(nookId);
             return false;
+        }
         nook.Session.Resize(cols, rows);
         nook.Cols = cols;
         nook.Rows = rows;
@@ -186,10 +196,14 @@ public sealed class NookRegistry : IDisposable, Cove.Engine.Agents.INookWriter
         lock (_sync)
         {
             if (!_nooks.TryGetValue(nookId, out nook))
+            {
+                _logger.NookKillUnknown(nookId);
                 return false;
+            }
             _nooks.Remove(nookId);
         }
-        Terminate(nook);
+        _logger.NookKill(nookId);
+        Terminate(nook, _logger);
         return true;
     }
 
@@ -198,9 +212,12 @@ public sealed class NookRegistry : IDisposable, Cove.Engine.Agents.INookWriter
         lock (_sync)
         {
             if (!_nooks.TryGetValue(nookId, out var nook))
+            {
+                _logger.NookKillUnknown(nookId);
                 return false;
+            }
             try { return nook.Session.Signal(Cove.Platform.Pty.PtyConstants.SigTerm); }
-            catch { return false; }
+            catch (System.Exception ex) { _logger.NookStopFailed(nookId, ex.Message); return false; }
         }
     }
 
@@ -262,11 +279,11 @@ public sealed class NookRegistry : IDisposable, Cove.Engine.Agents.INookWriter
         return res.BytesCopied == len ? buf : buf[..res.BytesCopied];
     }
 
-    private static void Terminate(NookSession nook)
+    private static void Terminate(NookSession nook, ILogger logger)
     {
-        try { nook.Session.Kill(); } catch { }
-        try { nook.Reader.Dispose(); } catch { }
-        try { nook.Session.Dispose(); } catch { }
+        try { nook.Session.Kill(); } catch (System.Exception ex) { logger.NookTerminateStepFailed(nook.NookId, "kill", ex.Message); }
+        try { nook.Reader.Dispose(); } catch (System.Exception ex) { logger.NookTerminateStepFailed(nook.NookId, "reader-dispose", ex.Message); }
+        try { nook.Session.Dispose(); } catch (System.Exception ex) { logger.NookTerminateStepFailed(nook.NookId, "session-dispose", ex.Message); }
     }
 
     public void Dispose()
@@ -279,6 +296,6 @@ public sealed class NookRegistry : IDisposable, Cove.Engine.Agents.INookWriter
             _nooks.Clear();
         }
         foreach (NookSession nook in all)
-            Terminate(nook);
+            Terminate(nook, _logger);
     }
 }
