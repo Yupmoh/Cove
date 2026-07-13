@@ -43,6 +43,11 @@ import { parseQuery, filterAndSort, MruTracker, cycleCategory, categoryLabel, ty
 import { buildEmptyState, EmptyStateMessages } from "./empty-states";
 import { brandLogoAt, nextBrandIndex, parseBrandIndex } from "./brand";
 import { adapterStatusMeta, toolsSubtitle, retentionChipVisible, retentionChipLabel, type ToolsAdapter } from "./tools-tab";
+import {
+  isValidProfileSlug, profilePickerLabel, firstDefault,
+  type LaunchProfileListItem, type LaunchProfileListResult, type LaunchProfileDetail,
+  type LauncherOptionsResponse, type CreateProfileInput, type UpdateProfileInput,
+} from "./profiles";
 import { DEFAULT_DRAFT, draftFromTheme, themeFromDraft, cssVarsFromTheme, xtermThemeFromDto, isCustom, isBuiltin, canSaveDraft, canDelete, isValidHex, contrastRatio, contrastTier, THEME_COLOR_FIELDS, type ThemeDto, type ThemeDraft } from "./theme-editor";
 import { categorizeBindings, isReservedChord, isValidChord, chordDisplay, canRecordChord, normalizeChord as normalizeChordStr, type KeybindDto } from "./keyboard-editor";
 import { ONBOARDING_STEPS, INITIAL_ONBOARDING_STATE, nextStep, prevStep, dismiss as dismissOnboarding, currentStepData, isLastStep, isFirstStep, progressPercent, setDefaultBayDir, setAdapterYolo, setBackdrop as setOnboardingBackdrop, setTheme as setOnboardingTheme, setAgentChimes as setOnboardingAgentChimes, shouldShowOnboarding, onboardingSeenFromConfig, ONBOARDING_COMPLETED_KEY, type OnboardingState } from "./onboarding";
@@ -3162,8 +3167,265 @@ function buildToolsCard(a: ToolsAdapter, container: HTMLElement): HTMLElement {
 
   if (retentionChipVisible(a.retention)) body.appendChild(buildRetentionChip(a, container));
 
+  void buildProfilesSection(a, container).then((el) => body.appendChild(el));
+
   card.appendChild(body);
   return card;
+}
+
+const launcherProfileSlugKey = (adapter: string) => `cove:launcher-profile:${adapter}`;
+
+function launcherProfileSlug(adapter: string): string {
+  return localStorage.getItem(launcherProfileSlugKey(adapter)) || "default";
+}
+
+interface ProfileListResult { profiles: LaunchProfileListItem[] }
+
+async function buildProfilesSection(a: ToolsAdapter, container: HTMLElement): Promise<HTMLElement> {
+  const section = document.createElement("div");
+  section.className = "tools-profiles";
+  section.style.cssText = "margin-top:10px;border-top:1px solid var(--border);padding-top:8px;";
+
+  const header = document.createElement("div");
+  header.style.cssText = "display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;";
+  const label = document.createElement("span");
+  label.className = "tools-subtitle";
+  label.textContent = "Launch profiles";
+  header.appendChild(label);
+
+  const newBtn = document.createElement("button");
+  newBtn.className = "diag-btn";
+  newBtn.style.cssText = "margin-top:0;padding:2px 8px;font-size:11px;";
+  newBtn.textContent = "New profile";
+  newBtn.addEventListener("click", () => openProfileEditor(a, null, container));
+  header.appendChild(newBtn);
+  section.appendChild(header);
+
+  const listEl = document.createElement("div");
+  listEl.style.cssText = "display:flex;flex-direction:column;gap:4px;";
+  section.appendChild(listEl);
+
+  try {
+    const result = await invoke<ProfileListResult>("cove://commands/launch-profile.list", { adapter: a.name });
+    renderProfileList(a, result.profiles ?? [], listEl, container);
+  } catch (err) {
+    console.warn("launch-profile.list failed", a.name, err);
+    const note = document.createElement("div");
+    note.className = "tools-subtitle";
+    note.textContent = "profiles unavailable";
+    listEl.appendChild(note);
+  }
+  return section;
+}
+
+function renderProfileList(
+  a: ToolsAdapter,
+  profiles: LaunchProfileListItem[],
+  listEl: HTMLElement,
+  container: HTMLElement,
+): void {
+  listEl.innerHTML = "";
+  if (profiles.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "tools-subtitle";
+    empty.textContent = "no profiles — using defaults";
+    listEl.appendChild(empty);
+    return;
+  }
+  for (const p of profiles) {
+    const row = document.createElement("div");
+    row.style.cssText = "display:flex;align-items:center;gap:6px;font-size:12px;";
+    const radio = document.createElement("input");
+    radio.type = "radio";
+    radio.name = `profile-radio-${a.name}`;
+    radio.checked = p.isDefault || launcherProfileSlug(a.name) === p.slug;
+    radio.addEventListener("change", () => {
+      localStorage.setItem(launcherProfileSlugKey(a.name), p.slug);
+      void invoke("cove://commands/launch-profile.set-default", { adapter: a.name, slug: p.slug }).catch(() => {});
+    });
+    row.appendChild(radio);
+    const name = document.createElement("span");
+    name.textContent = profilePickerLabel(p);
+    name.style.flex = "1";
+    row.appendChild(name);
+    const editBtn = document.createElement("button");
+    editBtn.className = "diag-btn";
+    editBtn.style.cssText = "margin-top:0;padding:1px 6px;font-size:11px;";
+    editBtn.textContent = "Edit";
+    editBtn.addEventListener("click", () => openProfileEditor(a, p.slug, container));
+    row.appendChild(editBtn);
+    if (profiles.length > 1) {
+      const delBtn = document.createElement("button");
+      delBtn.className = "diag-btn";
+      delBtn.style.cssText = "margin-top:0;padding:1px 6px;font-size:11px;";
+      delBtn.textContent = "Delete";
+      delBtn.addEventListener("click", async () => {
+        await invoke("cove://commands/launch-profile.delete", { adapter: a.name, slug: p.slug });
+        await renderToolsTab(container);
+      });
+      row.appendChild(delBtn);
+    }
+    listEl.appendChild(row);
+  }
+}
+
+function openProfileEditor(a: ToolsAdapter, slug: string | null, container: HTMLElement): void {
+  const overlay = document.createElement("div");
+  overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000;";
+  const dialog = document.createElement("div");
+  dialog.className = "settings-dialog";
+  dialog.style.cssText = "background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:16px;min-width:380px;max-width:520px;display:flex;flex-direction:column;gap:10px;";
+  dialog.addEventListener("click", (e) => e.stopPropagation());
+
+  const title = document.createElement("div");
+  title.style.fontWeight = "600";
+  title.textContent = slug ? `Edit profile · ${slug}` : `New profile · ${a.name}`;
+  dialog.appendChild(title);
+
+  const slugInput = textRow(dialog, "Slug", slug ?? "", "e.g. glm-umans");
+  slugInput.disabled = slug !== null;
+  const nameInput = textRow(dialog, "Name", "", "e.g. GLM Umans");
+  const modelInput = textRow(dialog, "Model", "", "e.g. glm, opus, default");
+  const effortInput = textRow(dialog, "Effort", "", "e.g. low, medium, high, max");
+  const agentInput = textRow(dialog, "Agent", "", "optional agent slug");
+
+  const envLabel = document.createElement("div");
+  envLabel.className = "tools-subtitle";
+  envLabel.textContent = "Environment variables (KEY=VALUE, one per line)";
+  dialog.appendChild(envLabel);
+  const envArea = document.createElement("textarea");
+  envArea.rows = 4;
+  envArea.style.cssText = "width:100%;font-family:var(--font-mono,monospace);font-size:12px;background:var(--bg-alt);color:var(--fg);border:1px solid var(--border);border-radius:4px;padding:4px;";
+  dialog.appendChild(envArea);
+
+  const argsLabel = document.createElement("div");
+  argsLabel.className = "tools-subtitle";
+  argsLabel.textContent = "Extra CLI args (one per line)";
+  dialog.appendChild(argsLabel);
+  const argsArea = document.createElement("textarea");
+  argsArea.rows = 3;
+  argsArea.style.cssText = "width:100%;font-family:var(--font-mono,monospace);font-size:12px;background:var(--bg-alt);color:var(--fg);border:1px solid var(--border);border-radius:4px;padding:4px;";
+  dialog.appendChild(argsArea);
+
+  const defaultCb = document.createElement("input");
+  defaultCb.type = "checkbox";
+  const defaultLabel = document.createElement("label");
+  defaultLabel.style.cssText = "display:flex;align-items:center;gap:6px;font-size:12px;";
+  defaultLabel.appendChild(defaultCb);
+  const defaultText = document.createElement("span");
+  defaultText.textContent = "Set as default profile";
+  defaultLabel.appendChild(defaultText);
+  dialog.appendChild(defaultLabel);
+
+  const errorEl = document.createElement("div");
+  errorEl.style.cssText = "color:#e0a44a;font-size:11px;min-height:14px;";
+  dialog.appendChild(errorEl);
+
+  const buttonRow = document.createElement("div");
+  buttonRow.style.cssText = "display:flex;gap:8px;justify-content:flex-end;";
+  const cancelBtn = document.createElement("button");
+  cancelBtn.className = "diag-btn";
+  cancelBtn.textContent = "Cancel";
+  cancelBtn.addEventListener("click", () => overlay.remove());
+  const saveBtn = document.createElement("button");
+  saveBtn.className = "diag-btn";
+  saveBtn.textContent = slug ? "Save" : "Create";
+  saveBtn.addEventListener("click", async () => {
+    errorEl.textContent = "";
+    const newSlug = slugInput.value.trim();
+    if (!slug && !isValidProfileSlug(newSlug)) {
+      errorEl.textContent = "slug must be kebab-case, 1-64 chars [a-z0-9-]";
+      return;
+    }
+    const env: Record<string, string> = {};
+    for (const line of envArea.value.split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      const eq = trimmed.indexOf("=");
+      if (eq < 0) { errorEl.textContent = `env line "${trimmed}" must be KEY=VALUE`; return; }
+      env[trimmed.slice(0, eq).trim()] = trimmed.slice(eq + 1).trim();
+    }
+    const cliArgs = argsArea.value.split("\n").map((s) => s.trim()).filter((s) => s.length > 0);
+    const base = {
+      adapter: a.name,
+      slug: slug ?? newSlug,
+      name: nameInput.value.trim() || (slug ?? newSlug),
+      model: modelInput.value.trim() || null,
+      effort: effortInput.value.trim() || null,
+      cliArgs,
+      env,
+      agent: agentInput.value.trim() || null,
+      isDefault: defaultCb.checked,
+    };
+    try {
+      if (slug) {
+        const update: UpdateProfileInput = base;
+        await invoke("cove://commands/launch-profile.update", update);
+      } else {
+        const create: CreateProfileInput = base;
+        await invoke("cove://commands/launch-profile.create", create);
+      }
+      overlay.remove();
+      await renderToolsTab(container);
+    } catch (err) {
+      errorEl.textContent = String(err);
+    }
+  });
+  buttonRow.appendChild(cancelBtn);
+  buttonRow.appendChild(saveBtn);
+  dialog.appendChild(buttonRow);
+
+  overlay.appendChild(dialog);
+  overlay.addEventListener("click", () => overlay.remove());
+  document.body.appendChild(overlay);
+
+  if (slug) {
+    void loadProfileIntoEditor(a.name, slug, { nameInput, modelInput, effortInput, agentInput, envArea, argsArea, defaultCb });
+  } else {
+    defaultCb.checked = true;
+  }
+}
+
+interface EditorFields {
+  nameInput: HTMLInputElement;
+  modelInput: HTMLInputElement;
+  effortInput: HTMLInputElement;
+  agentInput: HTMLInputElement;
+  envArea: HTMLTextAreaElement;
+  argsArea: HTMLTextAreaElement;
+  defaultCb: HTMLInputElement;
+}
+
+async function loadProfileIntoEditor(adapter: string, slug: string, f: EditorFields): Promise<void> {
+  try {
+    const detail = await invoke<LaunchProfileDetail>("cove://commands/launch-profile.get", { adapter, slug });
+    f.nameInput.value = detail.name;
+    f.modelInput.value = detail.model ?? "";
+    f.effortInput.value = detail.effort ?? "";
+    f.agentInput.value = detail.agent ?? "";
+    f.envArea.value = Object.entries(detail.env).map(([k, v]) => `${k}=${v}`).join("\n");
+    f.argsArea.value = (detail.cliArgs ?? []).join("\n");
+    f.defaultCb.checked = detail.isDefault;
+  } catch (err) {
+    console.warn("launch-profile.get failed", adapter, slug, err);
+  }
+}
+
+function textRow(parent: HTMLElement, label: string, value: string, placeholder: string): HTMLInputElement {
+  const row = document.createElement("div");
+  row.style.cssText = "display:flex;flex-direction:column;gap:2px;";
+  const lab = document.createElement("label");
+  lab.className = "tools-subtitle";
+  lab.textContent = label;
+  row.appendChild(lab);
+  const input = document.createElement("input");
+  input.type = "text";
+  input.value = value;
+  input.placeholder = placeholder;
+  input.style.cssText = "width:100%;background:var(--bg-alt);color:var(--fg);border:1px solid var(--border);border-radius:4px;padding:4px;font-size:12px;";
+  row.appendChild(input);
+  parent.appendChild(row);
+  return input;
 }
 
 function buildRetentionChip(a: ToolsAdapter, container: HTMLElement): HTMLElement {
@@ -4273,9 +4535,10 @@ function launcherYolo(adapter: string): boolean {
 
 async function buildAdapterLaunch(a: AdapterInfo): Promise<{ command: string; args: string[]; yolo: boolean }> {
   const yolo = launcherYolo(a.name);
+  const profileSlug = launcherProfileSlug(a.name);
   try {
     const built = await invoke<{ command: string; args: string[] }>("cove://commands/launch.build", {
-      adapter: a.name, profileSlug: "default", yolo, workingDir: null, extraFlags: [], env: {},
+      adapter: a.name, profileSlug, yolo, workingDir: null, extraFlags: [], env: {},
     });
     if (built.command) return { command: built.command, args: built.args ?? [], yolo };
   } catch (err) { console.warn("launch.build failed, spawning raw binary", a.name, err); }

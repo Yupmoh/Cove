@@ -7,6 +7,9 @@ public class LaunchProfileCommandTests
 {
     [Theory]
     [InlineData("launch-profile list")]
+    [InlineData("launch-profile get")]
+    [InlineData("launch-profile create")]
+    [InlineData("launch-profile update")]
     [InlineData("launch-profile set-default")]
     [InlineData("launch-profile delete")]
     public void LaunchProfileVerbs_AreRegistered(string verb)
@@ -16,6 +19,9 @@ public class LaunchProfileCommandTests
 
     [Theory]
     [InlineData("launch-profile list")]
+    [InlineData("launch-profile get")]
+    [InlineData("launch-profile create")]
+    [InlineData("launch-profile update")]
     [InlineData("launch-profile set-default")]
     [InlineData("launch-profile delete")]
     public void LaunchProfileVerbs_HaveHandlers(string verb)

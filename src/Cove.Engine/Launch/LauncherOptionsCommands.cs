@@ -21,6 +21,8 @@ public static class LauncherOptionsCommands
         var dtos = result.Options.Select(o => new LauncherOptionDto(
             o.Key, o.Label, o.Type, o.DefaultValueRaw,
             o.Choices?.Select(c => new LauncherOptionChoiceDto(c.Value, c.Label)).ToArray())).ToArray();
-        return ctx.Ok(new LauncherOptionsResponse(dtos), CoveJsonContext.Default.LauncherOptionsResponse);
+        var flags = result.SuggestedFlags.Select(f => new LauncherSuggestedFlagDto(
+            f.Flag, f.Description, f.Values?.ToArray() ?? null)).ToArray();
+        return ctx.Ok(new LauncherOptionsResponse(dtos, flags), CoveJsonContext.Default.LauncherOptionsResponse);
     }
 }

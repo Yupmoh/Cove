@@ -111,6 +111,10 @@ public sealed record AgentDefinitionListResult(AgentDefinitionListItem[] Agents)
 public sealed record AgentDefinitionShowResult(string Slug, string Name, string Description, string Adapter, string Prompt, string[] AttachedSkills);
 public sealed record LaunchProfileListItem(string Slug, string Name, string Adapter, bool IsDefault, string? Model, string? Effort, int ArgCount, int EnvCount);
 public sealed record LaunchProfileListResult(LaunchProfileListItem[] Profiles);
+public sealed record LaunchProfileDetail(string Slug, string Name, string Adapter, bool IsDefault, string? Model, string? Effort, string[] CliArgs, System.Collections.Generic.IReadOnlyDictionary<string, string> Env, System.Collections.Generic.IReadOnlyDictionary<string, bool> Permissions, string[] Skills, string? Agent, int SchemaVersion);
+public sealed record LaunchProfileGetParams(string Adapter, string Slug);
+public sealed record LaunchProfileCreateParams(string Adapter, string Slug, string Name, string? Model, string? Effort, string[]? CliArgs, Dictionary<string, string>? Env, Dictionary<string, bool>? Permissions, string[]? Skills, string? Agent, bool? IsDefault);
+public sealed record LaunchProfileUpdateParams(string Adapter, string Slug, string? Name, string? Model, string? Effort, string[]? CliArgs, Dictionary<string, string>? Env, Dictionary<string, bool>? Permissions, string[]? Skills, string? Agent, bool? IsDefault);
 public sealed record AdapterEnvVarItem(string Key, string Value, bool Enabled, string? Id);
 public sealed record AdapterEnvListResult(AdapterEnvVarItem[] Entries);
 public sealed record ResolvedEnvVar(string Key, string Value);
@@ -177,9 +181,10 @@ public sealed record NookScopeGetParams(string NookId);
 public sealed record NookScopeSetParams(string NookId, string Scope);
 public sealed record NookScopeResult(string NookId, string Scope);
 public sealed record LauncherOptionsParams(string Adapter);
-public sealed record LauncherOptionsResponse(LauncherOptionDto[] Options);
+public sealed record LauncherOptionsResponse(LauncherOptionDto[] Options, LauncherSuggestedFlagDto[] SuggestedFlags);
 public sealed record LauncherOptionDto(string Key, string Label, string Type, string? DefaultValueRaw, LauncherOptionChoiceDto[]? Choices);
 public sealed record LauncherOptionChoiceDto(string Value, string? Label);
+public sealed record LauncherSuggestedFlagDto(string Flag, string? Description, string[]? Values);
 
 public sealed record ProtocolResolveParams(string Uri, string? FocusedNookId, string? ActiveShoreId);
 public sealed record ProtocolResolveResult(string Uri, System.Text.Json.JsonElement? Params);
@@ -511,6 +516,10 @@ public sealed record PerfBundleListResult(System.Collections.Generic.IReadOnlyLi
 [JsonSerializable(typeof(AgentDefinitionShowResult))]
 [JsonSerializable(typeof(LaunchProfileListItem))]
 [JsonSerializable(typeof(LaunchProfileListResult))]
+[JsonSerializable(typeof(LaunchProfileDetail))]
+[JsonSerializable(typeof(LaunchProfileGetParams))]
+[JsonSerializable(typeof(LaunchProfileCreateParams))]
+[JsonSerializable(typeof(LaunchProfileUpdateParams))]
 [JsonSerializable(typeof(AdapterEnvVar))]
 [JsonSerializable(typeof(List<AdapterEnvVar>))]
 [JsonSerializable(typeof(AdapterEnvVarItem))]
@@ -550,6 +559,7 @@ public sealed record PerfBundleListResult(System.Collections.Generic.IReadOnlyLi
 [JsonSerializable(typeof(NotificationDeliverDto))]
 [JsonSerializable(typeof(LauncherOptionsParams))]
 [JsonSerializable(typeof(LauncherOptionsResponse))]
+[JsonSerializable(typeof(LauncherSuggestedFlagDto))]
 [JsonSerializable(typeof(OmniChatAppendParams))]
 [JsonSerializable(typeof(OmniChatHistoryParams))]
 [JsonSerializable(typeof(OmniChatHistoryResult))]

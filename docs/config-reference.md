@@ -30,6 +30,16 @@ All configuration keys for Cove, grouped by settings tab.
 | `speech.inputDevice` | Input Device | string | text |  |
 | `speech.onDeviceRecognition` | On-Device Recognition | bool | toggle |  |
 
+## bay
+
+| Key | Label | Type | Control | Description |
+|-----|-------|------|---------|-------------|
+| `session` | Sessions | object | section |  |
+| `session.restoreOnLaunch` | Restore On Launch | bool | toggle |  |
+| `worktree` | Worktree | object | section |  |
+| `worktree.defaultLocationPattern` | Default Location Pattern | string | text |  |
+| `worktree.postCreateCommands` | Post-Create Commands | object | text |  |
+
 ## diagnostics
 
 | Key | Label | Type | Control | Description |
@@ -107,14 +117,4 @@ All configuration keys for Cove, grouped by settings tab.
 | `updates.channel` | Channel | string | select |  |
 | `updates.checkIntervalHours` | Check Interval | int | number |  |
 | `updates.checkOnLaunch` | Check On Launch | bool | toggle |  |
-
-## bay
-
-| Key | Label | Type | Control | Description |
-|-----|-------|------|---------|-------------|
-| `session` | Sessions | object | section |  |
-| `session.restoreOnLaunch` | Restore On Launch | bool | toggle |  |
-| `worktree` | Worktree | object | section |  |
-| `worktree.defaultLocationPattern` | Default Location Pattern | string | text |  |
-| `worktree.postCreateCommands` | Post-Create Commands | object | text |  |
 
