@@ -6,6 +6,7 @@ import { SearchAddon } from "@xterm/addon-search";
 import "@xterm/xterm/css/xterm.css";
 import { toBase64Utf8, parseRelayText } from "./wsproto";
 import { scrubTerminalReports, createReplayScrubber, type ReplayScrubber } from "./terminal-scrub";
+import { createKeyboardProtocolTracker, shiftEnterSequence, type KeyboardProtocolTracker } from "./terminal-keyboard";
 import { renderKanbanBoard } from "./tasks-kanban";
 import { renderTaskList } from "./tasks-list";
 import { renderTimelineFeed } from "./timeline-feed";
@@ -212,6 +213,7 @@ interface NookView {
   replaying: boolean;
   restoring: boolean;
   replayScrub: ReplayScrubber;
+  keyboard: KeyboardProtocolTracker;
 }
 
 const nooks = new Map<string, NookView>();
@@ -368,6 +370,7 @@ function attachWs(nook: NookView) {
       return;
     }
     const raw = new Uint8Array(ev.data as ArrayBuffer);
+    nook.keyboard.push(raw);
     const bytes = (nook.restoring && nook.replaying)
       ? nook.replayScrub.push(raw)
       : scrubTerminalReports(raw, { includeOscColorReports: nook.replaying });
@@ -454,7 +457,7 @@ function makeNook(nookId: string, since: number): NookView {
   });
 
   const ws = new WebSocket(`ws://${location.host}/pty?nook=${encodeURIComponent(nookId)}&since=${since}`);
-  const pv: NookView = { nookId, term, fit: fitAddon, ws, el, consumed: 0, lastAck: 0, title: "", customTitle: "", headerTitleEl: titleSpan, search: searchAddon, replaying: true, restoring: !locallySpawnedNookIds.has(nookId), replayScrub: createReplayScrubber() };
+  const pv: NookView = { nookId, term, fit: fitAddon, ws, el, consumed: 0, lastAck: 0, title: "", customTitle: "", headerTitleEl: titleSpan, search: searchAddon, replaying: true, restoring: !locallySpawnedNookIds.has(nookId), replayScrub: createReplayScrubber(), keyboard: createKeyboardProtocolTracker() };
 
   el.addEventListener("mousedown", () => focusNook(nookId));
   attachWs(pv);
@@ -466,7 +469,7 @@ function makeNook(nookId: string, since: number): NookView {
     const chord = normalizeChord(e);
     const action = overrides[chord];
     if (action && action.startsWith("send-text:")) { void invoke("app.nookWrite", { nookId, dataBase64: toBase64Utf8(action.slice("send-text:".length)) }); return false; }
-    if (e.shiftKey && e.key === "Enter") { void invoke("app.nookWrite", { nookId, dataBase64: toBase64Utf8("\x1b\r") }); return false; }
+    if (e.shiftKey && e.key === "Enter") { void invoke("app.nookWrite", { nookId, dataBase64: toBase64Utf8(shiftEnterSequence(pv.keyboard.encoding())) }); return false; }
     if (!e.metaKey || e.altKey || e.ctrlKey) return true;
     const k = e.key.toLowerCase();
     if (k === "c") {
