@@ -54,6 +54,8 @@ public sealed class NookRegistry : IDisposable, Cove.Engine.Agents.INookWriter
         string nookId = "nook-" + System.Guid.NewGuid().ToString("N");
         string? inherited = (!string.IsNullOrEmpty(p.InheritCwdFrom) && TryGet(p.InheritCwdFrom!, out var src)) ? src.Cwd : null;
         string? fallback = !string.IsNullOrEmpty(defaultCwd) ? defaultCwd : _projectDir;
+        if (string.IsNullOrEmpty(inherited) && string.IsNullOrEmpty(p.Cwd) && string.IsNullOrEmpty(fallback))
+            _logger.NookSpawnCwdFallback(nookId, p.Adapter ?? "", Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
         string cwd = ResolveWorkingDirectory(inherited, p.Cwd, fallback);
         _logger.NookSpawn(nookId, p.Command, p.Adapter ?? "", p.Yolo, !string.IsNullOrEmpty(p.SessionId), p.Cols, p.Rows);
         var info = SpawnCore(nookId, p.Command, p.Args ?? System.Array.Empty<string>(), cwd, p.Cols, p.Rows, p.Env);

@@ -57,7 +57,7 @@ import { detectChimes, playChime, chimesEnabledFrom, chimePrefValue, AGENT_CHIME
 import { NotificationBridge, type NotificationBridgeDeps, type NotificationDeliverPayload } from "./notifications";
 import { buildMenu, menuChordSet } from "./menu-model";
 import { toolbarTiles } from "./toolbar-tiles";
-import { shouldShowLauncher, buildAdapterTiles, buildBuiltinTiles, isEmptyShoreTree, isPlaceholderLeaf, placeableNookForAction, type LauncherAdapter, type LauncherBuiltin, type LauncherTile } from "./box-launcher";
+import { shouldShowLauncher, buildAdapterTiles, buildBuiltinTiles, isEmptyShoreTree, isPlaceholderLeaf, placeableNookForAction, resolveLaunchCwd, type LauncherAdapter, type LauncherBuiltin, type LauncherTile } from "./box-launcher";
 import { adapterAccent, toolAccent, assignHotkeys, detectedHarnessTiles, clampLauncherSelection, moveLauncherSelection, hotkeyTarget, shapeRecentSessions, tipAt, computeLauncherCols, resolveLauncherYolo, type LauncherSelection, type LauncherGeometry, type LauncherArrowKey, type RecentSessionRow } from "./launcher-model";
 import { iconSvg, iconForNookType, monogram } from "./icons";
 import { dropZoneFor, moveMutationFor, zoneOverlayRect } from "./nook-dnd";
@@ -148,7 +148,8 @@ async function invoke<T>(cmd: string, args: unknown): Promise<T> {
 const locallySpawnedNookIds = new Set<string>();
 
 async function spawnNook(params: Record<string, unknown>): Promise<{ nookId: string }> {
-  const r = await invoke<{ nookId?: string; error?: { code?: string; message?: string } }>("app.nookSpawn", params);
+  const cwd = resolveLaunchCwd(String(params.cwd ?? ""), String(params.inheritCwdFrom ?? ""), activeProjectDir());
+  const r = await invoke<{ nookId?: string; error?: { code?: string; message?: string } }>("app.nookSpawn", { ...params, cwd });
   if (!r?.nookId) {
     const msg = r?.error?.message ?? "the engine could not start this terminal";
     console.warn("nook spawn failed", params, r);
