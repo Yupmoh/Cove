@@ -121,6 +121,44 @@ public sealed class ControlClientTests
         var received = await stub.WaitForPtyInputAsync(TimeSpan.FromSeconds(5));
         Assert.Equal(inputBytes, received);
     }
+
+    [Fact]
+    public async Task ConcurrentSends_StubDaemon_FramesNeverInterleave()
+    {
+        await using var stub = new StubDaemon();
+        await stub.StartAsync();
+        await using var client = new ControlClient(stub.Port.ToString());
+
+        await client.ConnectAsync();
+
+        const int count = 200;
+        var expected = new HashSet<string>();
+        var inputs = new List<byte[]>();
+        for (var i = 0; i < count; i++)
+        {
+            var payload = System.Text.Encoding.UTF8.GetBytes($"input-{i:D4}-payload-block");
+            inputs.Add(payload);
+            expected.Add(System.Convert.ToBase64String(payload));
+        }
+
+        var tasks = new List<Task>();
+        for (var i = 0; i < count; i++)
+        {
+            var payload = inputs[i];
+            tasks.Add(Task.Run(() => client.SendPtyInputAsync("nook-1", payload)));
+            tasks.Add(Task.Run(() => client.SendAsync("shore.list", null)));
+        }
+        await Task.WhenAll(tasks);
+
+        var received = new HashSet<string>();
+        for (var i = 0; i < count; i++)
+        {
+            var bytes = await stub.WaitForPtyInputAsync(TimeSpan.FromSeconds(10));
+            received.Add(System.Convert.ToBase64String(bytes));
+        }
+
+        Assert.Equal(expected, received);
+    }
 }
 
 internal sealed class StubDaemon : IAsyncDisposable
