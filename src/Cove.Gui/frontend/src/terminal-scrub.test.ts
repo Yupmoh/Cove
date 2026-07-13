@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { scrubTerminalReports } from "./terminal-scrub";
+import { scrubTerminalReports, createReplayScrubber } from "./terminal-scrub";
 
 function enc(s: string): Uint8Array {
   return new TextEncoder().encode(s);
@@ -77,5 +77,72 @@ describe("scrubTerminalReports", () => {
   it("scrubs multiple leading reports from a restore backlog", () => {
     const s = "\x1b[?62;c\x1b[>0;10;0c\x1b]11;rgb:0000/0000/0000\x07user@host:~$ ";
     expect(dec(scrubTerminalReports(enc(s), { includeOscColorReports: true }))).toBe("user@host:~$ ");
+  });
+});
+
+describe("createReplayScrubber", () => {
+  it("passes plain text and ordinary SGR through", () => {
+    const scrubber = createReplayScrubber();
+    const s = "\x1b[31mred\x1b[0mplain\x1b[H";
+    expect(dec(scrubber.push(enc(s)))).toBe(s);
+  });
+
+  it("keeps a benign private mode like show cursor", () => {
+    const scrubber = createReplayScrubber();
+    const s = "a\x1b[?25hb\x1b[?25lc";
+    expect(dec(scrubber.push(enc(s)))).toBe(s);
+  });
+
+  it("neutralizes alt-screen enter and exit", () => {
+    const scrubber = createReplayScrubber();
+    const s = "a\x1b[?1049hui\x1b[?1049lb\x1b[?47hx\x1b[?47ly\x1b[?1047hz\x1b[?1047lw";
+    expect(dec(scrubber.push(enc(s)))).toBe("auibxyzw");
+  });
+
+  it("neutralizes bracketed-paste and mouse-tracking enables", () => {
+    const scrubber = createReplayScrubber();
+    const s = "a\x1b[?2004hb\x1b[?1000hc\x1b[?1006hd\x1b[?1002le";
+    expect(dec(scrubber.push(enc(s)))).toBe("abcde");
+  });
+
+  it("neutralizes a multi-parameter private mode set containing a dangerous mode", () => {
+    const scrubber = createReplayScrubber();
+    const s = "a\x1b[?25;1049hb";
+    expect(dec(scrubber.push(enc(s)))).toBe("ab");
+  });
+
+  it("strips device reports and OSC color reports during replay", () => {
+    const scrubber = createReplayScrubber();
+    const s = "a\x1b[?62;cb\x1b]11;rgb:0000/0000/0000\x07c\x1b[24;80Rd";
+    expect(dec(scrubber.push(enc(s)))).toBe("abcd");
+  });
+
+  it("neutralizes an alt-screen enter split across chunk boundaries", () => {
+    const scrubber = createReplayScrubber();
+    const first = dec(scrubber.push(enc("before\x1b[?10")));
+    const second = dec(scrubber.push(enc("49hafter")));
+    expect(first + second).toBe("beforeafter");
+  });
+
+  it("strips a device report split across chunk boundaries", () => {
+    const scrubber = createReplayScrubber();
+    const first = dec(scrubber.push(enc("x\x1b[?6")));
+    const second = dec(scrubber.push(enc("2;cy")));
+    expect(first + second).toBe("xy");
+  });
+
+  it("carries a bare trailing escape and completes it on the next chunk", () => {
+    const scrubber = createReplayScrubber();
+    const first = dec(scrubber.push(enc("hello\x1b")));
+    const second = dec(scrubber.push(enc("[31mred")));
+    expect(first + second).toBe("hello\x1b[31mred");
+  });
+
+  it("flushes a carried incomplete tail", () => {
+    const scrubber = createReplayScrubber();
+    const first = dec(scrubber.push(enc("done\x1b[?20")));
+    const flushed = dec(scrubber.flush());
+    expect(first).toBe("done");
+    expect(flushed).toBe("\x1b[?20");
   });
 });

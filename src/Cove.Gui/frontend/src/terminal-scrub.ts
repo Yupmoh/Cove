@@ -101,6 +101,110 @@ function matchOscColorReport(input: Uint8Array, start: number): number {
   return end > 0 ? end : start;
 }
 
+const NEUTRALIZE_PRIVATE_MODES = new Set([47, 1047, 1048, 1049, 1000, 1001, 1002, 1003, 1004, 1005, 1006, 1015, 2004]);
+
+function matchPrivateModeNeutralize(input: Uint8Array, start: number): number {
+  const n = input.length;
+  if (start + 2 >= n || input[start + 2] !== 0x3f) return start;
+  let i = start + 3;
+  const numbers: number[] = [];
+  let current = "";
+  while (i < n) {
+    const b = input[i];
+    if (b >= 0x30 && b <= 0x39) { current += String.fromCharCode(b); i += 1; continue; }
+    if (b === 0x3b) { numbers.push(Number(current)); current = ""; i += 1; continue; }
+    break;
+  }
+  numbers.push(Number(current));
+  if (i >= n) return start;
+  const final = input[i];
+  if (final !== 0x68 && final !== 0x6c) return start;
+  const hasDangerous = numbers.some((num) => Number.isFinite(num) && NEUTRALIZE_PRIVATE_MODES.has(num));
+  if (!hasDangerous) return start;
+  return i + 1;
+}
+
+function escapeSequenceEnd(input: Uint8Array, start: number): number {
+  const n = input.length;
+  if (start + 1 >= n) return -1;
+  const kind = input[start + 1];
+  if (kind === CSI) {
+    let i = start + 2;
+    while (i < n && isParamByte(input[i])) i += 1;
+    while (i < n && isIntermediateByte(input[i])) i += 1;
+    if (i >= n) return -1;
+    return i + 1;
+  }
+  if (kind === OSC || kind === DCS || kind === 0x58 || kind === 0x5e || kind === 0x5f) {
+    const end = findStringTerminator(input, start + 2);
+    return end > 0 ? end : -1;
+  }
+  if (kind === 0x28 || kind === 0x29 || kind === 0x2a || kind === 0x2b) {
+    if (start + 2 >= n) return -1;
+    return start + 3;
+  }
+  return start + 2;
+}
+
+function concatChunks(a: Uint8Array, b: Uint8Array): Uint8Array {
+  if (a.length === 0) return b;
+  if (b.length === 0) return a;
+  const merged = new Uint8Array(a.length + b.length);
+  merged.set(a, 0);
+  merged.set(b, a.length);
+  return merged;
+}
+
+export interface ReplayScrubber {
+  push(chunk: Uint8Array): Uint8Array;
+  flush(): Uint8Array;
+}
+
+export function createReplayScrubber(): ReplayScrubber {
+  let carry = new Uint8Array(0);
+  const push = (chunk: Uint8Array): Uint8Array => {
+    const buf = concatChunks(carry, chunk);
+    const n = buf.length;
+    const out = new Uint8Array(n);
+    let o = 0;
+    let i = 0;
+    let heldFrom = n;
+    while (i < n) {
+      if (buf[i] === ESC) {
+        const kind = i + 1 < n ? buf[i + 1] : -1;
+        if (kind === CSI) {
+          const report = matchCsiReport(buf, i);
+          if (report > i) { i = report; continue; }
+          const neutralized = matchPrivateModeNeutralize(buf, i);
+          if (neutralized > i) { i = neutralized; continue; }
+        } else if (kind === DCS) {
+          const report = matchDcsReport(buf, i);
+          if (report > i) { i = report; continue; }
+        } else if (kind === OSC) {
+          const report = matchOscColorReport(buf, i);
+          if (report > i) { i = report; continue; }
+        }
+        const end = escapeSequenceEnd(buf, i);
+        if (end < 0) { heldFrom = i; break; }
+        for (let j = i; j < end; j += 1) { out[o] = buf[j]; o += 1; }
+        i = end;
+        continue;
+      }
+      out[o] = buf[i];
+      o += 1;
+      i += 1;
+    }
+    carry = heldFrom < n ? buf.slice(heldFrom) : new Uint8Array(0);
+    return out.subarray(0, o);
+  };
+  const flush = (): Uint8Array => {
+    const remainder = carry;
+    carry = new Uint8Array(0);
+    return remainder;
+  };
+  return { push, flush };
+}
+
 export function scrubTerminalReports(input: Uint8Array, options: ScrubOptions = DEFAULT_OPTIONS): Uint8Array {
   const n = input.length;
   const out = new Uint8Array(n);

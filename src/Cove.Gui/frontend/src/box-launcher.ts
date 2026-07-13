@@ -44,6 +44,24 @@ export function isEmptyShoreTree(node: ShoreTreeNode | null | undefined): boolea
   return subs.length === 0 || subs.every((s) => s.nookType === "empty");
 }
 
+export interface PlaceholderTreeNode {
+  kind: "leaf" | "split";
+  nookId?: string;
+  subtabs?: { nookType: string }[];
+  childA?: PlaceholderTreeNode;
+  childB?: PlaceholderTreeNode;
+}
+
+export function isPlaceholderLeaf(node: PlaceholderTreeNode | null | undefined, nookId: string): boolean {
+  if (!node) return false;
+  if (node.kind === "leaf") {
+    if (node.nookId !== nookId) return false;
+    const subs = node.subtabs ?? [];
+    return subs.length === 0 || subs.every((s) => s.nookType === "empty");
+  }
+  return isPlaceholderLeaf(node.childA, nookId) || isPlaceholderLeaf(node.childB, nookId);
+}
+
 export type LauncherPlacement = "replace" | "create";
 
 export function launcherPlacement(activeShoreEmpty: boolean): LauncherPlacement {

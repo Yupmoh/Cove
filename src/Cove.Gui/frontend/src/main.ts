@@ -5,7 +5,7 @@ import { WebglAddon } from "@xterm/addon-webgl";
 import { SearchAddon } from "@xterm/addon-search";
 import "@xterm/xterm/css/xterm.css";
 import { toBase64Utf8, parseRelayText } from "./wsproto";
-import { scrubTerminalReports } from "./terminal-scrub";
+import { scrubTerminalReports, createReplayScrubber, type ReplayScrubber } from "./terminal-scrub";
 import { renderKanbanBoard } from "./tasks-kanban";
 import { renderTaskList } from "./tasks-list";
 import { renderTimelineFeed } from "./timeline-feed";
@@ -44,9 +44,9 @@ import { buildEmptyState, EmptyStateMessages } from "./empty-states";
 import { brandLogoAt, nextBrandIndex, parseBrandIndex } from "./brand";
 import { adapterStatusMeta, toolsSubtitle, retentionChipVisible, retentionChipLabel, type ToolsAdapter } from "./tools-tab";
 import {
-  isValidProfileSlug, profilePickerLabel, firstDefault,
-  type LaunchProfileListItem, type LaunchProfileListResult, type LaunchProfileDetail,
-  type LauncherOptionsResponse, type CreateProfileInput, type UpdateProfileInput,
+  isValidProfileSlug, profilePickerLabel, firstDefault, envMapFromRows,
+  type LaunchProfileListItem, type LaunchProfileDetail,
+  type CreateProfileInput, type UpdateProfileInput,
 } from "./profiles";
 import { DEFAULT_DRAFT, draftFromTheme, themeFromDraft, cssVarsFromTheme, xtermThemeFromDto, isCustom, isBuiltin, canSaveDraft, canDelete, isValidHex, contrastRatio, contrastTier, THEME_COLOR_FIELDS, type ThemeDto, type ThemeDraft } from "./theme-editor";
 import { categorizeBindings, isReservedChord, isValidChord, chordDisplay, canRecordChord, normalizeChord as normalizeChordStr, type KeybindDto } from "./keyboard-editor";
@@ -56,7 +56,7 @@ import { detectChimes, playChime, chimesEnabledFrom, chimePrefValue, AGENT_CHIME
 import { NotificationBridge, type NotificationBridgeDeps, type NotificationDeliverPayload } from "./notifications";
 import { buildMenu, menuChordSet } from "./menu-model";
 import { toolbarTiles } from "./toolbar-tiles";
-import { shouldShowLauncher, buildAdapterTiles, buildBuiltinTiles, isEmptyShoreTree, placeableNookForAction, type LauncherAdapter, type LauncherBuiltin, type LauncherTile } from "./box-launcher";
+import { shouldShowLauncher, buildAdapterTiles, buildBuiltinTiles, isEmptyShoreTree, isPlaceholderLeaf, placeableNookForAction, type LauncherAdapter, type LauncherBuiltin, type LauncherTile } from "./box-launcher";
 import { adapterAccent, toolAccent, assignHotkeys, detectedHarnessTiles, clampLauncherSelection, moveLauncherSelection, hotkeyTarget, shapeRecentSessions, tipAt, computeLauncherCols, resolveLauncherYolo, type LauncherSelection, type LauncherGeometry, type LauncherArrowKey, type RecentSessionRow } from "./launcher-model";
 import { iconSvg, iconForNookType, monogram } from "./icons";
 import { dropZoneFor, moveMutationFor, zoneOverlayRect } from "./nook-dnd";
@@ -144,6 +144,8 @@ async function invoke<T>(cmd: string, args: unknown): Promise<T> {
   return JSON.parse(result as string) as T;
 }
 
+const locallySpawnedNookIds = new Set<string>();
+
 async function spawnNook(params: Record<string, unknown>): Promise<{ nookId: string }> {
   const r = await invoke<{ nookId?: string; error?: { code?: string; message?: string } }>("app.nookSpawn", params);
   if (!r?.nookId) {
@@ -152,6 +154,7 @@ async function spawnNook(params: Record<string, unknown>): Promise<{ nookId: str
     showInAppToast("Couldn't open terminal", msg, () => {});
     throw new Error(msg);
   }
+  locallySpawnedNookIds.add(r.nookId);
   return { nookId: r.nookId };
 }
 
@@ -207,6 +210,8 @@ interface NookView {
   headerTitleEl: HTMLElement;
   search: SearchAddon;
   replaying: boolean;
+  restoring: boolean;
+  replayScrub: ReplayScrubber;
 }
 
 const nooks = new Map<string, NookView>();
@@ -331,6 +336,14 @@ function persistSettings() {
   for (const [k, v] of entries)
     invoke("app.configSet", { key: k, value: v }).catch((e) => console.warn("configSet failed", k, e));
 }
+function endReplay(nook: NookView): void {
+  nook.replaying = false;
+  if (!nook.restoring) return;
+  const remainder = nook.replayScrub.flush();
+  if (remainder.length) nook.term.write(remainder);
+  nook.term.write("\x1b[?1049l");
+}
+
 function attachWs(nook: NookView) {
   const ws = nook.ws;
   ws.binaryType = "arraybuffer";
@@ -344,7 +357,7 @@ function attachWs(nook: NookView) {
     if (typeof ev.data === "string") {
       const m = parseRelayText(ev.data);
       if (!m) return;
-      if (m.t === "base") { nook.consumed = m.off; nook.lastAck = m.off; }
+      if (m.t === "base") { if (nook.restoring && nook.replaying) nook.term.reset(); nook.consumed = m.off; nook.lastAck = m.off; }
       else if (m.t === "resync") { nook.term.reset(); nook.consumed = m.base; nook.lastAck = m.base; }
       else if (m.t === "end") {
         nook.term.write(`\r\n\x1b[38;5;244m[process exited: ${m.code}]\x1b[0m\r\n`);
@@ -355,14 +368,16 @@ function attachWs(nook: NookView) {
       return;
     }
     const raw = new Uint8Array(ev.data as ArrayBuffer);
-    const bytes = scrubTerminalReports(raw, { includeOscColorReports: nook.replaying });
+    const bytes = (nook.restoring && nook.replaying)
+      ? nook.replayScrub.push(raw)
+      : scrubTerminalReports(raw, { includeOscColorReports: nook.replaying });
     nook.term.write(bytes, () => {
       nook.consumed += raw.length;
       if (nook.consumed - nook.lastAck >= CREDIT_THRESHOLD) sendAck();
     });
   };
   setInterval(sendAck, 100);
-  nook.term.onData((d) => { if (keyDebugOn()) console.warn(`[keydbg] onData len=${d.length} codes=${Array.from(d).slice(0, 8).map((c) => c.charCodeAt(0)).join(",")}`); nook.replaying = false; void enqueueNookWrite(nook.nookId, toBase64Utf8(d), (nookId, dataBase64) => invoke("app.nookWrite", { nookId, dataBase64 })); });
+  nook.term.onData((d) => { if (keyDebugOn()) console.warn(`[keydbg] onData len=${d.length} codes=${Array.from(d).slice(0, 8).map((c) => c.charCodeAt(0)).join(",")}`); if (nook.replaying) endReplay(nook); void enqueueNookWrite(nook.nookId, toBase64Utf8(d), (nookId, dataBase64) => invoke("app.nookWrite", { nookId, dataBase64 })); });
   nook.term.onResize(({ cols, rows }) => { void invoke("app.nookResize", { nookId: nook.nookId, cols, rows }); });
 }
 
@@ -439,7 +454,7 @@ function makeNook(nookId: string, since: number): NookView {
   });
 
   const ws = new WebSocket(`ws://${location.host}/pty?nook=${encodeURIComponent(nookId)}&since=${since}`);
-  const pv: NookView = { nookId, term, fit: fitAddon, ws, el, consumed: 0, lastAck: 0, title: "", customTitle: "", headerTitleEl: titleSpan, search: searchAddon, replaying: true };
+  const pv: NookView = { nookId, term, fit: fitAddon, ws, el, consumed: 0, lastAck: 0, title: "", customTitle: "", headerTitleEl: titleSpan, search: searchAddon, replaying: true, restoring: !locallySpawnedNookIds.has(nookId), replayScrub: createReplayScrubber() };
 
   el.addEventListener("mousedown", () => focusNook(nookId));
   attachWs(pv);
@@ -1444,9 +1459,18 @@ async function newShore(): Promise<void> {
   await reload();
 }
 
+function safeReplaceTarget(shoreId: string, placeholderId: string | null): string | null {
+  if (!placeholderId) return null;
+  const shore = layout?.shores.find((r) => r.id === shoreId);
+  if (!shore) { console.warn("replace target shore missing", shoreId, placeholderId); return null; }
+  if (!isPlaceholderLeaf(shore.layoutTree, placeholderId)) { console.warn("refusing to replace a live nook leaf", shoreId, placeholderId); return null; }
+  return placeholderId;
+}
+
 async function placeNookIntoShore(shoreId: string, placeholderId: string | null, nookId: string, nookType: string, shoreName?: string): Promise<void> {
-  if (placeholderId) {
-    await invoke("app.layoutMutate", { op: "replace", shoreId, targetNookId: placeholderId, newNookId: nookId, orientation: "", name: "", nookId: "", dir: 0, nookType });
+  const safePlaceholder = safeReplaceTarget(shoreId, placeholderId);
+  if (safePlaceholder) {
+    await invoke("app.layoutMutate", { op: "replace", shoreId, targetNookId: safePlaceholder, newNookId: nookId, orientation: "", name: "", nookId: "", dir: 0, nookType });
     if (shoreName) {
       try { await invoke("app.layoutMutate", { op: "rename", shoreId, name: shoreName, targetNookId: "", newNookId: "", orientation: "", nookId: "", dir: 0 }); } catch (err) { console.warn("shore rename after place failed", err); }
     }
@@ -3175,11 +3199,19 @@ function buildToolsCard(a: ToolsAdapter, container: HTMLElement): HTMLElement {
 
 const launcherProfileSlugKey = (adapter: string) => `cove:launcher-profile:${adapter}`;
 
-function launcherProfileSlug(adapter: string): string {
-  return localStorage.getItem(launcherProfileSlugKey(adapter)) || "default";
-}
-
 interface ProfileListResult { profiles: LaunchProfileListItem[] }
+
+async function resolveLauncherProfileSlug(adapter: string): Promise<string> {
+  const stored = localStorage.getItem(launcherProfileSlugKey(adapter));
+  if (stored) return stored;
+  try {
+    const result = await invoke<ProfileListResult>("cove://commands/launch-profile.list", { adapter });
+    return firstDefault(result.profiles ?? [])?.slug ?? "default";
+  } catch (err) {
+    console.warn("launch-profile.list failed", adapter, err);
+    return "default";
+  }
+}
 
 async function buildProfilesSection(a: ToolsAdapter, container: HTMLElement): Promise<HTMLElement> {
   const section = document.createElement("div");
@@ -3238,10 +3270,11 @@ function renderProfileList(
     const radio = document.createElement("input");
     radio.type = "radio";
     radio.name = `profile-radio-${a.name}`;
-    radio.checked = p.isDefault || launcherProfileSlug(a.name) === p.slug;
+    const storedSlug = localStorage.getItem(launcherProfileSlugKey(a.name));
+    radio.checked = storedSlug ? storedSlug === p.slug : p.isDefault;
     radio.addEventListener("change", () => {
       localStorage.setItem(launcherProfileSlugKey(a.name), p.slug);
-      void invoke("cove://commands/launch-profile.set-default", { adapter: a.name, slug: p.slug }).catch(() => {});
+      void invoke("cove://commands/launch-profile.set-default", { adapter: a.name, slug: p.slug }).catch((err) => console.warn("launch-profile.set-default failed", a.name, p.slug, err));
     });
     row.appendChild(radio);
     const name = document.createElement("span");
@@ -3337,14 +3370,15 @@ function openProfileEditor(a: ToolsAdapter, slug: string | null, container: HTML
       errorEl.textContent = "slug must be kebab-case, 1-64 chars [a-z0-9-]";
       return;
     }
-    const env: Record<string, string> = {};
+    const envRows: Array<{ key: string; value: string }> = [];
     for (const line of envArea.value.split("\n")) {
       const trimmed = line.trim();
       if (!trimmed) continue;
       const eq = trimmed.indexOf("=");
       if (eq < 0) { errorEl.textContent = `env line "${trimmed}" must be KEY=VALUE`; return; }
-      env[trimmed.slice(0, eq).trim()] = trimmed.slice(eq + 1).trim();
+      envRows.push({ key: trimmed.slice(0, eq).trim(), value: trimmed.slice(eq + 1).trim() });
     }
+    const env = envMapFromRows(envRows);
     const cliArgs = argsArea.value.split("\n").map((s) => s.trim()).filter((s) => s.length > 0);
     const base = {
       adapter: a.name,
@@ -4535,7 +4569,7 @@ function launcherYolo(adapter: string): boolean {
 
 async function buildAdapterLaunch(a: AdapterInfo): Promise<{ command: string; args: string[]; yolo: boolean }> {
   const yolo = launcherYolo(a.name);
-  const profileSlug = launcherProfileSlug(a.name);
+  const profileSlug = await resolveLauncherProfileSlug(a.name);
   try {
     const built = await invoke<{ command: string; args: string[] }>("cove://commands/launch.build", {
       adapter: a.name, profileSlug, yolo, workingDir: null, extraFlags: [], env: {},
@@ -4549,8 +4583,9 @@ async function spawnAgentInto(shoreId: string | null, placeholderId: string | nu
   const launch = await buildAdapterLaunch(a);
   const sp = (await spawnNook({ command: launch.command, args: launch.args, cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: a.name, agentName: a.displayName, bay: "", shore: "", yolo: launch.yolo })).nookId;
   if (shoreId) {
-    if (placeholderId) {
-      await invoke("app.layoutMutate", { op: "replace", shoreId, targetNookId: placeholderId, newNookId: sp, orientation: "", name: "", nookId: "", dir: 0, nookType: "terminal" });
+    const safePlaceholder = safeReplaceTarget(shoreId, placeholderId);
+    if (safePlaceholder) {
+      await invoke("app.layoutMutate", { op: "replace", shoreId, targetNookId: safePlaceholder, newNookId: sp, orientation: "", name: "", nookId: "", dir: 0, nookType: "terminal" });
     }
     activeShoreId = shoreId;
   } else {
