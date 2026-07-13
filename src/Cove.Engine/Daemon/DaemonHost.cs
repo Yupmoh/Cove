@@ -23,6 +23,8 @@ public sealed class DaemonHost
     private readonly CancellationTokenSource _shutdown = new();
     private readonly object _guiLock = new();
     private readonly List<FrameConnection> _guiConnections = new();
+    private readonly object _dirtyBaysLock = new();
+    private readonly HashSet<string> _dirtyBays = new(StringComparer.Ordinal);
 
     private int _totalConnections;
     private int _activeConnections;
@@ -156,7 +158,11 @@ public sealed class DaemonHost
         var shellDir = ShellIntegration.Install(dataDir);
         _nooks = new NookRegistry(_ptyHost, logger, spawnEnv, shellDir);
         _layout = new Cove.Engine.Layout.LayoutService();
-        _bays = new Cove.Engine.Bays.BayManager(logger: logger);
+        _bays = new Cove.Engine.Bays.BayManager(emit: change =>
+        {
+            if (change.Kind == Cove.Engine.Bays.BayChangeKind.Updated)
+                PersistBay(change.BayId, System.IO.Path.Combine(dataDir, "bays"), logger);
+        }, logger: logger);
         _runCommands = new Cove.Engine.Bays.RunCommandService(new Cove.Engine.Bays.RunCommandStore(System.IO.Path.Combine(dataDir, "run-commands"), logger), new Cove.Engine.Bays.PtyRunCommandSessionFactory(_ptyHost, spawnEnv, shellDir, logger), logger: logger);
         _restoration = new Cove.Engine.Restart.RestorationService(dataDir, logger, emitProgress: e => BroadcastEvent("restore.progress", e, Cove.Engine.Restart.RestorationJsonContext.Default.RestoreProgressEvent));
         _snapshots = new Cove.Engine.Snapshots.SnapshotService(dataDir, System.IO.Path.Combine(dataDir, "snapshots"), new Cove.Engine.Bays.ProcessGitRunner(), logger);
@@ -271,6 +277,7 @@ public sealed class DaemonHost
         _restoration.MarkLaunching();
         _restoration.EmitProgress("default", "load_bay", Cove.Engine.Restart.RestorePhase.Started, wasClean ? "clean" : "unclean");
         _layout!.OnChanged = () => PersistActiveBay(baysRoot, logger);
+        _nooks!.OnResized = nookId => MarkNookBayDirty(nookId);
         _hookRouter.SessionStarted += (nookId, adapter, sessionId) =>
         {
             _sessions?.SetSessionId(nookId, adapter, sessionId);
@@ -289,7 +296,7 @@ public sealed class DaemonHost
             foreach (var shore in sl.Shores)
                 foreach (var leaf in Cove.Engine.Layout.MosaicOps.Leaves(shore.LayoutTree))
                     if (entry.Sessions.TryGetValue(leaf.NookId, out var d))
-                        restorables.Add(new Cove.Engine.Restart.RestorableNook(d.NookId, d.Command, d.Args, d.Cwd, d.Title, d.Adapter, d.AgentName, d.SessionId, d.Yolo));
+                        restorables.Add(new Cove.Engine.Restart.RestorableNook(d.NookId, d.Command, d.Args, d.Cwd, d.Title, d.Adapter, d.AgentName, d.SessionId, d.Yolo, d.Cols, d.Rows));
             var spawner = new RestoreSpawner(_nooks!, entry.BayDir, sl.Id, _agentRouter, _sessions, _hookRouter, logger);
             var restorer = new Cove.Engine.Restart.SessionRestorer(spawner, BuildResume, logger);
             var summary = restorer.Restore(restorables, restoreEnabled);
@@ -300,7 +307,8 @@ public sealed class DaemonHost
             _layout!.LoadSnapshot(sl);
             var displayName = Cove.Engine.Layout.BayStartup.DisplayName(sl, fallbackProjectDir);
             var projectDir = string.IsNullOrWhiteSpace(sl.ProjectDir) ? fallbackProjectDir : sl.ProjectDir;
-            await _bays!.AdoptExistingAsync(sl.Id, displayName, projectDir).ConfigureAwait(false);
+            var icon = string.IsNullOrEmpty(sl.IconKind) ? null : new Cove.Engine.Bays.BayIcon(sl.IconKind, sl.IconValue ?? "");
+            await _bays!.AdoptExistingAsync(sl.Id, displayName, projectDir, icon: icon).ConfigureAwait(false);
             logger.LogWarning("bay startup: adopted {Id} '{Name}' shores={Shores} dir={Dir}", sl.Id, displayName, sl.Shores.Count, projectDir);
         }
         if (loadedBays.Count == 0)
@@ -328,7 +336,11 @@ public sealed class DaemonHost
         catch (System.Exception ex) { logger.LogWarning(ex, "run-command relaunch on restore failed"); }
         _restoration.EmitProgress("default", "restore_complete", Cove.Engine.Restart.RestorePhase.Completed);
         PopulateAmbientAggregator(aggregator, dataDir, logger);
-        _scrollbackTimer = new System.Threading.Timer(_ => PersistAllScrollback(baysRoot, logger), null, System.TimeSpan.FromSeconds(15), System.TimeSpan.FromSeconds(15));
+        _scrollbackTimer = new System.Threading.Timer(_ =>
+        {
+            PersistAllScrollback(baysRoot, logger);
+            FlushDirtyBays(baysRoot, logger);
+        }, null, System.TimeSpan.FromSeconds(15), System.TimeSpan.FromSeconds(15));
         if (!OperatingSystem.IsWindows() && File.Exists(_paths.SocketPath))
         {
             if (_endpoint.TryProbe(250))
@@ -384,6 +396,7 @@ public sealed class DaemonHost
         await listener.DisposeAsync().ConfigureAwait(false);
         try { _restoration?.MarkCleanShutdown(); } catch (System.Exception ex) { logger.LogWarning(ex, "clean-shutdown marker failed"); }
         try { PersistAllScrollback(System.IO.Path.Combine(_paths.DataDir.Root, "bays"), logger); } catch (System.Exception ex) { logger.LogWarning(ex, "shutdown scrollback snapshot failed"); }
+        try { FlushDirtyBays(System.IO.Path.Combine(_paths.DataDir.Root, "bays"), logger); } catch (System.Exception ex) { logger.LogWarning(ex, "shutdown bay snapshot flush failed"); }
         _scrollbackTimer?.Dispose();
         if (_runCommands is not null)
             await _runCommands.DisposeAsync().ConfigureAwait(false);
@@ -786,16 +799,59 @@ public sealed class DaemonHost
 
     private void PersistActiveBay(string baysRoot, ILogger logger)
     {
+        if (_layout is not { } layout)
+            return;
+        PersistBay(layout.ActiveBayId, baysRoot, logger);
+    }
+
+    private void MarkNookBayDirty(string nookId)
+    {
+        if (_layout is not { } layout)
+            return;
+        foreach (var bayId in layout.BayIds)
+        {
+            if (System.Linq.Enumerable.Contains(layout.LeafNookIds(bayId), nookId, StringComparer.Ordinal))
+            {
+                lock (_dirtyBaysLock)
+                    _dirtyBays.Add(bayId);
+                return;
+            }
+        }
+    }
+
+    private void FlushDirtyBays(string baysRoot, ILogger logger)
+    {
+        string[] ids;
+        lock (_dirtyBaysLock)
+        {
+            if (_dirtyBays.Count == 0)
+                return;
+            ids = new string[_dirtyBays.Count];
+            _dirtyBays.CopyTo(ids);
+            _dirtyBays.Clear();
+        }
+        foreach (var id in ids)
+            PersistBay(id, baysRoot, logger);
+    }
+
+    private void PersistBay(string bayId, string baysRoot, ILogger logger)
+    {
         if (_layout is not { } layout || _nooks is not { } nooks)
             return;
+        if (!System.Linq.Enumerable.Contains(layout.BayIds, bayId, StringComparer.Ordinal))
+        {
+            logger.LogWarning("bay persist skipped: {BayId} not present in layout", bayId);
+            return;
+        }
         try
         {
-            var wsId = layout.ActiveBayId;
+            var wsId = bayId;
             var actor = _bays?.Get(wsId);
             var name = actor?.State.Name ?? wsId;
             var dir = actor?.State.ProjectDir ?? nooks.ProjectDir ?? System.Environment.CurrentDirectory;
             var wsDir = System.IO.Path.Combine(baysRoot, wsId);
-            var snap = layout.ToSnapshot(wsId, name, dir);
+            var icon = actor?.State.Icon;
+            var snap = layout.ToSnapshot(wsId, name, dir) with { IconKind = icon?.Kind, IconValue = icon?.Value };
             var leafIds = new System.Collections.Generic.HashSet<string>(layout.LeafNookIds(wsId), System.StringComparer.Ordinal);
             var descs = nooks.Descriptors()
                 .Where(d => leafIds.Contains(d.NookId))
@@ -1032,7 +1088,7 @@ public sealed class DaemonHost
             try
             {
                 var scrollback = Cove.Engine.Layout.BayPersistence.LoadScrollback(nook.NookId, _bayDir);
-                _nooks.RespawnAs(nook.NookId, command, args, cwd, 80, 24, scrollback, nook.Adapter, nook.AgentName);
+                _nooks.RespawnAs(nook.NookId, command, args, cwd, nook.Cols, nook.Rows, scrollback, nook.Adapter, nook.AgentName);
                 if (!string.IsNullOrEmpty(nook.Title))
                     _nooks.Rename(nook.NookId, nook.Title!);
                 if (!string.IsNullOrEmpty(nook.Adapter))

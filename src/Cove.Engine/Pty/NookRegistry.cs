@@ -49,6 +49,7 @@ public sealed class NookRegistry : IDisposable, Cove.Engine.Agents.INookWriter
     }
 
     public string? ProjectDir { get => _projectDir; set => _projectDir = value; }
+    public Action<string>? OnResized { get; set; }
     public NookInfo Spawn(SpawnParams p, string? defaultCwd = null)
     {
         string nookId = "nook-" + System.Guid.NewGuid().ToString("N");
@@ -133,7 +134,7 @@ public sealed class NookRegistry : IDisposable, Cove.Engine.Agents.INookWriter
             var arr = new NookDescriptor[_nooks.Count];
             int i = 0;
             foreach (var p in _nooks.Values)
-                arr[i++] = new NookDescriptor(p.NookId, p.Command, p.Args, string.IsNullOrEmpty(p.Cwd) ? p.SpawnCwd : p.Cwd!, p.Title, p.Adapter, p.AgentName);
+                arr[i++] = new NookDescriptor(p.NookId, p.Command, p.Args, string.IsNullOrEmpty(p.Cwd) ? p.SpawnCwd : p.Cwd!, p.Title, p.Adapter, p.AgentName, null, false, p.Cols, p.Rows);
             return arr;
         }
     }
@@ -189,6 +190,7 @@ public sealed class NookRegistry : IDisposable, Cove.Engine.Agents.INookWriter
         nook.Session.Resize(cols, rows);
         nook.Cols = cols;
         nook.Rows = rows;
+        OnResized?.Invoke(nookId);
         return true;
     }
 

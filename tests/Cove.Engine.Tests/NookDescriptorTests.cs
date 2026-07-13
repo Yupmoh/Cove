@@ -23,6 +23,25 @@ public sealed class NookDescriptorTests
     }
 
     [Fact]
+    public void Descriptors_CarryLiveDimensions()
+    {
+        if (System.OperatingSystem.IsWindows())
+            return;
+
+        using var reg = NewRegistry();
+        reg.Spawn(new SpawnParams("/bin/sh", new[] { "-c", "sleep 1" }, "/tmp", null, 120, 40));
+        var d = reg.Descriptors();
+        Assert.Single(d);
+        Assert.Equal(120, d[0].Cols);
+        Assert.Equal(40, d[0].Rows);
+
+        reg.Resize(d[0].NookId, 200, 60);
+        var d2 = reg.Descriptors();
+        Assert.Equal(200, d2[0].Cols);
+        Assert.Equal(60, d2[0].Rows);
+    }
+
+    [Fact]
     public void RespawnAs_RegistersUnderGivenId()
     {
         if (System.OperatingSystem.IsWindows())

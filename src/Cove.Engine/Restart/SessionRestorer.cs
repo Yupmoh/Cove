@@ -12,7 +12,9 @@ public sealed record RestorableNook(
     string? Adapter,
     string? AgentName,
     string? SessionId,
-    bool Yolo);
+    bool Yolo,
+    int Cols = 80,
+    int Rows = 24);
 
 public sealed record RestoreSummary(int Restored, int Fresh, int Skipped);
 
