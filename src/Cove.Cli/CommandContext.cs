@@ -8,14 +8,14 @@ namespace Cove.Cli;
 
 public sealed class CommandContext
 {
-    public CommandContext(DaemonPaths paths, IControlEndpoint endpoint, TextWriter stdout, TextWriter? stderr = null, string[]? args = null)
+    public CommandContext(DaemonPaths paths, IControlEndpoint endpoint, TextWriter stdout, TextWriter? stderr = null, string[]? args = null, CoveChannel? channel = null)
     {
         Paths = paths;
         Endpoint = endpoint;
         Stdout = stdout;
         Stderr = stderr ?? System.Console.Error;
         Args = args ?? System.Array.Empty<string>();
-        Channel = ParseChannel(Args);
+        Channel = channel ?? CliChannel.Resolve(Args);
         IsJson = HasFlag(Args, "--json") || System.Environment.GetEnvironmentVariable("COVE_JSON") == "1";
         Filter = FlagValue(Args, "--filter");
         Source = FlagValue(Args, "--source") ?? "user:cli";
@@ -142,17 +142,6 @@ public sealed class CommandContext
             writer.Flush();
         }
         return JsonDocument.Parse(buffer.ToArray()).RootElement.Clone();
-    }
-
-    private static CoveChannel ParseChannel(string[] args)
-    {
-        var ch = FlagValue(args, "--channel");
-        return ch?.ToLowerInvariant() switch
-        {
-            "beta" => CoveChannel.Beta,
-            "dev" => CoveChannel.Dev,
-            _ => CoveChannel.Stable,
-        };
     }
 
     private static bool HasFlag(string[] args, string flag)
