@@ -60,4 +60,29 @@ public sealed class BayCwdSpawnTests
         }
         finally { try { Directory.Delete(dir, true); } catch { /* best effort */ } }
     }
+
+    [Fact]
+    public void ResolveWorkingDirectory_InheritedWins()
+    {
+        Assert.Equal("/inherited", NookRegistry.ResolveWorkingDirectory("/inherited", "/explicit", "/bay"));
+    }
+
+    [Fact]
+    public void ResolveWorkingDirectory_ExplicitOverBay()
+    {
+        Assert.Equal("/explicit", NookRegistry.ResolveWorkingDirectory(null, "/explicit", "/bay"));
+    }
+
+    [Fact]
+    public void ResolveWorkingDirectory_BayWhenNoInheritOrExplicit()
+    {
+        Assert.Equal("/bay", NookRegistry.ResolveWorkingDirectory(null, null, "/bay"));
+    }
+
+    [Fact]
+    public void ResolveWorkingDirectory_FallsBackToHomeWhenAllEmpty()
+    {
+        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        Assert.Equal(home, NookRegistry.ResolveWorkingDirectory(null, null, null));
+    }
 }

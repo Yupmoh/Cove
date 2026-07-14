@@ -216,7 +216,29 @@ public sealed class LaunchOrchestrator
             }
             options.Add(new LauncherOption(keyProp.GetString()!, labelProp.GetString()!, typeProp.GetString()!, defaultValueRaw, choices));
         }
-        return new LauncherOptionsResult(options);
+        var suggested = new List<LauncherSuggestedFlag>();
+        if (json.TryGetProperty("suggestedFlags", out var sfProp) && sfProp.ValueKind == System.Text.Json.JsonValueKind.Array)
+        {
+            foreach (var item in sfProp.EnumerateArray())
+            {
+                if (!item.TryGetProperty("flag", out var flagProp))
+                    continue;
+                string? description = item.TryGetProperty("description", out var descProp) ? descProp.GetString() : null;
+                List<string>? values = null;
+                if (item.TryGetProperty("values", out var valsProp) && valsProp.ValueKind == System.Text.Json.JsonValueKind.Array)
+                {
+                    values = new List<string>();
+                    foreach (var v in valsProp.EnumerateArray())
+                    {
+                        var s = v.GetString();
+                        if (s is not null)
+                            values.Add(s);
+                    }
+                }
+                suggested.Add(new LauncherSuggestedFlag(flagProp.GetString()!, description, values));
+            }
+        }
+        return new LauncherOptionsResult(options, suggested);
     }
 
     private static ResumeCommand ParseCommand(System.Text.Json.JsonElement json, string? workingDir)

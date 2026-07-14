@@ -46,10 +46,20 @@ if [ "$MODE" = "restart-all" ]; then
   fi
 fi
 
-if [ ! -x "$ENGINE" ] || [ ! -x "$GUI" ]; then
-  echo "binaries missing — building solution first"
-  dotnet build "$ROOT/Cove.slnx" -c Debug -v:q -clp:ErrorsOnly
+FRONTEND="$ROOT/src/Cove.Gui/frontend"
+WWWROOT="$ROOT/src/Cove.Gui/wwwroot"
+frontend_stale() {
+  [ -f "$WWWROOT/index.html" ] || return 0
+  [ -n "$(find "$FRONTEND/src" "$FRONTEND/package.json" "$FRONTEND/vite.config.ts" -newer "$WWWROOT/index.html" -print -quit 2>/dev/null)" ]
+}
+
+if frontend_stale; then
+  echo "frontend sources newer than bundle — rebuilding frontend"
+  (cd "$FRONTEND" && npm run build)
 fi
+
+echo "building solution (incremental)"
+dotnet build "$ROOT/Cove.slnx" -c Debug -v:q -clp:ErrorsOnly
 
 if daemon_pid > /dev/null; then
   echo "daemon already running — sessions will reattach"

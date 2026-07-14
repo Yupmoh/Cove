@@ -5,11 +5,35 @@ import {
   buildBuiltinTiles,
   buildLauncherTiles,
   isEmptyShoreTree,
+  isPlaceholderLeaf,
   launcherPlacement,
   placeableNookForAction,
+  resolveLaunchCwd,
   type LauncherAdapter,
   type LauncherBuiltin,
+  type PlaceholderTreeNode,
 } from "./box-launcher";
+
+describe("resolveLaunchCwd", () => {
+  it("defaults to the active bay dir when nothing is specified", () => {
+    expect(resolveLaunchCwd("", "", "/Users/moh/Desktop/Work/Raptor/InSpades")).toBe("/Users/moh/Desktop/Work/Raptor/InSpades");
+  });
+  it("keeps an explicit cwd over the bay dir", () => {
+    expect(resolveLaunchCwd("/tmp/here", "", "/Users/moh/bay")).toBe("/tmp/here");
+  });
+  it("yields empty so the engine inherits from a sibling nook", () => {
+    expect(resolveLaunchCwd("", "nook-123", "/Users/moh/bay")).toBe("");
+  });
+  it("prefers an explicit cwd even when inheriting", () => {
+    expect(resolveLaunchCwd("/tmp/here", "nook-123", "/Users/moh/bay")).toBe("/tmp/here");
+  });
+  it("returns empty when there is no active bay dir to fall back to", () => {
+    expect(resolveLaunchCwd("", "", "")).toBe("");
+  });
+  it("treats whitespace-only values as empty", () => {
+    expect(resolveLaunchCwd("   ", "  ", "/Users/moh/bay")).toBe("/Users/moh/bay");
+  });
+});
 
 describe("shouldShowLauncher", () => {
   it("shows only when the active bay has no shores", () => {
@@ -103,5 +127,33 @@ describe("placeableNookForAction", () => {
     expect(placeableNookForAction("tool.search")).toEqual({ nookType: "search", kind: "tool", shoreName: "Search" });
     expect(placeableNookForAction("tool.tasks")).toEqual({ nookType: "tasks-list", kind: "tool", shoreName: "Tasks" });
     expect(placeableNookForAction("tool.notepad")).toBeNull();
+  });
+});
+
+describe("isPlaceholderLeaf", () => {
+  const emptyLeaf: PlaceholderTreeNode = { kind: "leaf", nookId: "empty-1", subtabs: [{ nookType: "empty" }] };
+  const liveLeaf: PlaceholderTreeNode = { kind: "leaf", nookId: "nook-live", subtabs: [{ nookType: "terminal" }] };
+
+  it("treats an empty-typed leaf as a placeholder", () => {
+    expect(isPlaceholderLeaf(emptyLeaf, "empty-1")).toBe(true);
+  });
+
+  it("treats a leaf with no subtabs as a placeholder", () => {
+    expect(isPlaceholderLeaf({ kind: "leaf", nookId: "bare" }, "bare")).toBe(true);
+  });
+
+  it("does not treat a live terminal leaf as a placeholder", () => {
+    expect(isPlaceholderLeaf(liveLeaf, "nook-live")).toBe(false);
+  });
+
+  it("finds a placeholder leaf nested inside splits", () => {
+    const tree: PlaceholderTreeNode = { kind: "split", childA: liveLeaf, childB: emptyLeaf };
+    expect(isPlaceholderLeaf(tree, "empty-1")).toBe(true);
+    expect(isPlaceholderLeaf(tree, "nook-live")).toBe(false);
+  });
+
+  it("returns false when the id is absent", () => {
+    expect(isPlaceholderLeaf(emptyLeaf, "missing")).toBe(false);
+    expect(isPlaceholderLeaf(null, "empty-1")).toBe(false);
   });
 });

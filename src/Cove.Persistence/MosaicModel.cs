@@ -49,7 +49,7 @@ public sealed record NookLeaf : MosaicNode
 
 public sealed record Subtab(string DocumentId, NookType NookType, string? Title = null);
 
-public sealed record NookDescriptor(string NookId, string Command, string[] Args, string Cwd, string? Title = null, string? Adapter = null, string? AgentName = null, string? SessionId = null, bool Yolo = false);
+public sealed record NookDescriptor(string NookId, string Command, string[] Args, string Cwd, string? Title = null, string? Adapter = null, string? AgentName = null, string? SessionId = null, bool Yolo = false, int Cols = 80, int Rows = 24);
 
 public sealed record ShoreSnapshot
 {
@@ -67,6 +67,8 @@ public sealed record BaySnapshot
     public required string Name { get; init; }
     public required string ProjectDir { get; init; }
     public string? ActiveShoreId { get; init; }
+    public string? IconKind { get; init; }
+    public string? IconValue { get; init; }
     private readonly IReadOnlyList<ShoreSnapshot>? _shores;
     public IReadOnlyList<ShoreSnapshot> Shores { get => _shores ?? System.Array.Empty<ShoreSnapshot>(); init => _shores = value; }
 }

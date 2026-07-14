@@ -592,7 +592,15 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/launch-profile.create",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/launch-profile.delete",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/launch-profile.get",
     "source": "core"
   },
   {
@@ -601,6 +609,10 @@
   },
   {
     "command": "cove://commands/launch-profile.set-default",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/launch-profile.update",
     "source": "core"
   },
   {
@@ -1416,7 +1428,15 @@
     "source": "cli"
   },
   {
+    "command": "launch-profile create",
+    "source": "cli"
+  },
+  {
     "command": "launch-profile delete",
+    "source": "cli"
+  },
+  {
+    "command": "launch-profile get",
     "source": "cli"
   },
   {
@@ -1425,6 +1445,10 @@
   },
   {
     "command": "launch-profile set-default",
+    "source": "cli"
+  },
+  {
+    "command": "launch-profile update",
     "source": "cli"
   },
   {

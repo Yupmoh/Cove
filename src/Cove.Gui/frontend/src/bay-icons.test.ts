@@ -24,4 +24,16 @@ describe("bay-icons", () => {
   it("returns null for an emoji icon with an empty value", () => {
     expect(bayGlyph({ kind: "emoji", value: "" })).toBeNull();
   });
+
+  it("round-trips an icon carried on a bay.list summary", () => {
+    const summary = { iconKind: "emoji", iconValue: "🚀" } as { iconKind?: string | null; iconValue?: string | null };
+    const icon = summary.iconKind ? { kind: summary.iconKind, value: summary.iconValue ?? "" } : null;
+    expect(bayGlyph(icon)).toBe("🚀");
+  });
+
+  it("renders no glyph for a bay.list summary without an icon", () => {
+    const summary = {} as { iconKind?: string | null; iconValue?: string | null };
+    const icon = summary.iconKind ? { kind: summary.iconKind, value: summary.iconValue ?? "" } : null;
+    expect(bayGlyph(icon)).toBeNull();
+  });
 });

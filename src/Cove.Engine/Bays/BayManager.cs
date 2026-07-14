@@ -131,7 +131,7 @@ public sealed class BayManager : IAsyncDisposable
         return model;
     }
 
-    public async Task<BayModel> AdoptExistingAsync(string id, string name, string projectDir, string? collectionId = null)
+    public async Task<BayModel> AdoptExistingAsync(string id, string name, string projectDir, string? collectionId = null, BayIcon? icon = null)
     {
         var model = new BayModel
         {
@@ -144,6 +144,7 @@ public sealed class BayManager : IAsyncDisposable
             Nooks = new Dictionary<string, NookRecord>(),
             ActiveShoreId = null,
             FocusedNookId = null,
+            Icon = icon,
         };
         lock (_mapGate)
             _bays[id] = new Actor<BayModel>(model);

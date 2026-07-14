@@ -59,7 +59,7 @@ public static class RestoreChooserCommands
                     {
                         try
                         {
-                            nooks.RespawnAs(d.NookId, d.Command, d.Args, d.Cwd, 80, 24, BayPersistence.LoadScrollback(d.NookId, entry.BayDir));
+                            nooks.RespawnAs(d.NookId, d.Command, d.Args, d.Cwd, d.Cols, d.Rows, BayPersistence.LoadScrollback(d.NookId, entry.BayDir));
                             restored.Add(d.NookId);
                         }
                         catch { }
@@ -87,7 +87,7 @@ public static class RestoreChooserCommands
                 foreach (var leaf in MosaicOps.Leaves(shore.LayoutTree))
                     if (entry.Sessions.TryGetValue(leaf.NookId, out var d))
                     {
-                        try { nooks.RespawnAs(d.NookId, d.Command, d.Args, d.Cwd, 80, 24, BayPersistence.LoadScrollback(d.NookId, entry.BayDir)); }
+                        try { nooks.RespawnAs(d.NookId, d.Command, d.Args, d.Cwd, d.Cols, d.Rows, BayPersistence.LoadScrollback(d.NookId, entry.BayDir)); }
                         catch { }
                     }
             layout.LoadSnapshot(entry.Snapshot);

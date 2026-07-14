@@ -49,11 +49,14 @@ public sealed class NookRegistry : IDisposable, Cove.Engine.Agents.INookWriter
     }
 
     public string? ProjectDir { get => _projectDir; set => _projectDir = value; }
+    public Action<string>? OnResized { get; set; }
     public NookInfo Spawn(SpawnParams p, string? defaultCwd = null)
     {
         string nookId = "nook-" + System.Guid.NewGuid().ToString("N");
         string? inherited = (!string.IsNullOrEmpty(p.InheritCwdFrom) && TryGet(p.InheritCwdFrom!, out var src)) ? src.Cwd : null;
         string? fallback = !string.IsNullOrEmpty(defaultCwd) ? defaultCwd : _projectDir;
+        if (string.IsNullOrEmpty(inherited) && string.IsNullOrEmpty(p.Cwd) && string.IsNullOrEmpty(fallback))
+            _logger.NookSpawnCwdFallback(nookId, p.Adapter ?? "", Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
         string cwd = ResolveWorkingDirectory(inherited, p.Cwd, fallback);
         _logger.NookSpawn(nookId, p.Command, p.Adapter ?? "", p.Yolo, !string.IsNullOrEmpty(p.SessionId), p.Cols, p.Rows);
         var info = SpawnCore(nookId, p.Command, p.Args ?? System.Array.Empty<string>(), cwd, p.Cols, p.Rows, p.Env);
@@ -131,7 +134,7 @@ public sealed class NookRegistry : IDisposable, Cove.Engine.Agents.INookWriter
             var arr = new NookDescriptor[_nooks.Count];
             int i = 0;
             foreach (var p in _nooks.Values)
-                arr[i++] = new NookDescriptor(p.NookId, p.Command, p.Args, string.IsNullOrEmpty(p.Cwd) ? p.SpawnCwd : p.Cwd!, p.Title, p.Adapter, p.AgentName);
+                arr[i++] = new NookDescriptor(p.NookId, p.Command, p.Args, string.IsNullOrEmpty(p.Cwd) ? p.SpawnCwd : p.Cwd!, p.Title, p.Adapter, p.AgentName, null, false, p.Cols, p.Rows);
             return arr;
         }
     }
@@ -187,6 +190,7 @@ public sealed class NookRegistry : IDisposable, Cove.Engine.Agents.INookWriter
         nook.Session.Resize(cols, rows);
         nook.Cols = cols;
         nook.Rows = rows;
+        OnResized?.Invoke(nookId);
         return true;
     }
 

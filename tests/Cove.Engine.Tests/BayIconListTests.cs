@@ -50,6 +50,18 @@ public sealed class BayIconListTests
     }
 
     [Fact]
+    public async Task List_CarriesIcon_AfterAdoptWithIcon()
+    {
+        await using var m = new BayManager();
+        var ws = await m.AdoptExistingAsync("id-1", "w", "/a", icon: new BayIcon("emoji", "🚀"));
+
+        var listResp = await Route(m, "cove://commands/bay.list", null);
+        var item = ListItem(listResp!, ws.Id);
+        Assert.Equal("emoji", item.IconKind);
+        Assert.Equal("🚀", item.IconValue);
+    }
+
+    [Fact]
     public async Task List_IconCleared_WhenSetIconEmptyKind()
     {
         int n = 0;

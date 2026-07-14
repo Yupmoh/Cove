@@ -35,6 +35,7 @@ public sealed class ControlClient : IAsyncDisposable
     private readonly Channel<ControlFrame> _eventChannel = Channel.CreateUnbounded<ControlFrame>();
     private readonly Channel<PtyChunk> _ptyChannel = Channel.CreateUnbounded<PtyChunk>();
     private readonly CancellationTokenSource _cts = new();
+    private readonly SemaphoreSlim _writeGate = new(1, 1);
     private Task? _receiveTask;
 
     public ControlClient(string socketPath, ILogger? logger = null)
@@ -62,8 +63,13 @@ public sealed class ControlClient : IAsyncDisposable
         var envelope = new ControlEnvelope("req", id, method, parameters, null, null, null, null, null, null);
         var json = JsonSerializer.SerializeToUtf8Bytes(envelope, ControlJsonContext.Default.ControlEnvelope);
         var lengthPrefix = System.BitConverter.GetBytes(json.Length);
-        await _stream.WriteAsync(lengthPrefix, ct).ConfigureAwait(false);
-        await _stream.WriteAsync(json, ct).ConfigureAwait(false);
+        await _writeGate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            await _stream.WriteAsync(lengthPrefix, ct).ConfigureAwait(false);
+            await _stream.WriteAsync(json, ct).ConfigureAwait(false);
+        }
+        finally { _writeGate.Release(); }
 
         using var reg = ct.Register(() => tcs.TrySetCanceled());
         return await tcs.Task.ConfigureAwait(false);
@@ -102,9 +108,14 @@ public sealed class ControlClient : IAsyncDisposable
         var totalLength = json.Length + data.Length;
         var lengthPrefix = System.BitConverter.GetBytes(totalLength);
 
-        await _stream.WriteAsync(lengthPrefix, ct).ConfigureAwait(false);
-        await _stream.WriteAsync(json, ct).ConfigureAwait(false);
-        await _stream.WriteAsync(data, ct).ConfigureAwait(false);
+        await _writeGate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            await _stream.WriteAsync(lengthPrefix, ct).ConfigureAwait(false);
+            await _stream.WriteAsync(json, ct).ConfigureAwait(false);
+            await _stream.WriteAsync(data, ct).ConfigureAwait(false);
+        }
+        finally { _writeGate.Release(); }
     }
 
     private async Task ReceiveLoopAsync()
@@ -204,6 +215,7 @@ public sealed class ControlClient : IAsyncDisposable
         _stream?.Dispose();
         _tcp?.Dispose();
         _cts.Dispose();
+        _writeGate.Dispose();
         if (_receiveTask is not null)
             await _receiveTask.ConfigureAwait(false);
     }

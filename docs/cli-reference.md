@@ -148,9 +148,12 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/keybind.list` | core |  |
 | `cove://commands/keybind.set` | core |  |
 | `cove://commands/knowledge.ping` | core |  |
+| `cove://commands/launch-profile.create` | core |  |
 | `cove://commands/launch-profile.delete` | core |  |
+| `cove://commands/launch-profile.get` | core |  |
 | `cove://commands/launch-profile.list` | core |  |
 | `cove://commands/launch-profile.set-default` | core |  |
+| `cove://commands/launch-profile.update` | core |  |
 | `cove://commands/launch.build` | core |  |
 | `cove://commands/launch.overrides.clear` | core |  |
 | `cove://commands/launch.overrides.get` | core |  |
@@ -353,9 +356,12 @@ Generated from the command registry. Do not edit by hand.
 | `extension run` | cli |  |
 | `hook emit` | cli |  |
 | `knowledge ping` | cli |  |
+| `launch-profile create` | cli |  |
 | `launch-profile delete` | cli |  |
+| `launch-profile get` | cli |  |
 | `launch-profile list` | cli |  |
 | `launch-profile set-default` | cli |  |
+| `launch-profile update` | cli |  |
 | `library list` | cli |  |
 | `library materialize` | cli |  |
 | `memory add` | cli |  |
@@ -464,4 +470,4 @@ Generated from the command registry. Do not edit by hand.
 | `viewer get-state` | cli |  |
 | `viewer open` | cli |  |
 
-Total: 459 commands
+Total: 465 commands

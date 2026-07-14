@@ -62,6 +62,9 @@ internal static partial class PtyDataLog
     [ZLoggerMessage(3041, LogLevel.Debug, "nook spawn environment nook={nookId} envCount={envCount} argCount={argCount} cwd={cwd}")]
     public static partial void NookSpawnEnv(this ILogger logger, string nookId, int envCount, int argCount, string cwd);
 
+    [ZLoggerMessage(3048, LogLevel.Warning, "nook spawn falling back to home dir nook={nookId} adapter={adapter} home={home} (no inherited, explicit, or bay cwd)")]
+    public static partial void NookSpawnCwdFallback(this ILogger logger, string nookId, string adapter, string home);
+
     [ZLoggerMessage(3042, LogLevel.Information, "nook respawn nook={nookId} command={command} adapter={adapter}")]
     public static partial void NookRespawn(this ILogger logger, string nookId, string command, string adapter);
 
