@@ -17,6 +17,9 @@ internal static partial class PtyLog
     [ZLoggerMessage(LogLevel.Trace, "conpty CreatePseudoConsole result hr=0x{hr:X8} handleValid={handleValid}", EventId = 1003)]
     public static partial void WinPseudoConsoleCreated(this ILogger logger, int hr, bool handleValid);
 
+    [ZLoggerMessage(LogLevel.Debug, "conpty passthrough mode unsupported command={command} hr=0x{hr:X8} retrying with virtual screen", EventId = 1092)]
+    public static partial void WinPseudoConsolePassthroughUnsupported(this ILogger logger, string command, int hr);
+
     [ZLoggerMessage(LogLevel.Error, "conpty CreatePseudoConsole failed command={command} hr=0x{hr:X8}", EventId = 1004)]
     public static partial void WinPseudoConsoleFailed(this ILogger logger, string command, int hr);
 

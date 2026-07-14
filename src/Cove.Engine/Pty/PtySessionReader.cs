@@ -89,6 +89,7 @@ public sealed class PtySessionReader : IDisposable
 
     public void Dispose()
     {
+        _session.Kill();
         _thread?.Join(TimeSpan.FromSeconds(5));
     }
 }
