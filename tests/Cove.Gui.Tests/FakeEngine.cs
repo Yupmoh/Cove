@@ -19,14 +19,14 @@ public sealed class FakeEngine : IAsyncDisposable
         return c.GetStream();
     };
 
-    public Task ServeOnceAsync(ulong baseOffset, Func<Stream, Task> script) => Task.Run(async () =>
+    public Task ServeOnceAsync(ulong baseOffset, ulong replayUntilOffset, Func<Stream, Task> script) => Task.Run(async () =>
     {
         using var conn = await _l.AcceptTcpClientAsync();
         var s = conn.GetStream();
         var hello = await Read(s);
         await WriteResponse(s, ReqId(hello), new HelloResult(1, "0.1.0", 1234, "dev"), CoveJsonContext.Default.HelloResult);
         var sub = await Read(s);
-        await WriteResponse(s, ReqId(sub), new SubscribeResult(1, baseOffset, ProtocolConstants.FlowWindow), CoveJsonContext.Default.SubscribeResult);
+        await WriteResponse(s, ReqId(sub), new SubscribeResult(1, baseOffset, ProtocolConstants.FlowWindow, replayUntilOffset), CoveJsonContext.Default.SubscribeResult);
         _ = Task.Run(async () => { try { while (true) { var f = await Read(s); if (f.type == FrameType.Credit) Credits.Add(BinaryPrimitives.ReadUInt64LittleEndian(f.payload)); } } catch { Credits.TrimExcess(); } });
         await script(s);
     });

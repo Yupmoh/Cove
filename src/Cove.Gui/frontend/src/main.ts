@@ -1,11 +1,13 @@
 import { restoredSummaryText, shouldShowRestoreToast } from "./restore-summary";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
-import { WebglAddon } from "@xterm/addon-webgl";
+import { CanvasAddon } from "@xterm/addon-canvas";
 import { SearchAddon } from "@xterm/addon-search";
 import "@xterm/xterm/css/xterm.css";
-import { toBase64Utf8, parseRelayText } from "./wsproto";
-import { scrubTerminalReports } from "./terminal-scrub";
+import { decodeRelayData, toBase64Utf8, parseRelayText } from "./wsproto";
+import { createKeyboardProtocolTracker, shiftEnterSequence, type KeyboardProtocolTracker } from "./terminal-keyboard";
+import { isPaneFittable, shouldResize, type TermDims } from "./terminal-fit";
+import { createStreamGenerations, replayViewportAction, shouldDisposeNook, shouldResetReplay, streamVisibilityAction } from "./stream-guard";
 import { renderKanbanBoard } from "./tasks-kanban";
 import { renderTaskList } from "./tasks-list";
 import { renderTimelineFeed } from "./timeline-feed";
@@ -51,8 +53,8 @@ import { detectChimes, playChime, chimesEnabledFrom, chimePrefValue, AGENT_CHIME
 import { NotificationBridge, type NotificationBridgeDeps, type NotificationDeliverPayload } from "./notifications";
 import { buildMenu, menuChordSet } from "./menu-model";
 import { toolbarTiles } from "./toolbar-tiles";
-import { shouldShowLauncher, buildAdapterTiles, buildBuiltinTiles, isEmptyShoreTree, placeableNookForAction, type LauncherAdapter, type LauncherBuiltin, type LauncherTile } from "./box-launcher";
-import { adapterAccent, toolAccent, assignHotkeys, detectedHarnessTiles, clampLauncherSelection, moveLauncherSelection, hotkeyTarget, shapeRecentSessions, tipAt, computeLauncherCols, resolveLauncherYolo, type LauncherSelection, type LauncherGeometry, type LauncherArrowKey, type RecentSessionRow } from "./launcher-model";
+import { shouldShowLauncher, buildAdapterTiles, buildBuiltinTiles, isEmptyShoreTree, isPlaceholderLeaf, placeableNookForAction, resolveLaunchCwd, type LauncherAdapter, type LauncherBuiltin, type LauncherTile } from "./box-launcher";
+import { adapterAccent, toolAccent, assignHotkeys, detectedHarnessTiles, clampLauncherSelection, moveLauncherSelection, hotkeyTarget, shapeRecentSessions, tipAt, computeLauncherCols, resolveLauncherYolo, resolveLauncherProjectDir, type LauncherSelection, type LauncherGeometry, type LauncherArrowKey, type RecentSessionRow } from "./launcher-model";
 import { iconSvg, iconForNookType, monogram } from "./icons";
 import { dropZoneFor, moveMutationFor, zoneOverlayRect } from "./nook-dnd";
 import { cssPath, buildFeedbackReport, feedbackSlug, harnessPrompt } from "./inspect-mode";
@@ -67,14 +69,6 @@ installConsoleCapture((level, message) => {
   window.__ryn.invoke("app.frontendLog", { level, message }).catch(() => {});
 });
 
-function keyDebugOn(): boolean {
-  return localStorage.getItem("cove.debug.keys") === "true" || navigator.userAgent.includes("Windows");
-}
-document.addEventListener("keydown", (e) => {
-  if (!keyDebugOn()) return;
-  const t = e.target as HTMLElement | null;
-  console.warn(`[keydbg] doc keydown key=${e.key} target=${t?.tagName ?? "?"}.${t?.className?.toString().slice(0, 40) ?? ""} prevented=${e.defaultPrevented}`);
-}, true);
 
 const RYN_MENUBAR_EVENTS_BROKEN = false;
 import { initHud, toggleHud, recordFrame, hudMetrics, readJsHeapBytes, hudLines, type HudState, type JsHeapProbe } from "./perf-hud";
@@ -139,6 +133,8 @@ async function invoke<T>(cmd: string, args: unknown): Promise<T> {
   return JSON.parse(result as string) as T;
 }
 
+const locallySpawnedNookIds = new Set<string>();
+const renderedStreamNookIds = new Set<string>();
 async function spawnNook(params: Record<string, unknown>): Promise<{ nookId: string }> {
   const r = await invoke<{ nookId?: string; error?: { code?: string; message?: string } }>("app.nookSpawn", params);
   if (!r?.nookId) {
@@ -193,18 +189,28 @@ interface NookView {
   nookId: string;
   term: Terminal;
   fit: FitAddon;
-  ws: WebSocket;
+  ws: WebSocket | null;
   el: HTMLElement;
   consumed: number;
   lastAck: number;
+  expectedOffset: number;
+  replayUntilOffset: number;
   title: string;
   customTitle: string;
   headerTitleEl: HTMLElement;
   search: SearchAddon;
   replaying: boolean;
+  resetOnReplay: boolean;
+  keyboard: KeyboardProtocolTracker;
+  lastSent: TermDims | null;
+  handlersBound: boolean;
+  resizeObserver: ResizeObserver | null;
+  fitFrame: number | null;
+  reconnectTimer: number | null;
 }
 
 const nooks = new Map<string, NookView>();
+const streamGens = createStreamGenerations();
 let layout: BaySnapshot | null = null;
 let activeShoreId: string | null = null;
 let focusedNookId: string | null = null;
@@ -288,12 +294,27 @@ const palList = document.getElementById("pal-list")!;
 gridEl.style.display = "flex";
 gridEl.style.padding = "8px";
 
-function fitAll() {
-  requestAnimationFrame(() => {
-    for (const pv of nooks.values()) {
-      try { pv.fit.fit(); } catch { void 0; }
-    }
+function paneFittable(pv: NookView): boolean {
+  const host = pv.term.element?.parentElement as HTMLElement | null;
+  if (!host) return false;
+  return isPaneFittable(host.clientWidth, host.clientHeight, host.isConnected, host.offsetParent !== null);
+}
+function fitNook(pv: NookView): void {
+  if (!paneFittable(pv)) return;
+  try {
+    pv.fit.fit();
+    pv.term.refresh(0, Math.max(0, pv.term.rows - 1));
+  } catch { void 0; }
+}
+function scheduleFit(pv: NookView): void {
+  if (pv.fitFrame !== null) return;
+  pv.fitFrame = requestAnimationFrame(() => {
+    pv.fitFrame = null;
+    fitNook(pv);
   });
+}
+function fitAll() {
+  for (const pv of nooks.values()) scheduleFit(pv);
 }
 
 function applySettings() {
@@ -326,22 +347,52 @@ function persistSettings() {
   for (const [k, v] of entries)
     invoke("app.configSet", { key: k, value: v }).catch((e) => console.warn("configSet failed", k, e));
 }
-function attachWs(nook: NookView) {
-  const ws = nook.ws;
+function finishReplay(nook: NookView, resynced = false): void {
+  const viewportAction = replayViewportAction({ resetOnReplay: nook.resetOnReplay, resynced });
+  nook.replaying = false;
+  nook.resetOnReplay = false;
+  if (viewportAction === "bottom") nook.term.scrollToBottom();
+}
+
+function attachWs(nook: NookView): void {
+  if (nook.ws && nook.ws.readyState < WebSocket.CLOSING) return;
+  if (nook.reconnectTimer !== null) {
+    window.clearTimeout(nook.reconnectTimer);
+    nook.reconnectTimer = null;
+  }
+  const ws = new WebSocket(`ws://${location.host}/pty?nook=${encodeURIComponent(nook.nookId)}&since=${nook.consumed}`);
+  nook.ws = ws;
+  nook.replaying = true;
+  nook.replayUntilOffset = nook.consumed;
+  const generation = streamGens.claim(nook.nookId);
+  const current = () => streamGens.isCurrent(nook.nookId, generation);
   ws.binaryType = "arraybuffer";
   const sendAck = () => {
-    if (ws.readyState === 1 && nook.consumed > nook.lastAck) {
+    if (ws.readyState === WebSocket.OPEN && nook.consumed > nook.lastAck) {
       ws.send(JSON.stringify({ t: "ack", off: nook.consumed }));
       nook.lastAck = nook.consumed;
     }
   };
   ws.onmessage = (ev) => {
+    if (!current()) return;
     if (typeof ev.data === "string") {
       const m = parseRelayText(ev.data);
       if (!m) return;
-      if (m.t === "base") { nook.consumed = m.off; nook.lastAck = m.off; }
-      else if (m.t === "resync") { nook.term.reset(); nook.consumed = m.base; nook.lastAck = m.base; }
-      else if (m.t === "end") {
+      if (m.t === "base") {
+        if (nook.resetOnReplay && nook.replaying) nook.term.reset();
+        nook.consumed = m.off;
+        nook.expectedOffset = m.off;
+        nook.replayUntilOffset = m.head;
+        nook.lastAck = m.off;
+        if (m.head <= m.off) finishReplay(nook);
+      } else if (m.t === "resync") {
+        nook.term.reset();
+        nook.consumed = m.base;
+        nook.expectedOffset = m.base;
+        nook.replayUntilOffset = m.base;
+        nook.lastAck = m.base;
+        finishReplay(nook, true);
+      } else if (m.t === "end") {
         nook.term.write(`\r\n\x1b[38;5;244m[process exited: ${m.code}]\x1b[0m\r\n`);
         launcherRecentsAt = 0;
         void refreshLauncherRecents();
@@ -349,23 +400,68 @@ function attachWs(nook: NookView) {
       }
       return;
     }
-    const raw = new Uint8Array(ev.data as ArrayBuffer);
-    const bytes = scrubTerminalReports(raw, { includeOscColorReports: nook.replaying });
-    nook.term.write(bytes, () => {
-      nook.consumed += raw.length;
+    let frame;
+    try {
+      frame = decodeRelayData(ev.data as ArrayBuffer);
+    } catch (error) {
+      console.warn("invalid terminal stream frame", { nookId: nook.nookId, error: String(error) });
+      ws.close(1008, "invalid terminal stream frame");
+      return;
+    }
+    const { offset, raw } = frame;
+    const nextOffset = offset + raw.length;
+    if (offset < nook.expectedOffset && nextOffset <= nook.expectedOffset) return;
+    if (offset !== nook.expectedOffset) {
+      console.warn("terminal stream offset mismatch", { nookId: nook.nookId, expected: nook.expectedOffset, received: offset });
+      ws.close(1008, "terminal stream offset mismatch");
+      return;
+    }
+    nook.expectedOffset = nextOffset;
+    nook.keyboard.push(raw);
+    const bytes = raw;
+    const commit = () => {
+      if (!current()) return;
+      nook.consumed = nextOffset;
       if (nook.consumed - nook.lastAck >= CREDIT_THRESHOLD) sendAck();
+    };
+    nook.term.write(bytes, () => {
+      if (!current()) return;
+      if (nook.replaying && nextOffset >= nook.replayUntilOffset) finishReplay(nook);
+      commit();
     });
   };
-  setInterval(sendAck, 100);
-  nook.term.onData((d) => { if (keyDebugOn()) console.warn(`[keydbg] onData len=${d.length} codes=${Array.from(d).slice(0, 8).map((c) => c.charCodeAt(0)).join(",")}`); nook.replaying = false; void enqueueNookWrite(nook.nookId, toBase64Utf8(d), (nookId, dataBase64) => invoke("app.nookWrite", { nookId, dataBase64 })); });
-  nook.term.onResize(({ cols, rows }) => { void invoke("app.nookResize", { nookId: nook.nookId, cols, rows }); });
+  const ackTimer = window.setInterval(() => {
+    if (!current()) { window.clearInterval(ackTimer); return; }
+    sendAck();
+  }, 100);
+  ws.onclose = () => {
+    window.clearInterval(ackTimer);
+    nook.consumed = Math.max(nook.consumed, nook.expectedOffset);
+    if (nook.ws === ws) nook.ws = null;
+    if (!current() || nooks.get(nook.nookId) !== nook || !nook.el.isConnected) return;
+    nook.reconnectTimer = window.setTimeout(() => {
+      nook.reconnectTimer = null;
+      if (nook.el.isConnected) attachWs(nook);
+    }, 250);
+  };
+  if (nook.handlersBound) return;
+  nook.handlersBound = true;
+  nook.term.onData((d) => {
+    if (nook.replaying) return;
+    void enqueueNookWrite(nook.nookId, toBase64Utf8(d), (nookId, dataBase64) => invoke("app.nookWrite", { nookId, dataBase64 }));
+  });
+  nook.term.onResize(({ cols, rows }) => {
+    const dims: TermDims = { cols, rows };
+    if (!shouldResize(dims, nook.lastSent, paneFittable(nook))) return;
+    nook.lastSent = dims;
+    void invoke("app.nookResize", { nookId: nook.nookId, cols, rows });
+  });
 }
 
 function makeNook(nookId: string, since: number): NookView {
   const term = new Terminal({ allowTransparency: true, scrollback: settings.scrollback, convertEol: false, fontFamily: settings.fontFamily || "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: settings.fontSize, lineHeight: settings.lineHeight, cursorStyle: settings.cursorStyle, cursorBlink: settings.cursorBlink, theme: currentTermTheme() });
   const fitAddon = new FitAddon();
   term.loadAddon(fitAddon);
-  try { term.loadAddon(new WebglAddon()); } catch { void 0; }
   const searchAddon = new SearchAddon();
   term.loadAddon(searchAddon);
 
@@ -405,6 +501,7 @@ function makeNook(nookId: string, since: number): NookView {
   host.className = "term-host";
   el.appendChild(host);
   term.open(host);
+  try { term.loadAddon(new CanvasAddon()); } catch (error) { console.warn("terminal canvas renderer unavailable", { nookId, error: String(error) }); }
 
   header.addEventListener("contextmenu", (e) => {
     focusNook(nookId);
@@ -433,20 +530,20 @@ function makeNook(nookId: string, since: number): NookView {
     });
   });
 
-  const ws = new WebSocket(`ws://${location.host}/pty?nook=${encodeURIComponent(nookId)}&since=${since}`);
-  const pv: NookView = { nookId, term, fit: fitAddon, ws, el, consumed: 0, lastAck: 0, title: "", customTitle: "", headerTitleEl: titleSpan, search: searchAddon, replaying: true };
+  const resetOnReplay = shouldResetReplay({ locallySpawned: locallySpawnedNookIds.has(nookId), renderedBefore: renderedStreamNookIds.has(nookId) });
+  renderedStreamNookIds.add(nookId);
+  const pv: NookView = { nookId, term, fit: fitAddon, ws: null, el, consumed: since, expectedOffset: since, replayUntilOffset: since, lastAck: since, title: "", customTitle: "", headerTitleEl: titleSpan, search: searchAddon, replaying: true, resetOnReplay, keyboard: createKeyboardProtocolTracker(), lastSent: null, handlersBound: false, resizeObserver: null, fitFrame: null, reconnectTimer: null };
 
   el.addEventListener("mousedown", () => focusNook(nookId));
-  attachWs(pv);
   const overrides = loadKeybindings();
   term.attachCustomKeyEventHandler((e) => {
-    if (keyDebugOn()) console.warn(`[keydbg] xterm ${e.type} key=${e.key} prevented=${e.defaultPrevented}`);
+    if (e.shiftKey && e.key === "Enter" && e.type !== "keydown") return false;
     if (e.type !== "keydown") return true;
     if (e.key === "Tab") { e.preventDefault(); return true; }
     const chord = normalizeChord(e);
     const action = overrides[chord];
-    if (action && action.startsWith("send-text:")) { void invoke("app.nookWrite", { nookId, dataBase64: toBase64Utf8(action.slice("send-text:".length)) }); return false; }
-    if (e.shiftKey && e.key === "Enter") { void invoke("app.nookWrite", { nookId, dataBase64: toBase64Utf8("\x1b\r") }); return false; }
+    if (action && action.startsWith("send-text:")) { void enqueueNookWrite(nookId, toBase64Utf8(action.slice("send-text:".length)), (id, dataBase64) => invoke("app.nookWrite", { nookId: id, dataBase64 })); return false; }
+    if (e.shiftKey && e.key === "Enter") { void enqueueNookWrite(nookId, toBase64Utf8(shiftEnterSequence(pv.keyboard.encoding())), (id, dataBase64) => invoke("app.nookWrite", { nookId: id, dataBase64 })); return false; }
     if (!e.metaKey || e.altKey || e.ctrlKey) return true;
     const k = e.key.toLowerCase();
     if (k === "c") {
@@ -532,6 +629,8 @@ function makeNook(nookId: string, since: number): NookView {
   });
   term.onTitleChange((t) => { pv.title = t; rememberNookTitle(nookId, pv.customTitle || t); setTitle(); refreshTitles(); });
   nooks.set(nookId, pv);
+  pv.resizeObserver = new ResizeObserver(() => scheduleFit(pv));
+  pv.resizeObserver.observe(host);
   return pv;
 }
 
@@ -539,6 +638,53 @@ function getNook(nookId: string): NookView {
   const existing = nooks.get(nookId);
   if (existing) return existing;
   return makeNook(nookId, 0);
+}
+
+function disposeNook(nookId: string): void {
+  const pv = nooks.get(nookId);
+  if (!pv) return;
+  streamGens.invalidate(nookId);
+  if (pv.reconnectTimer !== null) window.clearTimeout(pv.reconnectTimer);
+  if (pv.fitFrame !== null) cancelAnimationFrame(pv.fitFrame);
+  pv.resizeObserver?.disconnect();
+  try { pv.ws?.close(); } catch { void 0; }
+  pv.ws = null;
+  pv.term.dispose();
+  nooks.delete(nookId);
+}
+
+function allLayoutNookIds(): Set<string> {
+  const ids = new Set<string>();
+  for (const shore of layout?.shores ?? []) for (const id of collectLeafIds(shore.layoutTree)) ids.add(id);
+  return ids;
+}
+
+function sweepDetachedNooks(): void {
+  const layoutIds = allLayoutNookIds();
+  for (const [id, pv] of nooks) {
+    const wsClosed = pv.ws === null || pv.ws.readyState === WebSocket.CLOSED;
+    if (shouldDisposeNook({ inLayout: layoutIds.has(id), wsClosed })) disposeNook(id);
+  }
+}
+function pauseNookStream(pv: NookView): void {
+  if (!pv.ws) return;
+  streamGens.invalidate(pv.nookId);
+  if (pv.reconnectTimer !== null) {
+    window.clearTimeout(pv.reconnectTimer);
+    pv.reconnectTimer = null;
+  }
+  pv.consumed = Math.max(pv.consumed, pv.expectedOffset);
+  const ws = pv.ws;
+  pv.ws = null;
+  try { ws.close(1000, "terminal hidden"); } catch { void 0; }
+}
+function syncNookStreams(): void {
+  for (const pv of nooks.values()) {
+    const connected = pv.ws !== null && pv.ws.readyState < WebSocket.CLOSING;
+    const action = streamVisibilityAction({ visible: pv.el.isConnected, connected });
+    if (action === "connect") attachWs(pv);
+    else if (action === "disconnect") pauseNookStream(pv);
+  }
 }
 
 function closeNookMenus(): void {
@@ -947,7 +1093,7 @@ function renderImageNook(nookId: string): HTMLElement {
   return el;
 }
 function activeProjectDir(): string {
-  return bayBoxItems.find((w) => w.id === (layout?.id ?? null))?.projectDir ?? "";
+  return resolveLauncherProjectDir(layout, bayBoxItems);
 }
 function renderGitNookWrapper(nookId: string): HTMLElement {
   const placeholder = document.createElement("div");
@@ -1165,7 +1311,6 @@ function renderShore(): void {
   const shore = activeShore();
   gridEl.innerHTML = "";
   const shoreEmpty = shore ? isEmptyShoreTree(shore.layoutTree) : false;
-  let zoomed = false;
   if (shore && shore.layoutTree && !shoreEmpty) {
     const treeIds = collectLeafIds(shore.layoutTree);
     const zid = shore.zoomedNookId;
@@ -1174,27 +1319,11 @@ function renderShore(): void {
       zoomEl.style.flexGrow = "1";
       gridEl.appendChild(zoomEl);
       focusedNookId = zid;
-      zoomed = true;
     } else {
       gridEl.appendChild(renderNode(shore.layoutTree));
     }
-    if (!zoomed) {
-      const keep = new Set<string>(treeIds);
-      for (const [id, pv] of nooks) {
-        if (!keep.has(id)) {
-          try { pv.ws.close(); } catch { void 0; }
-          pv.term.dispose();
-          nooks.delete(id);
-        }
-      }
-    }
-  } else {
-    for (const [id, pv] of nooks) {
-      try { pv.ws.close(); } catch { void 0; }
-      pv.term.dispose();
-      nooks.delete(id);
-    }
   }
+  sweepDetachedNooks();
   if (shore && shoreEmpty) {
     const placeholder = collectLeafIds(shore.layoutTree)[0] ?? null;
     focusedNookId = null;
@@ -1209,6 +1338,7 @@ function renderShore(): void {
       gridEl.appendChild(empty);
     }
   }
+  syncNookStreams();
   for (const [id, pv] of nooks) {
     pv.el.classList.toggle("focused", id === focusedNookId);
   }
@@ -1344,6 +1474,7 @@ async function closeNookById(nookId: string): Promise<void> {
   await closeBrowserWebview(nookId);
   try { await invoke("app.nookKill", { nookId }); } catch (err) { console.warn("nook kill on exit failed", nookId, err); }
   try { await invoke("app.layoutMutate", { op: "close", shoreId: shore.id, nookId, targetNookId: "", newNookId: "", orientation: "", name: "", dir: 0 }); } catch (err) { console.warn("layout close on exit failed", nookId, err); }
+  disposeNook(nookId);
   await reload();
 }
 
@@ -1389,8 +1520,10 @@ async function splitActiveWith(dir: "row" | "col", kind: string): Promise<void> 
 
 async function closeFocused(): Promise<void> {
   if (!focusedNookId || !activeShoreId) return;
-  await invoke("app.nookKill", { nookId: focusedNookId });
-  await invoke("app.layoutMutate", { op: "close", shoreId: activeShoreId, nookId: focusedNookId, targetNookId: "", newNookId: "", orientation: "", name: "", dir: 0 });
+  const nookId = focusedNookId;
+  await invoke("app.nookKill", { nookId });
+  await invoke("app.layoutMutate", { op: "close", shoreId: activeShoreId, nookId, targetNookId: "", newNookId: "", orientation: "", name: "", dir: 0 });
+  disposeNook(nookId);
   await reload();
 }
 
@@ -1402,6 +1535,7 @@ async function closeOthers(keepNookId: string): Promise<void> {
   for (const id of others) {
     try { await invoke("app.nookKill", { nookId: id }); } catch { void 0; }
     try { await invoke("app.layoutMutate", { op: "close", shoreId: activeShoreId, nookId: id, targetNookId: "", newNookId: "", orientation: "", name: "", dir: 0 }); } catch { void 0; }
+    disposeNook(id);
   }
   focusNook(keepNookId);
   await reload();
@@ -1488,6 +1622,7 @@ async function closeShore(shoreId: string): Promise<void> {
   for (const id of leaves) {
     await closeBrowserWebview(id);
     try { await invoke("app.nookKill", { nookId: id }); } catch { void 0; }
+    disposeNook(id);
   }
   try { await invoke("app.layoutMutate", { op: "closeShore", shoreId, nookId: "", targetNookId: "", newNookId: "", orientation: "", name: "", dir: 0 }); } catch { void 0; }
   if (activeShoreId === shoreId) activeShoreId = null;
@@ -4315,7 +4450,7 @@ let launcherRecentsAt = 0;
 async function loadLauncherRecents(): Promise<void> {
   const cwd = activeProjectDir();
   try {
-    const res = await invoke<SessionRecentResult>("cove://commands/session.recent", { cwd, limit: 50 });
+    const res = await invoke<SessionRecentResult>("cove://commands/session.recent", { cwd, limit: 0 });
     launcherRecents = res.sessions ?? [];
   } catch (err) {
     console.warn("session.recent failed", cwd, err);
@@ -4629,7 +4764,7 @@ function renderDetailDock(ctx: LauncherContext, tile: LauncherTile): HTMLElement
   controls.appendChild(yoloRow);
 
   const recentRows = launcherRecents.filter((r) => r.adapter === tile.adapterName);
-  const shaped = shapeRecentSessions(recentRows, Date.now(), 8);
+  const shaped = shapeRecentSessions(recentRows, Date.now(), recentRows.length);
   if (shaped.length > 0) {
     const dd = document.createElement("div");
     dd.className = "cl-resume-dd";

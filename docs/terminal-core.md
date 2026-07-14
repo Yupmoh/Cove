@@ -22,7 +22,7 @@ Working directory is tracked from the shell's OSC 7 emissions (`ShellIntegration
 
 Three independent recovery paths, each verified live:
 
-- **Reattach** — the daemon outlives the GUI. On GUI relaunch, `GuiEngineLauncher` dials the existing control socket, and each nook's `PtyStreamSender` replays its ring byte-exact from offset 0. No respawn.
+- **Reattach** — the daemon outlives the GUI. A visible nook subscribes from the last absolute byte offset accepted by its xterm instance; a cold GUI relaunch starts from offset 0. The relay publishes the ring head as an explicit replay boundary, so replay completion never depends on keyboard input. No respawn.
 - **Cold restart** — daemon and GUI both die. On next launch `DaemonHost` loads `bay.json`, respawns a fresh shell per persisted leaf under its original `nookId` (`NookRegistry.RespawnAs`), and pre-seeds each fresh ring with the nook's last `scrollback.bin` snapshot so prior output shows as history above the new prompt.
 - **Per-nook fault** — one shell exits while others live. `PtySessionReader` detects the exit, `PtyStreamSender.MarkChildExited` emits a stream-end frame carrying the exit code after the last data byte, and the GUI renders `[process exited: N]` in that nook only.
 
@@ -39,6 +39,8 @@ All JSON goes through source-generated `System.Text.Json` (`CoveJsonContext`) an
 ## GUI surface
 
 Command palette (⌘K), split (⌘D / ⌘⇧D), zoom (⌘Z), new terminal (⌘T), per-nook header with inline rename and an overflow menu, copy-or-SIGINT / select-all / paste keybinds, terminal settings panel (⌘,) with 9 `terminal.*` keys (fontFamily/fontSize/lineHeight/cursorStyle/cursorBlink/ligatures/scrollbackLines/padding/backgroundOpacity) live-applied to xterm and persisted to engine `config.json` via `config.get`/`config.set` routes, scrollback find bar (⌘F), and a launcher overlay (⌘L). Leaves can stack multiple terminals as subtabs with a tab strip.
+
+Production terminals use xterm's Canvas renderer. WebGL remains available only to the performance harness and explicit low-terminal-count experiments. Hidden shore and zoom siblings retain their xterm state but close their relay subscriptions; the daemon keeps draining into the ring, and the terminal reconnects from its last accepted absolute offset when visible. Each terminal owns one resize coordinator backed by `ResizeObserver`, visibility checks, animation-frame deduplication, and cell-dimension deduplication.
 
 ## Cross-platform PTY
 

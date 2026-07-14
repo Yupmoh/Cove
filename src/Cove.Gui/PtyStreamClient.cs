@@ -11,8 +11,9 @@ public sealed class PtyStreamClient : IAsyncDisposable
     private uint _seq;
     public ulong StreamId { get; }
     public ulong BaseOffset { get; }
+    public ulong ReplayUntilOffset { get; }
 
-    private PtyStreamClient(Stream s, ulong streamId, ulong baseOffset) { _s = s; StreamId = streamId; BaseOffset = baseOffset; }
+    private PtyStreamClient(Stream s, ulong streamId, ulong baseOffset, ulong replayUntilOffset) { _s = s; StreamId = streamId; BaseOffset = baseOffset; ReplayUntilOffset = replayUntilOffset; }
 
     public static async Task<PtyStreamClient> SubscribeAsync(
         Func<CancellationToken, Task<Stream>> dial, string clientVersion, string channel, string nookId, ulong since, CancellationToken ct)
@@ -24,7 +25,7 @@ public sealed class PtyStreamClient : IAsyncDisposable
             JsonSerializer.SerializeToElement(new SubscribeParams(nookId, since), CoveJsonContext.Default.SubscribeParams), 2, ct);
         if (!sub.Ok || sub.Data is null) throw new InvalidOperationException($"subscribe failed: {sub.Error?.Code}");
         var r = JsonSerializer.Deserialize(sub.Data.Value, CoveJsonContext.Default.SubscribeResult)!;
-        return new PtyStreamClient(s, r.StreamId, r.BaseOffset);
+        return new PtyStreamClient(s, r.StreamId, r.BaseOffset, r.ReplayUntilOffset);
     }
 
     private static async Task<ControlResponse> Request(Stream s, string uri, JsonElement paramsEl, uint seq, CancellationToken ct)

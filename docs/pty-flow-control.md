@@ -24,33 +24,45 @@ client is behind in delivery position, never in capture.
 
 ### Leg C — engine relay to xterm.js (webview)
 The GUI process relays Leg B to the terminal emulator over a same-origin loopback WebSocket.
-The relay is itself a Leg B client of the engine. It forwards bytes to a thin JS shim that
-feeds xterm.js and acknowledges consumed bytes; the relay forwards only up to the shim's
-acknowledged credit and also watches the socket's buffered amount as a second backpressure
-signal. When the page is backgrounded and the shim stops acking, the relay stops forwarding,
-its own engine cursor lags, it stops granting engine credit, and bytes wait in the engine
-ring. One elastic buffer, backpressure all the way down.
+The relay is itself a Leg B client of the engine. Every browser binary message preserves the
+engine frame's absolute offset as `offset u64 LE + raw bytes`. The browser requires that offset
+to equal its expected next offset before writing the bytes to xterm. Exact duplicate frames are
+discarded; gaps and overlaps close the subscription and reconnect from the last accepted offset.
 
-#### xterm.js ack-shim contract (implemented in TP-10)
-- On `StreamData(offset, raw)`: feed `raw` to `terminal.write(raw)`; when xterm's write
-  callback fires, add `raw.length` to a running consumed counter.
-- Send a `Credit(consumed)` frame once the consumed counter has advanced at least 128 KiB
-  since the last credit, and once more when the render queue goes idle.
-- On `Resync(newBaseOffset)`: call `terminal.reset()` (RIS), set the expected next offset to
-  `newBaseOffset`, and set the credit base to `newBaseOffset`.
-- On `StreamEnd(finalOffset, exitCode)`: the session is finished; stop crediting.
-- The shim never buffers unbounded data of its own; xterm's own write backpressure plus the
-  credit window are the only buffers.
+The relay begins with `{ "t": "base", "off": baseOffset, "head": replayUntilOffset }`. The
+browser suppresses xterm-generated input until the write callback reaches `head`, then enters
+live mode. Keyboard input never ends replay and never injects terminal mode changes.
 
-## The only failure mode: explicit resync
+Hidden terminals close their WebSocket after retaining the last accepted offset. The engine
+continues draining the PTY into its ring without spending browser render time or holding an
+off-screen renderer. Showing the terminal creates a new subscription from that offset.
+
+#### xterm.js ack-shim contract
+- On browser data `(offset, raw)`, require `offset == expectedOffset`, advance the expected
+  offset, and feed `raw` to `terminal.write(raw)`.
+- When xterm's write callback fires, publish that frame's end offset as consumed.
+- Send `Credit(consumed)` after at least 128 KiB of progress and once more when the render queue
+  goes idle.
+- On `Resync(newBaseOffset)`, call `terminal.reset()`, set both expected and consumed offsets to
+  `newBaseOffset`, and leave replay mode.
+- On `StreamEnd(finalOffset, exitCode)`, stop crediting and render the process exit.
+- The shim never buffers unbounded data of its own; xterm's write queue and the credit window are
+  the only browser-side buffers.
+
+## The only loss mode: explicit resync
 If a client falls so far behind that the ring evicts the next in-order byte it still needs
-(`sentOffset < ring.Tail`), the engine sends exactly one `Resync` frame with
-`newBaseOffset = ring.Tail`, resets its cursor there, and continues sending from that offset.
-It never splices a corrupted mid-stream. A resync means "your position was lost; reset your
-grid and continue from here." One resync per underrun event.
+(`sentOffset < ring.Tail`), the engine sends one `Resync` frame with
+`newBaseOffset = ring.Tail`, resets its cursor there, and continues from that offset. The
+browser resets its terminal before accepting the new base, so stale and post-loss bytes are
+never silently combined.
 
-Invariant: incoming bytes always buffer at the reader; a lagging consumer either catches up
-or is resynced, never spliced.
+The ring tail is a byte boundary, not a serialized terminal parser checkpoint. A deep underrun
+therefore makes exact screen reconstruction impossible and is surfaced as a reset. Under normal
+hide/show and reconnect flow the client resumes from its preserved offset before the default
+8 MiB ring is overtaken.
+
+Invariant: incoming bytes always buffer at the reader; a lagging consumer either catches up or
+receives an explicit reset with a new absolute base.
 
 ## Constants
 | Name | Value |
