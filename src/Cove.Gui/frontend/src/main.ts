@@ -291,6 +291,7 @@ function normalizeChord(e: KeyboardEvent): string {
 
 const gridEl = document.getElementById("grid")!;
 const paletteEl = document.getElementById("palette")!;
+const shoresRowEl = document.getElementById("shores-row")!;
 const shoreTabsEl = document.getElementById("shore-tabs")!;
 const leftSidebarEl = document.getElementById("left-sidebar")!;
 const leftRailEl = document.getElementById("left-rail")!;
@@ -301,6 +302,11 @@ const palList = document.getElementById("pal-list")!;
 
 gridEl.style.display = "flex";
 gridEl.style.padding = "8px";
+
+function syncTitlebarWorkspaceOffset(): void {
+  const workspaceLeft = leftSidebarEl.offsetLeft + leftSidebarEl.offsetWidth + 6;
+  document.documentElement.style.setProperty("--cove-workspace-left", `${workspaceLeft}px`);
+}
 
 function paneFittable(pv: NookView): boolean {
   const host = pv.term.element?.parentElement as HTMLElement | null;
@@ -1753,6 +1759,7 @@ function applySidebarModel(): void {
   const { root, content } = sideEl("left");
   root.classList.toggle("collapsed", collapsedOf(sidebarModel, "left"));
   content.style.width = `${widthOf(sidebarModel, "left")}px`;
+  syncTitlebarWorkspaceOffset();
   renderSidebarContent("left");
   renderLeftRail();
   fitAll();
@@ -2491,6 +2498,7 @@ function wireSidebarResize(handle: HTMLElement, side: SidebarSide): void {
       const next = startW + delta;
       sidebarModel = setWidth(sidebarModel, side, next);
       content.style.width = `${widthOf(sidebarModel, side)}px`;
+      syncTitlebarWorkspaceOffset();
       fitAll();
     };
     const onUp = () => {
@@ -2555,7 +2563,8 @@ function renderShoreTabs(): void {
   const wingModel = buildWingModel(wings, shoreWingSummaries, activeWingId);
   const visibleIds = visibleShoreIds(wingModel);
   const shores = visibleIds.length > 0 || wings.length > 1 ? filterShoresByWing(allShores, visibleIds) : allShores;
-  if (shores.length === 0) { shoreTabsEl.style.display = "none"; return; }
+  if (shores.length === 0) { shoreTabsEl.style.display = "none"; shoresRowEl.style.display = "none"; return; }
+  shoresRowEl.style.display = "flex";
   shoreTabsEl.style.display = "flex";
 
   const { pinned, unpinned } = partitionPinned(shores.map((r) => ({ id: r.id, name: r.name, pinned: pinnedShoreIds.has(r.id) })));
@@ -5615,8 +5624,10 @@ function renderTitleCluster(): void {
   const cluster = document.getElementById("tb-cluster");
   const right = document.getElementById("tb-right");
   if (!cluster || !right) { console.warn("title cluster containers missing"); return; }
-  cluster.innerHTML = "";
-  right.innerHTML = "";
+  const wordmark = document.getElementById("wordmark");
+  cluster.replaceChildren();
+  right.replaceChildren();
+  if (wordmark) cluster.appendChild(wordmark);
   for (const tool of clusterTools({ updateStaged: clusterUpdateStaged })) {
     if (tool.id === "find-anything") {
       const find = document.createElement("div");
@@ -5638,10 +5649,9 @@ function renderTitleCluster(): void {
       if (tool.id === "zoom-in") {
         const pct = document.createElement("div");
         pct.id = "tb-zoom-label";
-        pct.title = "Current app zoom — click to reset";
+        pct.setAttribute("aria-label", "Current app zoom");
         pct.setAttribute("data-webview-ignore", "");
         pct.textContent = `${Math.round(appZoom * 100)}%`;
-        pct.addEventListener("click", (e) => { e.stopPropagation(); appZoom = 1; applyAppZoom(); });
         right.appendChild(pct);
       }
       const btn = document.createElement("div");
@@ -5667,6 +5677,7 @@ function applyAppZoom(): void {
   localStorage.setItem("cove.appZoom", String(appZoom));
   const label = document.getElementById("tb-zoom-label");
   if (label) label.textContent = `${Math.round(appZoom * 100)}%`;
+  syncTitlebarWorkspaceOffset();
   fitAll();
 }
 
