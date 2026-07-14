@@ -8,12 +8,19 @@ using Cove.Platform.Ipc;
 using Cove.Protocol;
 
 string[] cliArgs = args;
-using (var cliLoggerFactory = Cove.Platform.CoveLog.CreateConsoleLoggerFactory())
-    cliLoggerFactory.CreateLogger("cove").Invoked(string.Join(' ', cliArgs));
-CoveChannel channel = ParseChannel(cliArgs);
+using var cliLoggerFactory = Cove.Platform.CoveLog.CreateConsoleLoggerFactory();
+var cliLogger = cliLoggerFactory.CreateLogger("cove");
+cliLogger.Invoked(string.Join(' ', cliArgs));
+CoveChannel channel = CliChannel.Resolve(cliArgs, cliLogger);
 CoveDataDir dataDir = CoveDataDir.Resolve(channel);
 var paths = new DaemonPaths(dataDir);
 IControlEndpoint endpoint = ControlEndpointFactory.FromSocketPath(dataDir.SocketPath);
+
+if (CliUsage.IsHelpRequested(cliArgs))
+{
+    CliUsage.Write(System.Console.Out);
+    return 0;
+}
 
 if (cliArgs.Length >= 2 && cliArgs[0] == "daemon")
 {
@@ -44,25 +51,31 @@ string? matchedVerb = null;
 if (matchedVerb is not null)
 {
     var verbArgs = CommandContext.SliceVerbArgs(matchedVerb, cliArgs);
-    var context = new CommandContext(paths, endpoint, System.Console.Out, args: verbArgs);
+    var context = new CommandContext(paths, endpoint, System.Console.Out, args: verbArgs, channel: channel);
     var handler = (System.Func<CommandContext, System.Threading.Tasks.Task<int>>)CoveCommandRegistry.Handlers[matchedVerb];
-    return await handler(context);
+    try
+    {
+        return await handler(context);
+    }
+    catch (DaemonStartTimeoutException ex)
+    {
+        return ReportConnectFailure(paths, ex);
+    }
 }
 
-return await DefaultConnectAndFocusAsync(paths, endpoint);
-
-static CoveChannel ParseChannel(string[] a)
+try
 {
-    for (int i = 0; i < a.Length - 1; i++)
-        if (a[i] == "--channel")
-            return a[i + 1] switch
-            {
-                "stable" => CoveChannel.Stable,
-                "beta" => CoveChannel.Beta,
-                "dev" => CoveChannel.Dev,
-                _ => CoveChannel.Stable,
-            };
-    return CoveChannel.Stable;
+    return await DefaultConnectAndFocusAsync(paths, endpoint);
+}
+catch (DaemonStartTimeoutException ex)
+{
+    return ReportConnectFailure(paths, ex);
+}
+
+static int ReportConnectFailure(DaemonPaths paths, DaemonStartTimeoutException ex)
+{
+    Console.Error.WriteLine($"error: could not reach the cove daemon on channel {paths.Channel} (socket {paths.SocketPath}): {ex.Message}");
+    return 1;
 }
 
 static bool HasFlag(string[] a, string flag)

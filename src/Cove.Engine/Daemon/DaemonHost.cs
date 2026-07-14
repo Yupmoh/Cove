@@ -699,7 +699,7 @@ public sealed class DaemonHost
         long tail = nook.Ring.Tail;
         long baseOffset = Math.Clamp((long)sp.SinceOffset, tail, head);
         _logger?.SubscribeStarted(sp.NookId, baseOffset, head, tail);
-        var subResult = new SubscribeResult(streamId, (ulong)baseOffset, ProtocolConstants.FlowWindow);
+        var subResult = new SubscribeResult(streamId, (ulong)baseOffset, ProtocolConstants.FlowWindow, (ulong)head);
         await WriteResponseAsync(conn, new ControlResponse(req.Id, true, ToElement(subResult, CoveJsonContext.Default.SubscribeResult)), cancellationToken).ConfigureAwait(false);
 
         var sink = new SocketByteStreamSink(stream);
