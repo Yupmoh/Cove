@@ -2,6 +2,7 @@
 set -euo pipefail
 
 SESSION_ID="${1:?Usage: build_resume_command.sh <session_id> [flags_json]}"
+FLAGS_JSON="${2:-}"
 
 resolve_binary() {
   local name="$1"; shift
@@ -16,5 +17,28 @@ resolve_binary() {
   printf '%s' "$name"
 }
 
+json_escape() {
+  local value="$1"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  printf '%s' "$value"
+}
+
+flag_true() {
+  printf '%s' "$FLAGS_JSON" | grep -q "\"$1\"[[:space:]]*:[[:space:]]*true"
+}
+
 bin="$(resolve_binary codex /opt/homebrew/bin/codex /usr/local/bin/codex)"
-printf '{"command":["%s","resume","%s"]}\n' "$bin" "$SESSION_ID"
+args=("$bin" "--dangerously-bypass-hook-trust")
+if flag_true "dangerouslySkipPermissions"; then
+  args+=("--yolo")
+fi
+args+=("resume" "$SESSION_ID")
+
+out='{"command":['
+for i in "${!args[@]}"; do
+  [ "$i" -gt 0 ] && out+=','
+  out+="\"$(json_escape "${args[$i]}")\""
+done
+out+=']}'
+printf '%s\n' "$out"

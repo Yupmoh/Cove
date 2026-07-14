@@ -19,10 +19,27 @@ import {
   shapeRecentSessions,
   computeLauncherCols,
   resolveLauncherYolo,
+  resolveLauncherProjectDir,
   type LauncherGeometry,
   type LauncherSession,
   type RecentSessionRow,
 } from "./launcher-model";
+
+describe("resolveLauncherProjectDir", () => {
+  it("uses the active layout project before the asynchronously loaded bay list", () => {
+    expect(resolveLauncherProjectDir(
+      { id: "in-spades", projectDir: "/work/InSpades" },
+      [],
+    )).toBe("/work/InSpades");
+  });
+
+  it("falls back to matching bay metadata for an older layout payload", () => {
+    expect(resolveLauncherProjectDir(
+      { id: "in-spades" },
+      [{ id: "in-spades", projectDir: "/work/InSpades" }],
+    )).toBe("/work/InSpades");
+  });
+});
 
 describe("resolveLauncherYolo", () => {
   it("defaults claude-code to bypass permissions", () => {

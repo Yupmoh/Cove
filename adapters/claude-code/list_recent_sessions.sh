@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-CWD="${1:-$PWD}"
+normalize_path() { if [ "$1" = "/" ]; then printf '/'; else printf '%s' "${1%/}"; fi; }
+CWD="$(normalize_path "${1:-$PWD}")"
 ROOT="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects"
 slug="$(printf '%s' "$CWD" | sed 's/[^a-zA-Z0-9]/-/g')"
 dir="$ROOT/$slug"

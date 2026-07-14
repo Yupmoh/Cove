@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using Microsoft.Extensions.Logging;
 
 namespace Cove.Adapters;
@@ -95,8 +96,19 @@ public static class BundledAdapterSeeder
             var stampPath = Path.Combine(targetDir, StampFileName);
             if (!File.Exists(stampPath))
             {
-                skipped.Add(name);
-                logger?.BundledAdapterUserManaged(name);
+                if (IsLegacyBundledAdapter(targetDir, name))
+                {
+                    Directory.Delete(targetDir, recursive: true);
+                    CopyRecursive(sourceDir, targetDir, logger);
+                    WriteStamp(targetDir, sourceHash);
+                    refreshed.Add(name);
+                    logger?.BundledAdapterRefreshed(name);
+                }
+                else
+                {
+                    skipped.Add(name);
+                    logger?.BundledAdapterUserManaged(name);
+                }
                 continue;
             }
 
@@ -112,6 +124,21 @@ public static class BundledAdapterSeeder
         }
 
         return new BundledSeedReport(copied, refreshed, skipped);
+    }
+
+    private static bool IsLegacyBundledAdapter(string adapterDir, string name)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(adapterDir, "adapter.json")));
+            var root = document.RootElement;
+            return root.TryGetProperty("name", out var manifestName)
+                && string.Equals(manifestName.GetString(), name, StringComparison.Ordinal)
+                && root.TryGetProperty("author", out var author)
+                && string.Equals(author.GetString(), "Cove", StringComparison.Ordinal);
+        }
+        catch (IOException) { return false; }
+        catch (JsonException) { return false; }
     }
 
     private static void WriteStamp(string adapterDir, string hash)

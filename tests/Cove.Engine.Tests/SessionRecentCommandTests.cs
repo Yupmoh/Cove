@@ -128,7 +128,7 @@ public sealed class SessionRecentCommandTests
     }
 
     [Fact]
-    public async Task Recent_CollapsesIdenticalLabelLineageToNewest()
+    public async Task Recent_KeepsDistinctSessionsWithIdenticalLabels()
     {
         if (OperatingSystem.IsWindows()) return;
         var root = CopyFixture("test-v2");
@@ -151,9 +151,11 @@ public sealed class SessionRecentCommandTests
 
             Assert.True(resp!.Ok);
             var sessions = resp.Data!.Value.GetProperty("sessions");
-            Assert.Equal(1, sessions.GetArrayLength());
+            Assert.Equal(2, sessions.GetArrayLength());
             Assert.Equal("real-new", sessions[0].GetProperty("sessionId").GetString());
+            Assert.Equal("real-old", sessions[1].GetProperty("sessionId").GetString());
             Assert.Equal("cove-session", sessions[0].GetProperty("label").GetString());
+            Assert.Equal("cove-session", sessions[1].GetProperty("label").GetString());
         }
         finally { try { Directory.Delete(root, true); } catch { } try { Directory.Delete(baysDir, true); } catch { } }
     }
@@ -186,6 +188,25 @@ public sealed class SessionRecentCommandTests
             Assert.Equal("Fix the router", sessions[1].GetProperty("label").GetString());
         }
         finally { try { Directory.Delete(root, true); } catch { } try { Directory.Delete(baysDir, true); } catch { } }
+    }
+
+    [Fact]
+    public async Task Recent_ZeroLimitReturnsEveryDiscoveredSession()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var root = CopyFixture("test-v2");
+        try
+        {
+            var rows = string.Join(",", Enumerable.Range(1, 25).Select(i =>
+                $"{{\"id\":\"session-{i}\",\"name\":\"Session {i}\",\"cwd\":\"/repo/work\",\"lastActive\":\"2024-01-01T00:00:00Z\"}}"));
+            WriteListScript(Path.Combine(root, "test-v2"), $"printf '%s\\n' '{{\"sessions\":[{rows}]}}'\n");
+
+            var resp = await Route(root, new SessionRecentParams("test-v2", 0, "/repo/work"));
+
+            Assert.True(resp!.Ok);
+            Assert.Equal(25, resp.Data!.Value.GetProperty("sessions").GetArrayLength());
+        }
+        finally { try { Directory.Delete(root, true); } catch { } }
     }
 
     [Fact]

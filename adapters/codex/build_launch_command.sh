@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+FLAGS_JSON="${1:-}"
+
 resolve_binary() {
   local name="$1"; shift
   local candidate
@@ -14,5 +16,27 @@ resolve_binary() {
   printf '%s' "$name"
 }
 
+json_escape() {
+  local value="$1"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  printf '%s' "$value"
+}
+
+flag_true() {
+  printf '%s' "$FLAGS_JSON" | grep -q "\"$1\"[[:space:]]*:[[:space:]]*true"
+}
+
 bin="$(resolve_binary codex /opt/homebrew/bin/codex /usr/local/bin/codex)"
-printf '{"command":["%s"]}\n' "$bin"
+args=("$bin" "--dangerously-bypass-hook-trust")
+if flag_true "dangerouslySkipPermissions"; then
+  args+=("--yolo")
+fi
+
+out='{"command":['
+for i in "${!args[@]}"; do
+  [ "$i" -gt 0 ] && out+=','
+  out+="\"$(json_escape "${args[$i]}")\""
+done
+out+=']}'
+printf '%s\n' "$out"

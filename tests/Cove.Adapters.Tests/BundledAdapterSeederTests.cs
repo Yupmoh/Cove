@@ -157,6 +157,23 @@ public sealed class BundledAdapterSeederTests : IDisposable
     }
 
     [Fact]
+    public void Seed_RefreshesLegacyCoveAdapterWithoutStamp()
+    {
+        var source = Path.Combine(_root, "source");
+        var sourceDir = MakeSourceAdapter(source, "codex", "{\"name\":\"codex\",\"author\":\"Cove\"}");
+        File.WriteAllText(Path.Combine(sourceDir, "list_recent_sessions.sh"), "new scanner");
+        var target = Path.Combine(_root, "target");
+        var targetDir = MakeSourceAdapter(target, "codex", "{\"name\":\"codex\",\"author\":\"Cove\"}");
+        File.WriteAllText(Path.Combine(targetDir, "list_recent_sessions.sh"), "old scanner");
+
+        var report = BundledAdapterSeeder.Seed(source, target);
+
+        Assert.Contains("codex", report.Refreshed);
+        Assert.Equal("new scanner", File.ReadAllText(Path.Combine(targetDir, "list_recent_sessions.sh")));
+        Assert.True(File.Exists(Path.Combine(targetDir, BundledAdapterSeeder.StampFileName)));
+    }
+
+    [Fact]
     public void Seed_NeverTouchesForeignAdapterDirs()
     {
         var source = Path.Combine(_root, "source");

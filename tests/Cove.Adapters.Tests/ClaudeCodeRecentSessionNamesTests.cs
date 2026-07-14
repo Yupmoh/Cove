@@ -57,7 +57,7 @@ public sealed class ClaudeCodeRecentSessionNamesTests
         if (OperatingSystem.IsWindows() || !JqAvailable()) return;
 
         var config = Path.Combine(Path.GetTempPath(), "cove-cc-" + Guid.NewGuid().ToString("N"));
-        var cwd = "/repo/work";
+        var cwd = "/repo/work/";
         var slug = "-repo-work";
         try
         {

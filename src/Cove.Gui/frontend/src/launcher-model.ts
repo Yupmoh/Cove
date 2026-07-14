@@ -2,6 +2,14 @@ export function detectedHarnessTiles<T extends { disabled: boolean }>(tiles: T[]
   return tiles.filter((t) => !t.disabled);
 }
 
+export function resolveLauncherProjectDir(
+  layout: { id: string; projectDir?: string } | null,
+  bays: { id: string; projectDir?: string }[],
+): string {
+  if (layout?.projectDir) return layout.projectDir;
+  return bays.find((bay) => bay.id === (layout?.id ?? ""))?.projectDir ?? "";
+}
+
 export const LAUNCHER_ACCENTS = ["#fab387", "#94e2d5", "#a6e3a1", "#89b4fa", "#f5c2e7"];
 
 export function hashAccent(name: string): string {

@@ -14,5 +14,6 @@ resolve_binary() {
   printf '%s' "$name"
 }
 
+ADAPTER_DIR="${COVE_ADAPTER_DIR:-$(cd "$(dirname "$0")" && pwd)}"
 bin="$(resolve_binary omp "$HOME/.bun/bin/omp" /opt/homebrew/bin/omp /usr/local/bin/omp)"
-printf '{"command":["%s"]}\n' "$bin"
+printf '{"command":["%s","--hook","%s/cove-hooks.ts"]}\n' "$bin" "$ADAPTER_DIR"
