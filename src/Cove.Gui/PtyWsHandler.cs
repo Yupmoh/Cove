@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
@@ -16,7 +17,7 @@ public static class PtyWsHandler
         {
             client = await PtyStreamClient.SubscribeAsync(dial, clientVersion, channel, nookId, since, ct);
             ulong browserAcked = client.BaseOffset;
-            await SendText(ws, $"{{\"t\":\"base\",\"off\":{client.BaseOffset}}}", ct);
+            await SendText(ws, $"{{\"t\":\"base\",\"off\":{client.BaseOffset},\"head\":{client.ReplayUntilOffset}}}", ct);
 
             var ackTask = Task.Run(async () =>
             {
@@ -32,7 +33,7 @@ public static class PtyWsHandler
             }, ct);
 
             await client.PumpAsync(
-                onData: async (offset, raw, c) => await ws.SendAsync(raw, WebSocketMessageType.Binary, true, c),
+                onData: async (offset, raw, c) => await SendData(ws, offset, raw, c),
                 onResync: async (newBase, c) => await SendText(ws, $"{{\"t\":\"resync\",\"base\":{newBase}}}", c),
                 onEnd: async (final, code, c) => await SendText(ws, $"{{\"t\":\"end\",\"code\":{code}}}", c),
                 ct);
@@ -48,6 +49,13 @@ public static class PtyWsHandler
 
     private static Task SendText(WebSocket ws, string s, CancellationToken ct)
         => ws.SendAsync(Encoding.UTF8.GetBytes(s), WebSocketMessageType.Text, true, ct);
+    private static async Task SendData(WebSocket ws, ulong offset, ReadOnlyMemory<byte> raw, CancellationToken ct)
+    {
+        var header = new byte[sizeof(ulong)];
+        BinaryPrimitives.WriteUInt64LittleEndian(header, offset);
+        await ws.SendAsync(header, WebSocketMessageType.Binary, false, ct);
+        await ws.SendAsync(raw, WebSocketMessageType.Binary, true, ct);
+    }
 
     private static ulong ParseAck(string json)
     {
