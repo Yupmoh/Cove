@@ -13,6 +13,7 @@ public sealed class PtySessionReader : IDisposable
     private readonly ILogger _logger;
     private readonly string _nookId;
     private readonly Osc7Parser _osc7 = new();
+    private readonly TerminalModeTracker _terminalModes = new();
     private Thread? _thread;
     private volatile bool _completed;
     private int _exitCode = -1;
@@ -32,6 +33,8 @@ public sealed class PtySessionReader : IDisposable
 
     public bool HasCompleted => _completed;
     public int ExitCode => _exitCode;
+    public string TerminalModePreamble => _terminalModes.BuildPreamble();
+    public string TerminalCheckpointModeSupplement => _terminalModes.BuildCheckpointSupplement();
 
     public void Start()
     {
@@ -57,6 +60,7 @@ public sealed class PtySessionReader : IDisposable
                     _logger.ReaderEof(_nookId, _totalBytes);
                     break;
                 }
+                _terminalModes.Feed(buffer.AsSpan(0, n));
                 _ring.Append(buffer.AsSpan(0, n));
                 _totalBytes += n;
                 if (!_firstOutputSeen)
