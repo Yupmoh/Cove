@@ -63,7 +63,17 @@ public sealed class OmpSessionIntegrationTests
 
         var runner = new MethodRunner();
         var args = sessionId is null ? Array.Empty<string>() : new[] { sessionId };
-        var result = await runner.RunAsync(AdapterDir, script, args, TimeSpan.FromSeconds(20));
+        var env = new Dictionary<string, string>();
+        string? root = null;
+        if (sessionId is not null)
+        {
+            root = Path.Combine(Path.GetTempPath(), "cove-omp-resume-" + Guid.NewGuid().ToString("N"));
+            var sessionDir = Path.Combine(root, "sessions", "repo");
+            Directory.CreateDirectory(sessionDir);
+            File.WriteAllText(Path.Combine(sessionDir, $"stamp_{sessionId}.jsonl"), "{}\n");
+            env["PI_CODING_AGENT_DIR"] = root;
+        }
+        var result = await runner.RunAsync(AdapterDir, script, args, TimeSpan.FromSeconds(20), env);
 
         Assert.True(result.ExitCode == 0, $"exit={result.ExitCode} stderr='{result.Stderr}' stdout='{result.Stdout}'");
         using var document = JsonDocument.Parse(result.Stdout);
@@ -75,5 +85,29 @@ public sealed class OmpSessionIntegrationTests
             Assert.Contains("--resume", command);
             Assert.Contains(sessionId, command);
         }
+        if (root is not null) try { Directory.Delete(root, true); } catch { }
+    }
+
+    [Fact]
+    public async Task BuildResumeCommand_FallsBackToFreshWhenSessionIsMissingFromOmpState()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var root = Path.Combine(Path.GetTempPath(), "cove-omp-missing-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var result = await new MethodRunner().RunAsync(
+                AdapterDir,
+                "build_resume_command.sh",
+                new[] { "missing-session" },
+                TimeSpan.FromSeconds(20),
+                new Dictionary<string, string> { ["PI_CODING_AGENT_DIR"] = root });
+            Assert.Equal(0, result.ExitCode);
+            using var document = JsonDocument.Parse(result.Stdout);
+            var command = document.RootElement.GetProperty("command").EnumerateArray().Select(value => value.GetString()).ToArray();
+            Assert.DoesNotContain("--resume", command);
+            Assert.DoesNotContain("missing-session", command);
+        }
+        finally { try { Directory.Delete(root, true); } catch { } }
     }
 }

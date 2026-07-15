@@ -3,6 +3,21 @@ set -euo pipefail
 
 SESSION_ID="${1:?Usage: build_resume_command.sh <session_id> [flags_json]}"
 FLAGS_JSON="${2:-}"
+ROOT="${CODEX_HOME:-$HOME/.codex}"
+
+session_known=0
+if command -v sqlite3 >/dev/null 2>&1; then
+  for database in "$ROOT"/state_*.sqlite; do
+    [ -e "$database" ] || continue
+    if [ "$(sqlite3 "$database" "SELECT 1 FROM threads WHERE id = '$(printf '%s' "$SESSION_ID" | sed "s/'/''/g")' LIMIT 1;" 2>/dev/null || true)" = "1" ]; then
+      session_known=1
+      break
+    fi
+  done
+fi
+if [ "$session_known" -eq 0 ] && find "$ROOT/sessions" "$ROOT/archived_sessions" -type f -name "*-${SESSION_ID}.jsonl" -print -quit 2>/dev/null | grep -q .; then
+  session_known=1
+fi
 
 resolve_binary() {
   local name="$1"; shift
@@ -33,7 +48,9 @@ args=("$bin" "--dangerously-bypass-hook-trust")
 if flag_true "dangerouslySkipPermissions"; then
   args+=("--yolo")
 fi
-args+=("resume" "$SESSION_ID")
+if [ "$session_known" -eq 1 ]; then
+  args+=("resume" "$SESSION_ID")
+fi
 
 out='{"command":['
 for i in "${!args[@]}"; do

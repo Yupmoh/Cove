@@ -114,7 +114,25 @@ public sealed class CodexSessionIntegrationTests
 
         var runner = new MethodRunner();
         var args = sessionId is null ? Array.Empty<string>() : new[] { sessionId };
-        var result = await runner.RunAsync(AdapterDir, script, args, TimeSpan.FromSeconds(20));
+        var env = new Dictionary<string, string>();
+        string? root = null;
+        if (sessionId is not null)
+        {
+            var sqlite = FindExecutable("sqlite3");
+            if (sqlite is null) return;
+            root = Path.Combine(Path.GetTempPath(), "cove-codex-resume-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(root);
+            using var process = Process.Start(new ProcessStartInfo(sqlite)
+            {
+                UseShellExecute = false,
+                ArgumentList = { Path.Combine(root, "state_5.sqlite"), $"CREATE TABLE threads (id TEXT); INSERT INTO threads VALUES ('{sessionId}');" },
+            });
+            Assert.NotNull(process);
+            await process.WaitForExitAsync();
+            Assert.Equal(0, process.ExitCode);
+            env["CODEX_HOME"] = root;
+        }
+        var result = await runner.RunAsync(AdapterDir, script, args, TimeSpan.FromSeconds(20), env);
 
         Assert.True(result.ExitCode == 0, $"exit={result.ExitCode} stderr='{result.Stderr}' stdout='{result.Stdout}'");
         using var document = JsonDocument.Parse(result.Stdout);
@@ -125,6 +143,30 @@ public sealed class CodexSessionIntegrationTests
             Assert.Contains("resume", command);
             Assert.Contains(sessionId, command);
         }
+        if (root is not null) try { Directory.Delete(root, true); } catch { }
+    }
+
+    [Fact]
+    public async Task BuildResumeCommand_FallsBackToFreshWhenSessionIsMissingFromCodexState()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var root = Path.Combine(Path.GetTempPath(), "cove-codex-missing-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var result = await new MethodRunner().RunAsync(
+                AdapterDir,
+                "build_resume_command.sh",
+                new[] { "missing-thread" },
+                TimeSpan.FromSeconds(20),
+                new Dictionary<string, string> { ["CODEX_HOME"] = root });
+            Assert.Equal(0, result.ExitCode);
+            using var document = JsonDocument.Parse(result.Stdout);
+            var command = document.RootElement.GetProperty("command").EnumerateArray().Select(value => value.GetString()).ToArray();
+            Assert.DoesNotContain("resume", command);
+            Assert.DoesNotContain("missing-thread", command);
+        }
+        finally { try { Directory.Delete(root, true); } catch { } }
     }
 
     [Theory]
@@ -137,12 +179,44 @@ public sealed class CodexSessionIntegrationTests
         var runner = new MethodRunner();
         var flags = """{"dangerouslySkipPermissions":true}""";
         var args = sessionId is null ? new[] { flags } : new[] { sessionId, flags };
-        var result = await runner.RunAsync(AdapterDir, script, args, TimeSpan.FromSeconds(20));
+        var env = new Dictionary<string, string>();
+        string? root = null;
+        if (sessionId is not null)
+        {
+            var sqlite = FindExecutable("sqlite3");
+            if (sqlite is null) return;
+            root = Path.Combine(Path.GetTempPath(), "cove-codex-resume-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(root);
+            using var process = Process.Start(new ProcessStartInfo(sqlite)
+            {
+                UseShellExecute = false,
+                ArgumentList = { Path.Combine(root, "state_5.sqlite"), $"CREATE TABLE threads (id TEXT); INSERT INTO threads VALUES ('{sessionId}');" },
+            });
+            Assert.NotNull(process);
+            await process.WaitForExitAsync();
+            Assert.Equal(0, process.ExitCode);
+            env["CODEX_HOME"] = root;
+        }
+        var result = await runner.RunAsync(AdapterDir, script, args, TimeSpan.FromSeconds(20), env);
 
         Assert.True(result.ExitCode == 0, $"exit={result.ExitCode} stderr='{result.Stderr}' stdout='{result.Stdout}'");
         using var document = JsonDocument.Parse(result.Stdout);
         var command = document.RootElement.GetProperty("command").EnumerateArray().Select(value => value.GetString()).ToArray();
         Assert.Contains("--yolo", command);
+        if (root is not null) try { Directory.Delete(root, true); } catch { }
+    }
+
+    [Fact]
+    public async Task HookCommand_ExitsSilentlyOutsideCove()
+    {
+        if (OperatingSystem.IsWindows()) return;
+
+        var runner = new MethodRunner();
+        var env = new Dictionary<string, string> { ["COVE"] = "0" };
+        var result = await runner.RunAsync(AdapterDir, "cove-hooks.sh", Array.Empty<string>(), TimeSpan.FromSeconds(20), env);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Empty(result.Stdout);
     }
 
     [Fact]
