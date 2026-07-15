@@ -33,6 +33,15 @@ export function resolveActiveBayId(items: BayCardEntry[], activeId: string | nul
   return (items.find((w) => w.id === activeId) ?? items[0]).id;
 }
 
+export interface BayHeadNavigation {
+  switchRequired: boolean;
+  showLauncher: boolean;
+}
+
+export function bayHeadNavigation(activeBayId: string | null, clickedBayId: string): BayHeadNavigation {
+  return { switchRequired: activeBayId !== clickedBayId, showLauncher: true };
+}
+
 export function sortFsEntries(entries: FsEntry[]): FsEntry[] {
   const rank = (e: FsEntry): number => (e.isDir ? 0 : 2) + (e.name.startsWith(".") ? 1 : 0);
   return [...entries].sort((a, b) => {

@@ -6,6 +6,7 @@ import {
   toggleCardCollapsed,
   scmChipText,
   bayAccent,
+  bayHeadNavigation,
   resolveActiveBayId,
   sortFsEntries,
   joinPath,
@@ -43,6 +44,16 @@ describe("resolveActiveBayId", () => {
 
   it("returns null for an empty list", () => {
     expect(resolveActiveBayId([], "x")).toBeNull();
+  });
+});
+
+describe("bayHeadNavigation", () => {
+  it("opens the launcher without switching when the clicked bay is already active", () => {
+    expect(bayHeadNavigation("one", "one")).toEqual({ switchRequired: false, showLauncher: true });
+  });
+
+  it("switches inactive bays before opening their launcher", () => {
+    expect(bayHeadNavigation("one", "two")).toEqual({ switchRequired: true, showLauncher: true });
   });
 });
 
