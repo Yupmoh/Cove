@@ -68,7 +68,7 @@ public sealed class HookNookIntegrationTests
     }
 
     [Fact]
-    public async Task HookPost_StopTransitions_NookToWaitingForInput()
+    public async Task HookPost_StopTransitions_NookToDone()
     {
         if (System.OperatingSystem.IsWindows()) return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(20));
@@ -84,6 +84,34 @@ public sealed class HookNookIntegrationTests
         using var http = new HttpClient();
         await PostHookAsync(http, port, "test-v2", "session-start", nookId, ct);
         await PostHookAsync(http, port, "test-v2", "stop", nookId, ct);
+
+        ControlResponse stateResp = await RequestAsync(ctl, "st", "cove://hooks/nook-states", null, ct);
+        Assert.True(stateResp.Ok);
+        var nooks = stateResp.Data!.Value.GetProperty("nooks");
+        string status = "";
+        foreach (var p in nooks.EnumerateArray())
+            if (p.GetProperty("nookId").GetString() == nookId)
+                status = p.GetProperty("status").GetString()!;
+        Assert.Equal("done", status);
+    }
+
+    [Fact]
+    public async Task HookPost_NotificationTransitions_NookToNeedsInput()
+    {
+        if (System.OperatingSystem.IsWindows()) return;
+        using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(20));
+        var ct = cts.Token;
+        await using var h = await DaemonTestHarness.StartAsync();
+        await using FrameConnection ctl = await h.ConnectAsync("cli");
+
+        string nookId = await SpawnAsync(ctl, "/bin/sh", new[] { "-c", "sleep 30" }, ct);
+
+        string portFile = System.IO.Path.Combine(h.DataDir, "hook-port");
+        int port = int.Parse(await System.IO.File.ReadAllTextAsync(portFile, ct));
+
+        using var http = new HttpClient();
+        await PostHookAsync(http, port, "test-v2", "session-start", nookId, ct);
+        await PostHookAsync(http, port, "test-v2", "notification", nookId, ct);
 
         ControlResponse stateResp = await RequestAsync(ctl, "st", "cove://hooks/nook-states", null, ct);
         Assert.True(stateResp.Ok);

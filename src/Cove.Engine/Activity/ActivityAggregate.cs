@@ -91,6 +91,8 @@ public sealed class ActivityAggregate
             "active" => AgentStatus.Working,
             "idle" => AgentStatus.Idle,
             "needs-input" => activeSubagents > 0 ? AgentStatus.Working : AgentStatus.WaitingForInput,
+            "needs-permission" => AgentStatus.NeedsPermission,
+            "done" => AgentStatus.Stopped,
             "error" => AgentStatus.Crashed,
             "tool-running" => AgentStatus.Working,
             _ => AgentStatus.Idle,

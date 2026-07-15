@@ -58,7 +58,7 @@ public sealed class NeedsInputSignalerTests
         var signaler = new NeedsInputSignaler(aggregate, bus, () => null);
 
         router.Route(Ev("nook-1", "claude-code", "session-start"));
-        router.Route(Ev("nook-1", "claude-code", "stop"));
+        router.Route(Ev("nook-1", "claude-code", "permission-request"));
         signaler.CheckAndSignal("nook-1");
 
         Assert.Equal(1, bus.SignalsSent);
@@ -74,7 +74,7 @@ public sealed class NeedsInputSignalerTests
         var signaler = new NeedsInputSignaler(aggregate, bus, () => "nook-1");
 
         router.Route(Ev("nook-1", "claude-code", "session-start"));
-        router.Route(Ev("nook-1", "claude-code", "stop"));
+        router.Route(Ev("nook-1", "claude-code", "notification"));
         signaler.CheckAndSignal("nook-1");
 
         Assert.Equal(0, bus.SignalsSent);
@@ -89,7 +89,7 @@ public sealed class NeedsInputSignalerTests
         var signaler = new NeedsInputSignaler(aggregate, bus, () => null);
 
         router.Route(Ev("nook-1", "claude-code", "session-start"));
-        router.Route(Ev("nook-1", "claude-code", "stop"));
+        router.Route(Ev("nook-1", "claude-code", "notification"));
         signaler.CheckAndSignal("nook-1");
         signaler.CheckAndSignal("nook-1");
 
@@ -105,14 +105,14 @@ public sealed class NeedsInputSignalerTests
         var signaler = new NeedsInputSignaler(aggregate, bus, () => null);
 
         router.Route(Ev("nook-1", "claude-code", "session-start"));
-        router.Route(Ev("nook-1", "claude-code", "stop"));
+        router.Route(Ev("nook-1", "claude-code", "notification"));
         signaler.CheckAndSignal("nook-1");
 
         router.Route(Ev("nook-1", "claude-code", "user-prompt-submit"));
         signaler.ClearSignal("nook-1");
         Assert.Equal(1, bus.BadgesCleared);
 
-        router.Route(Ev("nook-1", "claude-code", "stop"));
+        router.Route(Ev("nook-1", "claude-code", "notification"));
         signaler.CheckAndSignal("nook-1");
 
         Assert.Equal(2, bus.SignalsSent);
@@ -128,7 +128,7 @@ public sealed class NeedsInputSignalerTests
         var signaler = new NeedsInputSignaler(aggregate, bus, () => null, policy);
 
         router.Route(Ev("nook-1", "claude-code", "session-start"));
-        router.Route(Ev("nook-1", "claude-code", "stop"));
+        router.Route(Ev("nook-1", "claude-code", "notification"));
         signaler.CheckAndSignal("nook-1");
 
         Assert.Equal(1, bus.Delivered);
@@ -147,7 +147,7 @@ public sealed class NeedsInputSignalerTests
         var signaler = new NeedsInputSignaler(aggregate, bus, () => null, policy);
 
         router.Route(Ev("nook-1", "claude-code", "session-start"));
-        router.Route(Ev("nook-1", "claude-code", "stop"));
+        router.Route(Ev("nook-1", "claude-code", "notification"));
         signaler.CheckAndSignal("nook-1");
 
         Assert.Equal(1, bus.BadgesSent);
@@ -163,7 +163,7 @@ public sealed class NeedsInputSignalerTests
         var signaler = new NeedsInputSignaler(aggregate, bus, () => null);
 
         router.Route(Ev("nook-1", "claude-code", "session-start"));
-        router.Route(Ev("nook-1", "claude-code", "stop"));
+        router.Route(Ev("nook-1", "claude-code", "notification"));
         signaler.CheckAndSignal("nook-1");
 
         Assert.Equal(0, bus.Delivered);

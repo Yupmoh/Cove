@@ -93,8 +93,8 @@ public sealed class HookEventRouter
                 NeedsInputTransition?.Invoke(ev.NookId, false);
                 break;
             case "stop":
-                UpdateState(ev.NookId, s => s.WithStatus("needs-input"));
-                NeedsInputTransition?.Invoke(ev.NookId, true);
+                UpdateState(ev.NookId, s => s.WithStatus("done"));
+                NeedsInputTransition?.Invoke(ev.NookId, false);
                 break;
             case "stop-failure":
                 var reason = ExtractStopReason(ev.Payload);
@@ -116,9 +116,12 @@ public sealed class HookEventRouter
             case "subagent-stop":
                 UpdateState(ev.NookId, s => s with { ActiveSubagents = System.Math.Max(0, s.ActiveSubagents - 1), LastEventAt = System.DateTimeOffset.UtcNow });
                 break;
-            case "notification":
             case "permission-request":
-                UpdateState(ev.NookId, s => s with { LastEventAt = System.DateTimeOffset.UtcNow });
+                UpdateState(ev.NookId, s => s.WithStatus("needs-permission"));
+                NeedsInputTransition?.Invoke(ev.NookId, true);
+                break;
+            case "notification":
+                UpdateState(ev.NookId, s => s.WithStatus("needs-input"));
                 NeedsInputTransition?.Invoke(ev.NookId, true);
                 break;
         }

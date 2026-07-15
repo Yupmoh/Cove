@@ -32,6 +32,38 @@ public sealed class ShippedAdapterExampleTests
         Assert.Contains("list_recent_sessions", manifest.Methods.Keys);
     }
 
+    [Fact]
+    public void ClaudeHooksSettings_HasNotificationMatchersForPermissionAndIdle()
+    {
+        var path = Path.Combine(AdaptersRoot, "claude-code", "hooks-settings.json");
+        Assert.True(File.Exists(path), $"missing: {path}");
+
+        using var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(path));
+        var hooks = doc.RootElement.GetProperty("hooks");
+        Assert.True(hooks.TryGetProperty("Notification", out var notification), "hooks.Notification group missing");
+
+        string? permissionCommand = null;
+        string? idleCommand = null;
+        foreach (var group in notification.EnumerateArray())
+        {
+            var matcher = group.GetProperty("matcher").GetString();
+            var entry = group.GetProperty("hooks")[0];
+            Assert.Equal("command", entry.GetProperty("type").GetString());
+            var command = entry.GetProperty("command").GetString();
+            if (matcher == "permission_prompt") permissionCommand = command;
+            if (matcher == "idle_prompt") idleCommand = command;
+        }
+
+        Assert.NotNull(permissionCommand);
+        Assert.NotNull(idleCommand);
+        Assert.Contains("hook emit permission-request", permissionCommand!);
+        Assert.Contains("hook emit notification", idleCommand!);
+        Assert.Contains("\"$COVE_CLI_PATH\"", permissionCommand!);
+        Assert.Contains("--adapter claude-code", permissionCommand!);
+        Assert.Contains("--nook-id \"$COVE_NOOK_ID\"", permissionCommand!);
+        Assert.Contains("--nook-id \"$COVE_NOOK_ID\"", idleCommand!);
+    }
+
     [Theory]
     [InlineData("claude-code")]
     [InlineData("codex")]

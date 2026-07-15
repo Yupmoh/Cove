@@ -33,15 +33,33 @@ public sealed class HookEventRouterTests
     }
 
     [Fact]
-    public void Route_Stop_MarksNookNeedsInput()
+    public void Route_Stop_MarksNookDoneWithoutNeedsInputSignal()
     {
         var router = new HookEventRouter();
+        bool? needsInput = null;
+        router.NeedsInputTransition += (_, value) => needsInput = value;
         router.Route(new HookEvent { Adapter = "claude-code", Event = "session-start", NookId = "p1" });
         router.Route(new HookEvent { Adapter = "claude-code", Event = "stop", NookId = "p1" });
 
         var state = router.GetNookState("p1");
         Assert.NotNull(state);
-        Assert.Equal("needs-input", state!.Status);
+        Assert.Equal("done", state!.Status);
+        Assert.False(needsInput);
+    }
+
+    [Fact]
+    public void Route_PermissionRequest_MarksNeedsPermissionAndSignals()
+    {
+        var router = new HookEventRouter();
+        bool? needsInput = null;
+        router.NeedsInputTransition += (_, value) => needsInput = value;
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "session-start", NookId = "p1" });
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "permission-request", NookId = "p1" });
+
+        var state = router.GetNookState("p1");
+        Assert.NotNull(state);
+        Assert.Equal("needs-permission", state!.Status);
+        Assert.True(needsInput);
     }
 
     [Fact]
@@ -218,13 +236,17 @@ public sealed class HookEventRouterTests
     }
 
     [Fact]
-    public void Route_Notification_DoesNotChangeStatus()
+    public void Route_Notification_MarksNeedsInputAndSignals()
     {
         var router = new HookEventRouter();
+        bool? needsInput = null;
+        router.NeedsInputTransition += (_, value) => needsInput = value;
         router.Route(new HookEvent { Adapter = "claude-code", Event = "session-start", NookId = "p1" });
         router.Route(new HookEvent { Adapter = "claude-code", Event = "notification", NookId = "p1" });
 
         var state = router.GetNookState("p1");
-        Assert.Equal("active", state!.Status);
+        Assert.NotNull(state);
+        Assert.Equal("needs-input", state!.Status);
+        Assert.True(needsInput);
     }
 }

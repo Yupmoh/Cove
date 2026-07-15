@@ -28,7 +28,7 @@ export const AGENT_STATE_META: Record<AgentState, AgentStateMeta> = {
   "needs-input": { state: "needs-input", label: "needs input", color: "#e0a44a", order: 0 },
   running: { state: "running", label: "running", color: "#34c2b0", order: 1 },
   idle: { state: "idle", label: "idle", color: "#8ca2a9", order: 2 },
-  done: { state: "done", label: "finished", color: "#5fc08a", order: 3 },
+  done: { state: "done", label: "done", color: "#5fc08a", order: 3 },
 };
 
 export const AGENT_STATE_ORDER: AgentState[] = ["needs-input", "running", "idle", "done"];
@@ -44,6 +44,7 @@ export function mapAgentState(status: string): AgentState {
     case "tool-running":
       return "running";
     case "stopped":
+    case "done":
     case "crashed":
     case "error":
       return "done";
@@ -61,10 +62,11 @@ export function agentDisplayName(card: AgentCard): string {
   return card.nookId.length > 8 ? `${card.nookId.slice(0, 8)}…` : card.nookId;
 }
 
-export function buildAgentRows(cards: AgentCard[], needsInputNookIds: Set<string>): AgentRow[] {
+export function buildAgentRows(cards: AgentCard[], needsInputNookIds: Set<string>, acknowledgedDoneNookIds: Set<string> = new Set()): AgentRow[] {
   const rows: AgentRow[] = cards.map((card) => {
     const forced = needsInputNookIds.has(card.nookId);
-    const state = forced ? "needs-input" : mapAgentState(card.status);
+    const mapped = mapAgentState(card.status);
+    const state = forced ? "needs-input" : mapped === "done" && acknowledgedDoneNookIds.has(card.nookId) ? "idle" : mapped;
     return {
       nookId: card.nookId,
       name: agentDisplayName(card),
@@ -92,4 +94,17 @@ export function agentStateCounts(rows: AgentRow[]): Record<AgentState, number> {
 
 export function needsInputCount(rows: AgentRow[]): number {
   return rows.reduce((n, row) => (row.state === "needs-input" ? n + 1 : n), 0);
+}
+
+export function agentCardsEqual(previous: AgentCard[], next: AgentCard[]): boolean {
+  if (previous.length !== next.length) return false;
+  return previous.every((card, index) => {
+    const candidate = next[index];
+    return card.nookId === candidate.nookId
+      && card.adapter === candidate.adapter
+      && card.name === candidate.name
+      && card.status === candidate.status
+      && card.bay === candidate.bay
+      && card.shore === candidate.shore;
+  });
 }

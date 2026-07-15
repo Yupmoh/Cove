@@ -47,8 +47,26 @@ public sealed class ActivityAggregateTests
     {
         var agg = WithAgent(out var hooks, out _, "p1", "claude-code");
         hooks.Route(new HookEvent { Adapter = "claude-code", Event = "session-start", NookId = "p1" });
-        hooks.Route(new HookEvent { Adapter = "claude-code", Event = "stop", NookId = "p1" });
+        hooks.Route(new HookEvent { Adapter = "claude-code", Event = "notification", NookId = "p1" });
         Assert.Equal(AgentStatus.WaitingForInput, agg.ResolveStatus("p1"));
+    }
+
+    [Fact]
+    public void ResolveStatus_PermissionRequest_MapsToNeedsPermission()
+    {
+        var agg = WithAgent(out var hooks, out _, "p1", "claude-code");
+        hooks.Route(new HookEvent { Adapter = "claude-code", Event = "session-start", NookId = "p1" });
+        hooks.Route(new HookEvent { Adapter = "claude-code", Event = "permission-request", NookId = "p1" });
+        Assert.Equal(AgentStatus.NeedsPermission, agg.ResolveStatus("p1"));
+    }
+
+    [Fact]
+    public void ResolveStatus_Stop_MapsToStopped()
+    {
+        var agg = WithAgent(out var hooks, out _, "p1", "claude-code");
+        hooks.Route(new HookEvent { Adapter = "claude-code", Event = "session-start", NookId = "p1" });
+        hooks.Route(new HookEvent { Adapter = "claude-code", Event = "stop", NookId = "p1" });
+        Assert.Equal(AgentStatus.Stopped, agg.ResolveStatus("p1"));
     }
 
     [Fact]
@@ -57,7 +75,7 @@ public sealed class ActivityAggregateTests
         var agg = WithAgent(out var hooks, out _, "p1", "claude-code");
         hooks.Route(new HookEvent { Adapter = "claude-code", Event = "session-start", NookId = "p1" });
         hooks.Route(new HookEvent { Adapter = "claude-code", Event = "subagent-start", NookId = "p1" });
-        hooks.Route(new HookEvent { Adapter = "claude-code", Event = "stop", NookId = "p1" });
+        hooks.Route(new HookEvent { Adapter = "claude-code", Event = "notification", NookId = "p1" });
         Assert.Equal(AgentStatus.Working, agg.ResolveStatus("p1"));
     }
 
@@ -84,7 +102,7 @@ public sealed class ActivityAggregateTests
     {
         var agg = WithAgent(out var hooks, out _, "p1", "claude-code");
         hooks.Route(new HookEvent { Adapter = "claude-code", Event = "session-start", NookId = "p1" });
-        hooks.Route(new HookEvent { Adapter = "claude-code", Event = "stop", NookId = "p1" });
+        hooks.Route(new HookEvent { Adapter = "claude-code", Event = "notification", NookId = "p1" });
         Assert.True(agg.NeedsInput("p1"));
     }
 
@@ -106,9 +124,9 @@ public sealed class ActivityAggregateTests
         agentRouter.Register("p2", "codex", "B", "ws1", "shore1");
         agentRouter.Register("p3", "gemini", "C", "ws1", "shore1");
         hookRouter.Route(new HookEvent { Adapter = "claude-code", Event = "session-start", NookId = "p1" });
-        hookRouter.Route(new HookEvent { Adapter = "claude-code", Event = "stop", NookId = "p1" });
+        hookRouter.Route(new HookEvent { Adapter = "claude-code", Event = "notification", NookId = "p1" });
         hookRouter.Route(new HookEvent { Adapter = "codex", Event = "session-start", NookId = "p2" });
-        hookRouter.Route(new HookEvent { Adapter = "codex", Event = "stop", NookId = "p2" });
+        hookRouter.Route(new HookEvent { Adapter = "codex", Event = "permission-request", NookId = "p2" });
         hookRouter.Route(new HookEvent { Adapter = "gemini", Event = "session-start", NookId = "p3" });
         hookRouter.Route(new HookEvent { Adapter = "gemini", Event = "pre-tool-use", NookId = "p3" });
 

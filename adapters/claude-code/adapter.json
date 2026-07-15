@@ -27,7 +27,9 @@
     "user-prompt-submit": "cove://hooks/claude-code/user-prompt-submit",
     "pre-tool-use": "cove://hooks/claude-code/pre-tool-use",
     "post-tool-use": "cove://hooks/claude-code/post-tool-use",
-    "stop": "cove://hooks/claude-code/stop"
+    "stop": "cove://hooks/claude-code/stop",
+    "permission-request": "cove://hooks/claude-code/permission-request",
+    "notification": "cove://hooks/claude-code/notification"
   },
   "methods": {
     "list_recent_sessions": { "script": "list_recent_sessions.sh" },

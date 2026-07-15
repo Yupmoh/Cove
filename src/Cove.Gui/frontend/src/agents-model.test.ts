@@ -6,6 +6,7 @@ import {
   sortAgentRows,
   agentStateCounts,
   needsInputCount,
+  agentCardsEqual,
   type AgentCard,
   type AgentRow,
 } from "./agents-model";
@@ -17,8 +18,22 @@ describe("mapAgentState", () => {
     expect(mapAgentState("working")).toBe("running");
     expect(mapAgentState("tool-running")).toBe("running");
     expect(mapAgentState("idle")).toBe("idle");
+    expect(mapAgentState("done")).toBe("done");
     expect(mapAgentState("stopped")).toBe("done");
     expect(mapAgentState("crashed")).toBe("done");
+  });
+
+  it("acknowledges a finished agent as idle without turning questions into idle", () => {
+    const rows = buildAgentRows(
+      [
+        { nookId: "done", adapter: "x", name: "Done", status: "done" },
+        { nookId: "question", adapter: "x", name: "Question", status: "waitingforinput" },
+      ],
+      new Set(),
+      new Set(["done", "question"]),
+    );
+    expect(rows.find((row) => row.nookId === "done")?.state).toBe("idle");
+    expect(rows.find((row) => row.nookId === "question")?.state).toBe("needs-input");
   });
   it("treats an unknown status as idle", () => {
     expect(mapAgentState("something-else")).toBe("idle");
@@ -78,5 +93,20 @@ describe("counts", () => {
     );
     expect(agentStateCounts(rows)).toEqual({ "needs-input": 2, running: 1, idle: 0, done: 0 });
     expect(needsInputCount(rows)).toBe(2);
+  });
+});
+
+describe("agentCardsEqual", () => {
+  it("treats identical display data as unchanged", () => {
+    const previous: AgentCard[] = [{ nookId: "a", adapter: "codex", name: "Work", status: "working", bay: "Cove", shore: "Shore 1" }];
+    const next = previous.map((card) => ({ ...card }));
+    expect(agentCardsEqual(previous, next)).toBe(true);
+  });
+
+  it("detects sidebar-visible changes", () => {
+    const previous: AgentCard[] = [{ nookId: "a", adapter: "codex", name: "Work", status: "working" }];
+    expect(agentCardsEqual(previous, [{ ...previous[0], status: "idle" }])).toBe(false);
+    expect(agentCardsEqual(previous, [{ ...previous[0], name: "Review" }])).toBe(false);
+    expect(agentCardsEqual(previous, [])).toBe(false);
   });
 });
