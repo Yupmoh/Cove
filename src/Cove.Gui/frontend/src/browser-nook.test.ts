@@ -95,6 +95,23 @@ describe("BrowserNavState", () => {
     s.navigate("https://b.com");
     expect(s.reloadUrl()).toBe("https://b.com");
   });
+
+  it("restores the retained page and history index", () => {
+    const s = new BrowserNavState("about:blank");
+    s.restore(["https://a.com", "https://b.com", "https://c.com"], 1);
+    expect(s.currentUrl).toBe("https://b.com");
+    expect(s.canGoBack).toBe(true);
+    expect(s.canGoForward).toBe(true);
+    s.forward();
+    expect(s.currentUrl).toBe("https://c.com");
+  });
+
+  it("persists page-driven navigation but ignores expected and duplicate events", () => {
+    const s = new BrowserNavState("https://a.com");
+    expect(s.webviewNavigated("https://a.com", "https://a.com")).toBe(false);
+    expect(s.webviewNavigated("https://b.com", null)).toBe(true);
+    expect(s.webviewNavigated("https://b.com", null)).toBe(false);
+  });
 });
 
 describe("nativeWebviewBounds", () => {

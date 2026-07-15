@@ -95,4 +95,31 @@ public sealed class BrowserNookManagerTests
         Assert.NotNull(nook);
         Assert.Equal("https://a.com", nook!.CurrentUrl);
     }
+
+    [Fact]
+    public void Open_ExistingNook_RetainsCurrentPage()
+    {
+        var mgr = new BrowserNookManager();
+        mgr.Open("p1", "https://a.com");
+        mgr.Navigate("p1", "https://b.com");
+
+        var reopened = mgr.Open("p1", "about:blank");
+
+        Assert.Equal("https://b.com", reopened.CurrentUrl);
+        Assert.Equal(2, reopened.History.Count);
+        Assert.Equal(1, reopened.HistoryIndex);
+    }
+
+    [Fact]
+    public void Navigate_CurrentPage_DoesNotDuplicateHistory()
+    {
+        var mgr = new BrowserNookManager();
+        mgr.Open("p1", "https://a.com");
+
+        var unchanged = mgr.Navigate("p1", "https://a.com");
+
+        Assert.NotNull(unchanged);
+        Assert.Single(unchanged.History);
+        Assert.Equal(0, unchanged.HistoryIndex);
+    }
 }

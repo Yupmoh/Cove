@@ -16,6 +16,8 @@ public sealed class BrowserNookManager
 
     public BrowserNook Open(string nookId, string url)
     {
+        if (_nooks.TryGetValue(nookId, out var existing))
+            return existing;
         var nook = new BrowserNook(nookId, url, new List<string> { url }, 0);
         _nooks[nookId] = nook;
         return nook;
@@ -25,6 +27,8 @@ public sealed class BrowserNookManager
     {
         if (!_nooks.TryGetValue(nookId, out var existing))
             return null;
+        if (existing.CurrentUrl == url)
+            return existing;
         var history = existing.History.Take(existing.HistoryIndex + 1).Append(url).ToList();
         var nook = existing with { CurrentUrl = url, History = history, HistoryIndex = history.Count - 1 };
         _nooks[nookId] = nook;

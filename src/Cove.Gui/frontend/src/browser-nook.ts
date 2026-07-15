@@ -7,6 +7,12 @@ import { DownloadShelfState, downloadPercent, formatBytes, joinPath, type Downlo
 export const browserWebviewRegistry = new Map<string, number>();
 
 interface BrowserNookInstance { el: HTMLElement; sync: () => void; }
+
+interface BrowserNookDto {
+  currentUrl: string;
+  history: string[];
+  historyIndex: number;
+}
 const browserNookInstances = new Map<string, BrowserNookInstance>();
 
 export function reconcileBrowserBounds(): void {
@@ -39,6 +45,22 @@ export class BrowserNavState {
 
   constructor(initialUrl: string) {
     this.current = normalizeUrl(initialUrl);
+  }
+
+  restore(history: string[], historyIndex: number): void {
+    if (history.length === 0) return;
+    const retained = history.map(normalizeUrl);
+    const activeIndex = Math.max(0, Math.min(historyIndex, retained.length - 1));
+    this.backStack = retained.slice(0, activeIndex);
+    this.current = retained[activeIndex];
+    this.forwardStack = retained.slice(activeIndex + 1).reverse();
+  }
+
+  webviewNavigated(url: string, expectedUrl: string | null): boolean {
+    const next = normalizeUrl(url);
+    const changed = next !== this.current;
+    if (changed) this.navigate(next);
+    return changed && (expectedUrl === null || next !== normalizeUrl(expectedUrl));
   }
 
   get currentUrl(): string { return this.current; }
@@ -224,6 +246,7 @@ export async function renderBrowserNook(nookId: string, initialUrl: string, user
   let zoomLevel = 1.0;
   let devToolsOpen = false;
   let suspended = false;
+  let expectedNavigationUrl: string | null = null;
 
   const updateChrome = () => {
     urlBar.value = nav.currentUrl;
@@ -276,6 +299,7 @@ export async function renderBrowserNook(nookId: string, initialUrl: string, user
 
   const doNavigate = async (url: string) => {
     nav.navigate(url);
+    expectedNavigationUrl = nav.currentUrl;
     updateChrome();
     if (webviewId !== null) {
       setLoading(true);
@@ -290,6 +314,7 @@ export async function renderBrowserNook(nookId: string, initialUrl: string, user
   const doBack = async () => {
     if (!nav.canGoBack) return;
     nav.back();
+    expectedNavigationUrl = nav.currentUrl;
     updateChrome();
     if (webviewId !== null) await invoke("webviewPane.navigate", { id: webviewId, url: nav.currentUrl }).catch(() => void 0);
     void invoke("cove://commands/browser.back", { nookId }).catch(() => void 0);
@@ -298,6 +323,7 @@ export async function renderBrowserNook(nookId: string, initialUrl: string, user
   const doForward = async () => {
     if (!nav.canGoForward) return;
     nav.forward();
+    expectedNavigationUrl = nav.currentUrl;
     updateChrome();
     if (webviewId !== null) await invoke("webviewPane.navigate", { id: webviewId, url: nav.currentUrl }).catch(() => void 0);
     void invoke("cove://commands/browser.forward", { nookId }).catch(() => void 0);
@@ -525,10 +551,14 @@ export async function renderBrowserNook(nookId: string, initialUrl: string, user
   window.__ryn.on("webviewPane.navigated", (data: unknown) => {
     const evt = data as { id: number; url: string };
     if (evt.id !== webviewId) return;
-    nav.navigate(evt.url);
+    const persistNavigation = nav.webviewNavigated(evt.url, expectedNavigationUrl);
+    expectedNavigationUrl = null;
     updateChrome();
     findState.onNavigate();
     renderFind();
+    if (persistNavigation) {
+      void invoke("cove://commands/browser.navigate", { nookId, url: nav.currentUrl }).catch((err) => console.warn("engine browser.navigate failed", err));
+    }
   });
 
   window.__ryn.on("webviewPane.titleChanged", (data: unknown) => {
@@ -607,10 +637,16 @@ export async function renderBrowserNook(nookId: string, initialUrl: string, user
     renderDownloadShelf();
   });
 
-  void openWebView(nav.currentUrl).then(() => {
-    setLoading(true);
-    void invoke("cove://commands/browser.open", { nookId, url: nav.currentUrl }).catch(() => void 0);
-  });
+  void invoke<BrowserNookDto>("cove://commands/browser.open", { nookId, url: nav.currentUrl })
+    .catch(() => null)
+    .then((retained) => {
+      if (retained) nav.restore(retained.history, retained.historyIndex);
+      updateChrome();
+      expectedNavigationUrl = nav.currentUrl;
+      return openWebView(nav.currentUrl);
+    })
+    .then(() => setLoading(true))
+    .catch((err) => console.warn("webview open failed", nav.currentUrl, err));
 
   updateChrome();
   renderFind();
