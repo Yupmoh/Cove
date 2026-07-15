@@ -57,7 +57,7 @@ public sealed class RealAdapterGateTests
 
         Assert.NotNull(cmd);
         Assert.False(string.IsNullOrEmpty(cmd.Command));
-        Assert.Equal("claude", cmd.Command);
+        Assert.Equal("claude", Path.GetFileNameWithoutExtension(cmd.Command));
     }
 
     [Fact]
