@@ -77,14 +77,13 @@ public sealed class LayoutBaysTests
     }
 
     [Fact]
-    public void ClosingLastNook_ConvertsShoreToEmpty_NotRemoved()
+    public void ClosingLastNook_RemovesShore()
     {
         var svc = new LayoutService();
         var shore = svc.CreateShore("Terminal 1", Leaf("a"));
         svc.CloseNook(shore, "a");
-        var root = svc.GetRoot(shore);
-        Assert.NotNull(root);
-        Assert.True(LayoutService.IsEmptyShore(root!));
+        Assert.Null(svc.GetRoot(shore));
+        Assert.Empty(svc.ToSnapshot(LayoutService.DefaultBayId, "d", "/d").Shores);
     }
 
     [Fact]

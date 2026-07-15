@@ -311,13 +311,15 @@ public sealed class LayoutService
     {
         lock (_sync)
         {
-            var (_, shore) = GetShoreOrThrow(shoreId);
+            var (bucket, shore) = GetShoreOrThrow(shoreId);
             var next = MosaicOps.Close(shore.Root, nookId);
             if (next is null)
             {
-                shore.Root = MakeEmptyLeaf();
-                shore.ActiveNookId = ((NookLeaf)shore.Root).NookId;
-                shore.ZoomedNookId = null;
+                bucket.Shores.Remove(shoreId);
+                bucket.Order.Remove(shoreId);
+                _shoreToBay.Remove(shoreId);
+                if (bucket.ActiveShoreId == shoreId)
+                    bucket.ActiveShoreId = bucket.Order.Count > 0 ? bucket.Order[0] : null;
             }
             else
             {

@@ -85,4 +85,17 @@ public sealed class MoveNookTests
         var leaf = Assert.IsType<NookLeaf>(shore.LayoutTree);
         Assert.Equal("b", leaf.NookId);
     }
+
+    [Fact]
+    public void CloseNook_LastNook_RemovesShore()
+    {
+        var layout = new LayoutService();
+        var shoreId = layout.CreateShore("shore", Leaf("a"));
+
+        layout.CloseNook(shoreId, "a");
+
+        var snapshot = layout.ToSnapshot("w", "w", "/tmp");
+        Assert.Empty(snapshot.Shores);
+        Assert.Null(snapshot.ActiveShoreId);
+    }
 }

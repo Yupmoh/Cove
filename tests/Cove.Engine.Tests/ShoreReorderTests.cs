@@ -91,7 +91,7 @@ public sealed class ShoreReorderTests
     }
 
     [Fact]
-    public void CloseNook_LastNook_KeepsShoreAsEmpty_PreservingOrder()
+    public void CloseNook_LastNook_RemovesShore_PreservingRemainingOrder()
     {
         var svc = new LayoutService();
         var r1 = svc.CreateShore("A", Leaf("a"));
@@ -102,11 +102,9 @@ public sealed class ShoreReorderTests
         svc.CloseNook(r1, "a");
 
         var snap = svc.ToSnapshot("ws", "demo", "/proj");
-        Assert.Equal(3, snap.Shores.Count);
+        Assert.Equal(2, snap.Shores.Count);
         Assert.Equal(r3, snap.Shores[0].Id);
-        Assert.Equal(r1, snap.Shores[1].Id);
-        Assert.Equal(r2, snap.Shores[2].Id);
-        Assert.True(LayoutService.IsEmptyShore(snap.Shores[1].LayoutTree));
+        Assert.Equal(r2, snap.Shores[1].Id);
     }
 
     [Fact]
