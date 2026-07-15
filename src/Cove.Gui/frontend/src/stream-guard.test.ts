@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { createStreamGenerations, replayViewportAction, shouldDisposeNook, shouldResetReplay, streamVisibilityAction } from "./stream-guard";
+import { createStreamGenerations, processExitAction, replayViewportAction, shouldDisposeNook, shouldResetReplay, streamVisibilityAction } from "./stream-guard";
+
+describe("processExitAction", () => {
+  it("retains an exited nook so the user can inspect or restart it", () => {
+    expect(processExitAction()).toBe("retain");
+  });
+});
 
 describe("shouldDisposeNook", () => {
   it("keeps a nook that is still in the layout even when its socket is closed", () => {

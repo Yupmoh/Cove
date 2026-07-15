@@ -73,7 +73,6 @@ export function menuIA(): MenuSection[] {
         { id: "close-shore", label: "Close Shore", action: "shore.close" },
       ],
     },
-    { role: "editMenu" },
     {
       label: "View",
       items: [

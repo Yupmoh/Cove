@@ -24,6 +24,10 @@ export const SIDEBAR_MODES: SidebarModeMeta[] = [
   { mode: "notepad", icon: "✎", label: "Notepad", functional: true },
 ];
 
+export const SIDEBAR_RAIL_MODES = SIDEBAR_MODES.filter((meta) =>
+  meta.mode === "bays" || meta.mode === "skills" || meta.mode === "timeline",
+);
+
 export const SIDEBAR_MODE_META: Record<SidebarMode, SidebarModeMeta> = SIDEBAR_MODES.reduce(
   (acc, m) => { acc[m.mode] = m; return acc; },
   {} as Record<SidebarMode, SidebarModeMeta>,

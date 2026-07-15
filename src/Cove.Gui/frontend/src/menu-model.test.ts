@@ -42,6 +42,10 @@ describe("menuIA", () => {
     expect(labels).toContain("appMenu");
     expect(labels).toContain("windowMenu");
   });
+
+  it("does not install the native edit menu that intercepts terminal paste", () => {
+    expect(menuIA().some((section) => section.role === "editMenu")).toBe(false);
+  });
 });
 
 describe("buildMenu", () => {

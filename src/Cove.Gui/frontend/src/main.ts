@@ -6,8 +6,8 @@ import { SearchAddon } from "@xterm/addon-search";
 import "@xterm/xterm/css/xterm.css";
 import { decodeRelayData, toBase64Utf8, parseRelayText } from "./wsproto";
 import { createKeyboardProtocolTracker, shiftEnterSequence, type KeyboardProtocolTracker } from "./terminal-keyboard";
-import { isPaneFittable, shouldResize, type TermDims } from "./terminal-fit";
-import { createStreamGenerations, replayViewportAction, shouldDisposeNook, shouldResetReplay, streamVisibilityAction } from "./stream-guard";
+import { isPaneFittable, scrollLineAfterFit, shouldResize, type TermDims } from "./terminal-fit";
+import { createStreamGenerations, processExitAction, replayViewportAction, shouldDisposeNook, shouldResetReplay, streamVisibilityAction } from "./stream-guard";
 import { renderKanbanBoard } from "./tasks-kanban";
 import { renderTaskList } from "./tasks-list";
 import { renderTimelineFeed } from "./timeline-feed";
@@ -33,12 +33,12 @@ import { renderPdfNook } from "./pdf-nook";
 import { renderVideoNook } from "./video-nook";
 import { partitionPinned, reorderShore, glyphForNookType, visibleShoreIds, buildWingModel, filterShoresByWing } from "./shore-tabs";
 import { groupByBay, moveSelection, selectedNote, kindIcon, kindColor, type NoteListItem, type NavState } from "./notepad-sidebar";
-import { initialSidebarModel, selectLeftMode, toggleSide, setCollapsed, setWidth, collapsedOf, widthOf, SIDEBAR_MODES, SIDEBAR_MODE_META, type SidebarModel, type SidebarSide, type SidebarMode } from "./sidebar-model";
+import { initialSidebarModel, selectLeftMode, toggleSide, setCollapsed, setWidth, collapsedOf, widthOf, SIDEBAR_MODES, SIDEBAR_RAIL_MODES, SIDEBAR_MODE_META, type SidebarModel, type SidebarSide, type SidebarMode } from "./sidebar-model";
 import { nextBayName, type BayBoxInput } from "./bay-boxes";
 import { clampMenuPosition, normalizeItems, firstSelectableIndex, moveSelection as ctxMoveSelection, activeItem, type ContextMenuItem, type ContextMenuModel } from "./context-menu";
 import { buildBayTree, bayTreeEmptyMessage, NOOK_TYPE_LABELS, type TreeLeaf, type TreeShoreInput, type TreeRow } from "./bay-tree";
-import { buildAgentRows, mapAgentState, AGENT_STATE_META, type AgentCard, type AgentState } from "./agents-model";
-import { resolveActiveBayId, bayAccent, sortFsEntries, joinPath, scmChipText, parseCollapsedCardIds, serializeCollapsedCardIds, toggleCardCollapsed, type FsEntry, type BayCardEntry, type ScmSummary } from "./bay-cards";
+import { buildAgentRows, mapAgentState, agentCardsEqual, AGENT_STATE_META, type AgentCard, type AgentState } from "./agents-model";
+import { resolveActiveBayId, bayAccent, sortFsEntries, joinPath, mergeFsStatus, scmChipText, parseCollapsedCardIds, serializeCollapsedCardIds, toggleCardCollapsed, type FsEntry, type FsStatusEntry, type BayCardEntry, type ScmSummary } from "./bay-cards";
 import { BAY_ICON_CHOICES, bayGlyph } from "./bay-icons";
 import { orderSettingsTabs, settingsTabLabel, resolveActiveSettingsTab } from "./settings-tabs";
 import { parseQuery, filterAndSort, MruTracker, cycleCategory, categoryLabel, type PaletteItem } from "./omni-palette";
@@ -60,7 +60,7 @@ import { buildMenu, menuChordSet } from "./menu-model";
 import { toolbarTiles } from "./toolbar-tiles";
 import { shouldShowLauncher, buildAdapterTiles, buildBuiltinTiles, isEmptyShoreTree, isPlaceholderLeaf, placeableNookForAction, resolveLaunchCwd, type LauncherAdapter, type LauncherBuiltin, type LauncherTile } from "./box-launcher";
 import { adapterAccent, toolAccent, assignHotkeys, detectedHarnessTiles, clampLauncherSelection, moveLauncherSelection, hotkeyTarget, shapeRecentSessions, tipAt, computeLauncherCols, resolveLauncherYolo, resolveLauncherProjectDir, type LauncherSelection, type LauncherGeometry, type LauncherArrowKey, type RecentSessionRow } from "./launcher-model";
-import { iconSvg, iconForNookType, monogram } from "./icons";
+import { adapterIconSvg, fileIcon, iconSvg, iconForNookType } from "./icons";
 import { dropZoneFor, moveMutationFor, zoneOverlayRect } from "./nook-dnd";
 import { cssPath, buildFeedbackReport, feedbackSlug, harnessPrompt } from "./inspect-mode";
 import { clusterTools } from "./title-cluster";
@@ -215,6 +215,7 @@ interface NookView {
   resizeObserver: ResizeObserver | null;
   fitFrame: number | null;
   reconnectTimer: number | null;
+  exited: boolean;
 }
 
 const nooks = new Map<string, NookView>();
@@ -299,9 +300,9 @@ const leftContentEl = document.getElementById("left-content")!;
 const leftResizeEl = document.getElementById("left-resize")!;
 const palInput = document.getElementById("pal-input") as HTMLInputElement;
 const palList = document.getElementById("pal-list")!;
+let bayOverviewVisible = false;
 
 gridEl.style.display = "flex";
-gridEl.style.padding = "8px";
 
 function syncTitlebarWorkspaceOffset(): void {
   const workspaceLeft = leftSidebarEl.offsetLeft + leftSidebarEl.offsetWidth + 6;
@@ -316,7 +317,9 @@ function paneFittable(pv: NookView): boolean {
 function fitNook(pv: NookView): void {
   if (!paneFittable(pv)) return;
   try {
+    const before = { baseY: pv.term.buffer.active.baseY, viewportY: pv.term.buffer.active.viewportY };
     pv.fit.fit();
+    pv.term.scrollToLine(scrollLineAfterFit(before, pv.term.buffer.active.baseY));
     pv.term.refresh(0, Math.max(0, pv.term.rows - 1));
   } catch { void 0; }
 }
@@ -341,7 +344,7 @@ function applySettings() {
     pv.term.options.scrollback = settings.scrollback;
     pv.term.options.theme = currentTermTheme();
   }
-  gridEl.style.padding = `${settings.padding}px`;
+  document.documentElement.style.setProperty("--workspace-padding", `${settings.padding}px`);
   document.documentElement.style.setProperty("--cove-bg-opacity", String(settings.backgroundOpacity));
   fitAll();
   persistSettings();
@@ -369,6 +372,7 @@ function finishReplay(nook: NookView, resynced = false): void {
 }
 
 function attachWs(nook: NookView): void {
+  if (nook.exited) return;
   if (nook.ws && nook.ws.readyState < WebSocket.CLOSING) return;
   if (nook.reconnectTimer !== null) {
     window.clearTimeout(nook.reconnectTimer);
@@ -407,10 +411,11 @@ function attachWs(nook: NookView): void {
         nook.lastAck = m.base;
         finishReplay(nook, true);
       } else if (m.t === "end") {
+        nook.exited = true;
         nook.term.write(`\r\n\x1b[38;5;244m[process exited: ${m.code}]\x1b[0m\r\n`);
         launcherRecentsAt = 0;
         void refreshLauncherRecents();
-        window.setTimeout(() => { void closeNookById(nook.nookId); }, 400);
+        if (processExitAction() === "retain") nook.el.classList.add("process-exited");
       }
       return;
     }
@@ -452,7 +457,7 @@ function attachWs(nook: NookView): void {
     window.clearInterval(ackTimer);
     nook.consumed = Math.max(nook.consumed, nook.expectedOffset);
     if (nook.ws === ws) nook.ws = null;
-    if (!current() || nooks.get(nook.nookId) !== nook || !nook.el.isConnected) return;
+    if (!current() || nook.exited || nooks.get(nook.nookId) !== nook || !nook.el.isConnected) return;
     nook.reconnectTimer = window.setTimeout(() => {
       nook.reconnectTimer = null;
       if (nook.el.isConnected) attachWs(nook);
@@ -546,7 +551,7 @@ function makeNook(nookId: string, since: number): NookView {
 
   const resetOnReplay = shouldResetReplay({ locallySpawned: locallySpawnedNookIds.has(nookId), renderedBefore: renderedStreamNookIds.has(nookId) });
   renderedStreamNookIds.add(nookId);
-  const pv: NookView = { nookId, term, fit: fitAddon, ws: null, el, consumed: since, expectedOffset: since, replayUntilOffset: since, lastAck: since, title: "", customTitle: "", headerTitleEl: titleSpan, search: searchAddon, replaying: true, resetOnReplay, keyboard: createKeyboardProtocolTracker(), lastSent: null, handlersBound: false, resizeObserver: null, fitFrame: null, reconnectTimer: null };
+  const pv: NookView = { nookId, term, fit: fitAddon, ws: null, el, consumed: since, expectedOffset: since, replayUntilOffset: since, lastAck: since, title: "", customTitle: "", headerTitleEl: titleSpan, search: searchAddon, replaying: true, resetOnReplay, keyboard: createKeyboardProtocolTracker(), lastSent: null, handlersBound: false, resizeObserver: null, fitFrame: null, reconnectTimer: null, exited: false };
 
   el.addEventListener("mousedown", () => focusNook(nookId));
   const overrides = loadKeybindings();
@@ -787,6 +792,14 @@ function collectLeafIds(node: MosaicNode): string[] {
 function findLeafId(node: MosaicNode, termId: string): string | null {
   if (node.kind === "leaf") return (node.nookId === termId || node.subtabs.some((s) => s.documentId === termId)) ? node.nookId : null;
   return findLeafId(node.childA, termId) ?? findLeafId(node.childB, termId);
+}
+function findNookLocation(node: MosaicNode, nookId: string): { leaf: NookLeaf; subtabIndex: number } | null {
+  if (node.kind === "leaf") {
+    const subtabIndex = node.subtabs.findIndex((s) => s.documentId === nookId);
+    if (node.nookId === nookId || subtabIndex >= 0) return { leaf: node, subtabIndex };
+    return null;
+  }
+  return findNookLocation(node.childA, nookId) ?? findNookLocation(node.childB, nookId);
 }
 async function activateSubtab(leafId: string, index: number): Promise<void> {
   if (!activeShoreId) return;
@@ -1325,7 +1338,10 @@ function renderShore(): void {
   const shore = activeShore();
   gridEl.innerHTML = "";
   const shoreEmpty = shore ? isEmptyShoreTree(shore.layoutTree) : false;
-  if (shore && shore.layoutTree && !shoreEmpty) {
+  if (bayOverviewVisible) {
+    focusedNookId = null;
+    gridEl.appendChild(renderBoxLauncher(null, null));
+  } else if (shore && shore.layoutTree && !shoreEmpty) {
     const treeIds = collectLeafIds(shore.layoutTree);
     const zid = shore.zoomedNookId;
     if (zid && treeIds.includes(zid)) {
@@ -1338,11 +1354,11 @@ function renderShore(): void {
     }
   }
   sweepDetachedNooks();
-  if (shore && shoreEmpty) {
+  if (!bayOverviewVisible && shore && shoreEmpty) {
     const placeholder = collectLeafIds(shore.layoutTree)[0] ?? null;
     focusedNookId = null;
     gridEl.appendChild(renderBoxLauncher(shore.id, placeholder));
-  } else if (!shore || !shore.layoutTree) {
+  } else if (!bayOverviewVisible && (!shore || !shore.layoutTree)) {
     if (shouldShowLauncher((layout?.shores ?? []).length)) {
       gridEl.appendChild(renderBoxLauncher(null, null));
     } else {
@@ -1356,11 +1372,16 @@ function renderShore(): void {
   for (const [id, pv] of nooks) {
     pv.el.classList.toggle("focused", id === focusedNookId);
   }
+  syncAgentNookStateClasses();
   fitAll();
   requestAnimationFrame(() => { fitAll(); reconcileBrowserBounds(); });
 }
 
 function focusNook(nookId: string): void {
+  if (bayOverviewVisible) {
+    bayOverviewVisible = false;
+    renderShore();
+  }
   focusedNookId = nookId;
   for (const [id, pv] of nooks) {
     pv.el.classList.toggle("focused", id === nookId);
@@ -1385,23 +1406,17 @@ function refreshTitles(): void {
   });
 }
 
-async function reload(): Promise<BaySnapshot> {
-  layout = await invoke<BaySnapshot>("app.layoutGet", {});
-  try {
-    const list = await invoke<{ nooks: { nookId: string; title: string | null }[] }>("app.nookList", {});
-    for (const p of list.nooks) {
-      const pv = nooks.get(p.nookId);
-      if (pv && p.title) pv.customTitle = p.title;
-    }
-  } catch { void 0; }
-  if (!activeShoreId) {
+let reloadGeneration = 0;
+
+function applyLayoutSnapshot(snapshot: BaySnapshot): void {
+  layout = snapshot;
+  if (!activeShoreId || !layout.shores.some((shore) => shore.id === activeShoreId)) {
     activeShoreId = layout.activeShoreId ?? layout.shores[0]?.id ?? null;
   }
   const leaves = activeLeafIds();
   if (!focusedNookId || !leaves.includes(focusedNookId)) {
     focusedNookId = leaves[0] ?? null;
   }
-  if (activeProjectDir() !== launcherRecentsCwd) await loadLauncherRecents();
   renderShore();
   renderShoreTabs();
   renderSidebar();
@@ -1409,7 +1424,32 @@ async function reload(): Promise<BaySnapshot> {
     nooks.get(focusedNookId)?.term.focus();
   }
   refreshTitles();
-  return layout;
+}
+
+async function hydrateNookTitles(generation: number): Promise<void> {
+  try {
+    const list = await invoke<{ nooks: { nookId: string; title: string | null }[] }>("app.nookList", {});
+    if (generation !== reloadGeneration) return;
+    for (const p of list.nooks) {
+      const pv = nooks.get(p.nookId);
+      if (pv && p.title) pv.customTitle = p.title;
+    }
+    refreshTitles();
+  } catch { void 0; }
+}
+
+async function reload(): Promise<BaySnapshot> {
+  const generation = ++reloadGeneration;
+  const snapshot = await invoke<BaySnapshot>("app.layoutGet", {});
+  if (generation !== reloadGeneration) return snapshot;
+  applyLayoutSnapshot(snapshot);
+  void hydrateNookTitles(generation);
+  if (activeProjectDir() !== launcherRecentsCwd) {
+    void loadLauncherRecents().then(() => {
+      if (generation === reloadGeneration && bayOverviewVisible) renderShore();
+    });
+  }
+  return snapshot;
 }
 
 async function splitActive(dir: "row" | "col"): Promise<void> {
@@ -1653,8 +1693,10 @@ async function closeShore(shoreId: string): Promise<void> {
 }
 
 let sidebarModel: SidebarModel = initialSidebarModel();
+const sidebarScrollOffsets = new Map<SidebarMode, number>();
 const collapsedTreeShores = new Set<string>(JSON.parse(localStorage.getItem("cove.tree.collapsedShores") ?? "[]"));
 let agentCards: AgentCard[] = [];
+const acknowledgedDoneNooks = new Set<string>();
 const needsInputNooks = new Set<string>();
 let agentPollTimer: ReturnType<typeof setInterval> | null = null;
 let bayBoxItems: BayBoxInput[] = [];
@@ -1768,7 +1810,7 @@ function applySidebarModel(): void {
 function renderLeftRail(): void {
   leftRailEl.innerHTML = "";
   const activeMode = sidebarModel.leftMode;
-  for (const meta of SIDEBAR_MODES) {
+  for (const meta of SIDEBAR_RAIL_MODES) {
     const btn = document.createElement("div");
     btn.className = "sb-mode" + (meta.mode === activeMode ? " active" : "") + (meta.functional ? "" : " stub");
     btn.innerHTML = iconSvg(meta.mode);
@@ -1807,12 +1849,18 @@ function revealSidebarMode(mode: SidebarMode): void {
 function renderSidebarContent(side: SidebarSide): void {
   if (side !== "left") return;
   const { content } = sideEl(side);
+  const previousMode = content.dataset.sidebarMode as SidebarMode | undefined;
+  const previousScroller = content.querySelector<HTMLElement>(".sb-list");
+  if (previousMode && previousScroller) sidebarScrollOffsets.set(previousMode, previousScroller.scrollTop);
   if (collapsedOf(sidebarModel, side)) { content.innerHTML = ""; return; }
   content.innerHTML = "";
   const mode = sidebarModel.leftMode;
+  content.dataset.sidebarMode = mode;
   if (mode === "bays") renderBaysContent(content);
   else if (mode === "notepad") renderNotepadContent(content);
   else renderStubContent(content, mode);
+  const nextScroller = content.querySelector<HTMLElement>(".sb-list");
+  if (nextScroller) nextScroller.scrollTop = sidebarScrollOffsets.get(mode) ?? 0;
 }
 
 function sidebarHead(title: string, actions: { icon: string; title: string; run: () => void }[]): HTMLElement {
@@ -1860,6 +1908,7 @@ function shoreLeaves(shore: ShoreSnapshot): TreeLeaf[] {
 
 const fsExpandedDirs = new Set<string>(JSON.parse(localStorage.getItem("cove.files.expanded") ?? "[]"));
 let filesExpandedWs = parseCollapsedCardIds(localStorage.getItem("cove.files.expandedWs"));
+let collapsedBayCards = parseCollapsedCardIds(localStorage.getItem("cove.bays.collapsedCards"));
 const fsDirCache = new Map<string, { entries: FsEntry[]; truncated: boolean }>();
 const fsDirLoading = new Set<string>();
 const scmSummaryCache = new Map<string, ScmSummary>();
@@ -1877,7 +1926,12 @@ function requestScmSummary(dir: string): void {
       scmSummaryCache.set(dir, r);
       scmSummaryFetchedAt.set(dir, Date.now());
       scmSummaryFetching.delete(dir);
-      if (JSON.stringify(prev ?? null) !== JSON.stringify(r)) renderSidebarContent("left");
+      if (JSON.stringify(prev ?? null) !== JSON.stringify(r)) {
+        for (const cachedDir of fsDirCache.keys()) {
+          if (cachedDir === dir || cachedDir.startsWith(`${dir}/`)) fsDirCache.delete(cachedDir);
+        }
+        renderSidebarContent("left");
+      }
     })
     .catch((err) => {
       console.warn("git summary failed", dir, err);
@@ -1952,7 +2006,7 @@ function requestFsDir(path: string): void {
     });
 }
 
-function renderFsLevel(host: HTMLElement, dir: string, depth: number): void {
+function renderFsLevel(host: HTMLElement, rootDir: string, dir: string, depth: number, statuses: FsStatusEntry[]): void {
   const cached = fsDirCache.get(dir);
   if (!cached) {
     requestFsDir(dir);
@@ -1963,23 +2017,44 @@ function renderFsLevel(host: HTMLElement, dir: string, depth: number): void {
     host.appendChild(loading);
     return;
   }
-  for (const entry of cached.entries) {
+  const relativeDir = dir === rootDir ? "" : dir.slice(rootDir.length).replace(/^\/+/, "");
+  for (const entry of mergeFsStatus(cached.entries, relativeDir, statuses)) {
     const full = joinPath(dir, entry.name);
     const row = document.createElement("div");
-    row.className = "fs-row" + (entry.isDir ? " fs-dir" : " fs-file");
-    row.style.paddingLeft = `${10 + depth * 14}px`;
+    row.className = "fs-row" + (entry.isDir ? " fs-dir" : " fs-file") + (entry.status ? ` status-${entry.status}` : "");
+    row.style.paddingLeft = "8px";
+    const guides = document.createElement("span");
+    guides.className = "fs-tree-guides";
+    for (let level = 0; level < depth; level++) {
+      const guide = document.createElement("span");
+      guide.style.setProperty("--guide-color", `hsl(${(level * 47 + 196) % 360} 55% 62%)`);
+      guides.appendChild(guide);
+    }
+    row.appendChild(guides);
     const chev = document.createElement("span");
     chev.className = "tw-chevron" + (entry.isDir ? "" : " tw-spacer");
     if (entry.isDir) chev.textContent = fsExpandedDirs.has(full) ? "▾" : "▸";
     row.appendChild(chev);
     const ic = document.createElement("span");
     ic.className = "fs-ic";
-    ic.innerHTML = iconSvg(entry.isDir ? "folder" : "file");
+    if (entry.isDir) ic.innerHTML = iconSvg("folder");
+    else {
+      const spec = fileIcon(entry.name);
+      ic.innerHTML = spec.svg;
+      ic.style.color = spec.color;
+      ic.dataset.kind = spec.kind;
+    }
     row.appendChild(ic);
     const label = document.createElement("span");
     label.className = "tw-label";
     label.textContent = entry.name;
     row.appendChild(label);
+    if (entry.status) {
+      const status = document.createElement("span");
+      status.className = `fs-status fs-status-${entry.status}`;
+      status.textContent = entry.status;
+      row.appendChild(status);
+    }
     row.addEventListener("click", () => {
       if (entry.isDir) {
         if (fsExpandedDirs.has(full)) fsExpandedDirs.delete(full);
@@ -1991,7 +2066,7 @@ function renderFsLevel(host: HTMLElement, dir: string, depth: number): void {
       }
     });
     host.appendChild(row);
-    if (entry.isDir && fsExpandedDirs.has(full) && depth < 12) renderFsLevel(host, full, depth + 1);
+    if (entry.isDir && fsExpandedDirs.has(full) && depth < 12) renderFsLevel(host, rootDir, full, depth + 1, statuses);
   }
   if (cached.truncated) {
     const more = document.createElement("div");
@@ -2003,15 +2078,29 @@ function renderFsLevel(host: HTMLElement, dir: string, depth: number): void {
 }
 
 function agentStateByNook(): Map<string, AgentState> {
-  return new Map(buildAgentRows(agentCards, needsInputNooks).map((r) => [r.nookId, r.state]));
+  return new Map(buildAgentRows(agentCards, needsInputNooks, acknowledgedDoneNooks).map((r) => [r.nookId, r.state]));
+}
+
+function syncAgentNookStateClasses(): void {
+  const states = agentStateByNook();
+  for (const [nookId, nook] of nooks) {
+    nook.el.classList.remove("agent-running", "agent-needs-input", "agent-done", "agent-idle");
+    const state = states.get(nookId);
+    if (!state) continue;
+    nook.el.classList.add(`agent-${state}`);
+    const agent = agentCards.find((card) => card.nookId === nookId);
+    const accent = launcherAdapters.find((adapter) => adapter.name === agent?.adapter)?.accent;
+    nook.el.style.setProperty("--agent-accent", accent || AGENT_STATE_META[state].color);
+  }
 }
 
 function adapterDisplayLabel(adapterName: string): string {
   return launcherAdapters.find((a) => a.name === adapterName)?.displayName ?? adapterName.replace(/-/g, " ");
 }
 
-function buildNookCard(row: TreeRow, nookStates: Map<string, AgentState>): HTMLElement {
+function buildNookCard(row: TreeRow, nookStates: Map<string, AgentState>, activate?: () => void, close?: () => void): HTMLElement {
   const nookId = row.nookId ?? "";
+  const agent = agentCards.find((c) => c.nookId === nookId);
   const cardEl = document.createElement("div");
   cardEl.className = "nook-card";
   cardEl.style.marginLeft = `${6 + (row.depth - 1) * 14}px`;
@@ -2019,7 +2108,7 @@ function buildNookCard(row: TreeRow, nookStates: Map<string, AgentState>): HTMLE
   titleRow.className = "nook-card-title";
   const glyph = document.createElement("span");
   glyph.className = "pc-ic";
-  glyph.innerHTML = iconSvg(iconForNookType(row.nookType ?? "terminal"));
+  glyph.innerHTML = agent ? adapterIconSvg(agent.adapter) : iconForNookType(row.nookType ?? "terminal");
   titleRow.appendChild(glyph);
   const titleText = document.createElement("span");
   titleText.className = "pc-title-text";
@@ -2029,7 +2118,6 @@ function buildNookCard(row: TreeRow, nookStates: Map<string, AgentState>): HTMLE
 
   const metaRow = document.createElement("div");
   metaRow.className = "nook-card-meta";
-  const agent = agentCards.find((c) => c.nookId === nookId);
   const st = nookStates.get(nookId);
   if (agent && st) {
     cardEl.classList.add(`state-${st}`);
@@ -2047,7 +2135,11 @@ function buildNookCard(row: TreeRow, nookStates: Map<string, AgentState>): HTMLE
   }
   cardEl.appendChild(metaRow);
 
-  cardEl.addEventListener("click", () => { if (nookId) revealNook(nookId); });
+  cardEl.addEventListener("click", () => {
+    if (!nookId) return;
+    if (activate) activate();
+    else revealNook(nookId);
+  });
   cardEl.addEventListener("contextmenu", (e) => {
     openContextMenuAt(e, [
       { id: "focus", label: "Go to" },
@@ -2056,7 +2148,10 @@ function buildNookCard(row: TreeRow, nookStates: Map<string, AgentState>): HTMLE
     ], (id) => {
       if (id === "focus") focusTreeRow("nook", row.shoreId, nookId);
       else if (id === "copy-id") { if (navigator.clipboard) void navigator.clipboard.writeText(nookId); }
-      else if (id === "close") closeTreeRow("nook", row.shoreId, nookId);
+      else if (id === "close") {
+        if (close) close();
+        else closeTreeRow("nook", row.shoreId, nookId);
+      }
     });
   });
   return cardEl;
@@ -2080,8 +2175,8 @@ function renderBaysContent(container: HTMLElement): void {
   container.appendChild(scroll);
 }
 
-function wireBayCardDrag(el: HTMLElement, wid: string): void {
-  el.draggable = true;
+function wireBayCardDrag(el: HTMLElement, handle: HTMLElement, wid: string): void {
+  handle.draggable = true;
   el.addEventListener("dragstart", (e) => {
     draggingBayId = wid;
     if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
@@ -2220,8 +2315,9 @@ function bayCardHead(ws: BayCardEntry, mini: boolean): HTMLElement {
 }
 
 function renderBayCard(ws: BayCardEntry, isActive: boolean): HTMLElement {
+  const cardCollapsed = collapsedBayCards.has(ws.id);
   const card = document.createElement("div");
-  card.className = "ws-card" + (isActive ? " ws-card-active" : "");
+  card.className = "ws-card" + (isActive ? " ws-card-active" : "") + (cardCollapsed ? " collapsed" : "");
   card.style.setProperty("--ws-accent", bayAccent(ws.id));
   const head = bayCardHead(ws, !isActive);
   if (ws.projectDir) {
@@ -2252,19 +2348,30 @@ function renderBayCard(ws: BayCardEntry, isActive: boolean): HTMLElement {
       }
     }
   }
+  const collapse = document.createElement("button");
+  collapse.type = "button";
+  collapse.className = "ws-card-collapse";
+  collapse.title = cardCollapsed ? "Expand bay" : "Collapse bay";
+  collapse.setAttribute("aria-label", collapse.title);
+  collapse.setAttribute("aria-expanded", String(!cardCollapsed));
+  collapse.innerHTML = "<span>▾</span>";
+  collapse.addEventListener("click", (e) => {
+    e.stopPropagation();
+    collapsedBayCards = toggleCardCollapsed(collapsedBayCards, ws.id);
+    localStorage.setItem("cove.bays.collapsedCards", serializeCollapsedCardIds(collapsedBayCards));
+    renderSidebarContent("left");
+  });
+  head.appendChild(collapse);
   if (!isActive) head.addEventListener("click", () => void switchBay(ws.id));
   card.appendChild(head);
-  wireBayCardDrag(card, ws.id);
+  wireBayCardDrag(card, head.querySelector<HTMLElement>(".ws-card-swatch")!, ws.id);
+  if (cardCollapsed) return card;
 
   const body = document.createElement("div");
   body.className = "ws-card-body";
   const shoresHost = document.createElement("div");
   if (!isActive) {
     requestBaySnapshot(ws.id);
-    shoresHost.addEventListener("click", (e) => {
-      e.stopPropagation();
-      void switchBay(ws.id);
-    }, true);
   }
   body.appendChild(shoresHost);
   const sourceShores = isActive ? (layout?.shores ?? []) : (wsSnapshotCache.get(ws.id)?.shores ?? []);
@@ -2282,7 +2389,9 @@ function renderBayCard(ws: BayCardEntry, isActive: boolean): HTMLElement {
   const nookStates = agentStateByNook();
   for (const row of rows) {
     if (row.kind === "nook" && row.nookId) {
-      shoresHost.appendChild(buildNookCard(row, nookStates));
+      const activate = isActive ? undefined : () => void switchBay(ws.id, row.shoreId, row.nookId);
+      const close = isActive ? undefined : () => void closeTreeRowInBay(ws.id, "nook", row.shoreId, row.nookId);
+      shoresHost.appendChild(buildNookCard(row, nookStates, activate, close));
       continue;
     }
     const rowEl = document.createElement("div");
@@ -2317,7 +2426,10 @@ function renderBayCard(ws: BayCardEntry, isActive: boolean): HTMLElement {
       count.textContent = String(row.count);
       rowEl.appendChild(count);
     }
-    rowEl.addEventListener("click", () => onTreeRowClick(row.kind, row.shoreId, row.nookId, row.expandable));
+    rowEl.addEventListener("click", () => {
+      if (isActive) onTreeRowClick(row.kind, row.shoreId, row.nookId, row.expandable);
+      else void switchBay(ws.id, row.shoreId, row.nookId);
+    });
     if (row.kind === "shore" && row.shoreId) {
       const rid = row.shoreId;
       rowEl.draggable = true;
@@ -2349,7 +2461,10 @@ function renderBayCard(ws: BayCardEntry, isActive: boolean): HTMLElement {
       ], (id) => {
         if (id === "focus") focusTreeRow(row.kind, row.shoreId, row.nookId);
         else if (id === "rename" && row.shoreId) startShoreRename(row.shoreId, rowEl.querySelector(".tw-label") as HTMLElement, row.label);
-        else if (id === "close") closeTreeRow(row.kind, row.shoreId, row.nookId);
+        else if (id === "close") {
+          if (isActive) closeTreeRow(row.kind, row.shoreId, row.nookId);
+          else void closeTreeRowInBay(ws.id, row.kind, row.shoreId, row.nookId);
+        }
       });
     });
     shoresHost.appendChild(rowEl);
@@ -2375,7 +2490,7 @@ function renderBayCard(ws: BayCardEntry, isActive: boolean): HTMLElement {
   if (filesExpanded) {
     const filesHost = document.createElement("div");
     filesHost.className = "ws-files";
-    if (ws.projectDir) renderFsLevel(filesHost, ws.projectDir, 0);
+    if (ws.projectDir) renderFsLevel(filesHost, ws.projectDir, ws.projectDir, 0, scmSummaryCache.get(ws.projectDir)?.files ?? []);
     else {
       const none = document.createElement("div");
       none.className = "fs-row fs-note";
@@ -2427,6 +2542,51 @@ function closeTreeRow(kind: string, shoreId: string | null, nookId: string | nul
   if (kind === "shore" && shoreId) { void closeShore(shoreId); }
 }
 
+async function closeTreeRowInBay(bayId: string, kind: string, shoreId: string | null, nookId: string | null): Promise<void> {
+  if (layout?.id === bayId) {
+    closeTreeRow(kind, shoreId, nookId);
+    return;
+  }
+  if (!shoreId) {
+    console.warn("close requested without a shore", bayId, kind, nookId);
+    return;
+  }
+  const snapshot = wsSnapshotCache.get(bayId);
+  const shore = snapshot?.shores.find((candidate) => candidate.id === shoreId);
+  if (!shore) {
+    console.warn("close requested for shore outside cached bay", bayId, shoreId);
+    return;
+  }
+  const nookIds = kind === "shore" ? collectLeafIds(shore.layoutTree) : nookId ? [nookId] : [];
+  if (nookIds.length === 0) {
+    console.warn("close requested without a nook", bayId, shoreId);
+    return;
+  }
+  for (const id of nookIds) {
+    await closeBrowserWebview(id);
+    try { await invoke("app.nookKill", { nookId: id }); }
+    catch (err) { console.warn("inactive bay nook kill failed", bayId, id, err); }
+    disposeNook(id);
+  }
+  try {
+    await invoke("app.layoutMutate", {
+      op: kind === "shore" ? "closeShore" : "close",
+      shoreId,
+      nookId: kind === "nook" ? nookIds[0] : "",
+      targetNookId: "",
+      newNookId: "",
+      orientation: "",
+      name: "",
+      dir: 0,
+    });
+  } catch (err) {
+    console.warn("inactive bay layout close failed", bayId, shoreId, nookId, err);
+    return;
+  }
+  wsSnapshotFetchedAt.delete(bayId);
+  requestBaySnapshot(bayId);
+}
+
 let prevAgentStates = new Map<string, string>();
 
 function agentChimesEnabled(): boolean {
@@ -2438,16 +2598,24 @@ function setAgentChimesEnabled(enabled: boolean): void {
 }
 
 async function refreshAgents(): Promise<void> {
+  const previousCards = agentCards;
+  let nextCards: AgentCard[];
   try {
     const res = await invoke<{ cards: AgentCard[] }>("cove://commands/activity.list", {});
-    agentCards = res.cards ?? [];
-  } catch { agentCards = []; }
+    nextCards = res.cards ?? [];
+  } catch { nextCards = []; }
+  const cardsChanged = !agentCardsEqual(previousCards, nextCards);
+  agentCards = nextCards;
   const nextStates = new Map(agentCards.map((c) => [c.nookId, mapAgentState(c.status)]));
+  for (const nookId of acknowledgedDoneNooks) {
+    if (nextStates.get(nookId) !== "done") acknowledgedDoneNooks.delete(nookId);
+  }
   if (agentChimesEnabled()) {
     for (const kind of detectChimes(prevAgentStates, nextStates)) playChime(kind);
   }
   prevAgentStates = nextStates;
-  if (agentsVisible()) renderSidebarContent("left");
+  syncAgentNookStateClasses();
+  if (cardsChanged && agentsVisible()) renderSidebarContent("left");
 }
 
 function agentsVisible(): boolean {
@@ -2514,7 +2682,13 @@ function wireSidebarResize(handle: HTMLElement, side: SidebarSide): void {
 
 function startAgentPolling(): void {
   void refreshAgents();
-  if (agentPollTimer === null) agentPollTimer = setInterval(() => { if (agentsVisible()) void refreshAgents(); }, 3000);
+  if (agentPollTimer === null) agentPollTimer = setInterval(() => {
+    if (!agentsVisible()) return;
+    void refreshAgents();
+    for (const bay of bayBoxItems) {
+      if (bay.projectDir) requestScmSummary(bay.projectDir);
+    }
+  }, 3000);
 }
 
 const pinnedShoreIds = new Set<string>(JSON.parse(localStorage.getItem("cove.pinnedShores") ?? "[]"));
@@ -2578,12 +2752,14 @@ function renderShoreTabs(): void {
     const isPinned = pinnedShoreIds.has(shoreId);
     const tab = document.createElement("div");
     tab.className = "rtab" + (shoreId === activeShoreId ? " active" : "") + (isPinned ? " pinned" : "");
-    tab.draggable = true;
+    tab.draggable = false;
     tab.title = shoreTabName(shore);
 
     const glyph = document.createElement("span");
     glyph.className = "rtab-glyph";
     glyph.innerHTML = iconForNookType(shoreLeaves(shore)[0]?.nookType ?? "terminal");
+    glyph.draggable = true;
+    glyph.title = "Drag to reorder";
     tab.appendChild(glyph);
 
     const nameEl = document.createElement("span");
@@ -2602,6 +2778,17 @@ function renderShoreTabs(): void {
       if ((e.target as HTMLElement).classList.contains("rtab-close")) {
         if (isPinned) return;
         void closeShore(shoreId);
+        return;
+      }
+      if (bayOverviewVisible) {
+        bayOverviewVisible = false;
+        activeShoreId = shoreId;
+        const f = firstLeafOf(shore);
+        if (f) focusedNookId = f;
+        renderShore();
+        renderShoreTabs();
+        renderSidebar();
+        if (f) focusNook(f);
         return;
       }
       if (shoreId === activeShoreId) {
@@ -2689,10 +2876,15 @@ function renderShoreTabs(): void {
   };
 
   const homeBtn = document.createElement("div");
-  homeBtn.className = "rbox-ctl rbox-home";
+  homeBtn.className = "rbox-ctl rbox-home" + (bayOverviewVisible ? " active" : "");
   homeBtn.innerHTML = iconSvg("home");
-  homeBtn.title = "Bay overview";
-  homeBtn.addEventListener("click", () => revealSidebarMode("bays"));
+  homeBtn.title = "Bay launcher";
+  homeBtn.addEventListener("click", () => {
+    bayOverviewVisible = true;
+    revealSidebarMode("bays");
+    renderShore();
+    renderShoreTabs();
+  });
   shoreTabsEl.appendChild(homeBtn);
 
   for (const id of pinned) shoreTabsEl.appendChild(makeTab(id));
@@ -2983,12 +3175,18 @@ async function searchFiles(query: string): Promise<void> {
   }
 }
 
-async function switchBay(wsId: string): Promise<void> {
+async function switchBay(wsId: string, targetShoreId: string | null = null, targetNookId: string | null = null): Promise<void> {
   try {
+    const generation = ++reloadGeneration;
     await invoke("cove://commands/bay.switch", { id: wsId });
-    activeShoreId = null;
+    bayOverviewVisible = false;
+    activeShoreId = targetShoreId;
     focusedNookId = null;
-    await reload();
+    const snapshot = await invoke<BaySnapshot>("cove://commands/layout.get", { bayId: wsId });
+    if (generation !== reloadGeneration) return;
+    applyLayoutSnapshot(snapshot);
+    void hydrateNookTitles(generation);
+    if (targetNookId) revealNook(targetNookId);
     await loadWings();
     renderShoreTabs();
   } catch { void 0; }
@@ -4681,7 +4879,15 @@ async function loadLauncherAgents(): Promise<void> {
     for (const a of result.adapters ?? []) {
       const tile = document.createElement("div");
       tile.className = "launch-tile";
-      tile.innerHTML = `<span class="ic" style="color:${a.accent || "#cba6f7"}">&#9881;</span><span class="lbl">${a.displayName || a.name}</span>`;
+      const mark = document.createElement("span");
+      mark.className = "ic";
+      mark.style.color = a.accent || "#cba6f7";
+      mark.innerHTML = adapterIconSvg(a.name);
+      const label = document.createElement("span");
+      label.className = "lbl";
+      label.textContent = a.displayName || a.name;
+      tile.appendChild(mark);
+      tile.appendChild(label);
       tile.addEventListener("click", () => { closeLauncher(); void spawnAgent(a); });
       launchAgentsEl.appendChild(tile);
     }
@@ -4967,7 +5173,7 @@ function renderHarnessCard(ctx: LauncherContext, tile: LauncherTile, letter: str
   top.className = "cl-card-top";
   const badge = document.createElement("span");
   badge.className = "cl-card-badge";
-  badge.textContent = monogram(tile.label);
+  badge.innerHTML = adapterIconSvg(tile.adapterName);
   const key = document.createElement("span");
   key.className = "cl-card-key";
   key.textContent = letter;
@@ -5465,6 +5671,7 @@ async function submitBayDialog(): Promise<void> {
 }
 
 document.getElementById("wsc-close")!.addEventListener("click", closeBayDialog);
+document.getElementById("wsc-cancel")!.addEventListener("click", closeBayDialog);
 document.getElementById("wsc-browse")!.addEventListener("click", () => void browseBayDir());
 document.getElementById("wsc-create")!.addEventListener("click", () => void submitBayDialog());
 wsCreateEl.addEventListener("mousedown", (e) => { if (e.target === wsCreateEl) closeBayDialog(); });
@@ -5818,6 +6025,7 @@ function onNeedsInputChanged(): void {
   const count = needsInputNooks.size;
   if (count === 0) invoke("badge.clear", {}).catch(() => void 0);
   else invoke("badge.setCount", count).catch(() => void 0);
+  syncAgentNookStateClasses();
   if (agentsVisible()) renderSidebarContent("left");
 }
 
@@ -5880,16 +6088,26 @@ async function toggleBackdrop(): Promise<void> {
 
 function revealNook(nookId: string): void {
   if (!layout) return;
-  const shore = layout.shores.find((r) => findLeafId(r.layoutTree, nookId) !== null);
-  if (!shore) { console.warn("notification reveal: no shore for nook", nookId); return; }
-  if (activeShoreId !== shore.id) {
+  const match = layout.shores.map((shore) => ({ shore, location: findNookLocation(shore.layoutTree, nookId) })).find((item) => item.location !== null);
+  if (!match?.location) { console.warn("nook reveal: no shore for nook", nookId); return; }
+  const { shore, location } = match;
+  const activatesSubtab = location.subtabIndex >= 0 && location.leaf.activeSubtab !== location.subtabIndex;
+  if (activatesSubtab) location.leaf.activeSubtab = location.subtabIndex;
+  if (bayOverviewVisible || activeShoreId !== shore.id || activatesSubtab) {
+    bayOverviewVisible = false;
     activeShoreId = shore.id;
     renderShore();
     renderShoreTabs();
     renderSidebar();
   }
-  const leaf = findLeafId(shore.layoutTree, nookId) ?? nookId;
-  focusNook(leaf);
+  if (activatesSubtab) {
+    void invoke("app.layoutMutate", { op: "activateSubtab", shoreId: shore.id, nookId: location.leaf.nookId, targetNookId: "", newNookId: "", orientation: "", name: "", dir: location.subtabIndex })
+      .catch((error) => { console.warn("nook subtab activation failed", nookId, error); void reload(); });
+  }
+  if (mapAgentState(agentCards.find((card) => card.nookId === nookId)?.status ?? "idle") === "done") {
+    acknowledgedDoneNooks.add(nookId);
+  }
+  focusNook(nookId);
 }
 
 function toastHost(): HTMLElement {

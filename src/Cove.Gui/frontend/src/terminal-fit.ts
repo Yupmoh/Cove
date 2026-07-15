@@ -13,3 +13,8 @@ export function shouldResize(next: TermDims, prev: TermDims | null, visible: boo
   if (!prev) return true;
   return prev.cols !== next.cols || prev.rows !== next.rows;
 }
+
+export function scrollLineAfterFit(before: { baseY: number; viewportY: number }, nextBaseY: number): number {
+  const distanceFromBottom = Math.max(0, before.baseY - before.viewportY);
+  return Math.max(0, nextBaseY - distanceFromBottom);
+}

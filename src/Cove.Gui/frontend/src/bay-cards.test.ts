@@ -10,6 +10,7 @@ import {
   sortFsEntries,
   joinPath,
   dirBasename,
+  mergeFsStatus,
   type BayCardEntry,
 } from "./bay-cards";
 
@@ -69,6 +70,31 @@ describe("path helpers", () => {
     expect(dirBasename("/Users/moh/Desktop/Work/Cove")).toBe("Cove");
     expect(dirBasename("/Users/moh/Work/")).toBe("Work");
     expect(dirBasename("")).toBe("");
+  });
+});
+
+describe("file status decoration", () => {
+  const statuses = [
+    { path: "src/modified.ts", status: "M" as const },
+    { path: "src/added.ts", status: "A" as const },
+    { path: "removed/deleted.ts", status: "D" as const },
+  ];
+
+  it("decorates existing files and adds deleted files missing from disk", () => {
+    expect(mergeFsStatus([
+      { name: "modified.ts", isDir: false },
+      { name: "added.ts", isDir: false },
+    ], "src", statuses)).toEqual([
+      { name: "added.ts", isDir: false, status: "A" },
+      { name: "modified.ts", isDir: false, status: "M" },
+    ]);
+  });
+
+  it("synthesizes missing parent directories for deleted files", () => {
+    expect(mergeFsStatus([], "", statuses)).toContainEqual({ name: "removed", isDir: true });
+    expect(mergeFsStatus([], "removed", statuses)).toEqual([
+      { name: "deleted.ts", isDir: false, status: "D" },
+    ]);
   });
 });
 

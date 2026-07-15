@@ -31,6 +31,22 @@ public class GitSummaryTests
     }
 
     [Fact]
+    public void ParsesModifiedAddedDeletedAndUntrackedFiles()
+    {
+        var output = "# branch.head main\n1 .M N... 100644 100644 100644 abc def src/modified.cs\n1 A. N... 000000 100644 100644 abc def src/added.cs\n1 D. N... 100644 000000 000000 abc def src/deleted.cs\n? src/untracked.cs\n";
+        var json = GitSummary.Parse(output);
+        using var doc = JsonDocument.Parse(json);
+        var files = doc.RootElement.GetProperty("files").EnumerateArray().ToDictionary(
+            entry => entry.GetProperty("path").GetString()!,
+            entry => entry.GetProperty("status").GetString());
+
+        Assert.Equal("M", files["src/modified.cs"]);
+        Assert.Equal("A", files["src/added.cs"]);
+        Assert.Equal("D", files["src/deleted.cs"]);
+        Assert.Equal("A", files["src/untracked.cs"]);
+    }
+
+    [Fact]
     public void RunReportsMissingDirectory()
     {
         var json = GitSummary.Run("/nonexistent/cove-git-nope");

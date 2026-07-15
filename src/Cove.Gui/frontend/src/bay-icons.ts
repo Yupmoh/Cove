@@ -6,6 +6,8 @@ export interface BayIcon {
 export const BAY_ICON_CHOICES = [
   "📁", "🚀", "🛠️", "🧪", "🌊", "🔥", "⚡", "🎨",
   "🧠", "📦", "🌱", "🕹️", "📚", "💎", "🐚", "⭐",
+  "💻", "🖥️", "⌨️", "⚙️", "🔧", "🧰", "🧩", "🧱",
+  "🗃️", "🗂️", "📊", "🔬", "🛰️", "🌐", "☁️", "🔮",
 ] as const;
 
 export function bayGlyph(icon: BayIcon | null | undefined): string | null {

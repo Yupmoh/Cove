@@ -43,6 +43,7 @@ public static class GitSummary
         var ahead = 0;
         var behind = 0;
         var dirty = 0;
+        var files = new List<(string Path, string Status)>();
         foreach (var line in output.Split('\n'))
         {
             if (line.StartsWith("# branch.head ", StringComparison.Ordinal))
@@ -61,6 +62,8 @@ public static class GitSummary
             else if (line.Length > 0 && !line.StartsWith('#'))
             {
                 dirty++;
+                var parsed = ParseFile(line);
+                if (parsed is { } file) files.Add(file);
             }
         }
         using var ms = new MemoryStream();
@@ -72,10 +75,43 @@ public static class GitSummary
             w.WriteNumber("ahead", ahead);
             w.WriteNumber("behind", behind);
             w.WriteNumber("dirty", dirty);
+            w.WriteStartArray("files");
+            foreach (var (path, status) in files)
+            {
+                w.WriteStartObject();
+                w.WriteString("path", path);
+                w.WriteString("status", status);
+                w.WriteEndObject();
+            }
+            w.WriteEndArray();
             w.WriteNull("error");
             w.WriteEndObject();
         }
         return System.Text.Encoding.UTF8.GetString(ms.ToArray());
+    }
+
+    private static (string Path, string Status)? ParseFile(string line)
+    {
+        if (line.StartsWith("? ", StringComparison.Ordinal))
+            return (line[2..], "A");
+        if (line.StartsWith("1 ", StringComparison.Ordinal))
+        {
+            var fields = line.Split(' ', 9, StringSplitOptions.None);
+            return fields.Length == 9 ? (fields[8], NormalizeStatus(fields[1])) : null;
+        }
+        if (line.StartsWith("2 ", StringComparison.Ordinal))
+        {
+            var fields = line.Split(' ', 10, StringSplitOptions.None);
+            return fields.Length == 10 ? (fields[9].Split('\t')[0], NormalizeStatus(fields[1])) : null;
+        }
+        return null;
+    }
+
+    private static string NormalizeStatus(string xy)
+    {
+        if (xy.Contains('D')) return "D";
+        if (xy.Contains('A') || xy.Contains('?')) return "A";
+        return "M";
     }
 
     private static string Fail(string error)

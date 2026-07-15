@@ -4,6 +4,10 @@ function svg(body: string): string {
   return `<svg viewBox="0 0 24 24" ${STROKE_ATTRS} aria-hidden="true">${body}</svg>`;
 }
 
+function markSvg(body: string): string {
+  return `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true">${body}</svg>`;
+}
+
 export const ICONS: Record<string, string> = {
   bays: svg('<rect x="3" y="4" width="18" height="16" rx="2"/><line x1="9.5" y1="4" x2="9.5" y2="20"/>'),
   overview: svg('<rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/>'),
@@ -59,6 +63,49 @@ export const NOOK_TYPE_ICON: Record<string, string> = {
 
 export function iconForNookType(nookType: string): string {
   return iconSvg(NOOK_TYPE_ICON[nookType] ?? "terminal");
+}
+
+function adapterImage(path: string, label: string): string {
+  return `<img class="adapter-icon" src="${path}" alt="${label}" draggable="false" />`;
+}
+
+function adapterMask(path: string, label: string): string {
+  return `<span class="adapter-icon adapter-icon-mask" style="--adapter-mask:url('${path}')" role="img" aria-label="${label}"></span>`;
+}
+
+const ADAPTER_ICONS: Record<string, string> = {
+  "claude-code": adapterMask("/adapter-icons/claude.png", "Claude Code"),
+  codex: adapterMask("/adapter-icons/codex.png", "Codex"),
+  omp: adapterImage("/adapter-icons/omp.svg", "Oh My Pi"),
+};
+
+export function adapterIconSvg(adapterName: string): string {
+  return ADAPTER_ICONS[adapterName.toLowerCase()] ?? ICONS.agents;
+}
+
+export interface FileIconSpec {
+  kind: string;
+  color: string;
+  svg: string;
+}
+
+function languageMark(label: string): string {
+  return markSvg(`<rect x="3" y="3" width="18" height="18" rx="4" fill="currentColor" opacity=".16"/><text x="12" y="15.2" text-anchor="middle" fill="currentColor" font-size="8.5" font-weight="700" font-family="ui-monospace,monospace">${label}</text>`);
+}
+
+export function fileIcon(fileName: string): FileIconSpec {
+  const name = fileName.toLowerCase();
+  const extension = name.includes(".") ? name.slice(name.lastIndexOf(".")) : "";
+  if (extension === ".cs") return { kind: "csharp", color: "#63c174", svg: languageMark("C#") };
+  if (extension === ".fs" || extension === ".fsx") return { kind: "fsharp", color: "#70a5eb", svg: languageMark("F#") };
+  if (extension === ".ts" || extension === ".tsx") return { kind: "typescript", color: "#5ba8e8", svg: languageMark("TS") };
+  if (extension === ".js" || extension === ".jsx" || extension === ".mjs") return { kind: "javascript", color: "#e8d15b", svg: languageMark("JS") };
+  if (extension === ".json" || name === "package.json" || name.endsWith(".jsonl")) return { kind: "json", color: "#e8cf6a", svg: languageMark("{}") };
+  if (extension === ".md" || extension === ".mdx") return { kind: "markdown", color: "#8ab4f8", svg: languageMark("M") };
+  if ([".sln", ".slnx", ".csproj", ".fsproj", ".props", ".targets"].includes(extension)) return { kind: "dotnet", color: "#b18cff", svg: languageMark(".N") };
+  if ([".yml", ".yaml", ".toml", ".ini", ".env"].includes(extension) || name === "dockerfile") return { kind: "config", color: "#a9b1d6", svg: ICONS.gear };
+  if ([".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".ico"].includes(extension)) return { kind: "image", color: "#e69bc2", svg: ICONS.image };
+  return { kind: "file", color: "currentColor", svg: ICONS.file };
 }
 
 export function monogram(label: string): string {

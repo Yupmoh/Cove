@@ -4,6 +4,12 @@ export interface StreamGenerations {
   isCurrent(nookId: string, generation: number): boolean;
 }
 
+export type ProcessExitAction = "retain";
+
+export function processExitAction(): ProcessExitAction {
+  return "retain";
+}
+
 export function shouldDisposeNook(state: { inLayout: boolean; wsClosed: boolean }): boolean {
   return !state.inLayout && state.wsClosed;
 }

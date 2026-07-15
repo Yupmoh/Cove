@@ -3,7 +3,7 @@ import { BAY_ICON_CHOICES, bayGlyph } from "./bay-icons";
 
 describe("bay-icons", () => {
   it("offers a curated set of emoji choices", () => {
-    expect(BAY_ICON_CHOICES.length).toBe(16);
+    expect(BAY_ICON_CHOICES.length).toBeGreaterThanOrEqual(32);
     expect(BAY_ICON_CHOICES).toContain("🚀");
     expect(new Set(BAY_ICON_CHOICES).size).toBe(BAY_ICON_CHOICES.length);
   });

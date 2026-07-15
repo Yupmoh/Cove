@@ -44,7 +44,7 @@ internal static class Program
                 o.Width = 1440;
                 o.Height = 880;
                 o.TitleBarStyle = TitleBarStyle.Overlay;
-                o.TrafficLightPosition = new TrafficLightPosition(20, 17);
+                o.TrafficLightPosition = new TrafficLightPosition(20, 15);
                 o.Backdrop = BackdropMaterial.Blur;
                 o.DevTools = Environment.GetEnvironmentVariable("COVE_DEVTOOLS") == "1";
                 var iconPath = Path.Combine(AppContext.BaseDirectory, "assets", "app-icon.png");

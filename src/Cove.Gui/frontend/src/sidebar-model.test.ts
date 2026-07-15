@@ -11,6 +11,7 @@ import {
   SIDEBAR_MIN_WIDTH,
   SIDEBAR_MAX_WIDTH,
   SIDEBAR_MODES,
+  SIDEBAR_RAIL_MODES,
 } from "./sidebar-model";
 
 describe("initialSidebarModel", () => {
@@ -29,6 +30,10 @@ describe("SIDEBAR_MODES", () => {
     expect(names).not.toContain("agents");
     const functional = SIDEBAR_MODES.filter((m) => m.functional).map((m) => m.mode);
     expect(functional).toEqual(["bays", "notepad"]);
+  });
+
+  it("shows only bays, skills, and timeline in the left rail", () => {
+    expect(SIDEBAR_RAIL_MODES.map((m) => m.mode)).toEqual(["bays", "skills", "timeline"]);
   });
 });
 

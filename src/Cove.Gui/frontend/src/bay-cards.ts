@@ -10,6 +10,12 @@ export interface BayCardEntry {
 export interface FsEntry {
   name: string;
   isDir: boolean;
+  status?: "M" | "A" | "D";
+}
+
+export interface FsStatusEntry {
+  path: string;
+  status: "M" | "A" | "D";
 }
 
 export const BAY_ACCENTS = [
@@ -41,12 +47,34 @@ export function joinPath(dir: string, name: string): string {
   return dir.endsWith("/") ? dir + name : `${dir}/${name}`;
 }
 
+export function mergeFsStatus(entries: FsEntry[], relativeDir: string, statuses: FsStatusEntry[]): FsEntry[] {
+  const normalizedDir = relativeDir.replace(/^\.\//, "").replace(/^\/+|\/+$/g, "");
+  const prefix = normalizedDir ? `${normalizedDir}/` : "";
+  const merged = new Map(entries.map((entry) => [entry.name, { ...entry }]));
+  for (const item of statuses) {
+    const path = item.path.replace(/^\.\//, "").replace(/^\/+/, "");
+    if (!path.startsWith(prefix)) continue;
+    const remainder = path.slice(prefix.length);
+    if (!remainder) continue;
+    const slash = remainder.indexOf("/");
+    if (slash >= 0) {
+      const name = remainder.slice(0, slash);
+      if (!merged.has(name)) merged.set(name, { name, isDir: true });
+      continue;
+    }
+    const existing = merged.get(remainder);
+    merged.set(remainder, { name: remainder, isDir: existing?.isDir ?? false, status: item.status });
+  }
+  return sortFsEntries([...merged.values()]);
+}
+
 export interface ScmSummary {
   ok: boolean;
   branch?: string;
   ahead?: number;
   behind?: number;
   dirty?: number;
+  files?: FsStatusEntry[];
   error?: string | null;
 }
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isPaneFittable, shouldResize } from "./terminal-fit";
+import { isPaneFittable, scrollLineAfterFit, shouldResize } from "./terminal-fit";
 
 describe("isPaneFittable", () => {
   it("is fittable when connected, visible, and sized", () => {
@@ -46,5 +46,19 @@ describe("shouldResize", () => {
 
   it("rejects a degenerate two-by-one collapse", () => {
     expect(shouldResize({ cols: 0, rows: 0 }, { cols: 140, rows: 35 }, true)).toBe(false);
+  });
+});
+
+describe("scrollLineAfterFit", () => {
+  it("keeps a scrolled viewport the same distance from live output", () => {
+    expect(scrollLineAfterFit({ baseY: 500, viewportY: 420 }, 530)).toBe(450);
+  });
+
+  it("keeps a viewport following live output at the new bottom", () => {
+    expect(scrollLineAfterFit({ baseY: 500, viewportY: 500 }, 530)).toBe(530);
+  });
+
+  it("never restores before the beginning of scrollback", () => {
+    expect(scrollLineAfterFit({ baseY: 20, viewportY: 0 }, 5)).toBe(0);
   });
 });
