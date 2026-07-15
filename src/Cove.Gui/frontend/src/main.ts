@@ -411,11 +411,13 @@ function attachWs(nook: NookView): void {
         nook.lastAck = m.base;
         finishReplay(nook, true);
       } else if (m.t === "end") {
+        if (processExitAction(nook.exited) === "ignore") return;
         nook.exited = true;
-        nook.term.write(`\r\n\x1b[38;5;244m[process exited: ${m.code}]\x1b[0m\r\n`);
+        streamGens.invalidate(nook.nookId);
+        try { ws.close(1000, "process exited"); } catch { void 0; }
         launcherRecentsAt = 0;
         void refreshLauncherRecents();
-        if (processExitAction() === "retain") nook.el.classList.add("process-exited");
+        void closeNookById(nook.nookId);
       }
       return;
     }

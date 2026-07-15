@@ -2,8 +2,12 @@ import { describe, expect, it } from "vitest";
 import { createStreamGenerations, processExitAction, replayViewportAction, shouldDisposeNook, shouldResetReplay, streamVisibilityAction } from "./stream-guard";
 
 describe("processExitAction", () => {
-  it("retains an exited nook so the user can inspect or restart it", () => {
-    expect(processExitAction()).toBe("retain");
+  it("closes a nook on its first process exit", () => {
+    expect(processExitAction(false)).toBe("close");
+  });
+
+  it("ignores repeated process exits for the same nook", () => {
+    expect(processExitAction(true)).toBe("ignore");
   });
 });
 
