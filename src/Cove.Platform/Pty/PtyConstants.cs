@@ -5,7 +5,7 @@ public static class PtyConstants
     public const int AbiVersion = 1;
     public const int ReadBufferBytes = 65536;
     public const int MaxWriteBytes = 8 * 1024 * 1024;
-    public const int DefaultRingCapacityBytes = 1024 * 1024;
+    public const int DefaultRingCapacityBytes = 8 * 1024 * 1024;
     public const int MinRingCapacityBytes = 4096;
     public const int MinCols = 1;
     public const int MaxCols = 500;
