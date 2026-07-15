@@ -3,8 +3,9 @@ import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { CanvasAddon } from "@xterm/addon-canvas";
 import { SearchAddon } from "@xterm/addon-search";
+import { SerializeAddon } from "@xterm/addon-serialize";
 import "@xterm/xterm/css/xterm.css";
-import { decodeRelayData, toBase64Utf8, parseRelayText } from "./wsproto";
+import { decodeBase64Bytes, decodeRelayData, decodeTerminalRestoreBytes, toBase64Utf8, parseRelayText } from "./wsproto";
 import { createKeyboardProtocolTracker, shiftEnterSequence, type KeyboardProtocolTracker } from "./terminal-keyboard";
 import { isPaneFittable, scrollLineAfterFit, shouldResize, type TermDims } from "./terminal-fit";
 import { createStreamGenerations, processExitAction, replayViewportAction, shouldDisposeNook, shouldResetReplay, streamVisibilityAction } from "./stream-guard";
@@ -38,7 +39,7 @@ import { nextBayName, type BayBoxInput } from "./bay-boxes";
 import { clampMenuPosition, normalizeItems, firstSelectableIndex, moveSelection as ctxMoveSelection, activeItem, type ContextMenuItem, type ContextMenuModel } from "./context-menu";
 import { buildBayTree, bayTreeEmptyMessage, NOOK_TYPE_LABELS, type TreeLeaf, type TreeShoreInput, type TreeRow } from "./bay-tree";
 import { buildAgentRows, mapAgentState, agentCardsEqual, AGENT_STATE_META, type AgentCard, type AgentState } from "./agents-model";
-import { resolveActiveBayId, bayAccent, sortFsEntries, joinPath, mergeFsStatus, scmChipText, parseCollapsedCardIds, serializeCollapsedCardIds, toggleCardCollapsed, type FsEntry, type FsStatusEntry, type BayCardEntry, type ScmSummary } from "./bay-cards";
+import { resolveActiveBayId, bayAccent, bayHeadNavigation, sortFsEntries, joinPath, mergeFsStatus, scmChipText, parseCollapsedCardIds, serializeCollapsedCardIds, toggleCardCollapsed, type FsEntry, type FsStatusEntry, type BayCardEntry, type ScmSummary } from "./bay-cards";
 import { BAY_ICON_CHOICES, bayGlyph } from "./bay-icons";
 import { orderSettingsTabs, settingsTabLabel, resolveActiveSettingsTab } from "./settings-tabs";
 import { parseQuery, filterAndSort, MruTracker, cycleCategory, categoryLabel, type PaletteItem } from "./omni-palette";
@@ -197,6 +198,7 @@ interface NookView {
   nookId: string;
   term: Terminal;
   fit: FitAddon;
+  serialize: SerializeAddon;
   ws: WebSocket | null;
   el: HTMLElement;
   consumed: number;
@@ -209,12 +211,14 @@ interface NookView {
   search: SearchAddon;
   replaying: boolean;
   resetOnReplay: boolean;
+  restoringCheckpoint: boolean;
   keyboard: KeyboardProtocolTracker;
   lastSent: TermDims | null;
   handlersBound: boolean;
   resizeObserver: ResizeObserver | null;
   fitFrame: number | null;
   reconnectTimer: number | null;
+  checkpointTimer: number | null;
   exited: boolean;
 }
 
@@ -364,11 +368,29 @@ function persistSettings() {
   for (const [k, v] of entries)
     invoke("app.configSet", { key: k, value: v }).catch((e) => console.warn("configSet failed", k, e));
 }
+function scheduleTerminalCheckpoint(nook: NookView): void {
+  if (nook.checkpointTimer !== null) return;
+  nook.checkpointTimer = window.setTimeout(() => {
+    nook.checkpointTimer = null;
+    if (nook.replaying || nook.restoringCheckpoint || nook.expectedOffset !== nook.consumed || nook.exited || nooks.get(nook.nookId) !== nook) return;
+    const dataBase64 = toBase64Utf8(nook.serialize.serialize());
+    void invoke("app.nookCheckpoint", {
+      nookId: nook.nookId,
+      dataBase64,
+      offset: nook.consumed,
+      cols: nook.term.cols,
+      rows: nook.term.rows,
+      scrollbackLines: settings.scrollback,
+    }).catch((error) => console.warn("terminal checkpoint failed", { nookId: nook.nookId, error: String(error) }));
+  }, 1000);
+}
+
 function finishReplay(nook: NookView, resynced = false): void {
   const viewportAction = replayViewportAction({ resetOnReplay: nook.resetOnReplay, resynced });
   nook.replaying = false;
   nook.resetOnReplay = false;
   if (viewportAction === "bottom") nook.term.scrollToBottom();
+  scheduleTerminalCheckpoint(nook);
 }
 
 function attachWs(nook: NookView): void {
@@ -397,19 +419,46 @@ function attachWs(nook: NookView): void {
       const m = parseRelayText(ev.data);
       if (!m) return;
       if (m.t === "base") {
-        if (nook.resetOnReplay && nook.replaying) nook.term.reset();
         nook.consumed = m.off;
         nook.expectedOffset = m.off;
         nook.replayUntilOffset = m.head;
         nook.lastAck = m.off;
-        if (m.head <= m.off) finishReplay(nook);
+        if (m.checkpoint && m.checkpointCols && m.checkpointRows) {
+          nook.term.reset();
+          nook.restoringCheckpoint = true;
+          nook.term.resize(m.checkpointCols, m.checkpointRows);
+          nook.term.write(decodeTerminalRestoreBytes(m.checkpoint, m.modes), () => {
+            nook.restoringCheckpoint = false;
+            if (!current()) return;
+            scheduleFit(nook);
+            if (m.head <= m.off) finishReplay(nook);
+          });
+        } else {
+          if (nook.resetOnReplay && nook.replaying) {
+            nook.term.reset();
+            if (m.modes) nook.term.write(decodeBase64Bytes(m.modes));
+          }
+          if (m.head <= m.off) finishReplay(nook);
+        }
       } else if (m.t === "resync") {
         nook.term.reset();
         nook.consumed = m.base;
         nook.expectedOffset = m.base;
         nook.replayUntilOffset = m.base;
         nook.lastAck = m.base;
-        finishReplay(nook, true);
+        if (m.checkpoint && m.checkpointCols && m.checkpointRows) {
+          nook.restoringCheckpoint = true;
+          nook.term.resize(m.checkpointCols, m.checkpointRows);
+          nook.term.write(decodeTerminalRestoreBytes(m.checkpoint, m.modes), () => {
+            nook.restoringCheckpoint = false;
+            if (!current()) return;
+            scheduleFit(nook);
+            finishReplay(nook, true);
+          });
+        } else {
+          if (m.modes) nook.term.write(decodeBase64Bytes(m.modes));
+          finishReplay(nook, true);
+        }
       } else if (m.t === "end") {
         if (processExitAction(nook.exited) === "ignore") return;
         nook.exited = true;
@@ -444,6 +493,7 @@ function attachWs(nook: NookView): void {
       if (!current()) return;
       nook.consumed = nextOffset;
       if (nook.consumed - nook.lastAck >= CREDIT_THRESHOLD) sendAck();
+      scheduleTerminalCheckpoint(nook);
     };
     nook.term.write(bytes, () => {
       if (!current()) return;
@@ -472,6 +522,7 @@ function attachWs(nook: NookView): void {
     void enqueueNookWrite(nook.nookId, toBase64Utf8(d), (nookId, dataBase64) => invoke("app.nookWrite", { nookId, dataBase64 }));
   });
   nook.term.onResize(({ cols, rows }) => {
+    if (nook.restoringCheckpoint) return;
     const dims: TermDims = { cols, rows };
     if (!shouldResize(dims, nook.lastSent, paneFittable(nook))) return;
     nook.lastSent = dims;
@@ -485,6 +536,8 @@ function makeNook(nookId: string, since: number): NookView {
   term.loadAddon(fitAddon);
   const searchAddon = new SearchAddon();
   term.loadAddon(searchAddon);
+  const serializeAddon = new SerializeAddon();
+  term.loadAddon(serializeAddon);
 
   const el = document.createElement("div");
   el.className = "nook";
@@ -553,7 +606,7 @@ function makeNook(nookId: string, since: number): NookView {
 
   const resetOnReplay = shouldResetReplay({ locallySpawned: locallySpawnedNookIds.has(nookId), renderedBefore: renderedStreamNookIds.has(nookId) });
   renderedStreamNookIds.add(nookId);
-  const pv: NookView = { nookId, term, fit: fitAddon, ws: null, el, consumed: since, expectedOffset: since, replayUntilOffset: since, lastAck: since, title: "", customTitle: "", headerTitleEl: titleSpan, search: searchAddon, replaying: true, resetOnReplay, keyboard: createKeyboardProtocolTracker(), lastSent: null, handlersBound: false, resizeObserver: null, fitFrame: null, reconnectTimer: null, exited: false };
+  const pv: NookView = { nookId, term, fit: fitAddon, serialize: serializeAddon, ws: null, el, consumed: since, expectedOffset: since, replayUntilOffset: since, lastAck: since, title: "", customTitle: "", headerTitleEl: titleSpan, search: searchAddon, replaying: true, resetOnReplay, restoringCheckpoint: false, keyboard: createKeyboardProtocolTracker(), lastSent: null, handlersBound: false, resizeObserver: null, fitFrame: null, reconnectTimer: null, checkpointTimer: null, exited: false };
 
   el.addEventListener("mousedown", () => focusNook(nookId));
   const overrides = loadKeybindings();
@@ -666,6 +719,7 @@ function disposeNook(nookId: string): void {
   if (!pv) return;
   streamGens.invalidate(nookId);
   if (pv.reconnectTimer !== null) window.clearTimeout(pv.reconnectTimer);
+  if (pv.checkpointTimer !== null) window.clearTimeout(pv.checkpointTimer);
   if (pv.fitFrame !== null) cancelAnimationFrame(pv.fitFrame);
   pv.resizeObserver?.disconnect();
   try { pv.ws?.close(); } catch { void 0; }
@@ -2364,7 +2418,7 @@ function renderBayCard(ws: BayCardEntry, isActive: boolean): HTMLElement {
     renderSidebarContent("left");
   });
   head.appendChild(collapse);
-  if (!isActive) head.addEventListener("click", () => void switchBay(ws.id));
+  head.addEventListener("click", () => void openBayLauncher(ws.id));
   card.appendChild(head);
   wireBayCardDrag(card, head.querySelector<HTMLElement>(".ws-card-swatch")!, ws.id);
   if (cardCollapsed) return card;
@@ -3177,11 +3231,30 @@ async function searchFiles(query: string): Promise<void> {
   }
 }
 
-async function switchBay(wsId: string, targetShoreId: string | null = null, targetNookId: string | null = null): Promise<void> {
+async function openBayLauncher(wsId: string): Promise<void> {
+  const navigation = bayHeadNavigation(layout?.id ?? null, wsId);
+  if (navigation.switchRequired) {
+    await switchBay(wsId, null, null, navigation.showLauncher);
+    return;
+  }
+  bayOverviewVisible = navigation.showLauncher;
+  activeShoreId = null;
+  focusedNookId = null;
+  renderShore();
+  renderShoreTabs();
+  reconcileBrowserBounds();
+}
+
+async function switchBay(
+  wsId: string,
+  targetShoreId: string | null = null,
+  targetNookId: string | null = null,
+  showLauncher = false,
+): Promise<void> {
   try {
     const generation = ++reloadGeneration;
     await invoke("cove://commands/bay.switch", { id: wsId });
-    bayOverviewVisible = false;
+    bayOverviewVisible = showLauncher;
     activeShoreId = targetShoreId;
     focusedNookId = null;
     const snapshot = await invoke<BaySnapshot>("cove://commands/layout.get", { bayId: wsId });

@@ -12,8 +12,22 @@ public sealed class PtyStreamClient : IAsyncDisposable
     public ulong StreamId { get; }
     public ulong BaseOffset { get; }
     public ulong ReplayUntilOffset { get; }
+    public string TerminalModePreambleBase64 { get; }
+    public string TerminalCheckpointBase64 { get; }
+    public int CheckpointCols { get; }
+    public int CheckpointRows { get; }
 
-    private PtyStreamClient(Stream s, ulong streamId, ulong baseOffset, ulong replayUntilOffset) { _s = s; StreamId = streamId; BaseOffset = baseOffset; ReplayUntilOffset = replayUntilOffset; }
+    private PtyStreamClient(Stream s, SubscribeResult result)
+    {
+        _s = s;
+        StreamId = result.StreamId;
+        BaseOffset = result.BaseOffset;
+        ReplayUntilOffset = result.ReplayUntilOffset;
+        TerminalModePreambleBase64 = result.TerminalModePreambleBase64;
+        TerminalCheckpointBase64 = result.TerminalCheckpointBase64;
+        CheckpointCols = result.CheckpointCols;
+        CheckpointRows = result.CheckpointRows;
+    }
 
     public static async Task<PtyStreamClient> SubscribeAsync(
         Func<CancellationToken, Task<Stream>> dial, string clientVersion, string channel, string nookId, ulong since, CancellationToken ct)
@@ -25,7 +39,7 @@ public sealed class PtyStreamClient : IAsyncDisposable
             JsonSerializer.SerializeToElement(new SubscribeParams(nookId, since), CoveJsonContext.Default.SubscribeParams), 2, ct);
         if (!sub.Ok || sub.Data is null) throw new InvalidOperationException($"subscribe failed: {sub.Error?.Code}");
         var r = JsonSerializer.Deserialize(sub.Data.Value, CoveJsonContext.Default.SubscribeResult)!;
-        return new PtyStreamClient(s, r.StreamId, r.BaseOffset, r.ReplayUntilOffset);
+        return new PtyStreamClient(s, r);
     }
 
     private static async Task<ControlResponse> Request(Stream s, string uri, JsonElement paramsEl, uint seq, CancellationToken ct)
@@ -46,7 +60,7 @@ public sealed class PtyStreamClient : IAsyncDisposable
 
     public async Task PumpAsync(
         Func<ulong, ReadOnlyMemory<byte>, CancellationToken, Task> onData,
-        Func<ulong, CancellationToken, Task> onResync,
+        Func<ulong, string, string, int, int, CancellationToken, Task> onResync,
         Func<ulong, int, CancellationToken, Task> onEnd,
         CancellationToken ct)
     {
@@ -61,7 +75,20 @@ public sealed class PtyStreamClient : IAsyncDisposable
                     await onData(offset, f.Payload.AsMemory(8), ct);
                     break;
                 case FrameType.Resync:
-                    await onResync(BinaryPrimitives.ReadUInt64LittleEndian(f.Payload), ct);
+                    ulong newBase = BinaryPrimitives.ReadUInt64LittleEndian(f.Payload);
+                    if (f.Payload.Length < 20)
+                    {
+                        await onResync(newBase, f.Payload.Length > 8 ? Convert.ToBase64String(f.Payload.AsSpan(8)) : "", "", 0, 0, ct);
+                        break;
+                    }
+                    int cols = BinaryPrimitives.ReadInt32LittleEndian(f.Payload.AsSpan(8));
+                    int rows = BinaryPrimitives.ReadInt32LittleEndian(f.Payload.AsSpan(12));
+                    int modeLength = BinaryPrimitives.ReadInt32LittleEndian(f.Payload.AsSpan(16));
+                    if (modeLength < 0 || modeLength > f.Payload.Length - 20)
+                        throw new InvalidDataException("invalid resync mode length");
+                    string modes = modeLength == 0 ? "" : Convert.ToBase64String(f.Payload.AsSpan(20, modeLength));
+                    string checkpoint = modeLength == f.Payload.Length - 20 ? "" : Convert.ToBase64String(f.Payload.AsSpan(20 + modeLength));
+                    await onResync(newBase, modes, checkpoint, cols, rows, ct);
                     break;
                 case FrameType.StreamEnd:
                     var final = BinaryPrimitives.ReadUInt64LittleEndian(f.Payload);

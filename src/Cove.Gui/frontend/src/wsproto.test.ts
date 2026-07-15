@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { decodeRelayData, toBase64Utf8, parseRelayText } from "./wsproto";
+import { decodeBase64Bytes, decodeRelayData, decodeTerminalRestoreBytes, toBase64Utf8, parseRelayText } from "./wsproto";
 
 describe("wsproto", () => {
   it("base64-encodes UTF-8 (multibyte) correctly", () => {
@@ -14,7 +14,14 @@ describe("wsproto", () => {
     expect(() => decodeRelayData(new ArrayBuffer(7))).toThrow("relay data frame");
   });
   it("parses relay messages and rejects junk", () => {
-    expect(parseRelayText('{"t":"base","off":5,"head":9}')).toEqual({ t: "base", off: 5, head: 9 });
+    expect(parseRelayText('{"t":"base","off":5,"head":9,"modes":"G1s/MTA0OWg="}')).toEqual({ t: "base", off: 5, head: 9, modes: "G1s/MTA0OWg=" });
     expect(parseRelayText('{"t":"nope"}')).toBeNull();
+    expect(parseRelayText('{"t":"base","off":12,"head":20,"modes":"","checkpoint":"U1RBVEU=","checkpointCols":132,"checkpointRows":40}')).toEqual({ t: "base", off: 12, head: 20, modes: "", checkpoint: "U1RBVEU=", checkpointCols: 132, checkpointRows: 40 });
+  });
+  it("decodes a terminal mode preamble", () => {
+    expect(decodeBase64Bytes("G1s/MTA0OWg=")).toEqual(new Uint8Array([27, 91, 63, 49, 48, 52, 57, 104]));
+  });
+  it("appends mode supplements after serialized terminal state", () => {
+    expect(decodeTerminalRestoreBytes("U1RBVEU=", "G1s/MTAwNmg=")).toEqual(new Uint8Array([83, 84, 65, 84, 69, 27, 91, 63, 49, 48, 48, 54, 104]));
   });
 });

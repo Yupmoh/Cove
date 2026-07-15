@@ -17,7 +17,7 @@ public static class PtyWsHandler
         {
             client = await PtyStreamClient.SubscribeAsync(dial, clientVersion, channel, nookId, since, ct);
             ulong browserAcked = client.BaseOffset;
-            await SendText(ws, $"{{\"t\":\"base\",\"off\":{client.BaseOffset},\"head\":{client.ReplayUntilOffset}}}", ct);
+            await SendText(ws, $"{{\"t\":\"base\",\"off\":{client.BaseOffset},\"head\":{client.ReplayUntilOffset},\"modes\":\"{client.TerminalModePreambleBase64}\",\"checkpoint\":\"{client.TerminalCheckpointBase64}\",\"checkpointCols\":{client.CheckpointCols},\"checkpointRows\":{client.CheckpointRows}}}", ct);
 
             var ackTask = Task.Run(async () =>
             {
@@ -34,7 +34,7 @@ public static class PtyWsHandler
 
             await client.PumpAsync(
                 onData: async (offset, raw, c) => await SendData(ws, offset, raw, c),
-                onResync: async (newBase, c) => await SendText(ws, $"{{\"t\":\"resync\",\"base\":{newBase}}}", c),
+                onResync: async (newBase, modes, checkpoint, cols, rows, c) => await SendText(ws, $"{{\"t\":\"resync\",\"base\":{newBase},\"modes\":\"{modes}\",\"checkpoint\":\"{checkpoint}\",\"checkpointCols\":{cols},\"checkpointRows\":{rows}}}", c),
                 onEnd: async (final, code, c) => await SendText(ws, $"{{\"t\":\"end\",\"code\":{code}}}", c),
                 ct);
         }

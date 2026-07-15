@@ -19,14 +19,14 @@ public sealed class FakeEngine : IAsyncDisposable
         return c.GetStream();
     };
 
-    public Task ServeOnceAsync(ulong baseOffset, ulong replayUntilOffset, Func<Stream, Task> script) => Task.Run(async () =>
+    public Task ServeOnceAsync(ulong baseOffset, ulong replayUntilOffset, Func<Stream, Task> script, string terminalModePreambleBase64 = "") => Task.Run(async () =>
     {
         using var conn = await _l.AcceptTcpClientAsync();
         var s = conn.GetStream();
         var hello = await Read(s);
         await WriteResponse(s, ReqId(hello), new HelloResult(1, "0.1.0", 1234, "dev"), CoveJsonContext.Default.HelloResult);
         var sub = await Read(s);
-        await WriteResponse(s, ReqId(sub), new SubscribeResult(1, baseOffset, ProtocolConstants.FlowWindow, replayUntilOffset), CoveJsonContext.Default.SubscribeResult);
+        await WriteResponse(s, ReqId(sub), new SubscribeResult(1, baseOffset, ProtocolConstants.FlowWindow, replayUntilOffset, terminalModePreambleBase64), CoveJsonContext.Default.SubscribeResult);
         _ = Task.Run(async () => { try { while (true) { var f = await Read(s); if (f.type == FrameType.Credit) Credits.Add(BinaryPrimitives.ReadUInt64LittleEndian(f.payload)); } } catch { Credits.TrimExcess(); } });
         await script(s);
     });
@@ -38,7 +38,19 @@ public sealed class FakeEngine : IAsyncDisposable
         raw.CopyTo(payload, 8);
         await WriteFrame(s, FrameType.StreamData, 1, payload);
     }
-    public static Task WriteResync(Stream s, ulong newBase) { var p = new byte[8]; BinaryPrimitives.WriteUInt64LittleEndian(p, newBase); return WriteFrame(s, FrameType.Resync, 1, p); }
+    public static Task WriteResync(Stream s, ulong newBase, string terminalModePreamble = "") { var modes = System.Text.Encoding.ASCII.GetBytes(terminalModePreamble); var p = new byte[8 + modes.Length]; BinaryPrimitives.WriteUInt64LittleEndian(p, newBase); modes.CopyTo(p, 8); return WriteFrame(s, FrameType.Resync, 1, p); }
+    public static Task WriteCheckpointResync(Stream s, ulong newBase, string terminalModePreamble, byte[] terminalCheckpoint, int checkpointCols, int checkpointRows)
+    {
+        var modes = System.Text.Encoding.ASCII.GetBytes(terminalModePreamble);
+        var payload = new byte[20 + modes.Length + terminalCheckpoint.Length];
+        BinaryPrimitives.WriteUInt64LittleEndian(payload, newBase);
+        BinaryPrimitives.WriteInt32LittleEndian(payload.AsSpan(8), checkpointCols);
+        BinaryPrimitives.WriteInt32LittleEndian(payload.AsSpan(12), checkpointRows);
+        BinaryPrimitives.WriteInt32LittleEndian(payload.AsSpan(16), modes.Length);
+        modes.CopyTo(payload, 20);
+        terminalCheckpoint.CopyTo(payload, 20 + modes.Length);
+        return WriteFrame(s, FrameType.Resync, 1, payload);
+    }
     public static Task WriteEnd(Stream s, ulong final, int code) { var p = new byte[12]; BinaryPrimitives.WriteUInt64LittleEndian(p, final); BinaryPrimitives.WriteInt32LittleEndian(p.AsSpan(8), code); return WriteFrame(s, FrameType.StreamEnd, 1, p); }
 
     private static async Task WriteResponse<T>(Stream s, string id, T data, System.Text.Json.Serialization.Metadata.JsonTypeInfo<T> ti)

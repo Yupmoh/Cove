@@ -75,6 +75,13 @@ public sealed class CoveGuiCommands
         return await Call("cove://commands/nook.resize", p, ct);
     }
 
+    [RynCommand("app.nookCheckpoint")]
+    public async ValueTask<string> NookCheckpoint(string nookId, string dataBase64, long offset, int cols, int rows, int scrollbackLines, CancellationToken ct)
+    {
+        var p = JsonSerializer.SerializeToElement(new NookCheckpointParams(nookId, dataBase64, offset, cols, rows, scrollbackLines), CoveJsonContext.Default.NookCheckpointParams);
+        return await Call("cove://commands/nook.checkpoint", p, ct);
+    }
+
     [RynCommand("app.nookKill")]
     public async ValueTask<string> NookKill(string nookId, CancellationToken ct)
         => await Call("cove://commands/nook.kill", NookIdParam(nookId), ct);

@@ -19,7 +19,7 @@ public class PtyRelayTests
             await FakeEngine.WriteStreamData(s, 0, Encoding.ASCII.GetBytes("hi\r\n"));
             await Task.Delay(200);
             await FakeEngine.WriteEnd(s, 4, 0);
-        });
+        }, terminalModePreambleBase64: "G1s/MTA0OWg=");
 
         using var ws = new ClientWebSocket();
         await ws.ConnectAsync(new Uri($"ws://127.0.0.1:{server.Port}/pty?nook=p1&since=0"), CancellationToken.None);
@@ -27,6 +27,7 @@ public class PtyRelayTests
         var baseMsg = await ReceiveText(ws);
         Assert.Contains("\"t\":\"base\"", baseMsg);
         Assert.Contains("\"head\":4", baseMsg);
+        Assert.Contains("\"modes\":\"G1s/MTA0OWg=\"", baseMsg);
 
         var data = await ReceiveBinary(ws);
         Assert.Equal(12, data.Length);
@@ -53,7 +54,7 @@ public class PtyRelayTests
 
         var serve = engine.ServeOnceAsync(baseOffset: 0, replayUntilOffset: 0, script: async s =>
         {
-            await FakeEngine.WriteResync(s, 9437184);
+            await FakeEngine.WriteResync(s, 9437184, "\x1b[?1006h");
             await Task.Delay(100);
             await FakeEngine.WriteEnd(s, 9437184, 0);
         });
@@ -64,6 +65,36 @@ public class PtyRelayTests
         var resync = await ReceiveText(ws);
         Assert.Contains("\"t\":\"resync\"", resync);
         Assert.Contains("9437184", resync);
+        Assert.Contains("\"modes\":\"G1s/MTAwNmg=\"", resync);
+        await serve;
+    }
+
+    [Fact]
+    public async Task Relay_Forwards_Checkpoint_Resync_Metadata()
+    {
+        await using var engine = new FakeEngine();
+        var tmp = Directory.CreateTempSubdirectory().FullName;
+        await File.WriteAllTextAsync(Path.Combine(tmp, "index.html"), "<html>ok</html>");
+        await using var server = new LoopbackServer(tmp, engine.Dial, "0.1.0", "dev", port: 0);
+        server.Start();
+        var checkpoint = Encoding.ASCII.GetBytes("STATE");
+        var serve = engine.ServeOnceAsync(baseOffset: 0, replayUntilOffset: 0, script: async s =>
+        {
+            await FakeEngine.WriteCheckpointResync(s, 50000, "\x1b[?1006h", checkpoint, 132, 40);
+            await Task.Delay(100);
+            await FakeEngine.WriteEnd(s, 50000, 0);
+        });
+
+        using var ws = new ClientWebSocket();
+        await ws.ConnectAsync(new Uri($"ws://127.0.0.1:{server.Port}/pty?nook=p1&since=0"), CancellationToken.None);
+        _ = await ReceiveText(ws);
+        var resync = await ReceiveText(ws);
+
+        Assert.Contains("\"base\":50000", resync);
+        Assert.Contains("\"modes\":\"G1s/MTAwNmg=\"", resync);
+        Assert.Contains("\"checkpoint\":\"U1RBVEU=\"", resync);
+        Assert.Contains("\"checkpointCols\":132", resync);
+        Assert.Contains("\"checkpointRows\":40", resync);
         await serve;
     }
 
