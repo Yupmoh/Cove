@@ -12,7 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Terminal rendering now defaults to Canvas, coordinates resize through one visibility-aware observer, and no longer ends replay or changes alternate-screen mode on the first keypress
 - Removed temporary keyboard payload diagnostics from GUI logs
 - Claude, Codex, and OMP session discovery now scans pre-existing native histories without Cove metadata, resolves the active layout's project path, upgrades legacy bundled scanner scripts, preserves distinct sessions with identical labels, and merges Codex threads across state databases; Codex and OMP capture session IDs so daemon restarts resume the correct conversation
-- Restored and resynchronized terminals now follow replay to the live prompt without forcing ordinary reconnects away from the user's scroll position
+- Restored and resynchronized terminals now follow replay to the live prompt without forcing ordinary reconnects away from the user's scroll position, and recover active alternate-screen, mouse, and keyboard modes after their original control sequences leave the PTY ring
+- Terminal history persistence now stores atomic serialized xterm checkpoints with their exact raw PTY tails, restores original dimensions and private modes before replay, resynchronizes from checkpoints after ring overflow, and retains the full 8 MiB raw fallback instead of truncating daemon-restart history to 256 KiB
 
 ## [0.4.0] - 2026-07-13
 

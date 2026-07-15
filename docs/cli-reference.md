@@ -179,6 +179,7 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/memory.show` | core |  |
 | `cove://commands/memory.supersede` | core |  |
 | `cove://commands/nook-types.list` | core |  |
+| `cove://commands/nook.checkpoint` | core |  |
 | `cove://commands/nook.kill` | core |  |
 | `cove://commands/nook.list` | core |  |
 | `cove://commands/nook.read` | core |  |
@@ -470,4 +471,4 @@ Generated from the command registry. Do not edit by hand.
 | `viewer get-state` | cli |  |
 | `viewer open` | cli |  |
 
-Total: 465 commands
+Total: 466 commands
