@@ -1,4 +1,5 @@
 using System;
+using System.Text;
 using Cove.Engine.Pty;
 using Cove.Protocol;
 using Xunit;
@@ -13,6 +14,13 @@ public sealed class PtyStreamSenderTests
         for (int i = 0; i < len; i++)
             b[i] = (byte)((from + i) % 256);
         return b;
+    }
+
+    [Fact]
+    public void DefaultRingRetainsEightMiB()
+    {
+        var ring = new PtyRingBuffer();
+        Assert.Equal(8 * 1024 * 1024, ring.Capacity);
     }
 
     [Fact]
@@ -95,18 +103,71 @@ public sealed class PtyStreamSenderTests
         var ring = new PtyRingBuffer(65536);
         ring.Append(Pattern(0, 262144));
         var sink = new RecordingFrameSink();
-        var sender = new PtyStreamSender(1, 1, ring, 0, sink);
+        var sender = new PtyStreamSender(1, 1, ring, 0, sink, terminalModePreamble: () => "\x1b[?1049h");
 
         sender.PumpAvailable();
 
         Assert.Equal(1, sink.ResyncCount);
         Assert.Equal(196608ul, sink.Resyncs[0].NewBaseOffset);
+        Assert.Equal(new byte[] { 27, 91, 63, 49, 48, 52, 57, 104 }, sink.Resyncs[0].TerminalModePreamble);
         Assert.Equal(262144L, sender.SentOffset);
         Assert.Single(sink.Data);
         Assert.Equal(196608ul, sink.Data[0].Offset);
         Assert.Equal(65536, sink.Data[0].Raw.Length);
         for (int i = 0; i < 65536; i++)
             Assert.Equal((byte)((196608 + i) % 256), sink.Data[0].Raw[i]);
+    }
+
+    [Fact]
+    public void ForcedUnderrunResyncsFromLatestTerminalCheckpoint()
+    {
+        var ring = new PtyRingBuffer(65536);
+        ring.Append(Pattern(0, 100000));
+        var sink = new RecordingFrameSink();
+        var checkpoint = Encoding.ASCII.GetBytes("STATE");
+        var sender = new PtyStreamSender(
+            1,
+            1,
+            ring,
+            0,
+            sink,
+            terminalModePreamble: () => "\x1b[?1049h",
+            terminalCheckpoint: () => new TerminalResyncSnapshot(50000, checkpoint, 132, 40, "\x1b[?1006h"));
+
+        sender.PumpAvailable();
+
+        var resync = Assert.Single(sink.Resyncs);
+        Assert.Equal(50000ul, resync.NewBaseOffset);
+        Assert.Equal(checkpoint, resync.TerminalCheckpoint);
+        Assert.Equal(132, resync.CheckpointCols);
+        Assert.Equal(40, resync.CheckpointRows);
+        Assert.Equal(Encoding.ASCII.GetBytes("\x1b[?1006h"), resync.TerminalModePreamble);
+        Assert.Equal(100000L, sender.SentOffset);
+    }
+
+    [Fact]
+    public void NineMiBOverflowResyncsFromCheckpointInsteadOfTruncatedTail()
+    {
+        const int capacity = 8 * 1024 * 1024;
+        const int checkpointOffset = 2 * 1024 * 1024;
+        var ring = new PtyRingBuffer(capacity);
+        ring.Append(Pattern(0, 9 * 1024 * 1024));
+        var sink = new RecordingFrameSink();
+        var checkpoint = Encoding.ASCII.GetBytes("NINE_MIB_STATE");
+        var sender = new PtyStreamSender(
+            1,
+            1,
+            ring,
+            0,
+            sink,
+            terminalCheckpoint: () => new TerminalResyncSnapshot(checkpointOffset, checkpoint, 80, 24, ""));
+
+        sender.PumpAvailable();
+
+        var resync = Assert.Single(sink.Resyncs);
+        Assert.Equal((ulong)checkpointOffset, resync.NewBaseOffset);
+        Assert.Equal(checkpoint, resync.TerminalCheckpoint);
+        Assert.Equal((long)checkpointOffset + ProtocolConstants.FlowWindow, sender.SentOffset);
     }
 
     [Fact]

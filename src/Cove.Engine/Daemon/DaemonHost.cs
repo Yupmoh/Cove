@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
 using Cove.Engine.Config;
@@ -697,13 +698,29 @@ public sealed class DaemonHost
         const ulong streamId = 1;
         long head = nook.Ring.Head;
         long tail = nook.Ring.Tail;
-        long baseOffset = Math.Clamp((long)sp.SinceOffset, tail, head);
+        var checkpoint = _nooks.GetTerminalCheckpoint(sp.NookId);
+        bool useCheckpoint = checkpoint is not null && ((long)sp.SinceOffset < checkpoint.Offset || (sp.SinceOffset == 0 && checkpoint.Offset == 0));
+        long baseOffset = useCheckpoint ? checkpoint!.Offset : Math.Clamp((long)sp.SinceOffset, tail, head);
         _logger?.SubscribeStarted(sp.NookId, baseOffset, head, tail);
-        var subResult = new SubscribeResult(streamId, (ulong)baseOffset, ProtocolConstants.FlowWindow, (ulong)head);
+        var subResult = new SubscribeResult(
+            streamId,
+            (ulong)baseOffset,
+            ProtocolConstants.FlowWindow,
+            (ulong)head,
+            Convert.ToBase64String(Encoding.ASCII.GetBytes(useCheckpoint ? checkpoint!.ModeSupplement : nook.Reader.TerminalModePreamble)),
+            useCheckpoint ? Convert.ToBase64String(checkpoint!.Data) : "",
+            useCheckpoint ? checkpoint!.Cols : 0,
+            useCheckpoint ? checkpoint!.Rows : 0);
         await WriteResponseAsync(conn, new ControlResponse(req.Id, true, ToElement(subResult, CoveJsonContext.Default.SubscribeResult)), cancellationToken).ConfigureAwait(false);
 
         var sink = new SocketByteStreamSink(stream);
-        var sender = new PtyStreamSender(streamId, nook.Session.SessionId, nook.Ring, baseOffset, sink, sp.NookId, _logger);
+        var sender = new PtyStreamSender(streamId, nook.Session.SessionId, nook.Ring, baseOffset, sink, sp.NookId, _logger, () => nook.Reader.TerminalModePreamble, () =>
+        {
+            var currentCheckpoint = _nooks.GetTerminalCheckpoint(sp.NookId);
+            return currentCheckpoint is null
+                ? null
+                : new TerminalResyncSnapshot(currentCheckpoint.Offset, currentCheckpoint.Data, currentCheckpoint.Cols, currentCheckpoint.Rows, currentCheckpoint.ModeSupplement);
+        });
         var gate = new object();
         bool childMarked = false;
 
@@ -882,6 +899,12 @@ public sealed class DaemonHost
                 var wsDir = System.IO.Path.Combine(baysRoot, wsId);
                 foreach (var nookId in layout.LeafNookIds(wsId))
                 {
+                    var state = reg.CaptureTerminalRestoreState(nookId);
+                    if (state is not null)
+                    {
+                        Cove.Engine.Layout.BayPersistence.SaveTerminalRestoreState(nookId, state, wsDir);
+                        continue;
+                    }
                     var bytes = reg.SnapshotRing(nookId);
                     if (bytes.Length > 0)
                         Cove.Engine.Layout.BayPersistence.SaveScrollback(nookId, bytes, wsDir);
@@ -1087,8 +1110,11 @@ public sealed class DaemonHost
         {
             try
             {
-                var scrollback = Cove.Engine.Layout.BayPersistence.LoadScrollback(nook.NookId, _bayDir);
-                _nooks.RespawnAs(nook.NookId, command, args, cwd, nook.Cols, nook.Rows, scrollback, nook.Adapter, nook.AgentName);
+                var state = Cove.Engine.Layout.BayPersistence.LoadTerminalRestoreState(nook.NookId, _bayDir, _logger);
+                if (state is not null)
+                    _nooks.RespawnAs(nook.NookId, command, args, cwd, nook.Cols, nook.Rows, state, nook.Adapter, nook.AgentName);
+                else
+                    _nooks.RespawnAs(nook.NookId, command, args, cwd, nook.Cols, nook.Rows, Cove.Engine.Layout.BayPersistence.LoadScrollback(nook.NookId, _bayDir), nook.Adapter, nook.AgentName);
                 if (!string.IsNullOrEmpty(nook.Title))
                     _nooks.Rename(nook.NookId, nook.Title!);
                 if (!string.IsNullOrEmpty(nook.Adapter))

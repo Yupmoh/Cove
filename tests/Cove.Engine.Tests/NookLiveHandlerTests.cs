@@ -211,6 +211,37 @@ public sealed class NookLiveHandlerTests
     }
 
     [Fact]
+    public async Task Subscribe_FromCheckpointOffset_ReturnsSerializedStateAndDimensions()
+    {
+        if (OperatingSystem.IsWindows())
+            return;
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        CancellationToken ct = cts.Token;
+        await using var h = await DaemonTestHarness.StartAsync();
+        await using FrameConnection ctl = await h.ConnectAsync("cli");
+        string nookId = await SpawnAsync(ctl, "/bin/sh", new[] { "-c", "printf '\\033[?1049h\\033[?1006h'; sleep 30" }, 80, 24, ct);
+        await Task.Delay(200, ct);
+        byte[] checkpoint = Encoding.UTF8.GetBytes("SERIALIZED_STATE");
+        var checkpointParams = new NookCheckpointParams(nookId, Convert.ToBase64String(checkpoint), 1, 132, 40, 10000);
+        JsonElement checkpointElement = JsonSerializer.SerializeToElement(checkpointParams, CoveJsonContext.Default.NookCheckpointParams);
+        ControlResponse stored = await RequestAsync(ctl, "cp", "cove://commands/nook.checkpoint", checkpointElement, ct);
+        Assert.True(stored.Ok, stored.Error?.Message);
+
+        await using FrameConnection gui = await h.ConnectAsync("gui");
+        SubscribeResult result = await SubscribeAsync(gui, nookId, 0, ct);
+
+        Assert.Equal(Convert.ToBase64String(checkpoint), result.TerminalCheckpointBase64);
+        Assert.Equal(132, result.CheckpointCols);
+        Assert.Equal(40, result.CheckpointRows);
+        Assert.Equal(Convert.ToBase64String(Encoding.ASCII.GetBytes("\x1b[?1006h")), result.TerminalModePreambleBase64);
+
+        await using FrameConnection reconnect = await h.ConnectAsync("gui");
+        SubscribeResult continued = await SubscribeAsync(reconnect, nookId, 1, ct);
+        Assert.Equal(1ul, continued.BaseOffset);
+        Assert.Equal("", continued.TerminalCheckpointBase64);
+    }
+
+    [Fact]
     public async Task Subscribe_UnknownNook_ReturnsNotFound()
     {
         if (OperatingSystem.IsWindows())

@@ -42,16 +42,23 @@ public sealed class SocketByteStreamSink : IByteStreamFrameSink
         }
     }
 
-    public void SendResync(ulong streamId, ulong newBaseOffset)
+    public void SendResync(ulong streamId, ulong newBaseOffset, ReadOnlySpan<byte> terminalModePreamble, ReadOnlySpan<byte> terminalCheckpoint, int checkpointCols, int checkpointRows)
     {
+        const int metadataSize = 20;
+        int payloadLength = metadataSize + terminalModePreamble.Length + terminalCheckpoint.Length;
         Span<byte> header = stackalloc byte[ProtocolConstants.HeaderSize];
-        FrameHeader.Write(header, new FrameHeader(FrameType.Resync, streamId, NextSeq(), 8));
-        Span<byte> payload = stackalloc byte[8];
-        BinaryPrimitives.WriteUInt64LittleEndian(payload, newBaseOffset);
+        FrameHeader.Write(header, new FrameHeader(FrameType.Resync, streamId, NextSeq(), (uint)payloadLength));
+        Span<byte> metadata = stackalloc byte[metadataSize];
+        BinaryPrimitives.WriteUInt64LittleEndian(metadata, newBaseOffset);
+        BinaryPrimitives.WriteInt32LittleEndian(metadata.Slice(8), checkpointCols);
+        BinaryPrimitives.WriteInt32LittleEndian(metadata.Slice(12), checkpointRows);
+        BinaryPrimitives.WriteInt32LittleEndian(metadata.Slice(16), terminalModePreamble.Length);
         lock (_writeLock)
         {
             _stream.Write(header);
-            _stream.Write(payload);
+            _stream.Write(metadata);
+            _stream.Write(terminalModePreamble);
+            _stream.Write(terminalCheckpoint);
             _stream.Flush();
         }
     }

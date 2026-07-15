@@ -52,6 +52,50 @@ public sealed class PtyRingBuffer
         }
     }
 
+    public bool ContainsOffset(long offset)
+    {
+        lock (_sync)
+            return offset >= Math.Max(0, _head - _buffer.Length) && offset <= _head;
+    }
+
+    public byte[] Snapshot()
+    {
+        lock (_sync)
+        {
+            var tail = Math.Max(0, _head - _buffer.Length);
+            return SnapshotFromLocked(tail);
+        }
+    }
+
+    public bool TrySnapshotFrom(long fromOffset, out byte[] bytes)
+    {
+        lock (_sync)
+        {
+            var tail = Math.Max(0, _head - _buffer.Length);
+            if (fromOffset < tail || fromOffset > _head)
+            {
+                bytes = Array.Empty<byte>();
+                return false;
+            }
+            bytes = SnapshotFromLocked(fromOffset);
+            return true;
+        }
+    }
+
+    private byte[] SnapshotFromLocked(long fromOffset)
+    {
+        var length = checked((int)(_head - fromOffset));
+        if (length == 0)
+            return Array.Empty<byte>();
+        var bytes = new byte[length];
+        var start = (int)(fromOffset & _mask);
+        var firstRun = Math.Min(_buffer.Length - start, length);
+        _buffer.AsSpan(start, firstRun).CopyTo(bytes);
+        if (firstRun < length)
+            _buffer.AsSpan(0, length - firstRun).CopyTo(bytes.AsSpan(firstRun));
+        return bytes;
+    }
+
     public RingReadResult ReadInto(long fromOffset, Span<byte> dest)
     {
         lock (_sync)

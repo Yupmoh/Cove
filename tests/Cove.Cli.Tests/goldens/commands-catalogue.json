@@ -717,6 +717,10 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/nook.checkpoint",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/nook.kill",
     "source": "core"
   },

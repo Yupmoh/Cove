@@ -7,6 +7,8 @@ using Microsoft.Extensions.Logging;
 
 namespace Cove.Engine.Pty;
 
+internal sealed record TerminalCheckpoint(byte[] Data, long Offset, int Cols, int Rows, int ScrollbackLines, string ModeSupplement);
+
 internal sealed class NookSession
 {
     public required string NookId { get; init; }
@@ -23,6 +25,7 @@ internal sealed class NookSession
     public required PtyRingBuffer Ring { get; init; }
     public required PtyRingSignal Signal { get; init; }
     public required PtySessionReader Reader { get; init; }
+    public TerminalCheckpoint? Checkpoint { get; set; }
 
     public NookInfo ToInfo() => new(NookId, Command, Cols, Rows, !Reader.HasCompleted, Cwd, Title);
 }
@@ -71,6 +74,19 @@ public sealed class NookRegistry : IDisposable, Cove.Engine.Agents.INookWriter
         Tag(nookId, adapter, agentName);
         return info;
     }
+    public NookInfo RespawnAs(string nookId, string command, string[] args, string cwd, int cols, int rows, TerminalRestoreState restoreState, string? adapter = null, string? agentName = null)
+    {
+        _logger.NookRespawn(nookId, command, adapter ?? "");
+        var info = SpawnCore(nookId, command, args, cwd, cols, rows, null, restoreState.Tail);
+        lock (_sync)
+        {
+            if (_nooks.TryGetValue(nookId, out var nook))
+                nook.Checkpoint = new TerminalCheckpoint(restoreState.Checkpoint, 0, restoreState.Cols, restoreState.Rows, restoreState.ScrollbackLines, restoreState.ModeSupplement);
+        }
+        Tag(nookId, adapter, agentName);
+        return info;
+    }
+
 
     private void Tag(string nookId, string? adapter, string? agentName)
     {
@@ -243,17 +259,68 @@ public sealed class NookRegistry : IDisposable, Cove.Engine.Agents.INookWriter
     {
         if (!TryGet(nookId, out var nook))
             return System.Array.Empty<byte>();
-        const int cap = 262144;
-        long head = nook.Ring.Head;
-        long tail = nook.Ring.Tail;
-        long avail = head - tail;
-        if (avail <= 0)
-            return System.Array.Empty<byte>();
-        int len = (int)System.Math.Min(cap, avail);
-        long from = head - len;
-        var buf = new byte[len];
-        var res = nook.Ring.ReadInto(from, buf);
-        return res.BytesCopied == len ? buf : buf[..res.BytesCopied];
+        return nook.Ring.Snapshot();
+    }
+
+    public bool StoreTerminalCheckpoint(string nookId, byte[] checkpoint, long offset, int cols, int rows, int scrollbackLines)
+    {
+        if (!TryGet(nookId, out var nook))
+        {
+            _logger.TerminalCheckpointUnknownNook(nookId);
+            return false;
+        }
+        if (checkpoint.Length == 0 || offset < 0 || cols < 1 || rows < 1 || scrollbackLines < 0 || !nook.Ring.ContainsOffset(offset))
+        {
+            _logger.TerminalCheckpointRejected(nookId, offset, nook.Ring.Tail, nook.Ring.Head, cols, rows, checkpoint.Length);
+            return false;
+        }
+        lock (_sync)
+            nook.Checkpoint = new TerminalCheckpoint(checkpoint, offset, cols, rows, scrollbackLines, nook.Reader.TerminalCheckpointModeSupplement);
+        return true;
+    }
+
+    public bool StoreTerminalCheckpointBase64(string nookId, string checkpointBase64, long offset, int cols, int rows, int scrollbackLines)
+    {
+        try
+        {
+            return StoreTerminalCheckpoint(nookId, System.Convert.FromBase64String(checkpointBase64), offset, cols, rows, scrollbackLines);
+        }
+        catch (System.FormatException ex)
+        {
+            _logger.TerminalCheckpointDecodeFailed(nookId, ex.Message);
+            return false;
+        }
+    }
+
+    internal TerminalCheckpoint? GetTerminalCheckpoint(string nookId)
+    {
+        if (!TryGet(nookId, out var nook))
+        {
+            _logger.TerminalCheckpointUnknownNook(nookId);
+            return null;
+        }
+        TerminalCheckpoint? checkpoint;
+        lock (_sync)
+            checkpoint = nook.Checkpoint;
+        if (checkpoint is not null && !nook.Ring.ContainsOffset(checkpoint.Offset))
+        {
+            _logger.TerminalCheckpointExpired(nookId, checkpoint.Offset, nook.Ring.Tail, nook.Ring.Head);
+            return null;
+        }
+        return checkpoint;
+    }
+
+    public TerminalRestoreState? CaptureTerminalRestoreState(string nookId)
+    {
+        var checkpoint = GetTerminalCheckpoint(nookId);
+        if (checkpoint is null || !TryGet(nookId, out var nook))
+            return null;
+        if (!nook.Ring.TrySnapshotFrom(checkpoint.Offset, out var tail))
+        {
+            _logger.TerminalCheckpointExpired(nookId, checkpoint.Offset, nook.Ring.Tail, nook.Ring.Head);
+            return null;
+        }
+        return new TerminalRestoreState(checkpoint.Data, tail, checkpoint.Offset, checkpoint.Cols, checkpoint.Rows, checkpoint.ScrollbackLines, checkpoint.ModeSupplement);
     }
 
     public bool Rename(string nookId, string title)

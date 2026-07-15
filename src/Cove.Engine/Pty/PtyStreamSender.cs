@@ -1,4 +1,5 @@
 using System;
+using System.Text;
 using Cove.Protocol;
 using Microsoft.Extensions.Logging;
 
@@ -6,6 +7,8 @@ namespace Cove.Engine.Pty;
 
 public sealed class PtyStreamSender
 {
+    private static readonly Func<string> EmptyTerminalModePreamble = static () => "";
+    private static readonly Func<TerminalResyncSnapshot?> EmptyTerminalCheckpoint = static () => null;
     private readonly ulong _streamId;
     private readonly long _sessionId;
     private readonly PtyRingBuffer _ring;
@@ -13,6 +16,8 @@ public sealed class PtyStreamSender
     private readonly byte[] _scratch;
     private readonly ILogger? _logger;
     private readonly string _nookId;
+    private readonly Func<string> _terminalModePreamble;
+    private readonly Func<TerminalResyncSnapshot?> _terminalCheckpoint;
 
     private long _sentOffset;
     private long _ackOffset;
@@ -22,7 +27,7 @@ public sealed class PtyStreamSender
     private bool _faulted;
     private bool _firstDelivered;
 
-    public PtyStreamSender(ulong streamId, long sessionId, PtyRingBuffer ring, long baseOffset, IByteStreamFrameSink sink, string? nookId = null, ILogger? logger = null)
+    public PtyStreamSender(ulong streamId, long sessionId, PtyRingBuffer ring, long baseOffset, IByteStreamFrameSink sink, string? nookId = null, ILogger? logger = null, Func<string>? terminalModePreamble = null, Func<TerminalResyncSnapshot?>? terminalCheckpoint = null)
     {
         if (streamId == 0)
             throw new ArgumentOutOfRangeException(nameof(streamId), "byte-stream id must be >= 1.");
@@ -36,6 +41,8 @@ public sealed class PtyStreamSender
         _sink = sink;
         _logger = logger;
         _nookId = string.IsNullOrEmpty(nookId) ? sessionId.ToString(System.Globalization.CultureInfo.InvariantCulture) : nookId!;
+        _terminalModePreamble = terminalModePreamble ?? EmptyTerminalModePreamble;
+        _terminalCheckpoint = terminalCheckpoint ?? EmptyTerminalCheckpoint;
         _scratch = new byte[ProtocolConstants.StreamDataMaxRawBytes];
         _sentOffset = baseOffset;
         _ackOffset = baseOffset;
@@ -71,6 +78,21 @@ public sealed class PtyStreamSender
         PumpAvailable();
     }
 
+    private void SendResync(long fallbackOffset)
+    {
+        var checkpoint = _terminalCheckpoint();
+        bool useCheckpoint = checkpoint is not null && checkpoint.Offset >= _ring.Tail && checkpoint.Offset <= _ring.Head;
+        long newBase = useCheckpoint ? checkpoint!.Offset : fallbackOffset;
+        byte[] modes = Encoding.ASCII.GetBytes(useCheckpoint ? checkpoint!.ModePreamble : _terminalModePreamble());
+        ReadOnlySpan<byte> checkpointBytes = useCheckpoint ? checkpoint!.Checkpoint : ReadOnlySpan<byte>.Empty;
+        int cols = useCheckpoint ? checkpoint!.Cols : 0;
+        int rows = useCheckpoint ? checkpoint!.Rows : 0;
+        _logger?.DeliveryResync(_nookId, _streamId, (ulong)newBase);
+        _sink.SendResync(_streamId, (ulong)newBase, modes, checkpointBytes, cols, rows);
+        _sentOffset = newBase;
+        _ackOffset = newBase;
+    }
+
     public void PumpAvailable()
     {
         if (_faulted || _ended)
@@ -83,11 +105,7 @@ public sealed class PtyStreamSender
 
             if (_sentOffset < tail)
             {
-                long newBase = tail;
-                _logger?.DeliveryResync(_nookId, _streamId, (ulong)newBase);
-                _sink.SendResync(_streamId, (ulong)newBase);
-                _sentOffset = newBase;
-                _ackOffset = newBase;
+                SendResync(tail);
                 continue;
             }
 
@@ -102,11 +120,7 @@ public sealed class PtyStreamSender
                 RingReadResult result = _ring.ReadInto(_sentOffset, _scratch.AsSpan(0, want));
                 if (result.Underrun)
                 {
-                    long nb = result.NextOffset;
-                    _logger?.DeliveryResync(_nookId, _streamId, (ulong)nb);
-                    _sink.SendResync(_streamId, (ulong)nb);
-                    _sentOffset = nb;
-                    _ackOffset = nb;
+                    SendResync(result.NextOffset);
                     continue;
                 }
                 if (result.BytesCopied == 0)

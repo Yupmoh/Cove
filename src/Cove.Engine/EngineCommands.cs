@@ -128,4 +128,19 @@ internal static class EngineCommands
         long nextOffset = p.Offset + bytes.Length;
         return Task.FromResult(ctx.Ok(new NookReadResult(System.Convert.ToBase64String(bytes), nextOffset, head), CoveJsonContext.Default.NookReadResult));
     }
+
+    [CoveCommand("cove://commands/nook.checkpoint")]
+    public static Task<ControlResponse> NookCheckpoint(EngineDispatchContext ctx)
+    {
+        if (ctx.Nooks is not { } reg)
+            return Task.FromResult(ctx.Fail("not_ready", "nook registry unavailable"));
+        if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.NookCheckpointParams) is not { } p)
+            return Task.FromResult(ctx.Fail("invalid_params", "checkpoint params required"));
+        var resolved = reg.ResolveId(p.NookId);
+        if (!resolved.Found)
+            return Task.FromResult(ctx.Fail(resolved.ErrorCode ?? "not_found", $"unknown nook {p.NookId}"));
+        return Task.FromResult(reg.StoreTerminalCheckpointBase64(resolved.Id!, p.DataBase64, p.Offset, p.Cols, p.Rows, p.ScrollbackLines)
+            ? ctx.Ok()
+            : ctx.Fail("invalid_params", "checkpoint payload rejected"));
+    }
 }

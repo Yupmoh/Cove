@@ -2,7 +2,10 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Cove.Engine.Layout;
 using Cove.Engine.Pty;
+using Cove.Persistence;
 using Cove.Protocol;
+using Microsoft.Extensions.Logging;
+using ZLogger;
 
 namespace Cove.Engine.Restart;
 
@@ -59,10 +62,10 @@ public static class RestoreChooserCommands
                     {
                         try
                         {
-                            nooks.RespawnAs(d.NookId, d.Command, d.Args, d.Cwd, d.Cols, d.Rows, BayPersistence.LoadScrollback(d.NookId, entry.BayDir));
+                            RespawnPersistent(nooks, d, entry.BayDir, restoration.Logger);
                             restored.Add(d.NookId);
                         }
-                        catch { }
+                        catch (System.Exception ex) { restoration.Logger.SelectedNookRestoreFailed(d.NookId, ex.Message); }
                     }
         }
 
@@ -87,8 +90,8 @@ public static class RestoreChooserCommands
                 foreach (var leaf in MosaicOps.Leaves(shore.LayoutTree))
                     if (entry.Sessions.TryGetValue(leaf.NookId, out var d))
                     {
-                        try { nooks.RespawnAs(d.NookId, d.Command, d.Args, d.Cwd, d.Cols, d.Rows, BayPersistence.LoadScrollback(d.NookId, entry.BayDir)); }
-                        catch { }
+                        try { RespawnPersistent(nooks, d, entry.BayDir, restoration.Logger); }
+                        catch (System.Exception ex) { restoration.Logger.UndoNookRestoreFailed(d.NookId, ex.Message); }
                     }
             layout.LoadSnapshot(entry.Snapshot);
         }
@@ -96,8 +99,27 @@ public static class RestoreChooserCommands
         return await Task.FromResult(ctx.Ok());
     }
 
+    private static void RespawnPersistent(NookRegistry nooks, NookDescriptor descriptor, string bayDir, ILogger logger)
+    {
+        var state = BayPersistence.LoadTerminalRestoreState(descriptor.NookId, bayDir, logger);
+
+        if (state is not null)
+            nooks.RespawnAs(descriptor.NookId, descriptor.Command, descriptor.Args, descriptor.Cwd, descriptor.Cols, descriptor.Rows, state);
+        else
+            nooks.RespawnAs(descriptor.NookId, descriptor.Command, descriptor.Args, descriptor.Cwd, descriptor.Cols, descriptor.Rows, BayPersistence.LoadScrollback(descriptor.NookId, bayDir));
+    }
+
     private static bool WasRunning(NookRegistry nooks, string nookId)
         => nooks.TryGet(nookId, out _);
+}
+
+internal static partial class RestoreChooserLog
+{
+    [ZLoggerMessage(LogLevel.Warning, "selected nook restore failed nook={nookId} error={error}")]
+    public static partial void SelectedNookRestoreFailed(this ILogger logger, string nookId, string error);
+
+    [ZLoggerMessage(LogLevel.Warning, "undo nook restore failed nook={nookId} error={error}")]
+    public static partial void UndoNookRestoreFailed(this ILogger logger, string nookId, string error);
 }
 
 public sealed record RestoreConfirmParams(IReadOnlyList<string>? SelectedNookIds, bool AutoRestoreOnLaunch = false);

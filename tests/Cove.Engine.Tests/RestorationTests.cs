@@ -177,6 +177,92 @@ public sealed class RestorationTests
     }
 
     [Fact]
+    public async Task DaemonRestart_RestoresCheckpointAndRawTail()
+    {
+        if (System.OperatingSystem.IsWindows())
+            return;
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+        CancellationToken ct = cts.Token;
+        await using var h = await DaemonTestHarness.StartAsync();
+        await using FrameConnection ctl = await h.ConnectAsync("cli");
+
+        JsonElement spawnParams = JsonSerializer.SerializeToElement(
+            new SpawnParams("/bin/cat", Array.Empty<string>(), null, null, 80, 24),
+            CoveJsonContext.Default.SpawnParams);
+        await ctl.WriteFrameAsync(FrameType.Request, 0,
+            ControlCodec.Encode(new ControlRequest("1", "cove://commands/nook.spawn", spawnParams)), ct);
+        ControlResponse spawnResponse = await ReadResponseAsync(ctl, "1", ct);
+        Assert.True(spawnResponse.Ok, spawnResponse.Error?.Message);
+        string nookId = spawnResponse.Data!.Value.Deserialize(CoveJsonContext.Default.NookInfo)!.NookId;
+
+        JsonElement layoutParams = JsonSerializer.SerializeToElement(
+            new LayoutMutateParams("createShore", NewNookId: nookId, Name: "main"),
+            Cove.Protocol.CoveJsonContext.Default.LayoutMutateParams);
+        await ctl.WriteFrameAsync(FrameType.Request, 0,
+            ControlCodec.Encode(new ControlRequest("2", "cove://commands/layout.mutate", layoutParams)), ct);
+        Assert.True((await ReadResponseAsync(ctl, "2", ct)).Ok);
+
+        const string beforeCheckpoint = "BEFORE_CHECKPOINT\n";
+        JsonElement beforeWrite = JsonSerializer.SerializeToElement(
+            new NookWriteParams(nookId, Convert.ToBase64String(Encoding.ASCII.GetBytes(beforeCheckpoint))),
+            CoveJsonContext.Default.NookWriteParams);
+        await ctl.WriteFrameAsync(FrameType.Request, 0,
+            ControlCodec.Encode(new ControlRequest("3", "cove://commands/nook.write", beforeWrite)), ct);
+        Assert.True((await ReadResponseAsync(ctl, "3", ct)).Ok);
+        await Task.Delay(300, ct);
+
+        JsonElement readParams = JsonSerializer.SerializeToElement(
+            new NookReadParams(nookId, 0, 65536),
+            CoveJsonContext.Default.NookReadParams);
+        await ctl.WriteFrameAsync(FrameType.Request, 0,
+            ControlCodec.Encode(new ControlRequest("4", "cove://commands/nook.read", readParams)), ct);
+        ControlResponse readResponse = await ReadResponseAsync(ctl, "4", ct);
+        var readResult = readResponse.Data!.Value.Deserialize(CoveJsonContext.Default.NookReadResult)!;
+        Assert.Contains("BEFORE_CHECKPOINT", Encoding.ASCII.GetString(Convert.FromBase64String(readResult.DataBase64)));
+
+        byte[] serializedState = Encoding.ASCII.GetBytes("SERIALIZED_BEFORE_CHECKPOINT");
+        JsonElement checkpointParams = JsonSerializer.SerializeToElement(
+            new NookCheckpointParams(nookId, Convert.ToBase64String(serializedState), readResult.Head, 80, 24, 10000),
+            CoveJsonContext.Default.NookCheckpointParams);
+        await ctl.WriteFrameAsync(FrameType.Request, 0,
+            ControlCodec.Encode(new ControlRequest("5", "cove://commands/nook.checkpoint", checkpointParams)), ct);
+        Assert.True((await ReadResponseAsync(ctl, "5", ct)).Ok);
+
+        const string rawTail = "AFTER_CHECKPOINT\n";
+        JsonElement tailWrite = JsonSerializer.SerializeToElement(
+            new NookWriteParams(nookId, Convert.ToBase64String(Encoding.ASCII.GetBytes(rawTail))),
+            CoveJsonContext.Default.NookWriteParams);
+        await ctl.WriteFrameAsync(FrameType.Request, 0,
+            ControlCodec.Encode(new ControlRequest("6", "cove://commands/nook.write", tailWrite)), ct);
+        Assert.True((await ReadResponseAsync(ctl, "6", ct)).Ok);
+        await Task.Delay(2000, ct);
+
+        await h.RestartAsync();
+        await using FrameConnection restoredConnection = await h.ConnectAsync("cli");
+        JsonElement subscribeParams = JsonSerializer.SerializeToElement(
+            new SubscribeParams(nookId, 0), CoveJsonContext.Default.SubscribeParams);
+        await restoredConnection.WriteFrameAsync(FrameType.Request, 0,
+            ControlCodec.Encode(new ControlRequest("7", "cove://commands/nook.subscribe", subscribeParams)), ct);
+        ControlResponse subscribeResponse = await ReadResponseAsync(restoredConnection, "7", ct);
+        Assert.True(subscribeResponse.Ok, subscribeResponse.Error?.Message);
+        var subscription = subscribeResponse.Data!.Value.Deserialize(CoveJsonContext.Default.SubscribeResult)!;
+        Assert.Equal(Convert.ToBase64String(serializedState), subscription.TerminalCheckpointBase64);
+        Assert.Equal(80, subscription.CheckpointCols);
+        Assert.Equal(24, subscription.CheckpointRows);
+
+        var restoredTail = new MemoryStream();
+        var deadline = Task.Delay(TimeSpan.FromSeconds(5), ct);
+        while (!deadline.IsCompleted && restoredTail.Length < rawTail.Length)
+        {
+            Frame frame = (await restoredConnection.ReadFrameAsync(ct))!.Value;
+            if (frame.Header.Type != FrameType.StreamData)
+                continue;
+            restoredTail.Write(frame.Payload, 8, frame.Payload.Length - 8);
+        }
+        Assert.Contains("AFTER_CHECKPOINT", Encoding.ASCII.GetString(restoredTail.ToArray()));
+    }
+
+    [Fact]
     public async Task DaemonRestart_CapturesHookSessionId_PersistsOntoNookRecord_AndRespawnsSameNook()
     {
         if (System.OperatingSystem.IsWindows())

@@ -56,6 +56,25 @@ public sealed class NookRouteTests
         using var reg = NewRegistry();
         Assert.Empty(reg.Read("nope", 0, 64));
     }
+
+    [Fact]
+    public async Task Checkpoint_Route_StoresSerializedTerminalState()
+    {
+        if (System.OperatingSystem.IsWindows()) return;
+        using var reg = NewRegistry();
+        var info = reg.RespawnAs("checkpoint-route", "/bin/sh", new[] { "-c", "sleep 30" }, "/tmp", 80, 24, System.Text.Encoding.UTF8.GetBytes("prior"));
+        var checkpoint = System.Text.Encoding.UTF8.GetBytes("serialized");
+        var parameters = new NookCheckpointParams(info.NookId, System.Convert.ToBase64String(checkpoint), 2, 80, 24, 10000);
+        var request = new ControlRequest("r1", "cove://commands/nook.checkpoint", JsonSerializer.SerializeToElement(parameters, Cove.Protocol.CoveJsonContext.Default.NookCheckpointParams));
+
+        var response = await EngineCommandRouter.RouteAsync(request, nooks: reg);
+
+        Assert.NotNull(response);
+        Assert.True(response!.Ok, response.Error?.Message);
+        var state = Assert.IsType<TerminalRestoreState>(reg.CaptureTerminalRestoreState(info.NookId));
+        Assert.Equal(checkpoint, state.Checkpoint);
+        Assert.Equal("ior", System.Text.Encoding.UTF8.GetString(state.Tail));
+    }
 }
 
 public sealed class LayoutSnapshotRouteTests

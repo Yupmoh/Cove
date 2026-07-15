@@ -8,7 +8,7 @@ namespace Cove.Engine.Tests.Pty;
 internal sealed class RecordingFrameSink : IByteStreamFrameSink
 {
     public readonly record struct DataFrame(ulong StreamId, ulong Offset, byte[] Raw);
-    public readonly record struct ResyncFrame(ulong StreamId, ulong NewBaseOffset);
+    public readonly record struct ResyncFrame(ulong StreamId, ulong NewBaseOffset, byte[] TerminalModePreamble, byte[] TerminalCheckpoint, int CheckpointCols, int CheckpointRows);
     public readonly record struct EndFrame(ulong StreamId, ulong FinalOffset, int ExitCode);
     public readonly record struct ErrorFrame(ulong StreamId, string Code, string Message);
 
@@ -22,8 +22,8 @@ internal sealed class RecordingFrameSink : IByteStreamFrameSink
     public void SendStreamData(ulong streamId, ulong offset, ReadOnlySpan<byte> raw)
         => Data.Add(new DataFrame(streamId, offset, raw.ToArray()));
 
-    public void SendResync(ulong streamId, ulong newBaseOffset)
-        => Resyncs.Add(new ResyncFrame(streamId, newBaseOffset));
+    public void SendResync(ulong streamId, ulong newBaseOffset, ReadOnlySpan<byte> terminalModePreamble, ReadOnlySpan<byte> terminalCheckpoint, int checkpointCols, int checkpointRows)
+        => Resyncs.Add(new ResyncFrame(streamId, newBaseOffset, terminalModePreamble.ToArray(), terminalCheckpoint.ToArray(), checkpointCols, checkpointRows));
 
     public void SendStreamEnd(ulong streamId, ulong finalOffset, int exitCode)
         => Ends.Add(new EndFrame(streamId, finalOffset, exitCode));

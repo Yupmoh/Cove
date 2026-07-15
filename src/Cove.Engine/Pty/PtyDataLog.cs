@@ -82,4 +82,16 @@ internal static partial class PtyDataLog
 
     [ZLoggerMessage(3047, LogLevel.Warning, "nook resize unknown nook={nookId}")]
     public static partial void NookResizeUnknown(this ILogger logger, string nookId);
+
+    [ZLoggerMessage(3050, LogLevel.Warning, "terminal checkpoint unknown nook={nookId}")]
+    public static partial void TerminalCheckpointUnknownNook(this ILogger logger, string nookId);
+
+    [ZLoggerMessage(3051, LogLevel.Warning, "terminal checkpoint rejected nook={nookId} offset={offset} tail={tail} head={head} cols={cols} rows={rows} bytes={bytes}")]
+    public static partial void TerminalCheckpointRejected(this ILogger logger, string nookId, long offset, long tail, long head, int cols, int rows, int bytes);
+
+    [ZLoggerMessage(3052, LogLevel.Warning, "terminal checkpoint expired nook={nookId} offset={offset} tail={tail} head={head}")]
+    public static partial void TerminalCheckpointExpired(this ILogger logger, string nookId, long offset, long tail, long head);
+
+    [ZLoggerMessage(3053, LogLevel.Warning, "terminal checkpoint decode failed nook={nookId} error={error}")]
+    public static partial void TerminalCheckpointDecodeFailed(this ILogger logger, string nookId, string error);
 }
