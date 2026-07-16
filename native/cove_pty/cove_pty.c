@@ -203,3 +203,76 @@ long cove_pty_recv_with_fd(int sock, unsigned char *buf, int len, int *out_fd) {
         return (long)n;
     }
 }
+
+#if defined(__APPLE__)
+#include <sys/event.h>
+
+int cove_pty_exitwatch_new(void) {
+    int kq = kqueue();
+    return kq < 0 ? -errno : kq;
+}
+
+int cove_pty_exitwatch_add(int wfd, int pid) {
+    struct kevent kev;
+    EV_SET(&kev, (uintptr_t)pid, EVFILT_PROC, EV_ADD | EV_ONESHOT, NOTE_EXIT, 0, NULL);
+    if (kevent(wfd, &kev, 1, NULL, 0, NULL) < 0) {
+        return errno == ESRCH ? 1 : -errno;
+    }
+    return 0;
+}
+
+int cove_pty_exitwatch_next(int wfd) {
+    for (;;) {
+        struct kevent out;
+        int n = kevent(wfd, NULL, 0, &out, 1, NULL);
+        if (n > 0) {
+            return (int)out.ident;
+        }
+        if (n < 0 && errno == EINTR) {
+            continue;
+        }
+        return -errno;
+    }
+}
+#else
+#include <sys/epoll.h>
+#include <sys/syscall.h>
+
+int cove_pty_exitwatch_new(void) {
+    int ep = epoll_create1(EPOLL_CLOEXEC);
+    return ep < 0 ? -errno : ep;
+}
+
+int cove_pty_exitwatch_add(int wfd, int pid) {
+    int pfd = (int)syscall(SYS_pidfd_open, pid, 0);
+    if (pfd < 0) {
+        return errno == ESRCH ? 1 : -errno;
+    }
+    struct epoll_event ev;
+    ev.events = EPOLLIN;
+    ev.data.u64 = ((unsigned long long)(unsigned int)pid << 32) | (unsigned int)pfd;
+    if (epoll_ctl(wfd, EPOLL_CTL_ADD, pfd, &ev) < 0) {
+        int e = errno;
+        close(pfd);
+        return -e;
+    }
+    return 0;
+}
+
+int cove_pty_exitwatch_next(int wfd) {
+    for (;;) {
+        struct epoll_event out;
+        int n = epoll_wait(wfd, &out, 1, -1);
+        if (n > 0) {
+            int pid = (int)(out.data.u64 >> 32);
+            int pfd = (int)(out.data.u64 & 0xffffffffu);
+            close(pfd);
+            return pid;
+        }
+        if (n < 0 && errno == EINTR) {
+            continue;
+        }
+        return -errno;
+    }
+}
+#endif

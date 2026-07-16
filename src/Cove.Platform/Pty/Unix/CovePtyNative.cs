@@ -37,4 +37,13 @@ internal static partial class CovePtyNative
 
     [LibraryImport(PtyConstants.NativeLibrary, EntryPoint = "cove_pty_recv_with_fd")]
     internal static partial nint RecvWithFd(int sock, Span<byte> buffer, int length, out int fd);
+
+    [LibraryImport(PtyConstants.NativeLibrary, EntryPoint = "cove_pty_exitwatch_new")]
+    internal static partial int ExitWatchNew();
+
+    [LibraryImport(PtyConstants.NativeLibrary, EntryPoint = "cove_pty_exitwatch_add")]
+    internal static partial int ExitWatchAdd(int watchFd, int pid);
+
+    [LibraryImport(PtyConstants.NativeLibrary, EntryPoint = "cove_pty_exitwatch_next")]
+    internal static partial int ExitWatchNext(int watchFd);
 }
