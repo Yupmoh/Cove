@@ -74,6 +74,24 @@ internal static partial class PtyDataLog
     [ZLoggerMessage(3044, LogLevel.Warning, "nook kill unknown nook={nookId}")]
     public static partial void NookKillUnknown(this ILogger logger, string nookId);
 
+    [ZLoggerMessage(3054, LogLevel.Debug, "handoff export skipped exited nook={nookId}")]
+    public static partial void HandoffSkipExited(this ILogger logger, string nookId);
+
+    [ZLoggerMessage(3055, LogLevel.Warning, "handoff export unsupported session nook={nookId}")]
+    public static partial void HandoffExportUnsupported(this ILogger logger, string nookId);
+
+    [ZLoggerMessage(3056, LogLevel.Information, "handoff exported nook={nookId} pid={pid} ringBytes={ringBytes}")]
+    public static partial void HandoffExported(this ILogger logger, string nookId, int pid, int ringBytes);
+
+    [ZLoggerMessage(3057, LogLevel.Warning, "handoff adopt rejected nook={nookId} reason={reason}")]
+    public static partial void HandoffAdoptRejected(this ILogger logger, string nookId, string reason);
+
+    [ZLoggerMessage(3058, LogLevel.Information, "handoff adopted nook={nookId} pid={pid} ringHead={ringHead}")]
+    public static partial void HandoffAdopted(this ILogger logger, string nookId, int pid, long ringHead);
+
+    [ZLoggerMessage(3059, LogLevel.Information, "pty reader detached for handoff nook={nookId} totalBytes={totalBytes}")]
+    public static partial void ReaderDetached(this ILogger logger, string nookId, long totalBytes);
+
     [ZLoggerMessage(3045, LogLevel.Warning, "nook stop signal failed nook={nookId} error={error}")]
     public static partial void NookStopFailed(this ILogger logger, string nookId, string error);
 

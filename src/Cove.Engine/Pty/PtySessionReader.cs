@@ -10,6 +10,7 @@ public sealed class PtySessionReader : IDisposable
     private readonly IPtySession _session;
     private readonly PtyRingBuffer _ring;
     private readonly PtyRingSignal _signal;
+    private volatile bool _detached;
     private readonly ILogger _logger;
     private readonly string _nookId;
     private readonly Osc7Parser _osc7 = new();
@@ -54,6 +55,10 @@ public sealed class PtySessionReader : IDisposable
         {
             while (true)
             {
+                if (_detached)
+                    break;
+                if (!_session.WaitReadable(PtyConstants.DetachPollMs))
+                    continue;
                 int n = _session.Read(buffer);
                 if (n == 0)
                 {
@@ -84,11 +89,26 @@ public sealed class PtySessionReader : IDisposable
         }
         finally
         {
-            _exitCode = _session.WaitForExit();
-            _completed = true;
-            _logger.ReaderExit(_nookId, _exitCode);
+            if (_detached)
+            {
+                _completed = true;
+                _logger.ReaderDetached(_nookId, _totalBytes);
+            }
+            else
+            {
+                _exitCode = _session.WaitForExit();
+                _completed = true;
+                _logger.ReaderExit(_nookId, _exitCode);
+            }
             _signal.Set();
         }
+    }
+
+    public void DetachForHandoff()
+    {
+        _detached = true;
+        _thread?.Join(TimeSpan.FromSeconds(5));
+        _session.Dispose();
     }
 
     public void Dispose()

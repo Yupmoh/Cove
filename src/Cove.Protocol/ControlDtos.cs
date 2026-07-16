@@ -152,6 +152,26 @@ public sealed record AdapterListResult(System.Collections.Generic.IReadOnlyList<
 public sealed record RegistryEntryDto(string Name, string DisplayName, string Version, bool Official);
 public sealed record RegistryFetchResult(RegistryEntryDto[] Adapters);
 
+public sealed record HandoffCheckpointDto(string DataBase64, long Offset, int Cols, int Rows, int ScrollbackLines, string ModeSupplement);
+public sealed record HandoffNookRecord(
+    string NookId,
+    int Pid,
+    string Command,
+    string[] Args,
+    string SpawnCwd,
+    string? Cwd,
+    int Cols,
+    int Rows,
+    string? Title,
+    string? Adapter,
+    string? AgentName,
+    long RingHead,
+    int RingLength,
+    string? SessionId,
+    string? HookStatus,
+    HandoffCheckpointDto? Checkpoint);
+public sealed record HandoffBeginResult(int NookCount, string SocketPath);
+
 public sealed record ToolsRetentionDto(bool Present, bool Editable, bool Hidden, string? Value, string? Recommended);
 public sealed record ToolsAdapterDto(
     string Name,
@@ -541,6 +561,9 @@ public sealed record PerfBundleListResult(System.Collections.Generic.IReadOnlyLi
 [JsonSerializable(typeof(ActivityAcknowledgeParams))]
 [JsonSerializable(typeof(ActivityAcknowledgeResult))]
 [JsonSerializable(typeof(SessionStateDto))]
+[JsonSerializable(typeof(HandoffCheckpointDto))]
+[JsonSerializable(typeof(HandoffNookRecord))]
+[JsonSerializable(typeof(HandoffBeginResult))]
 [JsonSerializable(typeof(SessionListResult))]
 [JsonSerializable(typeof(ReplayInfoDto))]
 [JsonSerializable(typeof(SpawnedNooksResult))]

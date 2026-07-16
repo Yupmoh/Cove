@@ -9,6 +9,8 @@ namespace Cove.Engine.Pty;
 
 internal sealed record TerminalCheckpoint(byte[] Data, long Offset, int Cols, int Rows, int ScrollbackLines, string ModeSupplement);
 
+public sealed record HandoffExportItem(HandoffNookRecord Record, int MasterFd, byte[] RingTail);
+
 internal sealed class NookSession
 {
     public required string NookId { get; init; }
@@ -225,6 +227,110 @@ public sealed class NookRegistry : IDisposable, Cove.Engine.Agents.INookWriter
         _logger.NookKill(nookId);
         Terminate(nook, _logger);
         return true;
+    }
+
+    public IReadOnlyList<HandoffExportItem> ExportForHandoff()
+    {
+        List<NookSession> sessions;
+        lock (_sync)
+            sessions = new List<NookSession>(_nooks.Values);
+        var items = new List<HandoffExportItem>(sessions.Count);
+        foreach (var nook in sessions)
+        {
+            if (nook.Reader.HasCompleted)
+            {
+                _logger.HandoffSkipExited(nook.NookId);
+                continue;
+            }
+            if (!_host.TryExportSession(nook.Session, out var fd, out var pid))
+            {
+                _logger.HandoffExportUnsupported(nook.NookId);
+                continue;
+            }
+            int transferFd;
+            try
+            {
+                transferFd = Cove.Platform.Pty.Unix.UnixFd.Duplicate(fd);
+            }
+            catch (Cove.Platform.Pty.PtyIoException ex)
+            {
+                _logger.HandoffAdoptRejected(nook.NookId, $"export dup failed: {ex.Message}");
+                continue;
+            }
+            nook.Reader.DetachForHandoff();
+            var tail = nook.Ring.Snapshot();
+            var checkpoint = nook.Checkpoint is { } c
+                ? new HandoffCheckpointDto(Convert.ToBase64String(c.Data), c.Offset, c.Cols, c.Rows, c.ScrollbackLines, c.ModeSupplement)
+                : null;
+            var record = new HandoffNookRecord(
+                nook.NookId, pid, nook.Command, nook.Args, nook.SpawnCwd, nook.Cwd, nook.Cols, nook.Rows,
+                nook.Title, nook.Adapter, nook.AgentName, nook.Ring.Head, tail.Length, null, null, checkpoint);
+            _logger.HandoffExported(nook.NookId, pid, tail.Length);
+            items.Add(new HandoffExportItem(record, transferFd, tail));
+        }
+        return items;
+    }
+
+    public NookInfo? Adopt(HandoffNookRecord record, int masterFd, byte[] ringTail)
+    {
+        if (record.Pid <= 0 || masterFd < 0)
+        {
+            _logger.HandoffAdoptRejected(record.NookId, $"invalid transfer fd={masterFd} pid={record.Pid}");
+            return null;
+        }
+        if (OperatingSystem.IsWindows() is false && Cove.Platform.Pty.Unix.ProcessExitWatch.WaitForExitAsync(record.Pid).IsCompleted)
+        {
+            _logger.HandoffAdoptRejected(record.NookId, $"pid {record.Pid} already exited");
+            return null;
+        }
+        IPtySession session;
+        try
+        {
+            session = _host.AdoptSession(masterFd, record.Pid);
+        }
+        catch (Exception ex) when (ex is PlatformNotSupportedException or ArgumentOutOfRangeException)
+        {
+            _logger.HandoffAdoptRejected(record.NookId, ex.Message);
+            return null;
+        }
+        var ring = new PtyRingBuffer();
+        try
+        {
+            ring.RestoreAt(record.RingHead, ringTail);
+        }
+        catch (ArgumentException ex)
+        {
+            _logger.HandoffAdoptRejected(record.NookId, ex.Message);
+            session.Dispose();
+            return null;
+        }
+        var signal = new PtyRingSignal();
+        var reader = new PtySessionReader(session, ring, signal, _logger, record.NookId);
+        var nook = new NookSession
+        {
+            NookId = record.NookId,
+            Command = record.Command,
+            Args = record.Args,
+            SpawnCwd = record.SpawnCwd,
+            Cols = record.Cols,
+            Rows = record.Rows,
+            Session = session,
+            Ring = ring,
+            Signal = signal,
+            Reader = reader,
+        };
+        nook.Cwd = record.Cwd;
+        nook.Title = record.Title;
+        nook.Adapter = record.Adapter;
+        nook.AgentName = record.AgentName;
+        if (record.Checkpoint is { } cp)
+            nook.Checkpoint = new TerminalCheckpoint(Convert.FromBase64String(cp.DataBase64), cp.Offset, cp.Cols, cp.Rows, cp.ScrollbackLines, cp.ModeSupplement);
+        reader.OnCwd = c => nook.Cwd = c;
+        reader.Start();
+        lock (_sync)
+            _nooks[record.NookId] = nook;
+        _logger.HandoffAdopted(record.NookId, record.Pid, record.RingHead);
+        return nook.ToInfo();
     }
 
     public bool Stop(string nookId)

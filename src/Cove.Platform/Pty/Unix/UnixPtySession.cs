@@ -15,13 +15,19 @@ public sealed class UnixPtySession : IPtySession
     private int _disposed;
     private int _firstReadLogged;
 
-    internal UnixPtySession(long sessionId, int masterFd, int pid, ILogger logger)
+    private readonly bool _adopted;
+
+    internal UnixPtySession(long sessionId, int masterFd, int pid, ILogger logger, bool adopted = false)
     {
         SessionId = sessionId;
         _masterFd = masterFd;
         _pid = pid;
         _logger = logger;
+        _adopted = adopted;
     }
+
+    internal int MasterFd => _masterFd;
+    internal int Pid => _pid;
 
     public long SessionId { get; }
     public bool HasExited => Volatile.Read(ref _hasExited) != 0;
@@ -40,6 +46,14 @@ public sealed class UnixPtySession : IPtySession
         }
         _logger.UnixReadFailed(SessionId, (int)-n);
         throw new PtyIoException($"pty read failed (session {SessionId}, errno {-n}).", (int)-n);
+    }
+
+    public bool WaitReadable(int timeoutMs)
+    {
+        var rc = CovePtyNative.PollReadable(_masterFd, timeoutMs);
+        if (rc < 0)
+            return true;
+        return rc == 1;
     }
 
     public void Write(ReadOnlySpan<byte> data)
@@ -95,6 +109,14 @@ public sealed class UnixPtySession : IPtySession
     {
         if (HasExited)
             return _exitCode;
+        if (_adopted)
+        {
+            _exitCode = -1;
+            Volatile.Write(ref _hasExited, 1);
+            _logger.UnixAdoptedExitUnobservable(SessionId, _pid);
+            _logger.SessionExited(SessionId, _exitCode);
+            return -1;
+        }
         _logger.UnixWaitBegin(SessionId);
         for (int i = 0; i < 2000; i++)
         {

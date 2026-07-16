@@ -46,4 +46,10 @@ internal static partial class CovePtyNative
 
     [LibraryImport(PtyConstants.NativeLibrary, EntryPoint = "cove_pty_exitwatch_next")]
     internal static partial int ExitWatchNext(int watchFd);
+
+    [LibraryImport(PtyConstants.NativeLibrary, EntryPoint = "cove_pty_dup")]
+    internal static partial int Dup(int fd);
+
+    [LibraryImport(PtyConstants.NativeLibrary, EntryPoint = "cove_pty_poll_readable")]
+    internal static partial int PollReadable(int fd, int timeoutMs);
 }

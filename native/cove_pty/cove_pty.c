@@ -204,6 +204,33 @@ long cove_pty_recv_with_fd(int sock, unsigned char *buf, int len, int *out_fd) {
     }
 }
 
+int cove_pty_dup(int fd) {
+    int copy = fcntl(fd, F_DUPFD_CLOEXEC, 0);
+    return copy < 0 ? -errno : copy;
+}
+
+#include <poll.h>
+
+int cove_pty_poll_readable(int fd, int timeout_ms) {
+    struct pollfd p;
+    p.fd = fd;
+    p.events = POLLIN;
+    p.revents = 0;
+    for (;;) {
+        int rc = poll(&p, 1, timeout_ms);
+        if (rc > 0) {
+            return 1;
+        }
+        if (rc == 0) {
+            return 0;
+        }
+        if (errno == EINTR) {
+            continue;
+        }
+        return -errno;
+    }
+}
+
 #if defined(__APPLE__)
 #include <sys/event.h>
 

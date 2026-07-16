@@ -54,6 +54,32 @@ public sealed class UnixPtyHost : IPtyHost
         return new UnixPtySession(id, masterFd, pid, _logger);
     }
 
+    public bool TryExportSession(IPtySession session, out int masterFd, out int pid)
+    {
+        if (session is UnixPtySession unix)
+        {
+            masterFd = unix.MasterFd;
+            pid = unix.Pid;
+            return true;
+        }
+        _logger.UnixExportUnsupportedSession(session?.SessionId ?? -1);
+        masterFd = -1;
+        pid = -1;
+        return false;
+    }
+
+    public IPtySession AdoptSession(int masterFd, int pid)
+    {
+        if (!_supported)
+            throw new PlatformNotSupportedException(
+                "cove_pty native shim not found or ABI mismatch; expected libcove_pty next to the binary.");
+        if (masterFd < 0 || pid <= 0)
+            throw new ArgumentOutOfRangeException(nameof(masterFd), $"invalid adoption target fd={masterFd} pid={pid}");
+        long id = Interlocked.Increment(ref _nextSessionId);
+        _logger.UnixSessionAdopted(id, pid, masterFd);
+        return new UnixPtySession(id, masterFd, pid, _logger, adopted: true);
+    }
+
     private static bool ProbeAbi(ILogger logger)
     {
         try

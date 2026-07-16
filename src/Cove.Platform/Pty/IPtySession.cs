@@ -13,4 +13,6 @@ public interface IPtySession : IDisposable
     void Kill();
     bool Signal(int signum);
     int WaitForExit();
+
+    bool WaitReadable(int timeoutMs) => true;
 }

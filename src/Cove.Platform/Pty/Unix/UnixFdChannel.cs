@@ -1,5 +1,16 @@
 namespace Cove.Platform.Pty.Unix;
 
+
+public static class UnixFd
+{
+    public static int Duplicate(int fd)
+    {
+        var copy = CovePtyNative.Dup(fd);
+        if (copy < 0)
+            throw new PtyIoException($"fd dup failed (fd {fd}, errno {-copy}).", -copy);
+        return copy;
+    }
+}
 public static class UnixFdChannel
 {
     public static (int A, int B) CreateSocketPair()

@@ -10,6 +10,7 @@ public sealed class PtyRingBuffer
     private readonly int _mask;
     private readonly object _sync = new();
     private long _head;
+    private long _floor;
 
     public PtyRingBuffer(int capacity = PtyConstants.DefaultRingCapacityBytes)
     {
@@ -23,7 +24,7 @@ public sealed class PtyRingBuffer
 
     public int Capacity => _buffer.Length;
     public long Head { get { lock (_sync) return _head; } }
-    public long Tail { get { lock (_sync) return Math.Max(0, _head - _buffer.Length); } }
+    public long Tail { get { lock (_sync) return Math.Max(_floor, _head - _buffer.Length); } }
 
     public void Append(ReadOnlySpan<byte> data)
     {
@@ -50,6 +51,22 @@ public sealed class PtyRingBuffer
                 data.Slice(firstRun).CopyTo(_buffer.AsSpan(0));
             _head += data.Length;
         }
+    }
+
+    public void RestoreAt(long headOffset, ReadOnlySpan<byte> tail)
+    {
+        if (headOffset < 0)
+            throw new ArgumentOutOfRangeException(nameof(headOffset), "head offset must be non-negative.");
+        if (tail.Length > headOffset)
+            throw new ArgumentException("tail is longer than the offset space before head.", nameof(tail));
+        lock (_sync)
+        {
+            if (_head != 0)
+                throw new InvalidOperationException("ring restore requires an unused ring.");
+            _head = headOffset - tail.Length;
+            _floor = _head;
+        }
+        Append(tail);
     }
 
     public bool ContainsOffset(long offset)

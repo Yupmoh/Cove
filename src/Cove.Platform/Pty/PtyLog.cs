@@ -173,6 +173,15 @@ internal static partial class PtyLog
     [ZLoggerMessage(LogLevel.Warning, "pty signal failed session={sessionId} signum={signum} errno={errno}", EventId = 1071)]
     public static partial void UnixSignalFailed(this ILogger logger, long sessionId, int signum, int errno);
 
+    [ZLoggerMessage(LogLevel.Warning, "pty export rejected non-unix session session={sessionId}", EventId = 1093)]
+    public static partial void UnixExportUnsupportedSession(this ILogger logger, long sessionId);
+
+    [ZLoggerMessage(LogLevel.Information, "pty session adopted session={sessionId} pid={pid} fd={fd}", EventId = 1094)]
+    public static partial void UnixSessionAdopted(this ILogger logger, long sessionId, int pid, int fd);
+
+    [ZLoggerMessage(LogLevel.Information, "pty adopted session exit code unobservable session={sessionId} pid={pid}", EventId = 1095)]
+    public static partial void UnixAdoptedExitUnobservable(this ILogger logger, long sessionId, int pid);
+
     [ZLoggerMessage(LogLevel.Trace, "pty wait for exit begin session={sessionId}", EventId = 1072)]
     public static partial void UnixWaitBegin(this ILogger logger, long sessionId);
 
