@@ -66,7 +66,12 @@ if [ -n "$HANDOFF_FROM" ]; then
   COVE_HANDOFF=1 nohup "$ENGINE" daemon run --channel dev > /tmp/cove-daemon-dev.log 2>&1 &
   wait_gone "$HANDOFF_FROM" 200
   if kill -0 "$HANDOFF_FROM" 2>/dev/null; then
-    echo "handoff did not complete — predecessor still running, keeping it"
+    echo "handoff did not complete — stopping predecessor, restoring sessions (today's path)"
+    kill "$HANDOFF_FROM" 2>/dev/null || true
+    wait_gone "$HANDOFF_FROM"
+    nohup "$ENGINE" daemon run --channel dev > /tmp/cove-daemon-dev.log 2>&1 &
+    sleep 1
+    echo "daemon restarted with session restoration (log: /tmp/cove-daemon-dev.log)"
   else
     echo "handoff complete (log: /tmp/cove-daemon-dev.log)"
   fi

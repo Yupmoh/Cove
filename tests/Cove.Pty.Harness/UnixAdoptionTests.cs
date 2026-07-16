@@ -59,15 +59,13 @@ public sealed class UnixAdoptionTests
     }
 
     [Fact]
-    public void AdoptSession_RejectsClosedFd()
+    public void AdoptSession_RejectsUnusableFd()
     {
         if (OperatingSystem.IsWindows()) return;
         var host = PtyHostFactory.Create(NullLogger.Instance);
-        var (a, b) = Cove.Platform.Pty.Unix.UnixFdChannel.CreateSocketPair();
-        Cove.Platform.Pty.Unix.UnixFdChannel.CloseFd(a);
-        Cove.Platform.Pty.Unix.UnixFdChannel.CloseFd(b);
-        Assert.Throws<ArgumentOutOfRangeException>(() => host.AdoptSession(a, 1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => host.AdoptSession(1_000_000, 1));
     }
+
 
     [Fact]
     public void AdoptedSession_ObservesProcessExit()

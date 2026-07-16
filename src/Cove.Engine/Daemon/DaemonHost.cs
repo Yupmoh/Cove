@@ -140,18 +140,7 @@ public sealed class DaemonHost
             {
                 Cove.Platform.Pty.Unix.UnixFdChannel.CloseFd(item.Fd);
                 logger.HandoffAdoptionFellBack(item.Record.NookId);
-                try
-                {
-                    info = _nooks.RespawnAs(item.Record.NookId, item.Record.Command, item.Record.Args,
-                        item.Record.Cwd ?? item.Record.SpawnCwd, item.Record.Cols, item.Record.Rows,
-                        priorScrollback: item.Ring.Length > 0 ? item.Ring : null,
-                        adapter: item.Record.Adapter, agentName: item.Record.AgentName);
-                }
-                catch (Exception ex)
-                {
-                    DaemonLog.Write(_paths, $"handoff fallback respawn failed nook={item.Record.NookId}: {ex.Message}");
-                    continue;
-                }
+                continue;
             }
             if (item.Record.Adapter is { } adapter)
             {
