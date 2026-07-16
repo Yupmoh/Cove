@@ -7,6 +7,7 @@ import {
   agentStateCounts,
   needsInputCount,
   agentCardsEqual,
+  AGENT_STATE_META,
   type AgentCard,
   type AgentRow,
 } from "./agents-model";
@@ -108,5 +109,14 @@ describe("agentCardsEqual", () => {
     expect(agentCardsEqual(previous, [{ ...previous[0], status: "idle" }])).toBe(false);
     expect(agentCardsEqual(previous, [{ ...previous[0], name: "Review" }])).toBe(false);
     expect(agentCardsEqual(previous, [])).toBe(false);
+  });
+});
+
+describe("AGENT_STATE_META", () => {
+  it("labels the four states per the sidebar contract", () => {
+    expect(AGENT_STATE_META["needs-input"].label).toBe("needs input");
+    expect(AGENT_STATE_META.running.label).toBe("running");
+    expect(AGENT_STATE_META.idle.label).toBe("idle");
+    expect(AGENT_STATE_META.done.label).toBe("needs attention");
   });
 });
