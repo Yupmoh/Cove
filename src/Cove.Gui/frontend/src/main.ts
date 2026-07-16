@@ -5572,7 +5572,6 @@ function renderDetailDock(ctx: LauncherContext, tile: LauncherTile): HTMLElement
     closeLauncherDropdowns();
     if (!wasOpen) profileDd.classList.add("open");
   });
-  controls.appendChild(profileDd);
 
   const yoloRow = document.createElement("label");
   yoloRow.className = "cl-yolo-row";
@@ -5637,6 +5636,7 @@ function renderDetailDock(ctx: LauncherContext, tile: LauncherTile): HTMLElement
     controls.appendChild(dd);
   }
 
+  controls.appendChild(profileDd);
   const newSession = document.createElement("button");
   newSession.className = "cl-new-session";
   const nsLabel = document.createElement("span");
