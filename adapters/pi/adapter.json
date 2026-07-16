@@ -1,0 +1,36 @@
+{
+  "sdkVersion": 2,
+  "name": "pi",
+  "displayName": "pi",
+  "description": "Minimal, hackable coding agent.",
+  "accent": "#f5c2e7",
+  "binary": "pi",
+  "version": "1.0.0",
+  "author": "Cove",
+  "binaryDiscovery": {
+    "commands": [
+      "pi"
+    ],
+    "wellKnownPaths": [
+      "/opt/homebrew/bin",
+      "/usr/local/bin",
+      "~/.bun/bin",
+      "~/.npm-global/bin",
+      "~/.local/bin"
+    ],
+    "versionFlag": "--version",
+    "versionRegex": "(\\d+\\.\\d+\\.\\d+)"
+  },
+  "install": {
+    "macos": {
+      "cmd": "npm install -g --ignore-scripts @earendil-works/pi-coding-agent@latest"
+    },
+    "linux": {
+      "cmd": "npm install -g --ignore-scripts @earendil-works/pi-coding-agent@latest"
+    },
+    "windows": {
+      "cmd": "npm install -g --ignore-scripts @earendil-works/pi-coding-agent@latest"
+    }
+  },
+  "methods": {}
+}

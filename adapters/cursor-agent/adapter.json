@@ -1,0 +1,33 @@
+{
+  "sdkVersion": 2,
+  "name": "cursor-agent",
+  "displayName": "Cursor Agent",
+  "description": "Cursor's terminal coding agent.",
+  "accent": "#89b4fa",
+  "binary": "cursor-agent",
+  "version": "1.0.0",
+  "author": "Cove",
+  "binaryDiscovery": {
+    "commands": ["cursor-agent", "agent"],
+    "wellKnownPaths": [
+      "~/.local/bin",
+      "/opt/homebrew/bin",
+      "/usr/local/bin"
+    ],
+    "versionFlag": "--version",
+    "versionRegex": "(\\d+\\.\\d+(?:\\.\\d+)?)"
+  },
+  "install": {
+    "macos": { "cmd": "curl https://cursor.com/install -fsS | bash" },
+    "linux": { "cmd": "curl https://cursor.com/install -fsS | bash" }
+  },
+  "update": {
+    "macos": { "cmd": "agent update" },
+    "linux": { "cmd": "agent update" }
+  },
+  "uninstall": {
+    "macos": { "cmd": "rm -f ~/.local/bin/cursor-agent ~/.local/bin/agent && rm -rf ~/.local/share/cursor-agent" },
+    "linux": { "cmd": "rm -f ~/.local/bin/cursor-agent ~/.local/bin/agent && rm -rf ~/.local/share/cursor-agent" }
+  },
+  "methods": {}
+}

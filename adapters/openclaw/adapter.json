@@ -1,0 +1,36 @@
+{
+  "sdkVersion": 2,
+  "name": "openclaw",
+  "displayName": "OpenClaw",
+  "description": "Open-source personal AI assistant and coding agent.",
+  "accent": "#f38ba8",
+  "binary": "openclaw",
+  "version": "1.0.0",
+  "author": "Cove",
+  "binaryDiscovery": {
+    "commands": [
+      "openclaw"
+    ],
+    "wellKnownPaths": [
+      "/opt/homebrew/bin",
+      "/usr/local/bin",
+      "~/.bun/bin",
+      "~/.npm-global/bin",
+      "~/.local/bin"
+    ],
+    "versionFlag": "--version",
+    "versionRegex": "(\\d+\\.\\d+\\.\\d+)"
+  },
+  "install": {
+    "macos": {
+      "cmd": "npm install -g --allow-scripts=openclaw openclaw@latest"
+    },
+    "linux": {
+      "cmd": "npm install -g --allow-scripts=openclaw openclaw@latest"
+    },
+    "windows": {
+      "cmd": "npm install -g --allow-scripts=openclaw openclaw@latest"
+    }
+  },
+  "methods": {}
+}

@@ -1,0 +1,33 @@
+{
+  "sdkVersion": 2,
+  "name": "hermes",
+  "displayName": "Hermes",
+  "description": "Nous Research's Hermes terminal agent.",
+  "accent": "#f9e2af",
+  "binary": "hermes",
+  "version": "1.0.0",
+  "author": "Cove",
+  "binaryDiscovery": {
+    "commands": ["hermes"],
+    "wellKnownPaths": [
+      "~/.local/bin",
+      "/opt/homebrew/bin",
+      "/usr/local/bin"
+    ],
+    "versionFlag": "--version",
+    "versionRegex": "(\\d+\\.\\d+\\.\\d+)"
+  },
+  "install": {
+    "macos": { "cmd": "curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash" },
+    "linux": { "cmd": "curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash" }
+  },
+  "update": {
+    "macos": { "cmd": "hermes update" },
+    "linux": { "cmd": "hermes update" }
+  },
+  "uninstall": {
+    "macos": { "cmd": "hermes uninstall" },
+    "linux": { "cmd": "hermes uninstall" }
+  },
+  "methods": {}
+}

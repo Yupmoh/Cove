@@ -1,0 +1,36 @@
+{
+  "sdkVersion": 2,
+  "name": "opencode",
+  "displayName": "opencode",
+  "description": "The open-source AI coding agent.",
+  "accent": "#94e2d5",
+  "binary": "opencode",
+  "version": "1.0.0",
+  "author": "Cove",
+  "binaryDiscovery": {
+    "commands": [
+      "opencode"
+    ],
+    "wellKnownPaths": [
+      "/opt/homebrew/bin",
+      "/usr/local/bin",
+      "~/.bun/bin",
+      "~/.npm-global/bin",
+      "~/.local/bin"
+    ],
+    "versionFlag": "--version",
+    "versionRegex": "(\\d+\\.\\d+\\.\\d+)"
+  },
+  "install": {
+    "macos": {
+      "cmd": "npm install -g --allow-scripts=opencode-ai opencode-ai@latest"
+    },
+    "linux": {
+      "cmd": "npm install -g --allow-scripts=opencode-ai opencode-ai@latest"
+    },
+    "windows": {
+      "cmd": "npm install -g --allow-scripts=opencode-ai opencode-ai@latest"
+    }
+  },
+  "methods": {}
+}
