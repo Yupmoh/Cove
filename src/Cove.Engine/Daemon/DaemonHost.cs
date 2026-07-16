@@ -5,6 +5,7 @@ using System.Text.Json.Serialization.Metadata;
 using Cove.Engine.Config;
 using Cove.Engine.Hooks;
 using Cove.Engine.Pty;
+using Cove.Engine.Restart;
 using Cove.Platform;
 using Cove.Platform.Ipc;
 using Cove.Platform.Pty;
@@ -113,6 +114,110 @@ public sealed class DaemonHost
         _resumeSaga = resumeSaga;
     }
 
+    private static SingleInstanceGuard? TryAcquireWithRetry(string path, bool retry)
+    {
+        var guard = SingleInstanceGuard.TryAcquire(path);
+        if (guard is not null || !retry)
+            return guard;
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        while (sw.ElapsedMilliseconds < 10000)
+        {
+            System.Threading.Thread.Sleep(100);
+            guard = SingleInstanceGuard.TryAcquire(path);
+            if (guard is not null)
+                return guard;
+        }
+        return null;
+    }
+
+    private void AdoptTakenOverNooks(Cove.Engine.Restart.HandoffTakeover takeover, ILogger logger)
+    {
+        foreach (var item in takeover.Items)
+        {
+            var info = _nooks!.Adopt(item.Record, item.Fd, item.Ring);
+            if (info is null)
+            {
+                Cove.Platform.Pty.Unix.UnixFdChannel.CloseFd(item.Fd);
+                logger.HandoffAdoptionFellBack(item.Record.NookId);
+                continue;
+            }
+            if (item.Record.Adapter is { } adapter)
+            {
+                _agentRouter?.Register(info.NookId, adapter, item.Record.AgentName);
+                _sessions?.Register(info.NookId, adapter, item.Record.SessionId);
+                _hookRouter?.Seed(info.NookId, adapter, item.Record.SessionId);
+            }
+            logger.HandoffSuccessorAdopted(info.NookId, item.Record.Adapter ?? "");
+        }
+    }
+
+    private ControlResponse BeginHandoff(string requestId)
+    {
+        if (OperatingSystem.IsWindows())
+            return Fail(requestId, "unsupported", "handoff requires a unix host");
+        if (_nooks is not { } nooks)
+            return Fail(requestId, "not_ready", "nook registry unavailable");
+        if (Interlocked.Exchange(ref _handoffStarted, 1) != 0)
+            return Fail(requestId, "conflict", "handoff already in progress");
+
+        var exported = nooks.ExportForHandoff();
+        var items = new List<Cove.Engine.Pty.HandoffExportItem>(exported.Count);
+        foreach (var item in exported)
+        {
+            var state = _hookRouter?.GetNookState(item.Record.NookId);
+            items.Add(item with { Record = item.Record with { SessionId = state?.SessionId, HookStatus = state?.Status } });
+        }
+
+        var socketPath = System.IO.Path.Combine(_paths.DataDir.IpcDir, "handoff.sock");
+        try { File.Delete(socketPath); } catch (IOException) { }
+        var listener = new System.Net.Sockets.Socket(System.Net.Sockets.AddressFamily.Unix, System.Net.Sockets.SocketType.Stream, System.Net.Sockets.ProtocolType.Unspecified);
+        listener.Bind(new System.Net.Sockets.UnixDomainSocketEndPoint(socketPath));
+        listener.Listen(1);
+        _ = Task.Run(() => ServeHandoffAsync(listener, socketPath, items));
+        DaemonLog.Write(_paths, $"handoff begin: exporting {items.Count} nooks via {socketPath}");
+        return new ControlResponse(requestId, true, ToElement(new HandoffBeginResult(items.Count, socketPath), CoveJsonContext.Default.HandoffBeginResult));
+    }
+
+    private async Task ServeHandoffAsync(System.Net.Sockets.Socket listener, string socketPath, List<Cove.Engine.Pty.HandoffExportItem> items)
+    {
+        try
+        {
+            using var acceptCts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+            using var accepted = await listener.AcceptAsync(acceptCts.Token).ConfigureAwait(false);
+            accepted.Blocking = true;
+            var socketFd = (int)accepted.Handle;
+            foreach (var item in items)
+                Cove.Engine.Restart.HandoffWire.WriteRecord(socketFd, item.Record, item.MasterFd, item.RingTail);
+            accepted.ReceiveTimeout = 10000;
+            var ack = new byte[1];
+            var n = accepted.Receive(ack);
+            if (n != 1 || ack[0] != (byte)'K')
+                throw new IOException("handoff ack missing");
+            foreach (var item in items)
+                Cove.Platform.Pty.Unix.UnixFdChannel.CloseFd(item.MasterFd);
+            DaemonLog.Write(_paths, $"handoff complete: {items.Count} nooks transferred, shutting down");
+            _shutdown.Cancel();
+        }
+        catch (Exception ex)
+        {
+            DaemonLog.Write(_paths, "handoff aborted: " + ex.Message + "; re-adopting exported sessions");
+            foreach (var item in items)
+            {
+                var restored = _nooks?.Adopt(item.Record, item.MasterFd, item.RingTail);
+                if (restored is null)
+                    Cove.Platform.Pty.Unix.UnixFdChannel.CloseFd(item.MasterFd);
+            }
+            Volatile.Write(ref _handoffStarted, 0);
+        }
+        finally
+        {
+            listener.Dispose();
+            try { File.Delete(socketPath); } catch (IOException) { }
+        }
+    }
+
+    private int _handoffStarted;
+
     public async Task<int> RunAsync(CancellationToken externalCancellation)
     {
         System.IO.Directory.CreateDirectory(_paths.DataDir.Root);
@@ -130,7 +235,11 @@ public sealed class DaemonHost
         _logger = logger;
         logger.LogLevelResolved(minimumLevel.ToString(), System.Environment.GetEnvironmentVariable("COVE_LOG_LEVEL") ?? "");
 
-        SingleInstanceGuard? dataDirLock = SingleInstanceGuard.TryAcquire(_paths.DaemonLockPath);
+
+        Cove.Engine.Restart.HandoffTakeover? takeover = null;
+        if (!OperatingSystem.IsWindows() && System.Environment.GetEnvironmentVariable("COVE_HANDOFF") == "1")
+            takeover = await Cove.Engine.Restart.HandoffClient.TryTakeOverAsync(_paths, _endpoint, logger, externalCancellation).ConfigureAwait(false);
+        SingleInstanceGuard? dataDirLock = TryAcquireWithRetry(_paths.DaemonLockPath, retry: takeover is not null);
         if (dataDirLock is null)
         {
             int? ownerPid = PidFile.Read(_paths.DaemonLockPath);
@@ -142,7 +251,7 @@ public sealed class DaemonHost
 
         CoveTree.Ensure(_paths.DataDir);
 
-        SingleInstanceGuard? guard = SingleInstanceGuard.TryAcquire(_paths.PidFilePath);
+        SingleInstanceGuard? guard = TryAcquireWithRetry(_paths.PidFilePath, retry: takeover is not null);
         if (guard is null)
         {
             DaemonLog.Write(_paths, "daemon already running on channel " + _paths.Channel);
@@ -355,6 +464,9 @@ public sealed class DaemonHost
             try { File.Delete(_paths.SocketPath); }
             catch (Exception ex) { DaemonLog.Write(_paths, "stale unlink failed: " + ex.Message); }
         }
+        if (takeover is not null)
+            AdoptTakenOverNooks(takeover, logger);
+
 
         IControlListener listener;
         try
@@ -540,6 +652,18 @@ public sealed class DaemonHost
             }
             var hr = new HelloResult(ProtocolConstants.SemanticProtocolVersion, _engineVersion, Environment.ProcessId, _paths.Channel);
             await WriteResponseAsync(conn, new ControlResponse(req.Id, true, ToElement(hr, CoveJsonContext.Default.HelloResult)), cancellationToken).ConfigureAwait(false);
+            return false;
+        }
+
+        if (req.Uri == "cove://handoff/begin")
+        {
+            if (!state.HelloDone)
+            {
+                await WriteResponseAsync(conn, Fail(req.Id, "not_ready", "sys/hello required before handoff"), cancellationToken).ConfigureAwait(false);
+                return false;
+            }
+            var beginResponse = BeginHandoff(req.Id);
+            await WriteResponseAsync(conn, beginResponse, cancellationToken).ConfigureAwait(false);
             return false;
         }
 

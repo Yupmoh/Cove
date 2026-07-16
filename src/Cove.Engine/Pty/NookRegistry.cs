@@ -267,6 +267,8 @@ public sealed class NookRegistry : IDisposable, Cove.Engine.Agents.INookWriter
                 nook.Title, nook.Adapter, nook.AgentName, nook.Ring.Head, tail.Length, null, null, checkpoint);
             _logger.HandoffExported(nook.NookId, pid, tail.Length);
             items.Add(new HandoffExportItem(record, transferFd, tail));
+            lock (_sync)
+                _nooks.Remove(nook.NookId);
         }
         return items;
     }
