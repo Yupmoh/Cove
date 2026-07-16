@@ -27,7 +27,9 @@ resolve_binary() {
   for candidate in "$@"; do
     if [ -n "$candidate" ] && [ -x "$candidate" ]; then printf '%s' "$candidate"; return 0; fi
   done
-  candidate="$("${SHELL:-/bin/zsh}" -lc "command -v $name" 2>/dev/null || true)"
+  local quoted_name
+  quoted_name="$(printf '%q' "$name")"
+  candidate="$("${SHELL:-/bin/zsh}" -lc "command -v $quoted_name" 2>/dev/null || true)"
   if [ -n "$candidate" ]; then printf '%s' "$candidate"; return 0; fi
   printf '%s' "$name"
 }

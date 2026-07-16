@@ -13,7 +13,8 @@ public sealed record LaunchFlags(
     [property: JsonPropertyName("model")] string? Model,
     [property: JsonPropertyName("effort")] string? Effort,
     [property: JsonPropertyName("extraArgs")] string? ExtraArgs,
-    [property: JsonPropertyName("provider")] string? Provider);
+    [property: JsonPropertyName("provider")] string? Provider,
+    [property: JsonPropertyName("command")] string? Command);
 
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase, DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
 [JsonSerializable(typeof(LaunchFlags))]
@@ -270,7 +271,8 @@ public sealed class LaunchOrchestrator
         var argParts = new List<string>(profile.CliArgs.Count > 0 ? profile.CliArgs.Skip(1) : Array.Empty<string>());
         argParts.AddRange(overrides.ExtraFlags);
         var extraArgs = argParts.Count > 0 ? string.Join(" ", argParts) : null;
-        var flags = new LaunchFlags(overrides.Yolo, null, extra, profile.Model, profile.Effort, extraArgs, null);
+        var command = profile.CliArgs.Count > 0 && !string.IsNullOrWhiteSpace(profile.CliArgs[0]) ? profile.CliArgs[0] : null;
+        var flags = new LaunchFlags(overrides.Yolo, null, extra, profile.Model, profile.Effort, extraArgs, null, command);
         return System.Text.Json.JsonSerializer.Serialize(flags, LaunchFlagsJsonContext.Default.LaunchFlags);
     }
 

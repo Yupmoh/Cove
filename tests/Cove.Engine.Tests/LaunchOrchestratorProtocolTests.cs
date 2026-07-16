@@ -87,6 +87,52 @@ public sealed class LaunchOrchestratorProtocolTests
     }
 
     [Fact]
+    public async Task BuildLaunchCommandAsync_MethodBranch_PassesProfileCommandInFlags()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var root = NewDir();
+        try
+        {
+            WriteAdapter(root, "claude-code", "claude", buildLaunchScript: "scripts/build_launch.sh");
+            WriteScript(root, "claude-code", "scripts/build_launch.sh",
+                "printf '%s' \"$1\" > \"$(cd \"$(dirname \"$0\")/..\" && pwd)/flags-capture.json\"\necho '{\"command\":[\"ok\"]}'");
+            var orch = NewOrchestrator(root);
+            var profile = NewProfile("claude-code") with { CliArgs = new[] { "ccx", "--foo" } };
+            var overrides = new LauncherOverrides();
+
+            var cmd = await orch.BuildLaunchCommandAsync(profile, overrides);
+
+            Assert.Equal("ok", cmd.Command);
+            var flags = File.ReadAllText(Path.Combine(root, "claude-code", "flags-capture.json"));
+            Assert.Contains("\"command\":\"ccx\"", flags);
+            Assert.Contains("--foo", flags);
+        }
+        finally { try { Directory.Delete(root, true); } catch { } }
+    }
+
+    [Fact]
+    public async Task BuildLaunchCommandAsync_MethodBranch_OmitsCommandWhenProfileHasNoCliArgs()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var root = NewDir();
+        try
+        {
+            WriteAdapter(root, "claude-code", "claude", buildLaunchScript: "scripts/build_launch.sh");
+            WriteScript(root, "claude-code", "scripts/build_launch.sh",
+                "printf '%s' \"$1\" > \"$(cd \"$(dirname \"$0\")/..\" && pwd)/flags-capture.json\"\necho '{\"command\":[\"ok\"]}'");
+            var orch = NewOrchestrator(root);
+            var profile = NewProfile("claude-code");
+            var overrides = new LauncherOverrides();
+
+            await orch.BuildLaunchCommandAsync(profile, overrides);
+
+            var flags = File.ReadAllText(Path.Combine(root, "claude-code", "flags-capture.json"));
+            Assert.DoesNotContain("\"command\"", flags);
+        }
+        finally { try { Directory.Delete(root, true); } catch { } }
+    }
+
+    [Fact]
     public async Task BuildLaunchCommandAsync_UnknownAdapter_FailsFast()
     {
         var root = NewDir();

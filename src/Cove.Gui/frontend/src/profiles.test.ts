@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  deriveProfileSlug,
   isValidProfileSlug,
   profileDisplayName,
   profilePickerLabel,
@@ -36,6 +37,32 @@ describe("isValidProfileSlug", () => {
     expect(isValidProfileSlug("")).toBe(false);
     expect(isValidProfileSlug("has space")).toBe(false);
     expect(isValidProfileSlug("under_score")).toBe(false);
+  });
+});
+
+describe("deriveProfileSlug", () => {
+  it("passes through already-valid slugs", () => {
+    expect(deriveProfileSlug("ccx")).toBe("ccx");
+    expect(deriveProfileSlug("glm-umans")).toBe("glm-umans");
+  });
+
+  it("slugifies names with case, spaces, and punctuation", () => {
+    expect(deriveProfileSlug("Claude Code (CCX)")).toBe("claude-code-ccx");
+    expect(deriveProfileSlug("  GLM Umans  ")).toBe("glm-umans");
+    expect(deriveProfileSlug("under_score")).toBe("under-score");
+  });
+
+  it("returns empty for unusable input", () => {
+    expect(deriveProfileSlug("")).toBe("");
+    expect(deriveProfileSlug("   ")).toBe("");
+    expect(deriveProfileSlug("()")).toBe("");
+  });
+
+  it("caps length at 64 without a trailing dash", () => {
+    const derived = deriveProfileSlug("a".repeat(63) + " tail");
+    expect(derived.length).toBeLessThanOrEqual(64);
+    expect(derived.endsWith("-")).toBe(false);
+    expect(isValidProfileSlug(derived)).toBe(true);
   });
 });
 

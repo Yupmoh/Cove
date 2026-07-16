@@ -82,6 +82,15 @@ export function isValidProfileSlug(slug: string): boolean {
   return SLUG_RE.test(slug);
 }
 
+export function deriveProfileSlug(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 64)
+    .replace(/-+$/, "");
+}
+
 export function profileDisplayName(profile: LaunchProfileListItem): string {
   return profile.name || profile.slug;
 }

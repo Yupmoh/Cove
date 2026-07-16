@@ -47,7 +47,7 @@ import { buildEmptyState, EmptyStateMessages } from "./empty-states";
 import { brandLogoAt, nextBrandIndex, parseBrandIndex } from "./brand";
 import { adapterStatusMeta, toolsSubtitle, retentionChipVisible, retentionChipLabel, type ToolsAdapter } from "./tools-tab";
 import {
-  isValidProfileSlug, profilePickerLabel, firstDefault, envMapFromRows,
+  deriveProfileSlug, isValidProfileSlug, profilePickerLabel, firstDefault, envMapFromRows,
   type LaunchProfileListItem, type LaunchProfileDetail,
   type CreateProfileInput, type UpdateProfileInput,
 } from "./profiles";
@@ -3720,12 +3720,19 @@ function openProfileEditor(a: ToolsAdapter, slug: string | null, container: HTML
   title.textContent = slug ? `Edit profile · ${slug}` : `New profile · ${a.name}`;
   dialog.appendChild(title);
 
-  const slugInput = textRow(dialog, "Slug", slug ?? "", "e.g. glm-umans");
+  const nameInput = textRow(dialog, "Profile name", "", "e.g. Claude Code (ccx)",
+    "What this profile is called in the launcher");
+  const slugInput = textRow(dialog, "Profile ID", slug ?? "", "auto-generated from the name",
+    "Lowercase identifier used by the CLI and config; leave empty to generate it from the name");
   slugInput.disabled = slug !== null;
-  const nameInput = textRow(dialog, "Name", "", "e.g. GLM Umans");
-  const modelInput = textRow(dialog, "Model", "", "e.g. glm, opus, default");
-  const effortInput = textRow(dialog, "Effort", "", "e.g. low, medium, high, max");
-  const agentInput = textRow(dialog, "Agent", "", "optional agent slug");
+  const commandInput = textRow(dialog, "Command", "", `defaults to ${a.binary}`,
+    `Program to launch instead of ${a.binary} — a name on PATH or a full path like ~/bin/my-wrapper`);
+  const modelInput = textRow(dialog, "Model", "", "e.g. opus, sonnet, default",
+    "Passed to the CLI as its model flag; empty uses the tool's own default");
+  const effortInput = textRow(dialog, "Reasoning effort", "", "e.g. low, medium, high, max",
+    "Passed to the CLI when set; empty uses the tool's own default");
+  const agentInput = textRow(dialog, "Agent", "", "optional",
+    "ID of a saved agent definition to launch with this profile");
 
   const envLabel = document.createElement("div");
   envLabel.className = "tools-subtitle";
@@ -3770,9 +3777,9 @@ function openProfileEditor(a: ToolsAdapter, slug: string | null, container: HTML
   saveBtn.textContent = slug ? "Save" : "Create";
   saveBtn.addEventListener("click", async () => {
     errorEl.textContent = "";
-    const newSlug = slugInput.value.trim();
+    const newSlug = deriveProfileSlug(slugInput.value) || deriveProfileSlug(nameInput.value);
     if (!slug && !isValidProfileSlug(newSlug)) {
-      errorEl.textContent = "slug must be kebab-case, 1-64 chars [a-z0-9-]";
+      errorEl.textContent = "enter a profile name, or an ID using lowercase letters, digits, and dashes";
       return;
     }
     const envRows: Array<{ key: string; value: string }> = [];
@@ -3784,7 +3791,13 @@ function openProfileEditor(a: ToolsAdapter, slug: string | null, container: HTML
       envRows.push({ key: trimmed.slice(0, eq).trim(), value: trimmed.slice(eq + 1).trim() });
     }
     const env = envMapFromRows(envRows);
-    const cliArgs = argsArea.value.split("\n").map((s) => s.trim()).filter((s) => s.length > 0);
+    const extraArgLines = argsArea.value.split("\n").map((s) => s.trim()).filter((s) => s.length > 0);
+    const commandValue = commandInput.value.trim();
+    const cliArgs = commandValue
+      ? [commandValue, ...extraArgLines]
+      : extraArgLines.length > 0
+        ? [a.binary, ...extraArgLines]
+        : [];
     const base = {
       adapter: a.name,
       slug: slug ?? newSlug,
@@ -3819,7 +3832,7 @@ function openProfileEditor(a: ToolsAdapter, slug: string | null, container: HTML
   document.body.appendChild(overlay);
 
   if (slug) {
-    void loadProfileIntoEditor(a.name, slug, { nameInput, modelInput, effortInput, agentInput, envArea, argsArea, defaultCb });
+    void loadProfileIntoEditor(a.name, slug, { nameInput, commandInput, modelInput, effortInput, agentInput, envArea, argsArea, defaultCb });
   } else {
     defaultCb.checked = true;
   }
@@ -3827,6 +3840,7 @@ function openProfileEditor(a: ToolsAdapter, slug: string | null, container: HTML
 
 interface EditorFields {
   nameInput: HTMLInputElement;
+  commandInput: HTMLInputElement;
   modelInput: HTMLInputElement;
   effortInput: HTMLInputElement;
   agentInput: HTMLInputElement;
@@ -3843,20 +3857,28 @@ async function loadProfileIntoEditor(adapter: string, slug: string, f: EditorFie
     f.effortInput.value = detail.effort ?? "";
     f.agentInput.value = detail.agent ?? "";
     f.envArea.value = Object.entries(detail.env).map(([k, v]) => `${k}=${v}`).join("\n");
-    f.argsArea.value = (detail.cliArgs ?? []).join("\n");
+    const cliArgs = detail.cliArgs ?? [];
+    f.commandInput.value = cliArgs[0] ?? "";
+    f.argsArea.value = cliArgs.slice(1).join("\n");
     f.defaultCb.checked = detail.isDefault;
   } catch (err) {
     console.warn("launch-profile.get failed", adapter, slug, err);
   }
 }
 
-function textRow(parent: HTMLElement, label: string, value: string, placeholder: string): HTMLInputElement {
+function textRow(parent: HTMLElement, label: string, value: string, placeholder: string, hint?: string): HTMLInputElement {
   const row = document.createElement("div");
   row.style.cssText = "display:flex;flex-direction:column;gap:2px;";
   const lab = document.createElement("label");
   lab.className = "tools-subtitle";
   lab.textContent = label;
   row.appendChild(lab);
+  if (hint) {
+    const hintEl = document.createElement("div");
+    hintEl.style.cssText = "font-size:10.5px;color:var(--muted);opacity:0.85;";
+    hintEl.textContent = hint;
+    row.appendChild(hintEl);
+  }
   const input = document.createElement("input");
   input.type = "text";
   input.value = value;

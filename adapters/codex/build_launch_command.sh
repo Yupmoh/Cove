@@ -11,7 +11,9 @@ resolve_binary() {
   for candidate in "$@"; do
     if [ -n "$candidate" ] && [ -x "$candidate" ]; then printf '%s' "$candidate"; return 0; fi
   done
-  candidate="$("${SHELL:-/bin/zsh}" -lc "command -v $name" 2>/dev/null || true)"
+  local quoted_name
+  quoted_name="$(printf '%q' "$name")"
+  candidate="$("${SHELL:-/bin/zsh}" -lc "command -v $quoted_name" 2>/dev/null || true)"
   if [ -n "$candidate" ]; then printf '%s' "$candidate"; return 0; fi
   printf '%s' "$name"
 }
@@ -27,7 +29,17 @@ flag_true() {
   printf '%s' "$FLAGS_JSON" | grep -q "\"$1\"[[:space:]]*:[[:space:]]*true"
 }
 
-bin="$(resolve_binary codex /opt/homebrew/bin/codex /usr/local/bin/codex)"
+flag_string() {
+  printf '%s' "$FLAGS_JSON" | sed -n "s/.*\"$1\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" | head -1
+}
+
+custom_command="$(flag_string "command")"
+custom_command="${custom_command/#~\//$HOME/}"
+if [ -n "$custom_command" ]; then
+  bin="$(resolve_binary "$custom_command")"
+else
+  bin="$(resolve_binary codex /opt/homebrew/bin/codex /usr/local/bin/codex)"
+fi
 args=("$bin" "--dangerously-bypass-hook-trust")
 if flag_true "dangerouslySkipPermissions"; then
   args+=("--yolo")
