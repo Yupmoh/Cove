@@ -5270,11 +5270,16 @@ function paintBoxLauncher(wrap: HTMLElement, ctx: LauncherContext): void {
   const tip = document.createElement("span");
   tip.className = "cl-tip";
   tip.textContent = tipAt(launcherTipIndex);
+  const bayChip = document.createElement("span");
+  bayChip.className = "cl-hint cl-bay-chip";
+  bayChip.textContent = `bay · ${layout?.name?.trim() || "default"}`;
+  bayChip.title = activeProjectDir();
   const hint = document.createElement("span");
   hint.className = "cl-hint";
   hint.textContent = "hold ⇧ for shortcuts";
   header.appendChild(brand);
   header.appendChild(tip);
+  header.appendChild(bayChip);
   header.appendChild(hint);
   wrap.appendChild(header);
 
