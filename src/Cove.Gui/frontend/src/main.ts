@@ -5011,7 +5011,7 @@ interface AdapterListResult { adapters: AdapterInfo[]; }
 async function launchHarnessUpdate(tile: LauncherTile): Promise<void> {
   if (!tile.updateCommand) return;
   try {
-    const sp = (await spawnNook({ command: "/bin/sh", args: ["-lc", tile.updateCommand], cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: "", agentName: `Update ${tile.label}`, bay: "", shore: "" })).nookId;
+    const sp = (await spawnNook({ command: "", args: [], shellCommand: tile.updateCommand, cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: "", agentName: `Update ${tile.label}`, bay: "", shore: "" })).nookId;
     const r = await invoke<{ shoreId: string }>("app.layoutMutate", { op: "createShore", newNookId: sp, name: `Update ${tile.label}`, shoreId: "", targetNookId: "", orientation: "", nookId: "", dir: 0, nookType: "terminal" });
     activeShoreId = r.shoreId;
     await reload();

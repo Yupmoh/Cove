@@ -17,10 +17,13 @@ public sealed class CoveGuiCommands
         => await Call("cove://commands/nook.list", null, ct);
 
     [RynCommand("app.nookSpawn")]
-    public async ValueTask<string> NookSpawn(string command, string cwd, string inheritCwdFrom, int cols, int rows, string adapter, string agentName, string bay, string shore, string[]? args = null, string? sessionId = null, bool yolo = false, CancellationToken ct = default)
+    public async ValueTask<string> NookSpawn(string command, string cwd, string inheritCwdFrom, int cols, int rows, string adapter, string agentName, string bay, string shore, string[]? args = null, string? sessionId = null, bool yolo = false, string? shellCommand = null, CancellationToken ct = default)
     {
         var shell = string.IsNullOrEmpty(command) ? DefaultShell() : command;
-        var p = JsonSerializer.SerializeToElement(new SpawnParams(shell, args ?? Array.Empty<string>(), N(cwd), null, cols, rows, N(inheritCwdFrom), N(adapter), N(agentName), N(bay), N(shore), SessionId: N(sessionId ?? ""), Yolo: yolo), CoveJsonContext.Default.SpawnParams);
+        var spawnArgs = args ?? Array.Empty<string>();
+        if (!string.IsNullOrEmpty(shellCommand))
+            (shell, spawnArgs) = ShellLaunch.Invocation(DefaultShell(), shellCommand);
+        var p = JsonSerializer.SerializeToElement(new SpawnParams(shell, spawnArgs, N(cwd), null, cols, rows, N(inheritCwdFrom), N(adapter), N(agentName), N(bay), N(shore), SessionId: N(sessionId ?? ""), Yolo: yolo), CoveJsonContext.Default.SpawnParams);
         return await Call("cove://commands/nook.spawn", p, ct);
     }
 
