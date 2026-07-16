@@ -25,10 +25,25 @@ public static class AdapterListCommands
                 version = detection.Version;
                 binaryPath = detection.BinaryPath;
             }
-            items.Add(new AdapterListItemDto(manifest.Name, manifest.DisplayName, manifest.Accent, manifest.Binary, status, version, binaryPath));
+            items.Add(new AdapterListItemDto(manifest.Name, manifest.DisplayName, manifest.Accent, manifest.Binary, status, version, binaryPath, ResolveUpdateCommand(manifest)));
         }
 
         return Task.FromResult(ctx.Ok(new AdapterListResult(items), CoveJsonContext.Default.AdapterListResult));
+    }
+
+    public static string? ResolveUpdateCommand(AdapterManifest manifest)
+    {
+        var platform = OperatingSystem.IsWindows() ? "windows" : OperatingSystem.IsMacOS() ? "macos" : "linux";
+        if (manifest.Install.TryGetValue(platform, out var recipe) && !string.IsNullOrWhiteSpace(recipe.Cmd))
+            return recipe.Cmd;
+        return manifest.Name switch
+        {
+            "claude-code" => "npm install -g @anthropic-ai/claude-code@latest",
+            "codex" => "npm install -g @openai/codex@latest",
+            "gemini" => "npm install -g @google/gemini-cli@latest",
+            "omp" => "bun install -g @oh-my-pi/pi-coding-agent@latest",
+            _ => null,
+        };
     }
 
     private static string DetectionStatus(AdapterDetectionState state) => state switch

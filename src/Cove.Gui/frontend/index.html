@@ -508,6 +508,9 @@
     .cl-configure .cl-card-badge { width: 42px; height: 42px; border-radius: 12px; }
     .cl-configure .cl-card-note { font-size: 11px; color: var(--muted); line-height: 1.45; max-width: 240px; }
     .cl-card-note { font-size: 10px; color: var(--muted); }
+    .cl-bay-chip { color: var(--fg); border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
+    .cl-dock-update { margin-left: auto; height: 26px; font-size: 11px; font-family: inherit; color: var(--muted); background: transparent; border: 1px solid var(--border); border-radius: 7px; padding: 0 10px; cursor: pointer; transition: border-color 0.12s, color 0.12s; }
+    .cl-dock-update:hover { color: var(--fg); border-color: color-mix(in srgb, var(--card-accent, var(--accent)) 55%, var(--border)); }
     .cl-dock { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 14px; width: 100%; padding: 12px 14px; border-radius: 12px;
       background: color-mix(in srgb, var(--card-accent, var(--accent)) 7%, var(--panel));
       border: 1px solid color-mix(in srgb, var(--card-accent, var(--accent)) 32%, var(--border));

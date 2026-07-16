@@ -4,6 +4,7 @@ export interface LauncherAdapter {
   accent: string;
   binary: string;
   version?: string;
+  updateCommand?: string;
 }
 
 export interface LauncherBuiltin {
@@ -27,6 +28,7 @@ export interface LauncherTile {
   version: string;
   disabled: boolean;
   note: string;
+  updateCommand: string;
 }
 
 export function shouldShowLauncher(shoreCount: number): boolean {
@@ -112,6 +114,7 @@ export function buildAdapterTiles(adapters: LauncherAdapter[]): LauncherTile[] {
       version: (a.version ?? "").trim(),
       disabled: !detected,
       note: detected ? "" : "not detected",
+      updateCommand: (a.updateCommand ?? "").trim(),
     };
   });
 }
@@ -129,6 +132,7 @@ export function buildBuiltinTiles(builtins: LauncherBuiltin[]): LauncherTile[] {
     version: "",
     disabled: false,
     note: "",
+    updateCommand: "",
   }));
 }
 

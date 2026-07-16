@@ -5006,8 +5006,22 @@ launcherEl.addEventListener("mousedown", (e) => { if (e.target === launcherEl) c
 launcherEl.addEventListener("keydown", (e) => { if (e.key === "Escape") closeLauncher(); });
 
 const launchAgentsEl = document.getElementById("launch-agents")!;
-interface AdapterInfo { name: string; displayName: string; accent: string; binary: string; status?: string | null; version?: string | null; binaryPath?: string | null; }
+interface AdapterInfo { name: string; displayName: string; accent: string; binary: string; status?: string | null; version?: string | null; binaryPath?: string | null; updateCommand?: string | null; }
 interface AdapterListResult { adapters: AdapterInfo[]; }
+async function launchHarnessUpdate(tile: LauncherTile): Promise<void> {
+  if (!tile.updateCommand) return;
+  try {
+    const sp = (await spawnNook({ command: "/bin/sh", args: ["-lc", tile.updateCommand], cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: "", agentName: `Update ${tile.label}`, bay: "", shore: "" })).nookId;
+    const r = await invoke<{ shoreId: string }>("app.layoutMutate", { op: "createShore", newNookId: sp, name: `Update ${tile.label}`, shoreId: "", targetNookId: "", orientation: "", nookId: "", dir: 0, nookType: "terminal" });
+    activeShoreId = r.shoreId;
+    await reload();
+    focusNook(sp);
+  } catch (err) {
+    console.warn("harness update launch failed", tile.adapterName, err);
+    showInAppToast("Update not started", (err as Error).message, () => {});
+  }
+}
+
 async function loadLauncherAgents(): Promise<void> {
   try {
     const result = await invoke<AdapterListResult>("app.adapterList", {});
@@ -5076,7 +5090,7 @@ interface SessionRecentResult { sessions: RecentSessionRow[]; }
 async function loadLauncherAdapters(): Promise<void> {
   try {
     const result = await invoke<AdapterListResult>("app.adapterList", {});
-    launcherAdapters = (result.adapters ?? []).map((a) => ({ name: a.name, displayName: a.displayName, accent: a.accent, binary: a.binary, version: a.version ?? "" }));
+    launcherAdapters = (result.adapters ?? []).map((a) => ({ name: a.name, displayName: a.displayName, accent: a.accent, binary: a.binary, version: a.version ?? "", updateCommand: a.updateCommand ?? "" }));
   } catch { launcherAdapters = []; }
   await Promise.all([loadLauncherRecents(), loadLauncherProfiles()]);
   if ((layout?.shores ?? []).length === 0) renderShore();
@@ -5413,6 +5427,17 @@ function renderDetailDock(ctx: LauncherContext, tile: LauncherTile): HTMLElement
   idText.appendChild(idSub);
   identity.appendChild(dot);
   identity.appendChild(idText);
+  if (tile.updateCommand) {
+    const updateBtn = document.createElement("button");
+    updateBtn.className = "cl-dock-update";
+    updateBtn.textContent = "Update";
+    updateBtn.title = tile.updateCommand;
+    updateBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      void launchHarnessUpdate(tile);
+    });
+    identity.appendChild(updateBtn);
+  }
   dock.appendChild(identity);
 
   const choices = launcherProfileChoices(tile.adapterName, launcherProfiles.get(tile.adapterName) ?? []);
