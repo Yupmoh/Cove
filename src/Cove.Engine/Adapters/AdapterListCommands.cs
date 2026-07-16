@@ -25,7 +25,8 @@ public static class AdapterListCommands
                 version = detection.Version;
                 binaryPath = detection.BinaryPath;
             }
-            items.Add(new AdapterListItemDto(manifest.Name, manifest.DisplayName, manifest.Accent, manifest.Binary, status, version, binaryPath, ResolveUpdateCommand(manifest, ResolveRealPath(binaryPath))));
+            var realPath = ResolveRealPath(binaryPath);
+            items.Add(new AdapterListItemDto(manifest.Name, manifest.DisplayName, manifest.Accent, manifest.Binary, status, version, binaryPath, ResolveUpdateCommand(manifest, realPath), ResolveUninstallCommand(manifest, realPath), ResolveInstallCommand(manifest)));
         }
 
         return Task.FromResult(ctx.Ok(new AdapterListResult(items), CoveJsonContext.Default.AdapterListResult));
@@ -33,28 +34,73 @@ public static class AdapterListCommands
 
     public static string? ResolveUpdateCommand(AdapterManifest manifest, string? binaryRealPath)
     {
-        var platform = OperatingSystem.IsWindows() ? "windows" : OperatingSystem.IsMacOS() ? "macos" : "linux";
-        if (manifest.Install.TryGetValue(platform, out var recipe) && !string.IsNullOrWhiteSpace(recipe.Cmd))
-            return recipe.Cmd;
+        if (PlatformRecipe(manifest.Update) is { } explicitUpdate)
+            return explicitUpdate;
 
         var path = binaryRealPath ?? "";
         if (path.Contains("/Cellar/", StringComparison.Ordinal) || path.Contains("/Caskroom/", StringComparison.Ordinal))
             return $"brew upgrade {BrewName(manifest, path)}";
 
-        var npmPackage = manifest.Name switch
-        {
-            "claude-code" => "@anthropic-ai/claude-code",
-            "codex" => "@openai/codex",
-            "gemini" => "@google/gemini-cli",
-            "omp" => "@oh-my-pi/pi-coding-agent",
-            _ => null,
-        };
+        var npmPackage = KnownNpmPackage(manifest.Name);
+        if (npmPackage is not null && path.Contains("/.bun/", StringComparison.Ordinal))
+            return $"bun install -g {npmPackage}@latest";
+        if (npmPackage is not null && path.Contains("/node_modules/", StringComparison.Ordinal))
+            return $"npm install -g --allow-scripts={npmPackage} {npmPackage}@latest";
+
+        if (PlatformRecipe(manifest.Install) is { } installRecipe)
+            return installRecipe;
+
+        if (npmPackage is null)
+            return null;
+        return $"npm install -g --allow-scripts={npmPackage} {npmPackage}@latest";
+    }
+
+    public static string? ResolveInstallCommand(AdapterManifest manifest)
+    {
+        if (PlatformRecipe(manifest.Install) is { } recipe)
+            return recipe;
+        var npmPackage = KnownNpmPackage(manifest.Name);
+        if (npmPackage is null)
+            return null;
+        return $"npm install -g --allow-scripts={npmPackage} {npmPackage}@latest";
+    }
+
+    public static string? ResolveUninstallCommand(AdapterManifest manifest, string? binaryRealPath)
+    {
+        if (PlatformRecipe(manifest.Uninstall) is { } explicitUninstall)
+            return explicitUninstall;
+
+        var path = binaryRealPath ?? "";
+        if (path.Contains("/Cellar/", StringComparison.Ordinal) || path.Contains("/Caskroom/", StringComparison.Ordinal))
+            return $"brew uninstall {BrewName(manifest, path)}";
+
+        var npmPackage = KnownNpmPackage(manifest.Name);
         if (npmPackage is null)
             return null;
         if (path.Contains("/.bun/", StringComparison.Ordinal))
-            return $"bun install -g {npmPackage}@latest";
-        return $"npm install -g --allow-scripts={npmPackage} {npmPackage}@latest";
+            return $"bun remove -g {npmPackage}";
+        if (path.Contains("/node_modules/", StringComparison.Ordinal))
+            return $"npm uninstall -g {npmPackage}";
+        return null;
     }
+
+    private static string? PlatformRecipe(IReadOnlyDictionary<string, InstallRecipe> recipes)
+    {
+        var platform = OperatingSystem.IsWindows() ? "windows" : OperatingSystem.IsMacOS() ? "macos" : "linux";
+        return recipes.TryGetValue(platform, out var recipe) && !string.IsNullOrWhiteSpace(recipe.Cmd) ? recipe.Cmd : null;
+    }
+
+    private static string? KnownNpmPackage(string adapterName) => adapterName switch
+    {
+        "claude-code" => "@anthropic-ai/claude-code",
+        "codex" => "@openai/codex",
+        "gemini" => "@google/gemini-cli",
+        "omp" => "@oh-my-pi/pi-coding-agent",
+        "opencode" => "opencode-ai",
+        "pi" => "@earendil-works/pi-coding-agent",
+        "openclaw" => "openclaw",
+        _ => null,
+    };
 
     private static string BrewName(AdapterManifest manifest, string path)
     {

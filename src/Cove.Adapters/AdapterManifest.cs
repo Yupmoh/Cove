@@ -25,7 +25,12 @@ public sealed record AdapterManifest
     public LauncherOptions? LauncherOptions { get; init; }
     public IReadOnlyDictionary<string, string> Hooks { get; init; } = new Dictionary<string, string>();
     public string? SkillsDir { get; init; }
-    public IReadOnlyDictionary<string, InstallRecipe> Install { get; init; } = new Dictionary<string, InstallRecipe>();
+    private readonly IReadOnlyDictionary<string, InstallRecipe>? _install;
+    public IReadOnlyDictionary<string, InstallRecipe> Install { get => _install ?? new Dictionary<string, InstallRecipe>(); init => _install = value; }
+    private readonly IReadOnlyDictionary<string, InstallRecipe>? _update;
+    public IReadOnlyDictionary<string, InstallRecipe> Update { get => _update ?? new Dictionary<string, InstallRecipe>(); init => _update = value; }
+    private readonly IReadOnlyDictionary<string, InstallRecipe>? _uninstall;
+    public IReadOnlyDictionary<string, InstallRecipe> Uninstall { get => _uninstall ?? new Dictionary<string, InstallRecipe>(); init => _uninstall = value; }
     public IReadOnlyDictionary<string, HookEnvelopeDeclaration> HookEnvelopes { get; init; } = new Dictionary<string, HookEnvelopeDeclaration>();
 }
 
