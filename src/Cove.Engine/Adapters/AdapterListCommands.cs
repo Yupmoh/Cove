@@ -25,25 +25,56 @@ public static class AdapterListCommands
                 version = detection.Version;
                 binaryPath = detection.BinaryPath;
             }
-            items.Add(new AdapterListItemDto(manifest.Name, manifest.DisplayName, manifest.Accent, manifest.Binary, status, version, binaryPath, ResolveUpdateCommand(manifest)));
+            items.Add(new AdapterListItemDto(manifest.Name, manifest.DisplayName, manifest.Accent, manifest.Binary, status, version, binaryPath, ResolveUpdateCommand(manifest, ResolveRealPath(binaryPath))));
         }
 
         return Task.FromResult(ctx.Ok(new AdapterListResult(items), CoveJsonContext.Default.AdapterListResult));
     }
 
-    public static string? ResolveUpdateCommand(AdapterManifest manifest)
+    public static string? ResolveUpdateCommand(AdapterManifest manifest, string? binaryRealPath)
     {
         var platform = OperatingSystem.IsWindows() ? "windows" : OperatingSystem.IsMacOS() ? "macos" : "linux";
         if (manifest.Install.TryGetValue(platform, out var recipe) && !string.IsNullOrWhiteSpace(recipe.Cmd))
             return recipe.Cmd;
-        return manifest.Name switch
+
+        var path = binaryRealPath ?? "";
+        if (path.Contains("/Cellar/", StringComparison.Ordinal) || path.Contains("/Caskroom/", StringComparison.Ordinal))
+            return $"brew upgrade {BrewName(manifest)}";
+
+        var npmPackage = manifest.Name switch
         {
-            "claude-code" => "npm install -g @anthropic-ai/claude-code@latest",
-            "codex" => "npm install -g @openai/codex@latest",
-            "gemini" => "npm install -g @google/gemini-cli@latest",
-            "omp" => "bun install -g @oh-my-pi/pi-coding-agent@latest",
+            "claude-code" => "@anthropic-ai/claude-code",
+            "codex" => "@openai/codex",
+            "gemini" => "@google/gemini-cli",
+            "omp" => "@oh-my-pi/pi-coding-agent",
             _ => null,
         };
+        if (npmPackage is null)
+            return null;
+        if (path.Contains("/.bun/", StringComparison.Ordinal))
+            return $"bun install -g {npmPackage}@latest";
+        return $"npm install -g {npmPackage}@latest";
+    }
+
+    private static string BrewName(AdapterManifest manifest) => manifest.Name switch
+    {
+        "claude-code" => "claude-code",
+        "gemini" => "gemini-cli",
+        _ => manifest.Name,
+    };
+
+    private static string? ResolveRealPath(string? path)
+    {
+        if (string.IsNullOrEmpty(path))
+            return path;
+        try
+        {
+            return System.IO.File.ResolveLinkTarget(path, returnFinalTarget: true)?.FullName ?? path;
+        }
+        catch (System.IO.IOException)
+        {
+            return path;
+        }
     }
 
     private static string DetectionStatus(AdapterDetectionState state) => state switch
