@@ -90,6 +90,73 @@ public sealed class SessionServiceTests
     }
 
     [Fact]
+    public async Task ListRecentSessions_ServesStaleImmediately_ThenRefreshesInBackground()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var dir = NewDir();
+        try
+        {
+            WriteScript(dir, "list_recent_sessions.sh", """
+            echo '{"sessions":[{"id":"v1","cwd":"/repo","lastActive":"2024-01-01T00:00:00Z"}]}'
+            """);
+            var svc = new SessionService(new MethodRunner(), cacheTtl: TimeSpan.Zero);
+
+            var first = await svc.ListRecentSessionsAsync(dir, "/repo");
+            Assert.Equal("v1", Assert.Single(first).Id);
+
+            WriteScript(dir, "list_recent_sessions.sh", """
+            echo '{"sessions":[{"id":"v2","cwd":"/repo","lastActive":"2024-02-01T00:00:00Z"}]}'
+            """);
+
+            var stale = await svc.ListRecentSessionsAsync(dir, "/repo");
+            Assert.Equal("v1", Assert.Single(stale).Id);
+
+            var deadline = DateTimeOffset.UtcNow.AddSeconds(10);
+            while (DateTimeOffset.UtcNow < deadline)
+            {
+                var latest = await svc.ListRecentSessionsAsync(dir, "/repo");
+                if (latest.Count == 1 && latest[0].Id == "v2") return;
+                await Task.Delay(50);
+            }
+            Assert.Fail("background refresh never replaced the stale cache entry");
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
+
+    [Fact]
+    public async Task ListRecentSessions_FailedBackgroundRefresh_KeepsStaleAndRecovers()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var dir = NewDir();
+        try
+        {
+            WriteScript(dir, "list_recent_sessions.sh", """
+            echo '{"sessions":[{"id":"v1","cwd":"/repo","lastActive":"2024-01-01T00:00:00Z"}]}'
+            """);
+            var svc = new SessionService(new MethodRunner(), cacheTtl: TimeSpan.Zero);
+            Assert.Equal("v1", Assert.Single(await svc.ListRecentSessionsAsync(dir, "/repo")).Id);
+
+            WriteScript(dir, "list_recent_sessions.sh", "exit 1");
+            Assert.Equal("v1", Assert.Single(await svc.ListRecentSessionsAsync(dir, "/repo")).Id);
+            await Task.Delay(300);
+            Assert.Single(await svc.ListRecentSessionsAsync(dir, "/repo"));
+
+            WriteScript(dir, "list_recent_sessions.sh", """
+            echo '{"sessions":[{"id":"v3","cwd":"/repo","lastActive":"2024-03-01T00:00:00Z"}]}'
+            """);
+            var deadline = DateTimeOffset.UtcNow.AddSeconds(10);
+            while (DateTimeOffset.UtcNow < deadline)
+            {
+                var latest = await svc.ListRecentSessionsAsync(dir, "/repo");
+                if (latest.Count == 1 && latest[0].Id == "v3") return;
+                await Task.Delay(50);
+            }
+            Assert.Fail("refresh flag wedged: recovery script result never landed");
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
+
+    [Fact]
     public async Task ExtractSession_ParsesCanonicalEventJsonL()
     {
         if (OperatingSystem.IsWindows()) return;

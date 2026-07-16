@@ -97,23 +97,25 @@ public static class SessionCommands
         }
 
         var names = adapter is null
-            ? manifests.LoadAll().Select(m => m.Name).ToList()
+            ? manifests.LoadAll().Where(m => m.Methods.ContainsKey("list_recent_sessions")).Select(m => m.Name).ToList()
             : new List<string> { adapter };
 
         var titleMap = BuildNookTitleMap(ctx.BaysDir);
-        var rows = new List<RecentSessionDto>();
-        foreach (var name in names)
+        var lookups = names.Select(async name =>
         {
             var dir = manifests.ResolveDir(name);
-            List<Cove.Adapters.RecentSession> found;
             try
             {
-                found = await sessions.ListRecentSessionsAsync(dir, cwd).ConfigureAwait(false);
+                return (name, sessions: await sessions.ListRecentSessionsAsync(dir, cwd).ConfigureAwait(false));
             }
             catch (Exception)
             {
-                continue;
+                return (name, sessions: new List<Cove.Adapters.RecentSession>());
             }
+        }).ToList();
+        var rows = new List<RecentSessionDto>();
+        foreach (var (name, found) in await Task.WhenAll(lookups).ConfigureAwait(false))
+        {
             foreach (var s in found)
             {
                 var label = titleMap.TryGetValue(s.Id, out var title) ? title : s.Name;

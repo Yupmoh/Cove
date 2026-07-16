@@ -216,4 +216,35 @@ public sealed class SessionRecentCommandTests
         Assert.False(resp!.Ok);
         Assert.Equal("not_ready", resp.Error!.Code);
     }
+
+    [Fact]
+    public async Task Recent_SkipsAdaptersThatDeclareNoSessionListing()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var root = CopyFixture("test-v2");
+        try
+        {
+            WriteListScript(Path.Combine(root, "test-v2"),
+                "echo '{\"sessions\":[{\"id\":\"s1\",\"name\":\"real\",\"cwd\":\"/repo/work\",\"lastActive\":\"2026-07-16T00:00:00Z\"}]}'\n");
+
+            var silent = Path.Combine(root, "methodless");
+            Directory.CreateDirectory(silent);
+            File.WriteAllText(Path.Combine(silent, "adapter.json"), """
+                {"sdkVersion":2,"name":"methodless","displayName":"Methodless","description":"t","accent":"#fff","binary":"methodless","version":"1.0.0","methods":{}}
+                """);
+            WriteListScript(silent,
+                "echo '{\"sessions\":[{\"id\":\"ghost\",\"name\":\"ghost\",\"cwd\":\"/repo/work\",\"lastActive\":\"2026-07-16T00:00:00Z\"}]}'\n");
+
+            var resp = await Route(root, new SessionRecentParams(null, null, "/repo/work"));
+
+            Assert.True(resp!.Ok);
+            var sessions = resp.Data!.Value.GetProperty("sessions");
+            var ids = new List<string>();
+            foreach (var s in sessions.EnumerateArray())
+                ids.Add(s.GetProperty("sessionId").GetString() ?? "");
+            Assert.Contains("s1", ids);
+            Assert.DoesNotContain("ghost", ids);
+        }
+        finally { try { Directory.Delete(root, true); } catch { } }
+    }
 }
