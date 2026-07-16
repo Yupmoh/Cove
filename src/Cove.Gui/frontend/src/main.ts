@@ -623,7 +623,7 @@ function makeNook(nookId: string, since: number): NookView {
   renderedStreamNookIds.add(nookId);
   const pv: NookView = { nookId, term, fit: fitAddon, serialize: serializeAddon, ws: null, el, consumed: since, expectedOffset: since, replayUntilOffset: since, lastAck: since, title: "", customTitle: "", headerTitleEl: titleSpan, search: searchAddon, replaying: true, resetOnReplay, restoringCheckpoint: false, keyboard: createKeyboardProtocolTracker(), lastSent: null, handlersBound: false, resizeObserver: null, fitFrame: null, reconnectTimer: null, checkpointTimer: null, exited: false };
 
-  el.addEventListener("mousedown", () => focusNook(nookId));
+  el.addEventListener("mousedown", () => { acknowledgeAgentAttention(nookId); focusNook(nookId); });
   const overrides = loadKeybindings();
   term.attachCustomKeyEventHandler((e) => {
     if (e.shiftKey && e.key === "Enter" && e.type !== "keydown") return false;
@@ -2156,6 +2156,14 @@ function renderFsLevel(host: HTMLElement, rootDir: string, dir: string, depth: n
     more.textContent = "… more entries not shown";
     host.appendChild(more);
   }
+}
+
+function acknowledgeAgentAttention(nookId: string): void {
+  if (mapAgentState(agentCards.find((card) => card.nookId === nookId)?.status ?? "idle") !== "done") return;
+  if (acknowledgedDoneNooks.has(nookId)) return;
+  acknowledgedDoneNooks.add(nookId);
+  syncAgentNookStateClasses();
+  if (sidebarModel.leftMode === "bays" && !collapsedOf(sidebarModel, "left")) renderSidebarContent("left");
 }
 
 function agentStateByNook(): Map<string, AgentState> {
@@ -6363,9 +6371,7 @@ function revealNook(nookId: string): void {
     void invoke("app.layoutMutate", { op: "activateSubtab", shoreId: shore.id, nookId: location.leaf.nookId, targetNookId: "", newNookId: "", orientation: "", name: "", dir: location.subtabIndex })
       .catch((error) => { console.warn("nook subtab activation failed", nookId, error); void reload(); });
   }
-  if (mapAgentState(agentCards.find((card) => card.nookId === nookId)?.status ?? "idle") === "done") {
-    acknowledgedDoneNooks.add(nookId);
-  }
+  acknowledgeAgentAttention(nookId);
   focusNook(nookId);
 }
 
