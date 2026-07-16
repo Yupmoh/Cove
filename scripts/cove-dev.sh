@@ -21,8 +21,8 @@ gui_pid() {
 }
 
 wait_gone() {
-  local pid="$1" tries=0
-  while kill -0 "$pid" 2>/dev/null && [ "$tries" -lt 50 ]; do
+  local pid="$1" tries=0 max="${2:-50}"
+  while kill -0 "$pid" 2>/dev/null && [ "$tries" -lt "$max" ]; do
     sleep 0.1
     tries=$((tries + 1))
   done
@@ -38,11 +38,11 @@ if [ "$MODE" = "restart" ] || [ "$MODE" = "restart-all" ]; then
   fi
 fi
 
+HANDOFF_FROM=""
 if [ "$MODE" = "restart-all" ]; then
   if pid="$(daemon_pid)"; then
-    echo "stopping daemon (pid $pid) — nooks respawn, harness sessions need --resume"
-    kill "$pid" 2>/dev/null || true
-    wait_gone "$pid"
+    echo "daemon (pid $pid) stays up — successor will take over live sessions"
+    HANDOFF_FROM="$pid"
   fi
 fi
 
@@ -61,7 +61,16 @@ fi
 echo "building solution (incremental)"
 dotnet build "$ROOT/Cove.slnx" -c Debug -v:q -clp:ErrorsOnly
 
-if daemon_pid > /dev/null; then
+if [ -n "$HANDOFF_FROM" ]; then
+  echo "starting successor daemon with live handoff"
+  COVE_HANDOFF=1 nohup "$ENGINE" daemon run --channel dev > /tmp/cove-daemon-dev.log 2>&1 &
+  wait_gone "$HANDOFF_FROM" 200
+  if kill -0 "$HANDOFF_FROM" 2>/dev/null; then
+    echo "handoff did not complete — predecessor still running, keeping it"
+  else
+    echo "handoff complete (log: /tmp/cove-daemon-dev.log)"
+  fi
+elif daemon_pid > /dev/null; then
   echo "daemon already running — sessions will reattach"
 else
   nohup "$ENGINE" daemon run --channel dev > /tmp/cove-daemon-dev.log 2>&1 &

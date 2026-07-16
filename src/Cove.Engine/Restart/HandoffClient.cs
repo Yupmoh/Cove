@@ -72,8 +72,7 @@ public static class HandoffClient
             }
 
             using var socket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
-            await socket.ConnectAsync(new UnixDomainSocketEndPoint(begin.SocketPath), cancellationToken).ConfigureAwait(false);
-            socket.Blocking = true;
+            socket.Connect(new UnixDomainSocketEndPoint(begin.SocketPath));
             var socketFd = (int)socket.Handle;
 
             for (var i = 0; i < begin.NookCount; i++)

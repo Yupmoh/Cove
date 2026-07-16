@@ -75,6 +75,10 @@ public sealed class UnixPtyHost : IPtyHost
                 "cove_pty native shim not found or ABI mismatch; expected libcove_pty next to the binary.");
         if (masterFd < 0 || pid <= 0)
             throw new ArgumentOutOfRangeException(nameof(masterFd), $"invalid adoption target fd={masterFd} pid={pid}");
+        int probe = CovePtyNative.Dup(masterFd);
+        if (probe < 0)
+            throw new ArgumentOutOfRangeException(nameof(masterFd), $"adoption fd {masterFd} unusable (errno {-probe})");
+        CovePtyNative.Close(probe);
         long id = Interlocked.Increment(ref _nextSessionId);
         _logger.UnixSessionAdopted(id, pid, masterFd);
         return new UnixPtySession(id, masterFd, pid, _logger, adopted: true);

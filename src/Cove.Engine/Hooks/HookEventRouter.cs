@@ -47,14 +47,14 @@ public sealed class HookEventRouter
 
     public event Action<string, string, string>? SessionStarted;
 
-    public void Seed(string nookId, string adapter, string? sessionId = null)
+    public void Seed(string nookId, string adapter, string? sessionId = null, string? status = null)
     {
         if (string.IsNullOrEmpty(nookId))
         {
             _logger?.HookEventNoNookId(adapter, "seed");
             return;
         }
-        _nookStates.GetOrAdd(nookId, _ => new NookAgentState(nookId, adapter, "idle", 0, System.DateTimeOffset.UtcNow, SessionId: sessionId));
+        _nookStates.GetOrAdd(nookId, _ => new NookAgentState(nookId, adapter, string.IsNullOrEmpty(status) ? "idle" : status, 0, System.DateTimeOffset.UtcNow, SessionId: sessionId));
     }
 
     public bool Acknowledge(string nookId)

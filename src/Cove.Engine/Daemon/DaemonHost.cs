@@ -130,8 +130,9 @@ public sealed class DaemonHost
         return null;
     }
 
-    private void AdoptTakenOverNooks(Cove.Engine.Restart.HandoffTakeover takeover, ILogger logger)
+    private HashSet<string> AdoptTakenOverNooks(Cove.Engine.Restart.HandoffTakeover takeover, ILogger logger)
     {
+        var adopted = new HashSet<string>();
         foreach (var item in takeover.Items)
         {
             var info = _nooks!.Adopt(item.Record, item.Fd, item.Ring);
@@ -139,16 +140,31 @@ public sealed class DaemonHost
             {
                 Cove.Platform.Pty.Unix.UnixFdChannel.CloseFd(item.Fd);
                 logger.HandoffAdoptionFellBack(item.Record.NookId);
-                continue;
+                try
+                {
+                    info = _nooks.RespawnAs(item.Record.NookId, item.Record.Command, item.Record.Args,
+                        item.Record.Cwd ?? item.Record.SpawnCwd, item.Record.Cols, item.Record.Rows,
+                        priorScrollback: item.Ring.Length > 0 ? item.Ring : null,
+                        adapter: item.Record.Adapter, agentName: item.Record.AgentName);
+                }
+                catch (Exception ex)
+                {
+                    DaemonLog.Write(_paths, $"handoff fallback respawn failed nook={item.Record.NookId}: {ex.Message}");
+                    continue;
+                }
             }
             if (item.Record.Adapter is { } adapter)
             {
-                _agentRouter?.Register(info.NookId, adapter, item.Record.AgentName);
+                _agentRouter?.Register(info.NookId, adapter, item.Record.AgentName, status: item.Record.HookStatus ?? "idle");
                 _sessions?.Register(info.NookId, adapter, item.Record.SessionId);
-                _hookRouter?.Seed(info.NookId, adapter, item.Record.SessionId);
+                _hookRouter?.Seed(info.NookId, adapter, item.Record.SessionId, item.Record.HookStatus);
             }
+            adopted.Add(info.NookId);
             logger.HandoffSuccessorAdopted(info.NookId, item.Record.Adapter ?? "");
         }
+        if (takeover.Items.Count > 0)
+            BroadcastEvent("state.changed", new Cove.Protocol.StateChangedEvent("cove://events/handoff.adopted"), Cove.Protocol.CoveJsonContext.Default.StateChangedEvent);
+        return adopted;
     }
 
     private ControlResponse BeginHandoff(string requestId)
@@ -178,13 +194,17 @@ public sealed class DaemonHost
         return new ControlResponse(requestId, true, ToElement(new HandoffBeginResult(items.Count, socketPath), CoveJsonContext.Default.HandoffBeginResult));
     }
 
-    private async Task ServeHandoffAsync(System.Net.Sockets.Socket listener, string socketPath, List<Cove.Engine.Pty.HandoffExportItem> items)
+    private Task ServeHandoffAsync(System.Net.Sockets.Socket listener, string socketPath, List<Cove.Engine.Pty.HandoffExportItem> items) => Task.Run(() => ServeHandoff(listener, socketPath, items));
+
+    private void ServeHandoff(System.Net.Sockets.Socket listener, string socketPath, List<Cove.Engine.Pty.HandoffExportItem> items)
     {
         try
         {
-            using var acceptCts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-            using var accepted = await listener.AcceptAsync(acceptCts.Token).ConfigureAwait(false);
-            accepted.Blocking = true;
+            if (!listener.Poll(15_000_000, System.Net.Sockets.SelectMode.SelectRead))
+                throw new TimeoutException("no successor connected within 15s");
+            using var accepted = listener.Accept();
+            accepted.SendTimeout = 10000;
+            accepted.ReceiveTimeout = 10000;
             var socketFd = (int)accepted.Handle;
             foreach (var item in items)
                 Cove.Engine.Restart.HandoffWire.WriteRecord(socketFd, item.Record, item.MasterFd, item.RingTail);
@@ -398,6 +418,7 @@ public sealed class DaemonHost
         var restoreEnabled = _config?.GetSessionRestoreOnLaunch() ?? true;
         Cove.Engine.Restart.ResumeCommand BuildResume(string adapter, string sessionId, Cove.Engine.Restart.LauncherOverrides o)
             => resumeProtocol.BuildResumeCommandAsync(adapter, sessionId, o).GetAwaiter().GetResult();
+        var adoptedIds = takeover is not null ? AdoptTakenOverNooks(takeover, logger) : new HashSet<string>();
         var restoreTotals = new Cove.Engine.Restart.RestoreSummary(0, 0, 0);
         foreach (var entry in loadedBays)
         {
@@ -405,7 +426,7 @@ public sealed class DaemonHost
             var restorables = new List<Cove.Engine.Restart.RestorableNook?>();
             foreach (var shore in sl.Shores)
                 foreach (var leaf in Cove.Engine.Layout.MosaicOps.Leaves(shore.LayoutTree))
-                    if (entry.Sessions.TryGetValue(leaf.NookId, out var d))
+                    if (entry.Sessions.TryGetValue(leaf.NookId, out var d) && !adoptedIds.Contains(d.NookId))
                         restorables.Add(new Cove.Engine.Restart.RestorableNook(d.NookId, d.Command, d.Args, d.Cwd, d.Title, d.Adapter, d.AgentName, d.SessionId, d.Yolo, d.Cols, d.Rows));
             var spawner = new RestoreSpawner(_nooks!, entry.BayDir, sl.Id, _agentRouter, _sessions, _hookRouter, logger);
             var restorer = new Cove.Engine.Restart.SessionRestorer(spawner, BuildResume, logger);
@@ -464,8 +485,6 @@ public sealed class DaemonHost
             try { File.Delete(_paths.SocketPath); }
             catch (Exception ex) { DaemonLog.Write(_paths, "stale unlink failed: " + ex.Message); }
         }
-        if (takeover is not null)
-            AdoptTakenOverNooks(takeover, logger);
 
 
         IControlListener listener;

@@ -59,6 +59,48 @@ public sealed class UnixAdoptionTests
     }
 
     [Fact]
+    public void AdoptSession_RejectsClosedFd()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var host = PtyHostFactory.Create(NullLogger.Instance);
+        var (a, b) = Cove.Platform.Pty.Unix.UnixFdChannel.CreateSocketPair();
+        Cove.Platform.Pty.Unix.UnixFdChannel.CloseFd(a);
+        Cove.Platform.Pty.Unix.UnixFdChannel.CloseFd(b);
+        Assert.Throws<ArgumentOutOfRangeException>(() => host.AdoptSession(a, 1));
+    }
+
+    [Fact]
+    public void AdoptedSession_ObservesProcessExit()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var logger = NullLogger.Instance;
+        var predecessor = PtyHostFactory.Create(logger);
+        var original = predecessor.Spawn(new PtySpawnRequest
+        {
+            Command = "/bin/sh",
+            Args = new[] { "-c", "sleep 300" },
+            Cols = 80,
+            Rows = 24,
+        });
+        Assert.True(predecessor.TryExportSession(original, out var masterFd, out var pid));
+        var successor = PtyHostFactory.Create(logger);
+        var adopted = successor.AdoptSession(masterFd, pid);
+        try
+        {
+            adopted.Kill();
+            var sw = Stopwatch.StartNew();
+            var exit = adopted.WaitForExit();
+            Assert.Equal(-1, exit);
+            Assert.True(adopted.HasExited);
+            Assert.True(sw.Elapsed.TotalSeconds < 10);
+        }
+        finally
+        {
+            adopted.Dispose();
+        }
+    }
+
+    [Fact]
     public void FakeHostsWithoutHandoff_DeclineExport()
     {
         var host = new NoHandoffHost();

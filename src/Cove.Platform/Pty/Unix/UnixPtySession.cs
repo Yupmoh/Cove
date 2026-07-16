@@ -111,9 +111,17 @@ public sealed class UnixPtySession : IPtySession
             return _exitCode;
         if (_adopted)
         {
+            try
+            {
+                if (!ProcessExitWatch.WaitForExitAsync(_pid).Wait(TimeSpan.FromSeconds(2)))
+                    _logger.UnixAdoptedExitUnobservable(SessionId, _pid);
+            }
+            catch (AggregateException)
+            {
+                _logger.UnixAdoptedExitUnobservable(SessionId, _pid);
+            }
             _exitCode = -1;
             Volatile.Write(ref _hasExited, 1);
-            _logger.UnixAdoptedExitUnobservable(SessionId, _pid);
             _logger.SessionExited(SessionId, _exitCode);
             return -1;
         }
