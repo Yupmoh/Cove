@@ -1,5 +1,5 @@
-using Microsoft.Extensions.Logging;
 using Cove.Platform;
+using Microsoft.Extensions.Logging;
 
 namespace Cove.Cli;
 
