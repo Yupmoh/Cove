@@ -60,7 +60,9 @@
         "oneOf": [
           {
             "type": "object",
-            "required": ["script"],
+            "required": [
+              "script"
+            ],
             "properties": {
               "script": {
                 "type": "string",
@@ -72,7 +74,9 @@
           },
           {
             "type": "object",
-            "required": ["static"],
+            "required": [
+              "static"
+            ],
             "properties": {
               "static": {
                 "type": "string",
@@ -100,15 +104,57 @@
         "sessionStartManifest": {
           "description": "Envelope wrapping the SessionStart manifest stdout. 'identity' = raw text/plain (Claude Code, Codex, Grok); 'hookSpecificOutput' = JSON {hookSpecificOutput: {hookEventName, additionalContext}} (Gemini); 'flatAdditionalContext' = JSON {additional_context} (Cursor); 'none' = empty body (skip injection).",
           "oneOf": [
-            { "type": "object", "required": ["kind"], "properties": { "kind": { "const": "identity" } }, "additionalProperties": false },
-            { "type": "object", "required": ["kind"], "properties": { "kind": { "const": "flatAdditionalContext" } }, "additionalProperties": false },
-            { "type": "object", "required": ["kind"], "properties": { "kind": { "const": "none" } }, "additionalProperties": false },
             {
               "type": "object",
-              "required": ["kind", "hookEventName"],
+              "required": [
+                "kind"
+              ],
               "properties": {
-                "kind": { "const": "hookSpecificOutput" },
-                "hookEventName": { "type": "string", "minLength": 1, "description": "Value placed in hookSpecificOutput.hookEventName (e.g. 'SessionStart', 'BeforeAgent')." }
+                "kind": {
+                  "const": "identity"
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "required": [
+                "kind"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "flatAdditionalContext"
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "required": [
+                "kind"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "none"
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "required": [
+                "kind",
+                "hookEventName"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "hookSpecificOutput"
+                },
+                "hookEventName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Value placed in hookSpecificOutput.hookEventName (e.g. 'SessionStart', 'BeforeAgent')."
+                }
               },
               "additionalProperties": false
             }
@@ -117,14 +163,37 @@
         "userPromptSubmit": {
           "description": "Envelope wrapping the sigil-resolution response for the UserPromptSubmit (or equivalent) hook. 'hookSpecificOutput' is the Claude-Code-shaped envelope used by claude-code/codex/gemini/grok. 'none' is used by adapters with no same-turn injection primitive (cursor-agent).",
           "oneOf": [
-            { "type": "object", "required": ["kind"], "properties": { "kind": { "const": "none" } }, "additionalProperties": false },
             {
               "type": "object",
-              "required": ["kind", "hookEventName"],
+              "required": [
+                "kind"
+              ],
               "properties": {
-                "kind": { "const": "hookSpecificOutput" },
-                "hookEventName": { "type": "string", "minLength": 1, "description": "Value placed in hookSpecificOutput.hookEventName (e.g. 'UserPromptSubmit', 'BeforeAgent')." },
-                "includeSystemMessage": { "type": "boolean", "description": "When true, the envelope also includes a top-level 'systemMessage' field with the resolution status line. Defaults to false. Set true for claude-code/gemini/grok; false for codex." }
+                "kind": {
+                  "const": "none"
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "required": [
+                "kind",
+                "hookEventName"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "hookSpecificOutput"
+                },
+                "hookEventName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Value placed in hookSpecificOutput.hookEventName (e.g. 'UserPromptSubmit', 'BeforeAgent')."
+                },
+                "includeSystemMessage": {
+                  "type": "boolean",
+                  "description": "When true, the envelope also includes a top-level 'systemMessage' field with the resolution status line. Defaults to false. Set true for claude-code/gemini/grok; false for codex."
+                }
               },
               "additionalProperties": false
             }
@@ -133,14 +202,37 @@
         "preToolUse": {
           "description": "Epic 77 Story 77.5. Envelope + injection-capability for the PreToolUse hook (atrium's RunCommandStatusProvider injects a terse 'these run-commands are already running' nudge here, before a shell-class tool call). 'hookSpecificOutput' is the Claude-Code-shaped envelope (capable: atrium renders the assembled nudge in it). 'none' (or an omitted preToolUse field) means the adapter CANNOT inject at PreToolUse — the conservative default. Only set a non-none kind for an adapter VERIFIED to consume injected PreToolUse context.",
           "oneOf": [
-            { "type": "object", "required": ["kind"], "properties": { "kind": { "const": "none" } }, "additionalProperties": false },
             {
               "type": "object",
-              "required": ["kind", "hookEventName"],
+              "required": [
+                "kind"
+              ],
               "properties": {
-                "kind": { "const": "hookSpecificOutput" },
-                "hookEventName": { "type": "string", "minLength": 1, "description": "Value placed in hookSpecificOutput.hookEventName (e.g. 'PreToolUse')." },
-                "includeSystemMessage": { "type": "boolean", "description": "When true, the envelope also includes a top-level 'systemMessage' field. Defaults to false." }
+                "kind": {
+                  "const": "none"
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "required": [
+                "kind",
+                "hookEventName"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "hookSpecificOutput"
+                },
+                "hookEventName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Value placed in hookSpecificOutput.hookEventName (e.g. 'PreToolUse')."
+                },
+                "includeSystemMessage": {
+                  "type": "boolean",
+                  "description": "When true, the envelope also includes a top-level 'systemMessage' field. Defaults to false."
+                }
               },
               "additionalProperties": false
             }
@@ -149,14 +241,37 @@
         "postToolUse": {
           "description": "Epic 78 Story 78.1/78.3. Envelope + injection-capability for the PostToolUse hook (the carried hook payload is the tool RESULT rather than the tool input). 'hookSpecificOutput' is the Claude-Code-shaped envelope (capable: atrium renders the assembled injection in it). 'none' (or an omitted postToolUse field) means the adapter CANNOT inject at PostToolUse — the conservative default. Only set a non-none kind for an adapter VERIFIED to consume injected PostToolUse context. Per-adapter capability is declared in Story 78.3.",
           "oneOf": [
-            { "type": "object", "required": ["kind"], "properties": { "kind": { "const": "none" } }, "additionalProperties": false },
             {
               "type": "object",
-              "required": ["kind", "hookEventName"],
+              "required": [
+                "kind"
+              ],
               "properties": {
-                "kind": { "const": "hookSpecificOutput" },
-                "hookEventName": { "type": "string", "minLength": 1, "description": "Value placed in hookSpecificOutput.hookEventName (e.g. 'PostToolUse')." },
-                "includeSystemMessage": { "type": "boolean", "description": "When true, the envelope also includes a top-level 'systemMessage' field. Defaults to false." }
+                "kind": {
+                  "const": "none"
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "required": [
+                "kind",
+                "hookEventName"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "hookSpecificOutput"
+                },
+                "hookEventName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Value placed in hookSpecificOutput.hookEventName (e.g. 'PostToolUse')."
+                },
+                "includeSystemMessage": {
+                  "type": "boolean",
+                  "description": "When true, the envelope also includes a top-level 'systemMessage' field. Defaults to false."
+                }
               },
               "additionalProperties": false
             }
@@ -172,12 +287,18 @@
         "commands": {
           "type": "array",
           "description": "Candidate binary names to search on PATH, in priority order.",
-          "items": { "type": "string", "minLength": 1 }
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "wellKnownPaths": {
           "type": "array",
           "description": "Absolute or ~-prefixed fallback paths probed when no command resolves on PATH.",
-          "items": { "type": "string", "minLength": 1 }
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       },
       "additionalProperties": false
@@ -188,7 +309,9 @@
       "properties": {
         "macos": {
           "type": "object",
-          "required": ["cmd"],
+          "required": [
+            "cmd"
+          ],
           "properties": {
             "cmd": {
               "type": "string",
@@ -204,7 +327,9 @@
         },
         "linux": {
           "type": "object",
-          "required": ["cmd"],
+          "required": [
+            "cmd"
+          ],
           "properties": {
             "cmd": {
               "type": "string",
@@ -220,7 +345,9 @@
         },
         "windows": {
           "type": "object",
-          "required": ["cmd"],
+          "required": [
+            "cmd"
+          ],
           "properties": {
             "cmd": {
               "type": "string",
@@ -256,7 +383,11 @@
     "retention": {
       "type": "object",
       "description": "SDK v2. Optional. Declares the underlying tool's session retention knobs so atrium can render a 'click to extend' chip in the adapter nook footer and write new values via the tool's own config file. Adapters whose tool has no retention cap omit this field entirely; the chip is skipped.",
-      "required": ["fields", "readScript", "writeScript"],
+      "required": [
+        "fields",
+        "readScript",
+        "writeScript"
+      ],
       "properties": {
         "fields": {
           "type": "array",
@@ -264,15 +395,45 @@
           "description": "List of retention knobs. Each entry describes one numeric setting (days, max sessions, etc.) the user can extend.",
           "items": {
             "type": "object",
-            "required": ["key", "label", "default", "recommended"],
+            "required": [
+              "key",
+              "label",
+              "default",
+              "recommended"
+            ],
             "properties": {
-              "key": { "type": "string", "minLength": 1, "description": "Identifier passed back to the writeScript as key=value." },
-              "label": { "type": "string", "minLength": 1, "description": "Human-readable label shown in the modal." },
-              "unit": { "type": "string", "description": "Short suffix shown after the value in the chip (e.g. 'd' for days, 's' for sessions)." },
-              "default": { "type": "integer", "minimum": 0, "description": "Documented default the underlying tool uses out of the box." },
-              "recommended": { "type": "integer", "minimum": 1, "description": "Threshold at or above which the retention chip is hidden. Also pre-filled in the modal." },
-              "min": { "type": "integer", "minimum": 0 },
-              "max": { "type": "integer", "minimum": 1 }
+              "key": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Identifier passed back to the writeScript as key=value."
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Human-readable label shown in the modal."
+              },
+              "unit": {
+                "type": "string",
+                "description": "Short suffix shown after the value in the chip (e.g. 'd' for days, 's' for sessions)."
+              },
+              "default": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Documented default the underlying tool uses out of the box."
+              },
+              "recommended": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Threshold at or above which the retention chip is hidden. Also pre-filled in the modal."
+              },
+              "min": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "max": {
+                "type": "integer",
+                "minimum": 1
+              }
             },
             "additionalProperties": false
           }
@@ -293,7 +454,11 @@
     "sessionExtractor": {
       "type": "object",
       "description": "SDK v2. Optional. Declares an adapter-owned script that extracts native-transcript content into the canonical event stream consumed by atrium's session FTS index. When present, atrium's indexer invokes the script per session at backfill + live-watch time. See canonical-event.schema.json for the JSONL contract.",
-      "required": ["script", "schemaVersion", "supportsDepths"],
+      "required": [
+        "script",
+        "schemaVersion",
+        "supportsDepths"
+      ],
       "properties": {
         "script": {
           "type": "string",
@@ -309,8 +474,183 @@
           "type": "array",
           "minItems": 1,
           "uniqueItems": true,
-          "items": { "enum": ["quick", "standard", "deep"] },
+          "items": {
+            "enum": [
+              "quick",
+              "standard",
+              "deep"
+            ]
+          },
           "description": "Depth presets this script supports. Adapters MAY declare a subset if their transcript format only supports a degraded extraction (e.g. ['quick'] for an unstable transcript format)."
+        }
+      },
+      "additionalProperties": false
+    },
+    "update": {
+      "type": "object",
+      "description": "SDK v2. Optional. Per-platform update recipe run from the Tools UI. Same shape as 'install'.",
+      "properties": {
+        "macos": {
+          "type": "object",
+          "required": [
+            "cmd"
+          ],
+          "properties": {
+            "cmd": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Shell command line atrium runs to install the binary (e.g. 'npm install -g @anthropic-ai/claude-code')."
+            },
+            "postInstallAuth": {
+              "type": "boolean",
+              "description": "When true, the tool requires an interactive sign-in after install; atrium surfaces the Binary-row 'Sign-in required' note."
+            }
+          },
+          "additionalProperties": false
+        },
+        "linux": {
+          "type": "object",
+          "required": [
+            "cmd"
+          ],
+          "properties": {
+            "cmd": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Shell command line atrium runs to install the binary (e.g. 'npm install -g @anthropic-ai/claude-code')."
+            },
+            "postInstallAuth": {
+              "type": "boolean",
+              "description": "When true, the tool requires an interactive sign-in after install; atrium surfaces the Binary-row 'Sign-in required' note."
+            }
+          },
+          "additionalProperties": false
+        },
+        "windows": {
+          "type": "object",
+          "required": [
+            "cmd"
+          ],
+          "properties": {
+            "cmd": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Shell command line atrium runs to install the binary (e.g. 'npm install -g @anthropic-ai/claude-code')."
+            },
+            "postInstallAuth": {
+              "type": "boolean",
+              "description": "When true, the tool requires an interactive sign-in after install; atrium surfaces the Binary-row 'Sign-in required' note."
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "uninstall": {
+      "type": "object",
+      "description": "SDK v2. Optional. Per-platform uninstall recipe run from the Tools UI. Same shape as 'install'.",
+      "properties": {
+        "macos": {
+          "type": "object",
+          "required": [
+            "cmd"
+          ],
+          "properties": {
+            "cmd": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Shell command line atrium runs to install the binary (e.g. 'npm install -g @anthropic-ai/claude-code')."
+            },
+            "postInstallAuth": {
+              "type": "boolean",
+              "description": "When true, the tool requires an interactive sign-in after install; atrium surfaces the Binary-row 'Sign-in required' note."
+            }
+          },
+          "additionalProperties": false
+        },
+        "linux": {
+          "type": "object",
+          "required": [
+            "cmd"
+          ],
+          "properties": {
+            "cmd": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Shell command line atrium runs to install the binary (e.g. 'npm install -g @anthropic-ai/claude-code')."
+            },
+            "postInstallAuth": {
+              "type": "boolean",
+              "description": "When true, the tool requires an interactive sign-in after install; atrium surfaces the Binary-row 'Sign-in required' note."
+            }
+          },
+          "additionalProperties": false
+        },
+        "windows": {
+          "type": "object",
+          "required": [
+            "cmd"
+          ],
+          "properties": {
+            "cmd": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Shell command line atrium runs to install the binary (e.g. 'npm install -g @anthropic-ai/claude-code')."
+            },
+            "postInstallAuth": {
+              "type": "boolean",
+              "description": "When true, the tool requires an interactive sign-in after install; atrium surfaces the Binary-row 'Sign-in required' note."
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "screenState": {
+      "type": "object",
+      "description": "SDK v2. Optional. Screen-state detection rules for hookless adapters: regex rules evaluated top-down (first match wins) against the ANSI-stripped tail of the live terminal ring. Ignored when the adapter declares hooks.",
+      "properties": {
+        "quietMs": {
+          "type": "integer",
+          "minimum": 250,
+          "description": "Milliseconds of ring silence before the nook is considered idle. Default 2000."
+        },
+        "tailBytes": {
+          "type": "integer",
+          "minimum": 256,
+          "maximum": 65536,
+          "description": "How many trailing ring bytes to inspect. Default 4096."
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "pattern",
+              "status"
+            ],
+            "properties": {
+              "pattern": {
+                "type": "string",
+                "minLength": 1,
+                "description": ".NET regex evaluated against the stripped tail."
+              },
+              "status": {
+                "enum": [
+                  "idle",
+                  "active",
+                  "tool-running",
+                  "needs-input",
+                  "needs-permission",
+                  "done",
+                  "error"
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
         }
       },
       "additionalProperties": false

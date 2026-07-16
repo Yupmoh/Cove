@@ -48,4 +48,10 @@ internal static partial class HookLog
 
     [ZLoggerMessage(3401, LogLevel.Information, "hook state transition nook={nookId} adapter={adapter} event={eventName} status={status}")]
     public static partial void HookStateTransition(this ILogger logger, string nookId, string adapter, string eventName, string status);
+
+    [ZLoggerMessage(3402, LogLevel.Information, "screen state transition nook={nookId} adapter={adapter} status={status}")]
+    public static partial void ScreenStateTransition(this ILogger logger, string nookId, string adapter, string status);
+
+    [ZLoggerMessage(3403, LogLevel.Warning, "screen state scan failed error={error}")]
+    public static partial void ScreenScanFailed(this ILogger logger, string error);
 }

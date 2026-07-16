@@ -35,6 +35,11 @@ public sealed class HookEventRouter
         "rate-limited", "auth-failed", "billing-exceeded",
     };
 
+    private static readonly HashSet<string> InputStatuses = new()
+    {
+        "needs-input", "needs-permission",
+    };
+
     private readonly ConcurrentDictionary<string, NookAgentState> _nookStates = new();
     private readonly ILogger? _logger;
 
@@ -73,6 +78,24 @@ public sealed class HookEventRouter
         }
         _logger?.HookAcknowledgeUnknownNook(nookId);
         return false;
+    }
+
+    public void ScreenTransition(string nookId, string adapter, string status)
+    {
+        var prior = _nookStates.TryGetValue(nookId, out var existing) ? existing : null;
+        if (prior is not null && prior.Status == status)
+            return;
+        if (prior is null)
+            _nookStates[nookId] = new NookAgentState(nookId, adapter, status, 0, System.DateTimeOffset.UtcNow);
+        else
+            UpdateState(nookId, s => s.WithStatus(status));
+        var wasInput = prior is not null && InputStatuses.Contains(prior.Status);
+        var isInput = InputStatuses.Contains(status);
+        if (isInput && !wasInput)
+            NeedsInputTransition?.Invoke(nookId, true);
+        else if (wasInput && !isInput)
+            NeedsInputTransition?.Invoke(nookId, false);
+        _logger?.ScreenStateTransition(nookId, adapter, status);
     }
 
     public void Route(HookEvent ev)

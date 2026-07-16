@@ -38,6 +38,7 @@ public sealed class DaemonHost
     private NookRegistry? _nooks;
     private Cove.Engine.Layout.LayoutService? _layout;
     private System.Threading.Timer? _scrollbackTimer;
+    private Cove.Engine.Agents.ScreenStateScanner? _screenScanner;
     private Cove.Engine.Bays.BayManager? _bays;
     private Cove.Engine.Bays.RunCommandService? _runCommands;
     private Cove.Engine.Restart.RestorationService? _restoration;
@@ -478,6 +479,8 @@ public sealed class DaemonHost
             PersistAllScrollback(baysRoot, logger);
             FlushDirtyBays(baysRoot, logger);
         }, null, System.TimeSpan.FromSeconds(15), System.TimeSpan.FromSeconds(15));
+        _screenScanner = new Cove.Engine.Agents.ScreenStateScanner(_nooks!, _hookRouter, a => _manifestStore?.Load(a), logger);
+        _screenScanner.Start();
         if (!OperatingSystem.IsWindows() && File.Exists(_paths.SocketPath))
         {
             if (_endpoint.TryProbe(250))
@@ -535,6 +538,7 @@ public sealed class DaemonHost
         try { _restoration?.MarkCleanShutdown(); } catch (System.Exception ex) { logger.LogWarning(ex, "clean-shutdown marker failed"); }
         try { PersistAllScrollback(System.IO.Path.Combine(_paths.DataDir.Root, "bays"), logger); } catch (System.Exception ex) { logger.LogWarning(ex, "shutdown scrollback snapshot failed"); }
         try { FlushDirtyBays(System.IO.Path.Combine(_paths.DataDir.Root, "bays"), logger); } catch (System.Exception ex) { logger.LogWarning(ex, "shutdown bay snapshot flush failed"); }
+        _screenScanner?.Dispose();
         _scrollbackTimer?.Dispose();
         if (_runCommands is not null)
             await _runCommands.DisposeAsync().ConfigureAwait(false);

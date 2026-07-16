@@ -8,7 +8,10 @@
   "version": "1.0.0",
   "author": "Cove",
   "binaryDiscovery": {
-    "commands": ["cursor-agent", "agent"],
+    "commands": [
+      "cursor-agent",
+      "agent"
+    ],
     "wellKnownPaths": [
       "~/.local/bin",
       "/opt/homebrew/bin",
@@ -18,16 +21,45 @@
     "versionRegex": "(\\d+\\.\\d+(?:\\.\\d+)?)"
   },
   "install": {
-    "macos": { "cmd": "curl https://cursor.com/install -fsS | bash" },
-    "linux": { "cmd": "curl https://cursor.com/install -fsS | bash" }
+    "macos": {
+      "cmd": "curl https://cursor.com/install -fsS | bash"
+    },
+    "linux": {
+      "cmd": "curl https://cursor.com/install -fsS | bash"
+    }
   },
   "update": {
-    "macos": { "cmd": "agent update" },
-    "linux": { "cmd": "agent update" }
+    "macos": {
+      "cmd": "agent update"
+    },
+    "linux": {
+      "cmd": "agent update"
+    }
   },
   "uninstall": {
-    "macos": { "cmd": "rm -f ~/.local/bin/cursor-agent ~/.local/bin/agent && rm -rf ~/.local/share/cursor-agent" },
-    "linux": { "cmd": "rm -f ~/.local/bin/cursor-agent ~/.local/bin/agent && rm -rf ~/.local/share/cursor-agent" }
+    "macos": {
+      "cmd": "rm -f ~/.local/bin/cursor-agent ~/.local/bin/agent && rm -rf ~/.local/share/cursor-agent"
+    },
+    "linux": {
+      "cmd": "rm -f ~/.local/bin/cursor-agent ~/.local/bin/agent && rm -rf ~/.local/share/cursor-agent"
+    }
   },
-  "methods": {}
+  "methods": {},
+  "screenState": {
+    "quietMs": 2500,
+    "rules": [
+      {
+        "pattern": "(?im)(allow|approve|grant|permission).{0,80}(y/n|yes/no|\\[y|\\(y\\))",
+        "status": "needs-permission"
+      },
+      {
+        "pattern": "(?im)^.{0,120}(\\(y/n\\)|\\[y/n\\]|\\[y/N\\]|press (enter|y) to)",
+        "status": "needs-input"
+      },
+      {
+        "pattern": "(?i)(esc to interrupt|ctrl\\+c to (cancel|interrupt)|thinking|working\\.{2,3})",
+        "status": "active"
+      }
+    ]
+  }
 }

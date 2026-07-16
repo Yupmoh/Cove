@@ -32,5 +32,22 @@
       "cmd": "npm install -g --allow-scripts=opencode-ai opencode-ai@latest"
     }
   },
-  "methods": {}
+  "methods": {},
+  "screenState": {
+    "quietMs": 2500,
+    "rules": [
+      {
+        "pattern": "(?im)(allow|approve|grant|permission).{0,80}(y/n|yes/no|\\[y|\\(y\\))",
+        "status": "needs-permission"
+      },
+      {
+        "pattern": "(?im)^.{0,120}(\\(y/n\\)|\\[y/n\\]|\\[y/N\\]|press (enter|y) to)",
+        "status": "needs-input"
+      },
+      {
+        "pattern": "(?i)(esc to interrupt|ctrl\\+c to (cancel|interrupt)|thinking|working\\.{2,3})",
+        "status": "active"
+      }
+    ]
+  }
 }

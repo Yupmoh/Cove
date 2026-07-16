@@ -64,8 +64,24 @@ public sealed class ScreenStateDetectorTests
     public void Evaluate_MatchEqualToCurrent_ReturnsNull()
     {
         var decl = Decl(("ready", "idle"));
-        var status = ScreenStateDetector.Evaluate(decl, "ready", ringAdvanced: false, quietElapsed: false, currentStatus: "idle");
+        var status = ScreenStateDetector.Evaluate(decl, "ready", ringAdvanced: true, quietElapsed: false, currentStatus: "idle");
         Assert.Null(status);
+    }
+
+    [Fact]
+    public void Evaluate_Quiet_DoesNotDecayWaitingPrompt()
+    {
+        var decl = Decl(("(?i)allow", "needs-permission"));
+        var status = ScreenStateDetector.Evaluate(decl, "", ringAdvanced: false, quietElapsed: true, currentStatus: "needs-permission");
+        Assert.Null(status);
+    }
+
+    [Fact]
+    public void Evaluate_AnsweredPrompt_DeltaWithoutPromptGoesActive()
+    {
+        var decl = Decl(("(?i)allow this tool", "needs-permission"));
+        var status = ScreenStateDetector.Evaluate(decl, "y\ngranted y\nfinishing", ringAdvanced: true, quietElapsed: false, currentStatus: "needs-permission");
+        Assert.Equal("active", status);
     }
 
     [Fact]

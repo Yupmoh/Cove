@@ -186,6 +186,34 @@ public sealed class NookRegistry : IDisposable, Cove.Engine.Agents.INookWriter
         }
     }
 
+    public List<(string NookId, string Adapter)> ListAdapterNooks()
+    {
+        lock (_sync)
+        {
+            var result = new List<(string, string)>();
+            foreach (NookSession nook in _nooks.Values)
+                if (!string.IsNullOrEmpty(nook.Adapter))
+                    result.Add((nook.NookId, nook.Adapter!));
+            return result;
+        }
+    }
+
+    public (long Head, byte[] Delta)? TryGetScreenSample(string nookId, long sinceOffset, int maxBytes)
+    {
+        NookSession? nook;
+        lock (_sync)
+            _nooks.TryGetValue(nookId, out nook);
+        if (nook is null || nook.Reader.HasCompleted)
+            return null;
+        var head = nook.Ring.Head;
+        var from = Math.Max(nook.Ring.Tail, Math.Max(sinceOffset, head - maxBytes));
+        if (from >= head)
+            return (head, System.Array.Empty<byte>());
+        if (!nook.Ring.TrySnapshotFrom(from, out var delta))
+            return null;
+        return (head, delta);
+    }
+
     public bool Write(string nookId, ReadOnlySpan<byte> data)
     {
         if (!TryGet(nookId, out NookSession nook))
