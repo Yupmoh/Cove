@@ -28,7 +28,7 @@ export const AGENT_STATE_META: Record<AgentState, AgentStateMeta> = {
   "needs-input": { state: "needs-input", label: "needs input", color: "#e0a44a", order: 0 },
   running: { state: "running", label: "running", color: "#34c2b0", order: 1 },
   idle: { state: "idle", label: "idle", color: "#8ca2a9", order: 2 },
-  done: { state: "done", label: "needs attention", color: "#5fc08a", order: 3 },
+  done: { state: "done", label: "done", color: "#5fc08a", order: 3 },
 };
 
 export const AGENT_STATE_ORDER: AgentState[] = ["needs-input", "running", "idle", "done"];

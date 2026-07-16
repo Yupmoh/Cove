@@ -117,6 +117,6 @@ describe("AGENT_STATE_META", () => {
     expect(AGENT_STATE_META["needs-input"].label).toBe("needs input");
     expect(AGENT_STATE_META.running.label).toBe("running");
     expect(AGENT_STATE_META.idle.label).toBe("idle");
-    expect(AGENT_STATE_META.done.label).toBe("needs attention");
+    expect(AGENT_STATE_META.done.label).toBe("done");
   });
 });
