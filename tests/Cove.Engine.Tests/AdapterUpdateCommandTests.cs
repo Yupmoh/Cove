@@ -40,6 +40,20 @@ public sealed class AdapterUpdateCommandTests
     }
 
     [Fact]
+    public void RenamedBrewFormula_UsesThePathSegmentNotTheAdapterName()
+    {
+        var cmd = AdapterListCommands.ResolveUpdateCommand(Manifest("claude-code"), "/opt/homebrew/Cellar/claude-code-nightly/2.0.0/bin/claude");
+        Assert.Equal("brew upgrade claude-code-nightly", cmd);
+    }
+
+    [Fact]
+    public void MalformedCellarPath_FallsBackToTheKnownFormulaName()
+    {
+        var cmd = AdapterListCommands.ResolveUpdateCommand(Manifest("gemini"), "/opt/homebrew/Cellar/");
+        Assert.Equal("brew upgrade gemini-cli", cmd);
+    }
+
+    [Fact]
     public void BunGlobalBinary_UpdatesThroughBun()
     {
         var cmd = AdapterListCommands.ResolveUpdateCommand(Manifest("omp"), "/Users/x/.bun/install/global/node_modules/@oh-my-pi/pi-coding-agent/dist/cli.js");

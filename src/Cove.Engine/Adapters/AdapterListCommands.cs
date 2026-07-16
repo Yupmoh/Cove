@@ -39,7 +39,7 @@ public static class AdapterListCommands
 
         var path = binaryRealPath ?? "";
         if (path.Contains("/Cellar/", StringComparison.Ordinal) || path.Contains("/Caskroom/", StringComparison.Ordinal))
-            return $"brew upgrade {BrewName(manifest)}";
+            return $"brew upgrade {BrewName(manifest, path)}";
 
         var npmPackage = manifest.Name switch
         {
@@ -56,12 +56,28 @@ public static class AdapterListCommands
         return $"npm install -g {npmPackage}@latest";
     }
 
-    private static string BrewName(AdapterManifest manifest) => manifest.Name switch
+    private static string BrewName(AdapterManifest manifest, string path)
     {
-        "claude-code" => "claude-code",
-        "gemini" => "gemini-cli",
-        _ => manifest.Name,
-    };
+        var formula = BrewPathSegment(path, "/Cellar/") ?? BrewPathSegment(path, "/Caskroom/");
+        if (formula is not null)
+            return formula;
+        return manifest.Name switch
+        {
+            "gemini" => "gemini-cli",
+            _ => manifest.Name,
+        };
+    }
+
+    private static string? BrewPathSegment(string path, string marker)
+    {
+        var at = path.IndexOf(marker, StringComparison.Ordinal);
+        if (at < 0)
+            return null;
+        var start = at + marker.Length;
+        var end = path.IndexOf('/', start);
+        var segment = end < 0 ? path[start..] : path[start..end];
+        return segment.Length > 0 ? segment : null;
+    }
 
     private static string? ResolveRealPath(string? path)
     {
