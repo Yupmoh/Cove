@@ -185,13 +185,35 @@ public sealed class DaemonHost
         }
 
         var socketPath = System.IO.Path.Combine(_paths.DataDir.IpcDir, "handoff.sock");
-        try { File.Delete(socketPath); } catch (IOException) { }
-        var listener = new System.Net.Sockets.Socket(System.Net.Sockets.AddressFamily.Unix, System.Net.Sockets.SocketType.Stream, System.Net.Sockets.ProtocolType.Unspecified);
-        listener.Bind(new System.Net.Sockets.UnixDomainSocketEndPoint(socketPath));
-        listener.Listen(1);
-        _ = Task.Run(() => ServeHandoffAsync(listener, socketPath, items));
+        System.Net.Sockets.Socket? listener = null;
+        try
+        {
+            try { File.Delete(socketPath); } catch (IOException) { }
+            listener = new System.Net.Sockets.Socket(System.Net.Sockets.AddressFamily.Unix, System.Net.Sockets.SocketType.Stream, System.Net.Sockets.ProtocolType.Unspecified);
+            listener.Bind(new System.Net.Sockets.UnixDomainSocketEndPoint(socketPath));
+            listener.Listen(1);
+        }
+        catch (Exception ex)
+        {
+            listener?.Dispose();
+            DaemonLog.Write(_paths, "handoff begin failed: " + ex.Message + "; re-adopting exported sessions");
+            ReadoptExports(items);
+            Volatile.Write(ref _handoffStarted, 0);
+            return Fail(requestId, "io_error", "handoff socket setup failed: " + ex.Message);
+        }
+        _ = Task.Run(() => ServeHandoff(listener, socketPath, items));
         DaemonLog.Write(_paths, $"handoff begin: exporting {items.Count} nooks via {socketPath}");
         return new ControlResponse(requestId, true, ToElement(new HandoffBeginResult(items.Count, socketPath), CoveJsonContext.Default.HandoffBeginResult));
+    }
+
+    private void ReadoptExports(List<Cove.Engine.Pty.HandoffExportItem> items)
+    {
+        foreach (var item in items)
+        {
+            var restored = _nooks?.Adopt(item.Record, item.MasterFd, item.RingTail);
+            if (restored is null)
+                Cove.Platform.Pty.Unix.UnixFdChannel.CloseFd(item.MasterFd);
+        }
     }
 
     private Task ServeHandoffAsync(System.Net.Sockets.Socket listener, string socketPath, List<Cove.Engine.Pty.HandoffExportItem> items) => Task.Run(() => ServeHandoff(listener, socketPath, items));
@@ -221,12 +243,7 @@ public sealed class DaemonHost
         catch (Exception ex)
         {
             DaemonLog.Write(_paths, "handoff aborted: " + ex.Message + "; re-adopting exported sessions");
-            foreach (var item in items)
-            {
-                var restored = _nooks?.Adopt(item.Record, item.MasterFd, item.RingTail);
-                if (restored is null)
-                    Cove.Platform.Pty.Unix.UnixFdChannel.CloseFd(item.MasterFd);
-            }
+            ReadoptExports(items);
             Volatile.Write(ref _handoffStarted, 0);
         }
         finally

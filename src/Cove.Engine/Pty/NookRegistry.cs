@@ -328,6 +328,14 @@ public sealed class NookRegistry : IDisposable, Cove.Engine.Agents.INookWriter
         if (record.Checkpoint is { } cp)
             nook.Checkpoint = new TerminalCheckpoint(Convert.FromBase64String(cp.DataBase64), cp.Offset, cp.Cols, cp.Rows, cp.ScrollbackLines, cp.ModeSupplement);
         reader.OnCwd = c => nook.Cwd = c;
+        try
+        {
+            session.Resize(record.Cols, record.Rows);
+        }
+        catch (PtyIoException ex)
+        {
+            _logger.HandoffAdoptRejected(record.NookId, "resize replay failed: " + ex.Message);
+        }
         reader.Start();
         lock (_sync)
             _nooks[record.NookId] = nook;
