@@ -84,7 +84,7 @@ public sealed class HookEventRouter
             case "session-start":
                 var sessionId = ExtractSessionId(ev.Payload);
                 var priorSessionId = _nookStates.TryGetValue(ev.NookId, out var prior) ? prior.SessionId : null;
-                _nookStates[ev.NookId] = new NookAgentState(ev.NookId, ev.Adapter, "active", 0, System.DateTimeOffset.UtcNow, SessionId: sessionId ?? priorSessionId);
+                _nookStates[ev.NookId] = new NookAgentState(ev.NookId, ev.Adapter, "idle", 0, System.DateTimeOffset.UtcNow, SessionId: sessionId ?? priorSessionId);
                 if (sessionId is not null)
                     SessionStarted?.Invoke(ev.NookId, ev.Adapter, sessionId);
                 break;

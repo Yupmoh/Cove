@@ -8,7 +8,7 @@ namespace Cove.Engine.Tests;
 public sealed class HookEventRouterTests
 {
     [Fact]
-    public void Route_SessionStart_CreatesNookState()
+    public void Route_SessionStart_CreatesIdleNookState()
     {
         var router = new HookEventRouter();
         var ev = new HookEvent { Adapter = "claude-code", Event = "session-start", NookId = "p1" };
@@ -17,7 +17,7 @@ public sealed class HookEventRouterTests
         var state = router.GetNookState("p1");
         Assert.NotNull(state);
         Assert.Equal("claude-code", state!.Adapter);
-        Assert.Equal("active", state.Status);
+        Assert.Equal("idle", state.Status);
     }
 
     [Fact]
