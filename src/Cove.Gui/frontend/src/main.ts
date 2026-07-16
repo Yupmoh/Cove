@@ -5208,8 +5208,8 @@ function renderBoxLauncher(targetShoreId: string | null, targetPlaceholderId: st
   if (launcherTipTimer !== null) window.clearInterval(launcherTipTimer);
   launcherTipTimer = window.setInterval(() => {
     launcherTipIndex += 1;
-    const tipEl = wrap.querySelector(".cl-tip");
-    if (tipEl) tipEl.textContent = tipAt(launcherTipIndex);
+    const tipEl = wrap.querySelector<HTMLElement>(".cl-tip");
+    if (tipEl) setLauncherTip(tipEl, tipAt(launcherTipIndex));
     else if (launcherTipTimer !== null) { window.clearInterval(launcherTipTimer); launcherTipTimer = null; }
   }, 9000);
   queueMicrotask(() => { if (document.body.contains(wrap)) wrap.focus(); });
@@ -5258,6 +5258,29 @@ function firstSensibleSelection(harness: LauncherTile[], tools: LauncherTile[]):
   return { section: "harness", index: 0 };
 }
 
+function setLauncherTip(tipEl: HTMLElement, text: string): void {
+  tipEl.classList.remove("driving");
+  tipEl.style.removeProperty("--tip-shift");
+  tipEl.style.removeProperty("--tip-dur");
+  let inner = tipEl.querySelector<HTMLElement>(".cl-tip-text");
+  if (!inner) {
+    inner = document.createElement("span");
+    inner.className = "cl-tip-text";
+    tipEl.textContent = "";
+    tipEl.appendChild(inner);
+  }
+  inner.textContent = text;
+  requestAnimationFrame(() => {
+    if (!tipEl.isConnected || !inner) return;
+    const overflow = inner.scrollWidth - tipEl.clientWidth;
+    if (overflow <= 0) return;
+    const distance = overflow + 12;
+    tipEl.style.setProperty("--tip-shift", `-${distance}px`);
+    tipEl.style.setProperty("--tip-dur", `${Math.max(5, distance / 20)}s`);
+    tipEl.classList.add("driving");
+  });
+}
+
 function paintBoxLauncher(wrap: HTMLElement, ctx: LauncherContext): void {
   const { harness, tools, harnessKeys, toolKeys } = launcherTileSets();
   launcherCols = computeLauncherCols(wrap.clientWidth || 680, Math.max(1, harness.length), LAUNCHER_HARNESS_COLS);
@@ -5276,10 +5299,10 @@ function paintBoxLauncher(wrap: HTMLElement, ctx: LauncherContext): void {
   brand.src = brandLogoAt(brandIndex);
   const tip = document.createElement("span");
   tip.className = "cl-tip";
-  tip.textContent = tipAt(launcherTipIndex);
+  setLauncherTip(tip, tipAt(launcherTipIndex));
   const bayChip = document.createElement("span");
   bayChip.className = "cl-hint cl-bay-chip";
-  bayChip.textContent = `bay · ${layout?.name?.trim() || "default"}`;
+  bayChip.textContent = layout?.name?.trim() || "default";
   bayChip.title = activeProjectDir();
   const hint = document.createElement("span");
   hint.className = "cl-hint";
