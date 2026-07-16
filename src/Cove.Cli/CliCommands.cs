@@ -557,8 +557,12 @@ internal static class CliCommands
             ctx.Stderr.WriteLine("usage: cove exec <dot.name> [--params '<json>']");
             return Task.FromResult(1);
         }
-        var uri = "cove://commands/" + args[0].Replace(".", "/");
-        return ctx.RouteCoreAsync(uri);
+        string? paramsJson = null;
+        for (var i = 1; i + 1 < args.Length; i++)
+            if (args[i] == "--params")
+                paramsJson = args[i + 1];
+        var uri = "cove://commands/" + args[0];
+        return paramsJson is null ? ctx.RouteCoreAsync(uri) : ctx.RouteCoreWithParamsAsync(uri, paramsJson);
     }
     [CoveCommand("protocol resolve")]
     public static Task<int> ProtocolResolve(CommandContext ctx)
