@@ -6,6 +6,8 @@ Generated from the command registry. Do not edit by hand.
 |---------|--------|-------------|
 | `--version` | cli |  |
 | `-V` | cli |  |
+| `activity acknowledge` | cli |  |
+| `activity list` | cli |  |
 | `adapter-env list` | cli |  |
 | `adapter-env resolve` | cli |  |
 | `adapter-env save` | cli |  |
@@ -37,6 +39,7 @@ Generated from the command registry. Do not edit by hand.
 | `config get` | cli |  |
 | `config set` | cli |  |
 | `context` | cli |  |
+| `cove://commands/activity.acknowledge` | core |  |
 | `cove://commands/activity.list` | core |  |
 | `cove://commands/activity.needs-input` | core |  |
 | `cove://commands/adapter-env.list` | core |  |
@@ -471,4 +474,4 @@ Generated from the command registry. Do not edit by hand.
 | `viewer get-state` | cli |  |
 | `viewer open` | cli |  |
 
-Total: 466 commands
+Total: 469 commands

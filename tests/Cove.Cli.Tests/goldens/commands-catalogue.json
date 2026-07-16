@@ -8,6 +8,14 @@
     "source": "cli"
   },
   {
+    "command": "activity acknowledge",
+    "source": "cli"
+  },
+  {
+    "command": "activity list",
+    "source": "cli"
+  },
+  {
     "command": "adapter-env list",
     "source": "cli"
   },
@@ -130,6 +138,10 @@
   {
     "command": "context",
     "source": "cli"
+  },
+  {
+    "command": "cove://commands/activity.acknowledge",
+    "source": "core"
   },
   {
     "command": "cove://commands/activity.list",
