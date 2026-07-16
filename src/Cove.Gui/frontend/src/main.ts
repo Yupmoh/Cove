@@ -47,7 +47,7 @@ import { buildEmptyState, EmptyStateMessages } from "./empty-states";
 import { brandLogoAt, nextBrandIndex, parseBrandIndex } from "./brand";
 import { adapterStatusMeta, toolsSubtitle, retentionChipVisible, retentionChipLabel, type ToolsAdapter } from "./tools-tab";
 import {
-  deriveProfileSlug, isValidProfileSlug, profilePickerLabel, firstDefault, envMapFromRows,
+  deriveProfileSlug, isValidProfileSlug, profilePickerLabel, profileDisplayName, selectedLauncherProfile, launcherProfileChoices, envMapFromRows,
   type LaunchProfileListItem, type LaunchProfileDetail,
   type CreateProfileInput, type UpdateProfileInput,
 } from "./profiles";
@@ -3633,10 +3633,11 @@ interface ProfileListResult { profiles: LaunchProfileListItem[] }
 
 async function resolveLauncherProfileSlug(adapter: string): Promise<string> {
   const stored = localStorage.getItem(launcherProfileSlugKey(adapter));
-  if (stored) return stored;
+  const cached = launcherProfiles.get(adapter);
+  if (cached) return selectedLauncherProfile(launcherProfileChoices(adapter, cached), stored)?.slug ?? "default";
   try {
     const result = await invoke<ProfileListResult>("cove://commands/launch-profile.list", { adapter });
-    return firstDefault(result.profiles ?? [])?.slug ?? "default";
+    return selectedLauncherProfile(launcherProfileChoices(adapter, result.profiles ?? []), stored)?.slug ?? "default";
   } catch (err) {
     console.warn("launch-profile.list failed", adapter, err);
     return "default";
@@ -3659,7 +3660,7 @@ async function buildProfilesSection(a: ToolsAdapter, container: HTMLElement): Pr
   newBtn.className = "diag-btn";
   newBtn.style.cssText = "margin-top:0;padding:2px 8px;font-size:11px;";
   newBtn.textContent = "New profile";
-  newBtn.addEventListener("click", () => openProfileEditor(a, null, container));
+  newBtn.addEventListener("click", () => openProfileEditor(a, null, () => renderToolsTab(container)));
   header.appendChild(newBtn);
   section.appendChild(header);
 
@@ -3715,7 +3716,7 @@ function renderProfileList(
     editBtn.className = "diag-btn";
     editBtn.style.cssText = "margin-top:0;padding:1px 6px;font-size:11px;";
     editBtn.textContent = "Edit";
-    editBtn.addEventListener("click", () => openProfileEditor(a, p.slug, container));
+    editBtn.addEventListener("click", () => openProfileEditor(a, p.slug, () => renderToolsTab(container)));
     row.appendChild(editBtn);
     if (profiles.length > 1) {
       const delBtn = document.createElement("button");
@@ -3732,7 +3733,11 @@ function renderProfileList(
   }
 }
 
-function openProfileEditor(a: ToolsAdapter, slug: string | null, container: HTMLElement): void {
+function openProfileEditor(
+  a: { name: string; binary: string },
+  slug: string | null,
+  onSaved: (savedSlug: string) => void | Promise<void>,
+): void {
   const overlay = document.createElement("div");
   overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000;";
   const dialog = document.createElement("div");
@@ -3843,7 +3848,7 @@ function openProfileEditor(a: ToolsAdapter, slug: string | null, container: HTML
         await invoke("cove://commands/launch-profile.create", create);
       }
       overlay.remove();
-      await renderToolsTab(container);
+      await onSaved(base.slug);
     } catch (err) {
       errorEl.textContent = String(err);
     }
@@ -5064,7 +5069,7 @@ async function loadLauncherAdapters(): Promise<void> {
     const result = await invoke<AdapterListResult>("app.adapterList", {});
     launcherAdapters = (result.adapters ?? []).map((a) => ({ name: a.name, displayName: a.displayName, accent: a.accent, binary: a.binary, version: a.version ?? "" }));
   } catch { launcherAdapters = []; }
-  await loadLauncherRecents();
+  await Promise.all([loadLauncherRecents(), loadLauncherProfiles()]);
   if ((layout?.shores ?? []).length === 0) renderShore();
 }
 
@@ -5088,6 +5093,30 @@ async function refreshLauncherRecents(): Promise<void> {
   const before = JSON.stringify(launcherRecents);
   await loadLauncherRecents();
   if (JSON.stringify(launcherRecents) !== before) renderShore();
+}
+
+const launcherProfiles = new Map<string, LaunchProfileListItem[]>();
+let launcherProfilesAt = 0;
+async function loadLauncherProfiles(): Promise<void> {
+  const lists = await Promise.all(launcherAdapters.map(async (a) => {
+    try {
+      const result = await invoke<ProfileListResult>("cove://commands/launch-profile.list", { adapter: a.name });
+      return [a.name, result.profiles ?? []] as const;
+    } catch (err) {
+      console.warn("launch-profile.list failed", a.name, err);
+      return [a.name, launcherProfiles.get(a.name) ?? []] as const;
+    }
+  }));
+  launcherProfiles.clear();
+  for (const [adapter, profiles] of lists) launcherProfiles.set(adapter, profiles);
+  launcherProfilesAt = Date.now();
+}
+
+async function refreshLauncherProfiles(): Promise<void> {
+  if (Date.now() - launcherProfilesAt < 4000) return;
+  const before = JSON.stringify([...launcherProfiles.entries()]);
+  await loadLauncherProfiles();
+  if (JSON.stringify([...launcherProfiles.entries()]) !== before) repaintActiveLauncher();
 }
 
 function builtinLauncherDefs(): LauncherBuiltin[] {
@@ -5130,6 +5159,7 @@ function activateLauncherSelection(ctx: LauncherContext, harness: LauncherTile[]
 
 function renderBoxLauncher(targetShoreId: string | null, targetPlaceholderId: string | null): HTMLElement {
   void refreshLauncherRecents();
+  void refreshLauncherProfiles();
   const ctx: LauncherContext = { targetShoreId, targetPlaceholderId };
   const wrap = document.createElement("div");
   wrap.className = "box-launcher";
@@ -5345,13 +5375,18 @@ function repaintActiveLauncher(): void {
   paintBoxLauncher(wrap, { targetShoreId, targetPlaceholderId });
   wrap.focus();
 }
+function closeLauncherDropdowns(): void {
+  for (const el of document.querySelectorAll(".cl-resume-dd.open")) el.classList.remove("open");
+}
+document.addEventListener("click", closeLauncherDropdowns);
+
 
 function renderDetailDock(ctx: LauncherContext, tile: LauncherTile): HTMLElement {
   const accent = adapterAccent(tile.adapterName, tile.accent);
   const dock = document.createElement("div");
   dock.className = "cl-dock";
   dock.style.setProperty("--card-accent", accent);
-  dock.addEventListener("click", (e) => e.stopPropagation());
+  dock.addEventListener("click", (e) => { e.stopPropagation(); closeLauncherDropdowns(); });
 
   const identity = document.createElement("div");
   identity.className = "cl-dock-id";
@@ -5371,8 +5406,104 @@ function renderDetailDock(ctx: LauncherContext, tile: LauncherTile): HTMLElement
   identity.appendChild(idText);
   dock.appendChild(identity);
 
+  const choices = launcherProfileChoices(tile.adapterName, launcherProfiles.get(tile.adapterName) ?? []);
+  const storedSlug = localStorage.getItem(launcherProfileSlugKey(tile.adapterName));
+  const selectedProfile = selectedLauncherProfile(choices, storedSlug);
+
   const controls = document.createElement("div");
   controls.className = "cl-dock-controls";
+
+  const profileDd = document.createElement("div");
+  profileDd.className = "cl-resume-dd cl-profile-dd";
+  const profileTrigger = document.createElement("button");
+  profileTrigger.className = "cl-resume-trigger";
+  const profileTag = document.createElement("span");
+  profileTag.className = "cl-profile-tag";
+  profileTag.textContent = "profile";
+  const profileName = document.createElement("span");
+  profileName.className = "cl-resume-label cl-profile-name";
+  profileName.textContent = selectedProfile ? profileDisplayName(selectedProfile) : "Default";
+  const profileChev = document.createElement("span");
+  profileChev.className = "cl-resume-chev";
+  profileChev.textContent = "▾";
+  profileTrigger.appendChild(profileTag);
+  profileTrigger.appendChild(profileName);
+  profileTrigger.appendChild(profileChev);
+  profileDd.appendChild(profileTrigger);
+  const profileMenu = document.createElement("div");
+  profileMenu.className = "cl-resume-menu";
+  for (const p of choices) {
+    const isSelected = p.slug === selectedProfile?.slug;
+    const row = document.createElement("div");
+    row.className = "cl-recent-row cl-profile-opt" + (isSelected ? " cl-profile-selected" : "");
+    const col = document.createElement("div");
+    col.className = "cl-profile-opt-col";
+    const optName = document.createElement("span");
+    optName.className = "cl-profile-opt-name";
+    optName.textContent = profileDisplayName(p);
+    optName.title = profilePickerLabel(p);
+    col.appendChild(optName);
+    const subParts: string[] = [];
+    if (p.slug === "default" && p.argCount === 0 && p.envCount === 0 && !p.model) {
+      subParts.push("stock settings");
+    } else {
+      if (p.model) subParts.push(p.model);
+      if (p.effort) subParts.push(p.effort);
+      if (p.argCount > 0) subParts.push(`${p.argCount} arg${p.argCount === 1 ? "" : "s"}`);
+      if (p.envCount > 0) subParts.push(`${p.envCount} env`);
+    }
+    if (subParts.length > 0) {
+      const optSub = document.createElement("span");
+      optSub.className = "cl-profile-opt-sub";
+      optSub.textContent = subParts.join(" · ");
+      col.appendChild(optSub);
+    }
+    row.appendChild(col);
+    if (isSelected) {
+      const check = document.createElement("span");
+      check.className = "cl-profile-check";
+      check.textContent = "✓";
+      row.appendChild(check);
+    }
+    row.addEventListener("click", (e) => {
+      e.stopPropagation();
+      localStorage.setItem(launcherProfileSlugKey(tile.adapterName), p.slug);
+      repaintActiveLauncher();
+    });
+    profileMenu.appendChild(row);
+  }
+  const profileDivider = document.createElement("div");
+  profileDivider.className = "cl-profile-divider";
+  profileMenu.appendChild(profileDivider);
+  const newProfileRow = document.createElement("div");
+  newProfileRow.className = "cl-recent-row cl-profile-new";
+  const newProfilePlus = document.createElement("span");
+  newProfilePlus.className = "cl-profile-plus";
+  newProfilePlus.textContent = "+";
+  const newProfileLabel = document.createElement("span");
+  newProfileLabel.className = "cl-recent-cwd";
+  newProfileLabel.textContent = "New profile…";
+  newProfileRow.appendChild(newProfilePlus);
+  newProfileRow.appendChild(newProfileLabel);
+  newProfileRow.addEventListener("click", (e) => {
+    e.stopPropagation();
+    profileDd.classList.remove("open");
+    openProfileEditor({ name: tile.adapterName, binary: tile.binary }, null, async (savedSlug) => {
+      localStorage.setItem(launcherProfileSlugKey(tile.adapterName), savedSlug);
+      launcherProfilesAt = 0;
+      await loadLauncherProfiles();
+      repaintActiveLauncher();
+    });
+  });
+  profileMenu.appendChild(newProfileRow);
+  profileDd.appendChild(profileMenu);
+  profileTrigger.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const wasOpen = profileDd.classList.contains("open");
+    closeLauncherDropdowns();
+    if (!wasOpen) profileDd.classList.add("open");
+  });
+  controls.appendChild(profileDd);
 
   const yoloRow = document.createElement("label");
   yoloRow.className = "cl-yolo-row";
@@ -5430,7 +5561,9 @@ function renderDetailDock(ctx: LauncherContext, tile: LauncherTile): HTMLElement
     dd.appendChild(menu);
     trigger.addEventListener("click", (e) => {
       e.stopPropagation();
-      dd.classList.toggle("open");
+      const wasOpen = dd.classList.contains("open");
+      closeLauncherDropdowns();
+      if (!wasOpen) dd.classList.add("open");
     });
     controls.appendChild(dd);
   }

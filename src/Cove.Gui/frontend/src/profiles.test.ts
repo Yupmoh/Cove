@@ -9,6 +9,8 @@ import {
   envMapFromRows,
   cliArgsFromRows,
   firstDefault,
+  selectedLauncherProfile,
+  launcherProfileChoices,
   type LaunchProfileListItem,
   type LauncherOption,
 } from "./profiles";
@@ -63,6 +65,65 @@ describe("deriveProfileSlug", () => {
     expect(derived.length).toBeLessThanOrEqual(64);
     expect(derived.endsWith("-")).toBe(false);
     expect(isValidProfileSlug(derived)).toBe(true);
+  });
+});
+describe("selectedLauncherProfile", () => {
+  const profiles = [
+    item({ slug: "default", name: "Default" }),
+    item({ slug: "ccx", name: "Claude Code (ccx)", isDefault: true }),
+    item({ slug: "glm-umans", name: "GLM Umans" }),
+  ];
+
+  it("prefers the stored slug when it still exists", () => {
+    expect(selectedLauncherProfile(profiles, "glm-umans")?.slug).toBe("glm-umans");
+  });
+
+  it("falls back to the default profile when the stored slug is gone", () => {
+    expect(selectedLauncherProfile(profiles, "deleted")?.slug).toBe("ccx");
+  });
+
+  it("falls back to the default profile without a stored slug", () => {
+    expect(selectedLauncherProfile(profiles, null)?.slug).toBe("ccx");
+  });
+
+  it("falls back to the first profile when none is default", () => {
+    const noDefault = [item({ slug: "a" }), item({ slug: "b" })];
+    expect(selectedLauncherProfile(noDefault, null)?.slug).toBe("a");
+  });
+
+  it("returns null for an empty list", () => {
+    expect(selectedLauncherProfile([], "any")).toBeNull();
+  });
+});
+
+describe("launcherProfileChoices", () => {
+  it("prepends a stock Default when no profile uses the default slug", () => {
+    const choices = launcherProfileChoices("claude-code", [item({ slug: "ccx", isDefault: true })]);
+    expect(choices.map((p) => p.slug)).toEqual(["default", "ccx"]);
+    expect(choices[0].name).toBe("Default");
+    expect(choices[0].adapter).toBe("claude-code");
+  });
+
+  it("marks the stock Default as default only when no real default exists", () => {
+    expect(launcherProfileChoices("claude-code", [item({ slug: "a" })])[0].isDefault).toBe(true);
+    expect(launcherProfileChoices("claude-code", [item({ slug: "a", isDefault: true })])[0].isDefault).toBe(false);
+  });
+
+  it("does not duplicate an explicit default-slug profile", () => {
+    const explicit = [item({ slug: "default", name: "Mine" }), item({ slug: "ccx" })];
+    expect(launcherProfileChoices("claude-code", explicit)).toBe(explicit);
+  });
+
+  it("yields only the stock Default for an empty list", () => {
+    const choices = launcherProfileChoices("codex", []);
+    expect(choices).toHaveLength(1);
+    expect(choices[0]).toMatchObject({ slug: "default", isDefault: true, adapter: "codex" });
+  });
+
+  it("keeps stored stock selection distinct from a real default profile", () => {
+    const choices = launcherProfileChoices("claude-code", [item({ slug: "ccx", isDefault: true })]);
+    expect(selectedLauncherProfile(choices, "default")?.slug).toBe("default");
+    expect(selectedLauncherProfile(choices, null)?.slug).toBe("ccx");
   });
 });
 

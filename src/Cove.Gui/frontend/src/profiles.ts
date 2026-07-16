@@ -142,3 +142,32 @@ export function cliArgsFromRows(rows: Array<{ flag: string; value: string | null
 export function firstDefault(profiles: LaunchProfileListItem[]): LaunchProfileListItem | null {
   return profiles.find((p) => p.isDefault) ?? profiles[0] ?? null;
 }
+
+export function selectedLauncherProfile(
+  profiles: LaunchProfileListItem[],
+  storedSlug: string | null,
+): LaunchProfileListItem | null {
+  if (storedSlug) {
+    const stored = profiles.find((p) => p.slug === storedSlug);
+    if (stored) return stored;
+  }
+  return firstDefault(profiles);
+}
+
+export function launcherProfileChoices(
+  adapter: string,
+  profiles: LaunchProfileListItem[],
+): LaunchProfileListItem[] {
+  if (profiles.some((p) => p.slug === "default")) return profiles;
+  const stock: LaunchProfileListItem = {
+    slug: "default",
+    name: "Default",
+    adapter,
+    isDefault: !profiles.some((p) => p.isDefault),
+    model: null,
+    effort: null,
+    argCount: 0,
+    envCount: 0,
+  };
+  return [stock, ...profiles];
+}
