@@ -108,11 +108,16 @@ public sealed class UnixPtyHost : IPtyHost
     private static List<string> BuildEnvironment(IReadOnlyDictionary<string, string>? overrides)
     {
         var map = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (System.Collections.DictionaryEntry e in Environment.GetEnvironmentVariables())
-            map[(string)e.Key] = (string)(e.Value ?? string.Empty);
         if (overrides is not null)
+        {
             foreach (var kv in overrides)
                 map[kv.Key] = kv.Value;
+        }
+        else
+        {
+            foreach (System.Collections.DictionaryEntry e in Environment.GetEnvironmentVariables())
+                map[(string)e.Key] = (string)(e.Value ?? string.Empty);
+        }
         if (!map.ContainsKey("TERM"))
             map["TERM"] = PtyConstants.DefaultTerm;
 

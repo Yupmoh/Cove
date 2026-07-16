@@ -17,6 +17,37 @@ public sealed class SpawnEnvironment
         _bayId = bayId;
     }
 
+    private static readonly string[] HostOnlyKeys =
+    {
+        "NO_COLOR", "CI", "FORCE_COLOR", "TERM_PROGRAM_VERSION", "TERMINFO", "TERMINFO_DIRS",
+        "CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "OMPCODE",
+    };
+
+    private static readonly string[] HostOnlyPrefixes = { "GHOSTTY_", "HERDR_" };
+
+    public static void ApplyTerminalIdentity(Dictionary<string, string> env)
+    {
+        foreach (var key in HostOnlyKeys)
+            env.Remove(key);
+        var leaked = new List<string>();
+        foreach (var key in env.Keys)
+        {
+            foreach (var prefix in HostOnlyPrefixes)
+            {
+                if (key.StartsWith(prefix, System.StringComparison.Ordinal))
+                {
+                    leaked.Add(key);
+                    break;
+                }
+            }
+        }
+        foreach (var key in leaked)
+            env.Remove(key);
+        env["TERM"] = "xterm-256color";
+        env["COLORTERM"] = "truecolor";
+        env["TERM_PROGRAM"] = "Cove";
+    }
+
     public Dictionary<string, string> Build(string nookId, IReadOnlyDictionary<string, string>? callerEnv)
     {
         var env = new Dictionary<string, string>(System.StringComparer.Ordinal);
@@ -25,6 +56,7 @@ public sealed class SpawnEnvironment
             if (e.Key is string k && e.Value is string v)
                 env[k] = v;
         }
+        ApplyTerminalIdentity(env);
         env["PATH"] = _probedPath;
         if (callerEnv is not null)
         {

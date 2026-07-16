@@ -38,4 +38,61 @@ public sealed class SpawnEnvironmentTests
         Assert.Equal("p1", env["COVE_NOOK_ID"]);
         Assert.Equal("x", env["MYVAR"]);
     }
+
+    [Fact]
+    public void ApplyTerminalIdentity_ScrubsHostOnlyAndHarnessVars()
+    {
+        var env = new Dictionary<string, string>(System.StringComparer.Ordinal)
+        {
+            ["TERM"] = "dumb",
+            ["NO_COLOR"] = "1",
+            ["CI"] = "1",
+            ["TERMINFO"] = "/Applications/Ghostty.app/Contents/Resources/terminfo",
+            ["FORCE_COLOR"] = "0",
+            ["CLAUDECODE"] = "1",
+            ["CLAUDE_CODE_ENTRYPOINT"] = "cli",
+            ["OMPCODE"] = "1",
+            ["GHOSTTY_RESOURCES_DIR"] = "/x",
+            ["HERDR_SESSION"] = "abc",
+            ["HOME"] = "/Users/x",
+        };
+
+        SpawnEnvironment.ApplyTerminalIdentity(env);
+
+        Assert.Equal("xterm-256color", env["TERM"]);
+        Assert.Equal("truecolor", env["COLORTERM"]);
+        Assert.Equal("Cove", env["TERM_PROGRAM"]);
+        Assert.False(env.ContainsKey("NO_COLOR"));
+        Assert.False(env.ContainsKey("TERMINFO"));
+        Assert.False(env.ContainsKey("CI"));
+        Assert.False(env.ContainsKey("FORCE_COLOR"));
+        Assert.False(env.ContainsKey("CLAUDECODE"));
+        Assert.False(env.ContainsKey("CLAUDE_CODE_ENTRYPOINT"));
+        Assert.False(env.ContainsKey("OMPCODE"));
+        Assert.False(env.ContainsKey("GHOSTTY_RESOURCES_DIR"));
+        Assert.False(env.ContainsKey("HERDR_SESSION"));
+        Assert.Equal("/Users/x", env["HOME"]);
+    }
+
+    [Fact]
+    public void Build_CallerEnvOverridesTerminalIdentity()
+    {
+        var se = new SpawnEnvironment("/probed/bin:/usr/bin", "/data", "/data/bin/cove", "ws1");
+        var env = se.Build("p1", new Dictionary<string, string> { ["TERM"] = "xterm-kitty" });
+
+        Assert.Equal("xterm-kitty", env["TERM"]);
+    }
+
+    [Fact]
+    public void Build_EstablishesCoveTerminalIdentity()
+    {
+        var se = new SpawnEnvironment("/probed/bin:/usr/bin", "/data", "/data/bin/cove", "ws1");
+        var env = se.Build("p1", null);
+
+        Assert.Equal("xterm-256color", env["TERM"]);
+        Assert.Equal("truecolor", env["COLORTERM"]);
+        Assert.Equal("Cove", env["TERM_PROGRAM"]);
+        Assert.False(env.ContainsKey("NO_COLOR"));
+        Assert.False(env.ContainsKey("CI"));
+    }
 }
