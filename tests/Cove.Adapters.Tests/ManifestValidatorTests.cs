@@ -176,4 +176,49 @@ public sealed class ManifestValidatorTests
         Assert.Null(manifest);
         Assert.Contains(errors, e => e.Code == "json_error");
     }
+
+    [Fact]
+    public void ScreenState_InvalidRegex_IsRejected()
+    {
+        var m = ValidManifest() with
+        {
+            ScreenState = new ScreenStateDeclaration
+            {
+                Rules = [new ScreenStateRule { Pattern = "([unclosed", Status = "active" }],
+            },
+        };
+        var errors = Validate(m);
+        Assert.Contains(errors, e => e.Field == "screenState.rules[0].pattern" && e.Code == "invalid_regex");
+    }
+
+    [Fact]
+    public void ScreenState_UnknownStatus_IsRejected()
+    {
+        var m = ValidManifest() with
+        {
+            ScreenState = new ScreenStateDeclaration
+            {
+                Rules = [new ScreenStateRule { Pattern = "ready", Status = "sleeping" }],
+            },
+        };
+        var errors = Validate(m);
+        Assert.Contains(errors, e => e.Field == "screenState.rules[0].status" && e.Code == "invalid_value");
+    }
+
+    [Fact]
+    public void ScreenState_ValidRules_Pass()
+    {
+        var m = ValidManifest() with
+        {
+            ScreenState = new ScreenStateDeclaration
+            {
+                Rules =
+                [
+                    new ScreenStateRule { Pattern = "(?i)allow", Status = "needs-permission" },
+                    new ScreenStateRule { Pattern = "working", Status = "active" },
+                ],
+            },
+        };
+        Assert.Empty(Validate(m));
+    }
 }

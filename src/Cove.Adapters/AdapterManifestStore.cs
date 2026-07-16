@@ -61,6 +61,11 @@ public sealed class AdapterManifestStore
                 return null;
             }
             var manifest = NormalizeCollections(parsed);
+            if (manifest.ScreenState is { } screen && HasInvalidScreenRules(screen))
+            {
+                _logger?.ManifestScreenStateDropped(adapter);
+                manifest = manifest with { ScreenState = null };
+            }
             lock (_lock)
             {
                 _cache[adapter] = (manifest, lastWrite);
@@ -93,6 +98,26 @@ public sealed class AdapterManifestStore
         WellKnownPaths = manifest.WellKnownPaths ?? [],
         SuggestedFlags = manifest.SuggestedFlags ?? [],
     };
+
+    private static bool HasInvalidScreenRules(ScreenStateDeclaration screen)
+    {
+        foreach (var rule in screen.Rules)
+        {
+            if (string.IsNullOrEmpty(rule.Pattern) || !ScreenStateDeclaration.IsValidStatus(rule.Status))
+                return true;
+            try
+            {
+                _ = new System.Text.RegularExpressions.Regex(rule.Pattern,
+                    System.Text.RegularExpressions.RegexOptions.Multiline | System.Text.RegularExpressions.RegexOptions.CultureInvariant,
+                    TimeSpan.FromMilliseconds(100));
+            }
+            catch (ArgumentException)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
 
     public IReadOnlyList<AdapterManifest> LoadAll()
     {

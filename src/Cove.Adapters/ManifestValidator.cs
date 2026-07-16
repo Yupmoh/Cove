@@ -51,6 +51,31 @@ public static class ManifestValidator
                     || (!string.IsNullOrEmpty(kv.Value.Script) && !string.IsNullOrEmpty(kv.Value.Static)))
                     errors.Add(new ValidationError($"methods.{kv.Key}", "script_xor_static", "method must have script XOR static"));
 
+        if (m.ScreenState is { } screen)
+        {
+            for (var i = 0; i < screen.Rules.Count; i++)
+            {
+                var rule = screen.Rules[i];
+                if (string.IsNullOrEmpty(rule.Pattern))
+                {
+                    errors.Add(new ValidationError($"screenState.rules[{i}].pattern", "missing", "pattern is required"));
+                }
+                else
+                {
+                    try
+                    {
+                        _ = new Regex(rule.Pattern, RegexOptions.Multiline | RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100));
+                    }
+                    catch (ArgumentException ex)
+                    {
+                        errors.Add(new ValidationError($"screenState.rules[{i}].pattern", "invalid_regex", ex.Message));
+                    }
+                }
+                if (!ScreenStateDeclaration.IsValidStatus(rule.Status))
+                    errors.Add(new ValidationError($"screenState.rules[{i}].status", "invalid_value", $"status '{rule.Status}' is not a known agent status"));
+            }
+        }
+
         var adapterName = string.IsNullOrWhiteSpace(m.Name) ? "(unnamed)" : m.Name;
         foreach (var error in errors)
             logger?.ManifestValidationRuleFailed(adapterName, error.Field, error.Code);

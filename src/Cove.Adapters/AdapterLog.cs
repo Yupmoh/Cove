@@ -175,6 +175,9 @@ internal static partial class AdapterLog
     [ZLoggerMessage(LogLevel.Warning, "manifest parsed to null adapter={adapter} path={path}")]
     public static partial void ManifestParsedNullAt(this ILogger logger, string adapter, string path);
 
+    [ZLoggerMessage(LogLevel.Warning, "manifest screenState dropped (invalid rules) adapter={adapter}")]
+    public static partial void ManifestScreenStateDropped(this ILogger logger, string adapter);
+
     [ZLoggerMessage(LogLevel.Debug, "manifest validation rule failed adapter={adapter} field={field} code={code}")]
     public static partial void ManifestValidationRuleFailed(this ILogger logger, string adapter, string field, string code);
 

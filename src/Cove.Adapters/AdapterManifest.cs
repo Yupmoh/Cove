@@ -23,6 +23,7 @@ public sealed record AdapterManifest
     public AdapterRetention? Retention { get; init; }
     public SessionExtractor? SessionExtractor { get; init; }
     public LauncherOptions? LauncherOptions { get; init; }
+    public ScreenStateDeclaration? ScreenState { get; init; }
     public IReadOnlyDictionary<string, string> Hooks { get; init; } = new Dictionary<string, string>();
     public string? SkillsDir { get; init; }
     private readonly IReadOnlyDictionary<string, InstallRecipe>? _install;
@@ -38,6 +39,32 @@ public sealed record HookEnvelopeDeclaration
 {
     public required HookEnvelopeKind Kind { get; init; }
     public bool IncludeSystemMessage { get; init; }
+}
+
+public sealed record ScreenStateRule
+{
+    public required string Pattern { get; init; }
+    public required string Status { get; init; }
+}
+
+public sealed record ScreenStateDeclaration
+{
+    private static readonly HashSet<string> Vocabulary = new()
+    {
+        "idle", "active", "tool-running", "needs-input", "needs-permission", "done", "error",
+    };
+
+    public int QuietMs { get; init; } = 2000;
+    public int TailBytes { get; init; } = 4096;
+    public IReadOnlyList<ScreenStateRule> Rules { get; init; } = [];
+
+    [JsonIgnore]
+    public int EffectiveTailBytes => Math.Clamp(TailBytes, 256, 65536);
+
+    [JsonIgnore]
+    public int EffectiveQuietMs => Math.Max(250, QuietMs);
+
+    public static bool IsValidStatus(string status) => Vocabulary.Contains(status);
 }
 
 [JsonConverter(typeof(HookEnvelopeKindConverter))]
@@ -151,6 +178,8 @@ public sealed record FooterChipData(string ProfileSlug, bool IsDefault, DateTime
 [JsonSerializable(typeof(BinaryDiscovery))]
 [JsonSerializable(typeof(HookEnvelopeDeclaration))]
 [JsonSerializable(typeof(Dictionary<string, HookEnvelopeDeclaration>))]
+[JsonSerializable(typeof(ScreenStateDeclaration))]
+[JsonSerializable(typeof(ScreenStateRule))]
 [JsonSerializable(typeof(List<AdapterEnvVar>))]
 [JsonSerializable(typeof(Registry))]
 [JsonSerializable(typeof(List<RegistryEntry>))]
