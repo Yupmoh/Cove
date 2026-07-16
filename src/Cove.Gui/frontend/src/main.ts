@@ -4797,6 +4797,41 @@ async function renderHarnessStep(body: HTMLElement): Promise<void> {
     grid.appendChild(el);
   }
 
+  try {
+    const listed = await invoke<AdapterListResult>("app.adapterList", {});
+    const installable = mapLauncherAdapters(listed.adapters).filter((a) => a.status !== "detected" && (a.installCommand ?? "").trim().length > 0);
+    if (installable.length > 0) {
+      const installLabel = document.createElement("div");
+      installLabel.className = "tools-subtitle";
+      installLabel.style.marginTop = "12px";
+      installLabel.textContent = "Install more harnesses";
+      body.appendChild(installLabel);
+      const installGrid = document.createElement("div");
+      installGrid.className = "ob-adapter-list" + (installable.length > 4 ? " ob-grid-2" : "");
+      for (const a of installable) {
+        const row = document.createElement("div");
+        row.className = "ob-adapter";
+        const rowName = document.createElement("span");
+        rowName.className = "ob-adapter-name";
+        rowName.textContent = a.displayName || a.name;
+        const installBtn = document.createElement("button");
+        installBtn.className = "diag-btn ob-install-btn";
+        installBtn.textContent = "+";
+        installBtn.title = a.installCommand ?? "";
+        installBtn.addEventListener("click", () => {
+          completeOnboarding();
+          void launchHarnessShellTask(a.installCommand ?? "", `Install ${a.displayName || a.name}`);
+        });
+        row.appendChild(rowName);
+        row.appendChild(installBtn);
+        installGrid.appendChild(row);
+      }
+      body.appendChild(installGrid);
+    }
+  } catch (err) {
+    console.warn("onboarding install list failed", err);
+  }
+
   const dirRow = document.createElement("div");
   dirRow.style.cssText = "display:flex;gap:8px;align-items:center;margin-top:12px;";
   const dirInput = document.createElement("input");
@@ -5006,8 +5041,21 @@ launcherEl.addEventListener("mousedown", (e) => { if (e.target === launcherEl) c
 launcherEl.addEventListener("keydown", (e) => { if (e.key === "Escape") closeLauncher(); });
 
 const launchAgentsEl = document.getElementById("launch-agents")!;
-interface AdapterInfo { name: string; displayName: string; accent: string; binary: string; status?: string | null; version?: string | null; binaryPath?: string | null; updateCommand?: string | null; }
+interface AdapterInfo { name: string; displayName: string; accent: string; binary: string; status?: string | null; version?: string | null; binaryPath?: string | null; updateCommand?: string | null; installCommand?: string | null; uninstallCommand?: string | null; }
 interface AdapterListResult { adapters: AdapterInfo[]; }
+function mapLauncherAdapters(adapters: AdapterInfo[] | null | undefined): LauncherAdapter[] {
+  return (adapters ?? []).map((a) => ({
+    name: a.name,
+    displayName: a.displayName,
+    accent: a.accent,
+    binary: a.binary,
+    version: a.version ?? "",
+    status: a.status ?? "",
+    updateCommand: a.updateCommand ?? "",
+    installCommand: a.installCommand ?? "",
+    uninstallCommand: a.uninstallCommand ?? "",
+  }));
+}
 async function launchHarnessUpdate(tile: LauncherTile): Promise<void> {
   if (!tile.updateCommand) return;
   try {
@@ -5020,6 +5068,41 @@ async function launchHarnessUpdate(tile: LauncherTile): Promise<void> {
     console.warn("harness update launch failed", tile.adapterName, err);
     showInAppToast("Update not started", (err as Error).message, () => {});
   }
+}
+
+async function launchHarnessShellTask(commandLine: string, shoreName: string): Promise<void> {
+  try {
+    const sp = (await spawnNook({ command: "", args: [], shellCommand: commandLine, cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: "", agentName: shoreName, bay: "", shore: "" })).nookId;
+    const r = await invoke<{ shoreId: string }>("app.layoutMutate", { op: "createShore", newNookId: sp, name: shoreName, shoreId: "", targetNookId: "", orientation: "", nookId: "", dir: 0, nookType: "terminal" });
+    activeShoreId = r.shoreId;
+    await reload();
+    focusNook(sp);
+    scheduleAdapterRedetect();
+  } catch (err) {
+    console.warn("harness shell task failed", shoreName, err);
+    showInAppToast(`${shoreName} not started`, (err as Error).message, () => {});
+  }
+}
+
+let adapterRedetectTimer: number | null = null;
+function scheduleAdapterRedetect(): void {
+  if (adapterRedetectTimer !== null) return;
+  let remaining = 30;
+  adapterRedetectTimer = window.setInterval(async () => {
+    remaining -= 1;
+    if (remaining <= 0 && adapterRedetectTimer !== null) { window.clearInterval(adapterRedetectTimer); adapterRedetectTimer = null; }
+    const before = JSON.stringify(launcherAdapters);
+    try {
+      await invoke("cove://commands/adapter.rescan", {});
+      const result = await invoke<AdapterListResult>("app.adapterList", {});
+      launcherAdapters = mapLauncherAdapters(result.adapters);
+    } catch { return; }
+    if (JSON.stringify(launcherAdapters) !== before) repaintActiveLauncher();
+  }, 10000);
+}
+
+function installableHarnesses(): LauncherAdapter[] {
+  return launcherAdapters.filter((a) => a.status !== "detected" && (a.installCommand ?? "").trim().length > 0);
 }
 
 async function loadLauncherAgents(): Promise<void> {
@@ -5090,7 +5173,7 @@ interface SessionRecentResult { sessions: RecentSessionRow[]; }
 async function loadLauncherAdapters(): Promise<void> {
   try {
     const result = await invoke<AdapterListResult>("app.adapterList", {});
-    launcherAdapters = (result.adapters ?? []).map((a) => ({ name: a.name, displayName: a.displayName, accent: a.accent, binary: a.binary, version: a.version ?? "", updateCommand: a.updateCommand ?? "" }));
+    launcherAdapters = mapLauncherAdapters(result.adapters);
   } catch { launcherAdapters = []; }
   await Promise.all([loadLauncherRecents(), loadLauncherProfiles()]);
   if ((layout?.shores ?? []).length === 0) renderShore();
@@ -5320,6 +5403,9 @@ function paintBoxLauncher(wrap: HTMLElement, ctx: LauncherContext): void {
     const selected = launcherSelection.section === "harness" && launcherSelection.index === i;
     cards.appendChild(renderHarnessCard(ctx, tile, harnessKeys[i], selected));
   });
+  if (harness.length > 0 && installableHarnesses().length > 0) {
+    cards.appendChild(renderInstallHarnessCard());
+  }
   if (harness.length === 0) {
     cards.style.gridTemplateColumns = "minmax(0, 280px)";
     cards.appendChild(renderConfigureAdapterCard());
@@ -5373,6 +5459,30 @@ function openAdapterSetup(): void {
   renderOnboarding();
 }
 
+function renderInstallHarnessCard(): HTMLElement {
+  const el = document.createElement("div");
+  el.className = "cl-card cl-install-card";
+  const plus = document.createElement("span");
+  plus.className = "cl-install-plus";
+  plus.textContent = "+";
+  const label = document.createElement("span");
+  label.className = "cl-install-label";
+  label.textContent = "Install harness";
+  el.appendChild(plus);
+  el.appendChild(label);
+  el.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const options = installableHarnesses();
+    if (options.length === 0) return;
+    openContextMenuAt(e, options.map((a) => ({ id: `install:${a.name}`, label: a.displayName || a.name })), (id) => {
+      const picked = options.find((a) => `install:${a.name}` === id);
+      if (!picked?.installCommand) return;
+      void launchHarnessShellTask(picked.installCommand, `Install ${picked.displayName || picked.name}`);
+    });
+  });
+  return el;
+}
+
 function renderHarnessCard(ctx: LauncherContext, tile: LauncherTile, letter: string, selected: boolean): HTMLElement {
   const accent = adapterAccent(tile.adapterName, tile.accent);
   const el = document.createElement("div");
@@ -5388,7 +5498,27 @@ function renderHarnessCard(ctx: LauncherContext, tile: LauncherTile, letter: str
   key.className = "cl-card-key";
   key.textContent = letter;
   top.appendChild(badge);
-  top.appendChild(key);
+  const topRight = document.createElement("span");
+  topRight.className = "cl-card-top-right";
+  if (tile.uninstallCommand) {
+    const minus = document.createElement("button");
+    minus.className = "cl-card-minus";
+    minus.textContent = "−";
+    minus.title = `Uninstall ${tile.label}`;
+    minus.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openContextMenuAt(e, [
+        { id: "uninstall", label: `Uninstall ${tile.label}`, danger: true },
+        { id: "cancel", label: "Cancel" },
+      ], (id) => {
+        if (id !== "uninstall" || !tile.uninstallCommand) return;
+        void launchHarnessShellTask(tile.uninstallCommand, `Uninstall ${tile.label}`);
+      });
+    });
+    topRight.appendChild(minus);
+  }
+  topRight.appendChild(key);
+  top.appendChild(topRight);
   el.appendChild(top);
 
   const name = document.createElement("div");

@@ -4,7 +4,10 @@ export interface LauncherAdapter {
   accent: string;
   binary: string;
   version?: string;
+  status?: string;
   updateCommand?: string;
+  installCommand?: string;
+  uninstallCommand?: string;
 }
 
 export interface LauncherBuiltin {
@@ -29,6 +32,7 @@ export interface LauncherTile {
   disabled: boolean;
   note: string;
   updateCommand: string;
+  uninstallCommand: string;
 }
 
 export function shouldShowLauncher(shoreCount: number): boolean {
@@ -101,7 +105,7 @@ export function placeableNookForAction(action: string): PlaceableNook | null {
 
 export function buildAdapterTiles(adapters: LauncherAdapter[]): LauncherTile[] {
   return adapters.map((a) => {
-    const detected = a.binary.trim().length > 0;
+    const detected = a.status ? a.status === "detected" : a.binary.trim().length > 0;
     return {
       kind: "adapter",
       id: `adapter:${a.name}`,
@@ -115,6 +119,7 @@ export function buildAdapterTiles(adapters: LauncherAdapter[]): LauncherTile[] {
       disabled: !detected,
       note: detected ? "" : "not detected",
       updateCommand: (a.updateCommand ?? "").trim(),
+      uninstallCommand: (a.uninstallCommand ?? "").trim(),
     };
   });
 }
@@ -133,6 +138,7 @@ export function buildBuiltinTiles(builtins: LauncherBuiltin[]): LauncherTile[] {
     disabled: false,
     note: "",
     updateCommand: "",
+    uninstallCommand: "",
   }));
 }
 
