@@ -62,27 +62,33 @@ public static class ScreenStateDetector
         return Encoding.UTF8.GetString(kept, 0, n);
     }
 
+    public static string? MatchRules(ScreenStateDeclaration declaration, string text)
+    {
+        foreach (var rule in declaration.Rules)
+        {
+            var regex = PatternCache.GetOrAdd(rule.Pattern,
+                static p => new Regex(p, RegexOptions.Multiline | RegexOptions.CultureInvariant, MatchTimeout));
+            bool matched;
+            try
+            {
+                matched = regex.IsMatch(text);
+            }
+            catch (RegexMatchTimeoutException)
+            {
+                continue;
+            }
+            if (matched)
+                return rule.Status;
+        }
+        return null;
+    }
+
     public static string? Evaluate(ScreenStateDeclaration declaration, string deltaText, bool ringAdvanced, bool quietElapsed, string currentStatus)
     {
         if (ringAdvanced)
         {
-            foreach (var rule in declaration.Rules)
-            {
-                var regex = PatternCache.GetOrAdd(rule.Pattern,
-                    static p => new Regex(p, RegexOptions.Multiline | RegexOptions.CultureInvariant, MatchTimeout));
-                bool matched;
-                try
-                {
-                    matched = regex.IsMatch(deltaText);
-                }
-                catch (RegexMatchTimeoutException)
-                {
-                    continue;
-                }
-                if (matched)
-                    return rule.Status == currentStatus ? null : rule.Status;
-            }
-            return currentStatus == "active" ? null : "active";
+            var matched = MatchRules(declaration, deltaText) ?? "active";
+            return matched == currentStatus ? null : matched;
         }
         if (quietElapsed && currentStatus == "active")
             return "idle";

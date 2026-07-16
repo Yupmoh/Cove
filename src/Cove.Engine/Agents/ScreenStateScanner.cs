@@ -31,10 +31,10 @@ public sealed class ScreenStateScanner : IDisposable
 
     public void Start()
     {
-        _timer = new Timer(_ => Tick(), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+        _timer = new Timer(_ => ScanOnce(), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
     }
 
-    internal void Tick()
+    public void ScanOnce()
     {
         if (Interlocked.Exchange(ref _ticking, 1) != 0)
             return;
@@ -48,9 +48,8 @@ public sealed class ScreenStateScanner : IDisposable
                 var declaration = manifest?.ScreenState;
                 if (declaration is null || manifest!.Hooks.Count > 0)
                     continue;
-                var priorHead = _memos.TryGetValue(nookId, out var memo) ? memo.LastHead : -1L;
-                var since = priorHead < 0 ? long.MaxValue : priorHead;
-                if (_nooks.TryGetScreenSample(nookId, since, declaration.EffectiveTailBytes) is not { } sample)
+                var priorHead = _memos.TryGetValue(nookId, out var memo) ? memo.LastHead : 0L;
+                if (_nooks.TryGetScreenSample(nookId, priorHead, declaration.EffectiveTailBytes) is not { } sample)
                 {
                     _memos.Remove(nookId);
                     continue;
@@ -59,6 +58,9 @@ public sealed class ScreenStateScanner : IDisposable
                 if (memo is null)
                 {
                     _memos[nookId] = new NookMemo { LastHead = sample.Head, LastAdvanceTicks = now };
+                    var initial = ScreenStateDetector.MatchRules(declaration, ScreenStateDetector.AnsiStrip(sample.Delta));
+                    if (initial is not null)
+                        _router.ScreenTransition(nookId, adapter, initial);
                     continue;
                 }
                 var advanced = sample.Head != memo.LastHead;
