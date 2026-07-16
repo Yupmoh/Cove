@@ -53,7 +53,7 @@ public static class AdapterListCommands
             return null;
         if (path.Contains("/.bun/", StringComparison.Ordinal))
             return $"bun install -g {npmPackage}@latest";
-        return $"npm install -g {npmPackage}@latest";
+        return $"npm install -g --allow-scripts={npmPackage} {npmPackage}@latest";
     }
 
     private static string BrewName(AdapterManifest manifest, string path)

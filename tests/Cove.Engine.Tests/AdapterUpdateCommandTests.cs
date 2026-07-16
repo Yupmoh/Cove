@@ -61,17 +61,17 @@ public sealed class AdapterUpdateCommandTests
     }
 
     [Fact]
-    public void NpmGlobalBinary_UpdatesThroughNpm()
+    public void NpmGlobalBinary_UpdatesThroughNpmAllowingItsInstallScripts()
     {
         var cmd = AdapterListCommands.ResolveUpdateCommand(Manifest("claude-code"), "/opt/homebrew/lib/node_modules/@anthropic-ai/claude-code/cli.js");
-        Assert.Equal("npm install -g @anthropic-ai/claude-code@latest", cmd);
+        Assert.Equal("npm install -g --allow-scripts=@anthropic-ai/claude-code @anthropic-ai/claude-code@latest", cmd);
     }
 
     [Fact]
     public void UnknownInstallLocation_FallsBackToNpmPackage()
     {
         var cmd = AdapterListCommands.ResolveUpdateCommand(Manifest("codex"), "/usr/local/bin/codex");
-        Assert.Equal("npm install -g @openai/codex@latest", cmd);
+        Assert.Equal("npm install -g --allow-scripts=@openai/codex @openai/codex@latest", cmd);
     }
 
     [Fact]
