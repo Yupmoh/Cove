@@ -1,4 +1,5 @@
 #include <errno.h>
+#include <sys/socket.h>
 #include <fcntl.h>
 #include <signal.h>
 #include <stdlib.h>
@@ -130,4 +131,75 @@ int cove_pty_reap(int pid) {
 
 void cove_pty_close(int fd) {
     close(fd);
+}
+
+int cove_pty_socketpair(int *out_a, int *out_b) {
+    int fds[2];
+    if (socketpair(AF_UNIX, SOCK_STREAM, 0, fds) != 0) {
+        return -errno;
+    }
+    *out_a = fds[0];
+    *out_b = fds[1];
+    return 0;
+}
+
+long cove_pty_send_with_fd(int sock, const unsigned char *buf, int len, int fd) {
+    struct iovec iov;
+    iov.iov_base = (void *)buf;
+    iov.iov_len = (size_t)len;
+    struct msghdr msg;
+    memset(&msg, 0, sizeof msg);
+    msg.msg_iov = &iov;
+    msg.msg_iovlen = 1;
+    char control[CMSG_SPACE(sizeof(int))];
+    if (fd >= 0) {
+        memset(control, 0, sizeof control);
+        msg.msg_control = control;
+        msg.msg_controllen = sizeof control;
+        struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msg);
+        cmsg->cmsg_level = SOL_SOCKET;
+        cmsg->cmsg_type = SCM_RIGHTS;
+        cmsg->cmsg_len = CMSG_LEN(sizeof(int));
+        memcpy(CMSG_DATA(cmsg), &fd, sizeof(int));
+    }
+    for (;;) {
+        ssize_t n = sendmsg(sock, &msg, 0);
+        if (n >= 0) {
+            return (long)n;
+        }
+        if (errno == EINTR) {
+            continue;
+        }
+        return -(long)errno;
+    }
+}
+
+long cove_pty_recv_with_fd(int sock, unsigned char *buf, int len, int *out_fd) {
+    *out_fd = -1;
+    struct iovec iov;
+    iov.iov_base = (void *)buf;
+    iov.iov_len = (size_t)len;
+    struct msghdr msg;
+    memset(&msg, 0, sizeof msg);
+    msg.msg_iov = &iov;
+    msg.msg_iovlen = 1;
+    char control[CMSG_SPACE(sizeof(int))];
+    memset(control, 0, sizeof control);
+    msg.msg_control = control;
+    msg.msg_controllen = sizeof control;
+    for (;;) {
+        ssize_t n = recvmsg(sock, &msg, 0);
+        if (n < 0) {
+            if (errno == EINTR) {
+                continue;
+            }
+            return -(long)errno;
+        }
+        struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msg);
+        if (cmsg != NULL && cmsg->cmsg_level == SOL_SOCKET && cmsg->cmsg_type == SCM_RIGHTS
+            && cmsg->cmsg_len >= CMSG_LEN(sizeof(int))) {
+            memcpy(out_fd, CMSG_DATA(cmsg), sizeof(int));
+        }
+        return (long)n;
+    }
 }

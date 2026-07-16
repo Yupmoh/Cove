@@ -28,4 +28,13 @@ internal static partial class CovePtyNative
 
     [LibraryImport(PtyConstants.NativeLibrary, EntryPoint = "cove_pty_close")]
     internal static partial void Close(int fd);
+
+    [LibraryImport(PtyConstants.NativeLibrary, EntryPoint = "cove_pty_socketpair")]
+    internal static partial int SocketPair(out int a, out int b);
+
+    [LibraryImport(PtyConstants.NativeLibrary, EntryPoint = "cove_pty_send_with_fd")]
+    internal static partial nint SendWithFd(int sock, ReadOnlySpan<byte> buffer, int length, int fd);
+
+    [LibraryImport(PtyConstants.NativeLibrary, EntryPoint = "cove_pty_recv_with_fd")]
+    internal static partial nint RecvWithFd(int sock, Span<byte> buffer, int length, out int fd);
 }
