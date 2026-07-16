@@ -5197,7 +5197,14 @@ function renderBoxLauncher(targetShoreId: string | null, targetPlaceholderId: st
     if (cols !== launcherCols) paintBoxLauncher(wrap, ctx);
   });
   ro.observe(wrap);
-  wrap.addEventListener("keydown", (e) => handleLauncherKey(e, wrap, ctx));
+  wrap.addEventListener("keydown", (e) => {
+    if (e.key === "Shift") wrap.classList.add("show-keys");
+    handleLauncherKey(e, wrap, ctx);
+  });
+  wrap.addEventListener("keyup", (e) => {
+    if (e.key === "Shift") wrap.classList.remove("show-keys");
+  });
+  wrap.addEventListener("blur", () => wrap.classList.remove("show-keys"));
   if (launcherTipTimer !== null) window.clearInterval(launcherTipTimer);
   launcherTipTimer = window.setInterval(() => {
     launcherTipIndex += 1;
