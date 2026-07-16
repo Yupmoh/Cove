@@ -5955,12 +5955,16 @@ let appZoom = (() => {
 
 function applyAppZoom(): void {
   appZoom = Math.min(1.5, Math.max(0.7, Math.round(appZoom * 10) / 10));
-  (document.body.style as CSSStyleDeclaration & { zoom: string }).zoom = String(appZoom);
   localStorage.setItem("cove.appZoom", String(appZoom));
   const label = document.getElementById("tb-zoom-label");
   if (label) label.textContent = `${Math.round(appZoom * 100)}%`;
-  syncTitlebarWorkspaceOffset();
-  fitAll();
+  void window.__ryn.invoke("window.setPageZoom", { factor: appZoom })
+    .then(() => {
+      syncTitlebarWorkspaceOffset();
+      fitAll();
+      reconcileBrowserBounds();
+    })
+    .catch((err) => console.warn("window.setPageZoom failed", err));
 }
 
 function setupTitleCluster(): void {

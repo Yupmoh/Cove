@@ -129,6 +129,11 @@ describe("nativeWebviewBounds", () => {
     const b = nativeWebviewBounds({ x: 0, y: -5, width: 200, height: 600 });
     expect(b.y).toBe(0);
   });
+
+  it("passes css rects through unscaled per the ryn 0.26 page-zoom contract", () => {
+    const b = nativeWebviewBounds({ x: 100, y: 50, width: 60, height: 40 });
+    expect(b).toEqual({ x: 100, y: 50, width: 60, height: 40 });
+  });
 });
 
 describe("themeBackgroundColor", () => {
