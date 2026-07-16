@@ -2162,6 +2162,7 @@ function acknowledgeAgentAttention(nookId: string): void {
   if (mapAgentState(agentCards.find((card) => card.nookId === nookId)?.status ?? "idle") !== "done") return;
   if (acknowledgedDoneNooks.has(nookId)) return;
   acknowledgedDoneNooks.add(nookId);
+  void invoke("cove://commands/activity.acknowledge", { nookId }).catch((err) => console.warn("activity.acknowledge failed", nookId, err));
   syncAgentNookStateClasses();
   if (sidebarModel.leftMode === "bays" && !collapsedOf(sidebarModel, "left")) renderSidebarContent("left");
 }

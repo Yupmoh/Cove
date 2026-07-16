@@ -57,6 +57,23 @@ public sealed class HookEventRouter
         _nookStates.GetOrAdd(nookId, _ => new NookAgentState(nookId, adapter, "idle", 0, System.DateTimeOffset.UtcNow, SessionId: sessionId));
     }
 
+    public bool Acknowledge(string nookId)
+    {
+        while (_nookStates.TryGetValue(nookId, out var existing))
+        {
+            if (existing.Status is not ("done" or "error"))
+                return false;
+            var idle = existing with { Status = "idle", StopReason = null, LastEventAt = System.DateTimeOffset.UtcNow };
+            if (_nookStates.TryUpdate(nookId, idle, existing))
+            {
+                if (_logger is { } log)
+                    log.HookStateTransition(nookId, existing.Adapter, "acknowledge", "idle");
+                return true;
+            }
+        }
+        return false;
+    }
+
     public void Route(HookEvent ev)
     {
         if (ev.NookId is null)

@@ -937,7 +937,8 @@ public sealed class DaemonHost
             || uri.StartsWith("cove://commands/worktree.", System.StringComparison.Ordinal)
             || uri.StartsWith("cove://commands/bay-command.", System.StringComparison.Ordinal)
             || uri.StartsWith("cove://commands/task.", System.StringComparison.Ordinal)
-            || uri.StartsWith("cove://commands/run.", System.StringComparison.Ordinal);
+            || uri.StartsWith("cove://commands/run.", System.StringComparison.Ordinal)
+            || uri == "cove://commands/activity.acknowledge";
     }
 
     private static string? ResolveTaskEventChannel(string uri)

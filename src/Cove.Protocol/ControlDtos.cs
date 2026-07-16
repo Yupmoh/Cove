@@ -131,6 +131,8 @@ public sealed record AgentListResult(System.Collections.Generic.IReadOnlyList<Ag
 
 public sealed record ActivityCardDto(string NookId, string Adapter, string? Name, string? Bay, string? Shore, string Status, string? StopReason, int ActiveSubagents, string? LastEvent, System.DateTimeOffset LastEventAt);
 public sealed record ActivityListResult(System.Collections.Generic.IReadOnlyList<ActivityCardDto> Cards);
+public sealed record ActivityAcknowledgeParams(string NookId);
+public sealed record ActivityAcknowledgeResult(bool Acknowledged);
 
 public sealed record SessionStateDto(string NookId, string Adapter, string? SessionId, string Lifecycle, bool Resumable);
 public sealed record SessionListResult(System.Collections.Generic.IReadOnlyList<SessionStateDto> Sessions);
@@ -536,6 +538,8 @@ public sealed record PerfBundleListResult(System.Collections.Generic.IReadOnlyLi
 [JsonSerializable(typeof(AgentListResult))]
 [JsonSerializable(typeof(ActivityCardDto))]
 [JsonSerializable(typeof(ActivityListResult))]
+[JsonSerializable(typeof(ActivityAcknowledgeParams))]
+[JsonSerializable(typeof(ActivityAcknowledgeResult))]
 [JsonSerializable(typeof(SessionStateDto))]
 [JsonSerializable(typeof(SessionListResult))]
 [JsonSerializable(typeof(ReplayInfoDto))]

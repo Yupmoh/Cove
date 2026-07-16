@@ -175,6 +175,14 @@ internal static class CliCommands
     public static Task<int> AdapterEnvResolve(CommandContext ctx)
         => ctx.RouteCoreAsync("cove://commands/adapter-env.resolve");
 
+    [CoveCommand("activity list")]
+    public static Task<int> ActivityList(CommandContext ctx)
+        => ctx.RouteCoreAsync("cove://commands/activity.list");
+
+    [CoveCommand("activity acknowledge")]
+    public static Task<int> ActivityAcknowledge(CommandContext ctx)
+        => ctx.RouteCoreWithParamsAsync("cove://commands/activity.acknowledge", BuildNookIdParams(ctx.Args));
+
     [CoveCommand("hook emit")]
     public static async Task<int> HookEmit(CommandContext ctx)
     {
@@ -234,6 +242,13 @@ internal static class CliCommands
         var adapter = ArgValue(args, "--adapter");
         if (adapter is null) return null;
         return "{\"adapter\":\"" + EscapeJson(adapter) + "\"}";
+    }
+
+    private static string? BuildNookIdParams(string[] args)
+    {
+        var nookId = ArgValue(args, "--nook-id");
+        if (nookId is null) return null;
+        return "{\"nookId\":\"" + EscapeJson(nookId) + "\"}";
     }
 
     private static string? BuildGetParams(string[] args)

@@ -46,4 +46,16 @@ public static class ActivityCommands
 
         return Task.FromResult(ctx.Ok(new ActivityListResult(cards), CoveJsonContext.Default.ActivityListResult));
     }
+
+    [CoveCommand("cove://commands/activity.acknowledge")]
+    public static Task<ControlResponse> Acknowledge(EngineDispatchContext ctx)
+    {
+        if (ctx.HookRouter is not { } router)
+            return Task.FromResult(ctx.Fail("not_ready", "hook router unavailable"));
+        if (ctx.Request.Params is not System.Text.Json.JsonElement el
+            || System.Text.Json.JsonSerializer.Deserialize(el, CoveJsonContext.Default.ActivityAcknowledgeParams) is not { } p
+            || string.IsNullOrEmpty(p.NookId))
+            return Task.FromResult(ctx.Fail("invalid_params", "nookId required"));
+        return Task.FromResult(ctx.Ok(new ActivityAcknowledgeResult(router.Acknowledge(p.NookId)), CoveJsonContext.Default.ActivityAcknowledgeResult));
+    }
 }

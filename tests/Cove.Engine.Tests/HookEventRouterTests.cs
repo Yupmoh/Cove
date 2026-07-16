@@ -249,4 +249,46 @@ public sealed class HookEventRouterTests
         Assert.Equal("needs-input", state!.Status);
         Assert.True(needsInput);
     }
+
+    [Fact]
+    public void Acknowledge_DoneNook_TransitionsToIdle()
+    {
+        var router = new HookEventRouter();
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "session-start", NookId = "p1" });
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "stop", NookId = "p1" });
+
+        Assert.True(router.Acknowledge("p1"));
+        Assert.Equal("idle", router.GetNookState("p1")!.Status);
+    }
+
+    [Fact]
+    public void Acknowledge_CrashedNook_TransitionsToIdleAndClearsStopReason()
+    {
+        var router = new HookEventRouter();
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "session-start", NookId = "p1" });
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "stop-failure", NookId = "p1" });
+
+        Assert.True(router.Acknowledge("p1"));
+        var state = router.GetNookState("p1")!;
+        Assert.Equal("idle", state.Status);
+        Assert.Null(state.StopReason);
+    }
+
+    [Fact]
+    public void Acknowledge_ActiveNook_IsRefused()
+    {
+        var router = new HookEventRouter();
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "session-start", NookId = "p1" });
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "user-prompt-submit", NookId = "p1" });
+
+        Assert.False(router.Acknowledge("p1"));
+        Assert.Equal("active", router.GetNookState("p1")!.Status);
+    }
+
+    [Fact]
+    public void Acknowledge_UnknownNook_IsRefused()
+    {
+        var router = new HookEventRouter();
+        Assert.False(router.Acknowledge("missing"));
+    }
 }
