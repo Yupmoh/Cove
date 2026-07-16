@@ -1,8 +1,5 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
-using System.Threading;
 using Cove.Engine.Pty;
 using Cove.Platform.Pty;
 using Microsoft.Extensions.Logging.Abstractions;
