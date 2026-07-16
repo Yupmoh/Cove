@@ -29,6 +29,9 @@ internal static partial class HookLog
     [ZLoggerMessage(LogLevel.Warning, "hook event dropped untracked nook adapter={adapter} event={eventName} nook={nookId}")]
     public static partial void HookEventUntrackedNook(this ILogger logger, string adapter, string eventName, string nookId);
 
+    [ZLoggerMessage(LogLevel.Warning, "acknowledge dropped unknown nook nook={nookId}")]
+    public static partial void HookAcknowledgeUnknownNook(this ILogger logger, string nookId);
+
     [ZLoggerMessage(LogLevel.Warning, "hook resolve missing params adapter={adapter} event={eventName}")]
     public static partial void HookResolveMissingParams(this ILogger logger, string adapter, string eventName);
 

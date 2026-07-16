@@ -71,6 +71,7 @@ public sealed class HookEventRouter
                 return true;
             }
         }
+        _logger?.HookAcknowledgeUnknownNook(nookId);
         return false;
     }
 
