@@ -7,7 +7,7 @@ import { SerializeAddon } from "@xterm/addon-serialize";
 import "@xterm/xterm/css/xterm.css";
 import { decodeBase64Bytes, decodeRelayData, decodeTerminalRestoreBytes, toBase64Utf8, parseRelayText } from "./wsproto";
 import { createKeyboardProtocolTracker, shiftEnterSequence, type KeyboardProtocolTracker } from "./terminal-keyboard";
-import { isPaneFittable, scrollLineAfterFit, shouldResize, type TermDims } from "./terminal-fit";
+import { isPaneFittable, scrollLineAfterFit, shouldResize, viewportScrollTopFor, type TermDims } from "./terminal-fit";
 import { createStreamGenerations, processExitAction, replayViewportAction, shouldDisposeNook, shouldResetReplay, streamVisibilityAction } from "./stream-guard";
 import { renderKanbanBoard } from "./tasks-kanban";
 import { renderTaskList } from "./tasks-list";
@@ -318,12 +318,27 @@ function paneFittable(pv: NookView): boolean {
   if (!host) return false;
   return isPaneFittable(host.clientWidth, host.clientHeight, host.isConnected, host.offsetParent !== null);
 }
+const savedNookViewports = new Map<string, { baseY: number; viewportY: number }>();
 function fitNook(pv: NookView): void {
   if (!paneFittable(pv)) return;
   try {
-    const before = { baseY: pv.term.buffer.active.baseY, viewportY: pv.term.buffer.active.viewportY };
+    const live = { baseY: pv.term.buffer.active.baseY, viewportY: pv.term.buffer.active.viewportY };
+    let before = live;
+    if (!pv.replaying && !pv.restoringCheckpoint) {
+      const saved = savedNookViewports.get(pv.nookId);
+      if (saved) {
+        savedNookViewports.delete(pv.nookId);
+        before = saved;
+      }
+    }
     pv.fit.fit();
-    pv.term.scrollToLine(scrollLineAfterFit(before, pv.term.buffer.active.baseY));
+    const targetLine = scrollLineAfterFit(before, pv.term.buffer.active.baseY);
+    pv.term.scrollToLine(targetLine);
+    const viewport = pv.el.querySelector<HTMLElement>(".xterm-viewport");
+    if (viewport) {
+      const scrollTop = viewportScrollTopFor(targetLine, pv.term.buffer.active.baseY, viewport.scrollHeight, viewport.clientHeight);
+      if (scrollTop !== null) viewport.scrollTop = scrollTop;
+    }
     pv.term.refresh(0, Math.max(0, pv.term.rows - 1));
   } catch { void 0; }
 }
@@ -718,6 +733,7 @@ function disposeNook(nookId: string): void {
   const pv = nooks.get(nookId);
   if (!pv) return;
   streamGens.invalidate(nookId);
+  savedNookViewports.delete(nookId);
   if (pv.reconnectTimer !== null) window.clearTimeout(pv.reconnectTimer);
   if (pv.checkpointTimer !== null) window.clearTimeout(pv.checkpointTimer);
   if (pv.fitFrame !== null) cancelAnimationFrame(pv.fitFrame);
@@ -1390,8 +1406,17 @@ function firstLeafOf(shore: ShoreSnapshot): string | undefined {
   return collectLeafIds(shore.layoutTree)[0];
 }
 
+function captureNookViewports(): void {
+  for (const [id, pv] of nooks) {
+    if (!pv.el.isConnected || pv.replaying || pv.restoringCheckpoint) continue;
+    const buf = pv.term.buffer.active;
+    savedNookViewports.set(id, { baseY: buf.baseY, viewportY: buf.viewportY });
+  }
+}
+
 function renderShore(): void {
   const shore = activeShore();
+  captureNookViewports();
   gridEl.innerHTML = "";
   const shoreEmpty = shore ? isEmptyShoreTree(shore.layoutTree) : false;
   if (bayOverviewVisible) {

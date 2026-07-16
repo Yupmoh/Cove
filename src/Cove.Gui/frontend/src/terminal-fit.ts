@@ -18,3 +18,15 @@ export function scrollLineAfterFit(before: { baseY: number; viewportY: number },
   const distanceFromBottom = Math.max(0, before.baseY - before.viewportY);
   return Math.max(0, nextBaseY - distanceFromBottom);
 }
+
+export function viewportScrollTopFor(
+  targetLine: number,
+  baseY: number,
+  scrollHeight: number,
+  clientHeight: number,
+): number | null {
+  if (baseY <= 0) return null;
+  const max = scrollHeight - clientHeight;
+  if (max <= 0) return null;
+  return (Math.min(targetLine, baseY) / baseY) * max;
+}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isPaneFittable, scrollLineAfterFit, shouldResize } from "./terminal-fit";
+import { isPaneFittable, scrollLineAfterFit, shouldResize, viewportScrollTopFor } from "./terminal-fit";
 
 describe("isPaneFittable", () => {
   it("is fittable when connected, visible, and sized", () => {
@@ -60,5 +60,35 @@ describe("scrollLineAfterFit", () => {
 
   it("never restores before the beginning of scrollback", () => {
     expect(scrollLineAfterFit({ baseY: 20, viewportY: 0 }, 5)).toBe(0);
+  });
+});
+
+describe("viewport reattach restoration", () => {
+  it("restores a bottom-following viewport to the new bottom", () => {
+    expect(scrollLineAfterFit({ baseY: 500, viewportY: 500 }, 530)).toBe(530);
+  });
+
+  it("restores a scrolled-up viewport to the same distance from bottom", () => {
+    expect(scrollLineAfterFit({ baseY: 500, viewportY: 420 }, 450)).toBe(370);
+  });
+
+  it("maps the bottom line to the maximum scrollTop", () => {
+    expect(viewportScrollTopFor(500, 500, 12000, 600)).toBe(11400);
+  });
+
+  it("maps a mid-scrollback line proportionally", () => {
+    expect(viewportScrollTopFor(250, 500, 12000, 600)).toBe(5700);
+  });
+
+  it("clamps a target past the scrollback to the maximum scrollTop", () => {
+    expect(viewportScrollTopFor(600, 500, 12000, 600)).toBe(11400);
+  });
+
+  it("returns null with no scrollback", () => {
+    expect(viewportScrollTopFor(0, 0, 600, 600)).toBeNull();
+  });
+
+  it("returns null when content fits the viewport", () => {
+    expect(viewportScrollTopFor(5, 5, 400, 600)).toBeNull();
   });
 });
