@@ -866,6 +866,26 @@ public sealed class DaemonHost
             useCheckpoint ? checkpoint!.Rows : 0);
         await WriteResponseAsync(conn, new ControlResponse(req.Id, true, ToElement(subResult, CoveJsonContext.Default.SubscribeResult)), cancellationToken).ConfigureAwait(false);
 
+        if (_nooks.ConsumePendingRepaint(sp.NookId))
+        {
+            var repaintCols = nook.Cols;
+            var repaintRows = nook.Rows;
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    _nooks.Resize(sp.NookId, Math.Max(2, repaintCols - 1), repaintRows);
+                    await Task.Delay(50).ConfigureAwait(false);
+                    _nooks.Resize(sp.NookId, repaintCols, repaintRows);
+                    DaemonLog.Write(_paths, $"repaint jiggle after adoption nook={sp.NookId} cols={repaintCols} rows={repaintRows}");
+                }
+                catch (Exception ex)
+                {
+                    DaemonLog.Write(_paths, $"repaint jiggle failed nook={sp.NookId}: {ex.Message}");
+                }
+            });
+        }
+
         var sink = new SocketByteStreamSink(stream);
         var sender = new PtyStreamSender(streamId, nook.Session.SessionId, nook.Ring, baseOffset, sink, sp.NookId, _logger, () => nook.Reader.TerminalModePreamble, () =>
         {

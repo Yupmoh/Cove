@@ -28,6 +28,7 @@ internal sealed class NookSession
     public required PtyRingSignal Signal { get; init; }
     public required PtySessionReader Reader { get; init; }
     public TerminalCheckpoint? Checkpoint { get; set; }
+    public bool PendingRepaint { get; set; }
 
     public NookInfo ToInfo() => new(NookId, Command, Cols, Rows, !Reader.HasCompleted, Cwd, Title);
 }
@@ -198,6 +199,19 @@ public sealed class NookRegistry : IDisposable, Cove.Engine.Agents.INookWriter
         }
     }
 
+    public bool ConsumePendingRepaint(string nookId)
+    {
+        lock (_sync)
+        {
+            if (_nooks.TryGetValue(nookId, out var nook) && nook.PendingRepaint)
+            {
+                nook.PendingRepaint = false;
+                return true;
+            }
+            return false;
+        }
+    }
+
     public (long Head, byte[] Delta)? TryGetScreenSample(string nookId, long sinceOffset, int maxBytes)
     {
         NookSession? nook;
@@ -350,6 +364,7 @@ public sealed class NookRegistry : IDisposable, Cove.Engine.Agents.INookWriter
             Reader = reader,
         };
         nook.Cwd = record.Cwd;
+        nook.PendingRepaint = true;
         nook.Title = record.Title;
         nook.Adapter = record.Adapter;
         nook.AgentName = record.AgentName;

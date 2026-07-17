@@ -44,6 +44,9 @@ public sealed class RegistryHandoffTests
         var adopted = successor.Adopt(item.Record, item.MasterFd, item.RingTail);
         Assert.NotNull(adopted);
         Assert.Equal(nookId, adopted!.NookId);
+        Assert.True(successor.ConsumePendingRepaint(nookId));
+        Assert.False(successor.ConsumePendingRepaint(nookId));
+
 
         Assert.True(successor.Search(nookId, "HANDOFF_BEFORE", caseSensitive: true).Length > 0);
 
