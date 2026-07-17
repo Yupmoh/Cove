@@ -5602,20 +5602,45 @@ function renderInstallHarnessCard(): HTMLElement {
 function openHarnessInstallModal(): void {
   const rows = harnessInstallRows(launcherAdapters);
   if (rows.length === 0) return;
+  const previousFocus = document.activeElement as HTMLElement | null;
   const overlay = document.createElement("div");
   overlay.className = "hi-overlay";
   const panel = document.createElement("div");
   panel.className = "hi-panel";
+  panel.setAttribute("role", "dialog");
+  panel.setAttribute("aria-modal", "true");
+  panel.setAttribute("aria-label", "Install a harness");
 
   const close = (): void => {
     overlay.remove();
     document.removeEventListener("keydown", onKey, true);
+    previousFocus?.focus?.();
   };
   const onKey = (e: KeyboardEvent): void => {
     if (e.key === "Escape") {
       e.stopPropagation();
+      e.preventDefault();
       close();
+      return;
     }
+    if (!panel.contains(e.target as Node)) {
+      e.stopPropagation();
+      e.preventDefault();
+      return;
+    }
+    if (e.key === "Tab") {
+      const focusables = Array.from(panel.querySelectorAll<HTMLElement>("button, [tabindex]"));
+      if (focusables.length === 0) return;
+      const index = focusables.indexOf(document.activeElement as HTMLElement);
+      const next = e.shiftKey
+        ? focusables[(index <= 0 ? focusables.length : index) - 1]
+        : focusables[(index + 1) % focusables.length];
+      e.preventDefault();
+      e.stopPropagation();
+      next.focus();
+      return;
+    }
+    e.stopPropagation();
   };
   document.addEventListener("keydown", onKey, true);
   overlay.addEventListener("mousedown", (e) => {
@@ -5633,7 +5658,7 @@ function openHarnessInstallModal(): void {
   sub.textContent = "Add a coding agent to Cove. Uninstalled harnesses stay listed here, ready to reinstall.";
   heading.appendChild(title);
   heading.appendChild(sub);
-  const x = document.createElement("span");
+  const x = document.createElement("button");
   x.className = "hi-x";
   x.textContent = "✕";
   x.addEventListener("click", close);
@@ -5687,6 +5712,7 @@ function openHarnessInstallModal(): void {
   panel.appendChild(list);
   overlay.appendChild(panel);
   document.body.appendChild(overlay);
+  (panel.querySelector<HTMLElement>(".hi-install") ?? x).focus();
 }
 
 function renderHarnessCard(ctx: LauncherContext, tile: LauncherTile, letter: string, selected: boolean): HTMLElement {
