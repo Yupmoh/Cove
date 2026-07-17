@@ -3613,7 +3613,7 @@ function buildToolsCard(a: ToolsAdapter, container: HTMLElement): HTMLElement {
 
   if (retentionChipVisible(a.retention)) body.appendChild(buildRetentionChip(a, container));
 
-  void buildProfilesSection(a, container).then((el) => body.appendChild(el));
+  if (a.status === "detected") void buildProfilesSection(a, container).then((el) => body.appendChild(el));
 
   card.appendChild(body);
   return card;

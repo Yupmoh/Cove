@@ -20,19 +20,22 @@ public sealed class BayManager : IAsyncDisposable
     private readonly WorktreeService _worktrees;
     private readonly ILogger _logger;
     private readonly Dictionary<string, GitWatchService> _watchers = new(StringComparer.Ordinal);
+    private readonly Action<IReadOnlyList<string>>? _persistOrder;
     public BayManager(
         RegistryModel? registry = null,
         IEnumerable<BayModel>? bays = null,
         Action<BayChange>? emit = null,
         Func<string>? newId = null,
         IGitRunner? gitRunner = null,
-        ILogger? logger = null)
+        ILogger? logger = null,
+        Action<IReadOnlyList<string>>? persistOrder = null)
     {
         _newId = newId ?? (() => Guid.NewGuid().ToString("N"));
         _emit = emit;
         _logger = logger ?? NullLogger.Instance;
         _worktrees = new WorktreeService(gitRunner ?? new ProcessGitRunner());
         _registry = new Actor<RegistryModel>(registry ?? new RegistryModel());
+        _persistOrder = persistOrder;
         if (bays is not null)
             foreach (var bay in bays)
                 _bays[bay.Id] = new Actor<BayModel>(bay);
@@ -328,6 +331,7 @@ public sealed class BayManager : IAsyncDisposable
                     next.Add(id);
             return r with { OpenBays = next };
         }).ConfigureAwait(false);
+        _persistOrder?.Invoke(_registry.State.OpenBays);
     }
 
     public async Task<bool> MoveShoreAsync(string fromBayId, string shoreId, string toBayId)

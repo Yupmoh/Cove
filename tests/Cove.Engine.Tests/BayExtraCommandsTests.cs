@@ -50,6 +50,19 @@ public sealed class BayExtraCommandsTests
     }
 
     [Fact]
+    public async Task Reorder_InvokesOrderPersistence()
+    {
+        int n = 0;
+        System.Collections.Generic.IReadOnlyList<string>? persisted = null;
+        await using var m = new BayManager(newId: () => $"id-{++n}", persistOrder: ids => persisted = ids);
+        var a = await m.CreateBayAsync("a", "/a");
+        var b = await m.CreateBayAsync("b", "/b");
+
+        await m.ReorderBaysAsync(new[] { b.Id, a.Id });
+        Assert.Equal(new[] { b.Id, a.Id }, persisted);
+    }
+
+    [Fact]
     public async Task MoveShore_MovesBetweenBays()
     {
         int n = 0;

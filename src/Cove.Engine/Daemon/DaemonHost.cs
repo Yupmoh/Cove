@@ -299,7 +299,19 @@ public sealed class DaemonHost
         {
             if (change.Kind == Cove.Engine.Bays.BayChangeKind.Updated)
                 PersistBay(change.BayId, System.IO.Path.Combine(dataDir, "bays"), logger);
-        }, logger: logger);
+        }, logger: logger, persistOrder: ids =>
+        {
+            var orderPath = System.IO.Path.Combine(dataDir, "bays", Cove.Engine.Layout.BayStartup.OrderFileName);
+            try
+            {
+                System.IO.Directory.CreateDirectory(System.IO.Path.Combine(dataDir, "bays"));
+                System.IO.File.WriteAllLines(orderPath, ids);
+            }
+            catch (System.IO.IOException ex)
+            {
+                logger.LogWarning("bay order persistence failed at {Path}: {Error}", orderPath, ex.Message);
+            }
+        });
         _runCommands = new Cove.Engine.Bays.RunCommandService(new Cove.Engine.Bays.RunCommandStore(System.IO.Path.Combine(dataDir, "run-commands"), logger), new Cove.Engine.Bays.PtyRunCommandSessionFactory(_ptyHost, spawnEnv, shellDir, logger), logger: logger);
         _restoration = new Cove.Engine.Restart.RestorationService(dataDir, logger, emitProgress: e => BroadcastEvent("restore.progress", e, Cove.Engine.Restart.RestorationJsonContext.Default.RestoreProgressEvent));
         _snapshots = new Cove.Engine.Snapshots.SnapshotService(dataDir, System.IO.Path.Combine(dataDir, "snapshots"), new Cove.Engine.Bays.ProcessGitRunner(), logger);

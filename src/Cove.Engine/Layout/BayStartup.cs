@@ -10,6 +10,8 @@ public sealed record LoadedBay(BaySnapshot Snapshot, Dictionary<string, NookDesc
 
 public static class BayStartup
 {
+    public const string OrderFileName = "order.txt";
+
     public static IReadOnlyList<LoadedBay> Enumerate(string baysRoot, ILogger logger)
     {
         var result = new List<LoadedBay>();
@@ -30,7 +32,36 @@ public static class BayStartup
             }
             result.Add(new LoadedBay(layout, sessions, dir));
         }
-        return result;
+        return ApplyPersistedOrder(result, ReadOrderFile(Path.Combine(baysRoot, OrderFileName), logger));
+    }
+
+    public static IReadOnlyList<string> ReadOrderFile(string path, ILogger logger)
+    {
+        if (!File.Exists(path))
+            return [];
+        try
+        {
+            return File.ReadAllLines(path).Where(l => !string.IsNullOrWhiteSpace(l)).Select(l => l.Trim()).ToList();
+        }
+        catch (IOException ex)
+        {
+            logger.LogWarning("bay startup: order file unreadable at {Path}: {Error}", path, ex.Message);
+            return [];
+        }
+    }
+
+    public static IReadOnlyList<LoadedBay> ApplyPersistedOrder(IReadOnlyList<LoadedBay> bays, IReadOnlyList<string> order)
+    {
+        if (order.Count == 0)
+            return bays;
+        var rank = new Dictionary<string, int>(System.StringComparer.Ordinal);
+        for (var i = 0; i < order.Count; i++)
+            rank.TryAdd(order[i], i);
+        return bays
+            .Select((bay, index) => (bay, index))
+            .OrderBy(x => rank.TryGetValue(x.bay.Snapshot.Id, out var r) ? r : order.Count + x.index)
+            .Select(x => x.bay)
+            .ToList();
     }
 
     public static string DisplayName(BaySnapshot snap, string fallbackProjectDir)

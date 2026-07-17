@@ -48,6 +48,51 @@ public sealed class BayStartupTests
     }
 
     [Fact]
+    public void Enumerate_HonorsPersistedOrderFile()
+    {
+        var root = NewRoot();
+        try
+        {
+            WriteWs(root, "wsA", "Alpha", "/tmp/a");
+            WriteWs(root, "wsB", "Beta", "/tmp/b");
+            WriteWs(root, "wsC", "Gamma", "/tmp/c");
+            File.WriteAllLines(Path.Combine(root, "order.txt"), new[] { "wsC", "wsA" });
+            var loaded = BayStartup.Enumerate(root, NullLogger.Instance);
+            Assert.Equal(new[] { "wsC", "wsA", "wsB" }, loaded.Select(l => l.Snapshot.Id).ToArray());
+        }
+        finally { try { Directory.Delete(root, true); } catch { } }
+    }
+
+    [Fact]
+    public void Enumerate_IgnoresUnknownIdsInOrderFile()
+    {
+        var root = NewRoot();
+        try
+        {
+            WriteWs(root, "wsA", "Alpha", "/tmp/a");
+            WriteWs(root, "wsB", "Beta", "/tmp/b");
+            File.WriteAllLines(Path.Combine(root, "order.txt"), new[] { "gone", "wsB", "" });
+            var loaded = BayStartup.Enumerate(root, NullLogger.Instance);
+            Assert.Equal(new[] { "wsB", "wsA" }, loaded.Select(l => l.Snapshot.Id).ToArray());
+        }
+        finally { try { Directory.Delete(root, true); } catch { } }
+    }
+
+    [Fact]
+    public void Enumerate_NoOrderFile_KeepsDirectoryOrder()
+    {
+        var root = NewRoot();
+        try
+        {
+            WriteWs(root, "wsB", "Beta", "/tmp/b");
+            WriteWs(root, "wsA", "Alpha", "/tmp/a");
+            var loaded = BayStartup.Enumerate(root, NullLogger.Instance);
+            Assert.Equal(new[] { "wsA", "wsB" }, loaded.Select(l => l.Snapshot.Id).ToArray());
+        }
+        finally { try { Directory.Delete(root, true); } catch { } }
+    }
+
+    [Fact]
     public void DisplayName_LegacyDefault_DerivesFromProjectDir()
     {
         var snap = new BaySnapshot { Id = "default", Name = "default", ProjectDir = "/Users/moh/code/cove" };
