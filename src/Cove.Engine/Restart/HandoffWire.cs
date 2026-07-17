@@ -7,7 +7,7 @@ namespace Cove.Engine.Restart;
 
 public static class HandoffWire
 {
-    private const int MaxRecordJsonBytes = 1 << 20;
+    private const int MaxRecordJsonBytes = 1 << 26;
     private const int RingChunkBytes = 1 << 18;
 
     public static void WriteRecord(int socketFd, HandoffNookRecord record, int transferFd, ReadOnlySpan<byte> ring)

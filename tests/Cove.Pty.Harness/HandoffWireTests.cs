@@ -59,6 +59,34 @@ public sealed class HandoffWireTests
     }
 
     [Fact]
+    public async Task Records_WithMultiMegabyteCheckpoint_RoundTrip()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var (a, b) = UnixFdChannel.CreateSocketPair();
+        try
+        {
+            var data = new byte[3 << 20];
+            new Random(3).NextBytes(data);
+            var checkpoint = new HandoffCheckpointDto(Convert.ToBase64String(data), 123, 80, 24, 10000, "");
+            var record = new HandoffNookRecord("nook-cp", 4242, "/bin/zsh", new[] { "-i" }, "/repo", null, 80, 24, null, "omp", "omp", 5, 4, "sess-1", "idle", checkpoint);
+            var ring = Encoding.UTF8.GetBytes("tail");
+            var writer = Task.Run(() => HandoffWire.WriteRecord(a, record, -1, ring));
+
+            var received = HandoffWire.ReadRecord(b);
+            Assert.NotNull(received);
+            Assert.Equal("nook-cp", received!.Value.Record.NookId);
+            Assert.Equal(checkpoint.DataBase64, received.Value.Record.Checkpoint!.DataBase64);
+            Assert.Equal(ring, received.Value.Ring);
+            await writer.WaitAsync(TimeSpan.FromSeconds(10));
+        }
+        finally
+        {
+            UnixFdChannel.CloseFd(a);
+            UnixFdChannel.CloseFd(b);
+        }
+    }
+
+    [Fact]
     public void ReadRecord_OnClosedPeer_ReturnsNull()
     {
         if (OperatingSystem.IsWindows()) return;
