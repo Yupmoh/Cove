@@ -2964,8 +2964,16 @@ function renderShoreTabs(): void {
   }
   for (const id of unpinned) shoreTabsEl.appendChild(makeTab(id));
 
+  const addBtn = document.createElement("div");
+  addBtn.className = "rbox-ctl rbox-add";
+  addBtn.innerHTML = iconSvg("plus");
+  addBtn.title = "New shore (Cmd T)";
+  addBtn.addEventListener("click", () => void newShore());
+  shoreTabsEl.appendChild(addBtn);
+
   if (wings.length > 1 || wingSwitcherExpanded) {
     const switcher = document.createElement("div");
+    switcher.style.marginLeft = "auto";
     switcher.id = "wing-switcher";
     if (!wingSwitcherExpanded) {
       const toggle = document.createElement("div");
@@ -2991,14 +2999,6 @@ function renderShoreTabs(): void {
     }
     shoreTabsEl.appendChild(switcher);
   }
-
-  const addBtn = document.createElement("div");
-  addBtn.className = "rbox-ctl rbox-add";
-  addBtn.style.cssText = "margin-left:auto;";
-  addBtn.innerHTML = iconSvg("plus");
-  addBtn.title = "New shore (Cmd T)";
-  addBtn.addEventListener("click", () => void newShore());
-  shoreTabsEl.appendChild(addBtn);
 
   updateEdgeFade();
 }
