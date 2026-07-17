@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifyDictationTarget, classifySpaceTarget, createSpaceHold, encodeNookText, partialPreview, spaceHoldTransition, SpaceHoldMs, type FocusDescriptor, type SpaceHoldEvent, type SpaceHoldState, type SpaceHoldHooks, type SpaceKeyEventLike, type SpaceTarget } from "./dictation";
+import { classifyDictationTarget, classifySpaceTarget, createNookTypist, createSpaceHold, encodeNookText, partialPreview, spaceHoldTransition, SpaceHoldMs, typedRevision, type FocusDescriptor, type SpaceHoldEvent, type SpaceHoldState, type SpaceHoldHooks, type SpaceKeyEventLike, type SpaceTarget } from "./dictation";
 
 const focus = (partial: Partial<FocusDescriptor>): FocusDescriptor => ({
   tagName: "DIV",
@@ -268,5 +268,77 @@ describe("partialPreview", () => {
 
   it("returns empty for empty text", () => {
     expect(partialPreview("")).toBe("");
+  });
+});
+
+describe("typedRevision", () => {
+  it("appends when the new text extends the old", () => {
+    expect(typedRevision("hello", "hello world")).toEqual({ erase: 0, append: " world" });
+  });
+
+  it("erases only the changed tail on revision", () => {
+    expect(typedRevision("hello word", "hello world")).toEqual({ erase: 1, append: "ld" });
+  });
+
+  it("does nothing for identical text", () => {
+    expect(typedRevision("same", "same")).toEqual({ erase: 0, append: "" });
+  });
+
+  it("erases everything when the new text is empty", () => {
+    expect(typedRevision("gone", "")).toEqual({ erase: 4, append: "" });
+  });
+
+  it("counts astral characters as single erasures", () => {
+    expect(typedRevision("a🎤", "a")).toEqual({ erase: 1, append: "" });
+    expect(typedRevision("", "🎤 test")).toEqual({ erase: 0, append: "🎤 test" });
+  });
+
+  it("types everything from scratch", () => {
+    expect(typedRevision("", "hello")).toEqual({ erase: 0, append: "hello" });
+  });
+});
+
+describe("createNookTypist", () => {
+  function typist() {
+    const writes: string[] = [];
+    return { writes, t: createNookTypist(async (p) => { writes.push(p); }) };
+  }
+
+  it("types incrementally as partials grow", async () => {
+    const { writes, t } = typist();
+    await t.revise("hello");
+    await t.revise("hello world");
+    expect(writes).toEqual(["hello", " world"]);
+  });
+
+  it("sends DEL for the changed tail then the correction in one payload", async () => {
+    const { writes, t } = typist();
+    await t.revise("hello word");
+    await t.revise("hello world");
+    expect(writes).toEqual(["hello word", "\u007fld"]);
+  });
+
+  it("writes nothing for identical revisions", async () => {
+    const { writes, t } = typist();
+    await t.revise("same");
+    await t.revise("same");
+    expect(writes).toEqual(["same"]);
+  });
+
+  it("erases the whole preview when the final text is empty", async () => {
+    const { writes, t } = typist();
+    await t.revise("oops");
+    await t.revise("");
+    expect(writes).toEqual(["oops", "\u007f\u007f\u007f\u007f"]);
+  });
+
+  it("keeps sessions isolated: an old session's final diffs against its own preview", async () => {
+    const a = typist();
+    const b = typist();
+    await a.t.revise("hello");
+    await b.t.revise("hi");
+    await a.t.revise("hello world");
+    expect(a.writes).toEqual(["hello", " world"]);
+    expect(b.writes).toEqual(["hi"]);
   });
 });

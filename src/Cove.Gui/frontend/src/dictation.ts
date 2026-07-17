@@ -212,6 +212,31 @@ interface DictationDeps {
   holdKey?: string;
 }
 
+export function typedRevision(prev: string, next: string): { erase: number; append: string } {
+  const a = [...prev];
+  const b = [...next];
+  let common = 0;
+  while (common < a.length && common < b.length && a[common] === b[common]) common++;
+  return { erase: a.length - common, append: b.slice(common).join("") };
+}
+
+export interface NookTypist {
+  revise(next: string): Promise<void>;
+}
+
+export function createNookTypist(write: (payload: string) => Promise<void>): NookTypist {
+  let lastTyped = "";
+  return {
+    async revise(next: string): Promise<void> {
+      if (next === lastTyped) return;
+      const { erase, append } = typedRevision(lastTyped, next);
+      const payload = "\u007f".repeat(erase) + append;
+      if (payload) await write(payload);
+      lastTyped = next;
+    },
+  };
+}
+
 type PillState = "recording" | "transcribing" | "downloading" | "error";
 
 export function setupDictation(deps: DictationDeps): void {
@@ -247,14 +272,87 @@ export function setupDictation(deps: DictationDeps): void {
     }
   };
 
-  const doStop = async (): Promise<void> => {
+  type LiveTarget =
+    | { kind: "range"; el: HTMLInputElement | HTMLTextAreaElement; start: number; end: number }
+    | { kind: "ce"; el: Element; node: Text | null }
+    | { kind: "nook"; typist: NookTypist }
+    | null;
+
+  let recordingTarget: LiveTarget = null;
+  let writeChain: Promise<void> = Promise.resolve();
+
+  const captureLiveTarget = (): LiveTarget => {
+    const el = document.activeElement;
+    const nookId = deps.getFocusedNookId();
+    const route = classifyDictationTarget(describeFocus(el), nookId);
+    if (route === "editable" && el) {
+      if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+        const start = el.selectionStart ?? el.value.length;
+        return { kind: "range", el, start, end: el.selectionEnd ?? start };
+      }
+      return { kind: "ce", el, node: null };
+    }
+    if (route === "nook" && nookId) {
+      return {
+        kind: "nook",
+        typist: createNookTypist((payload) =>
+          deps.invoke("app.nookWrite", { nookId, dataBase64: encodeNookText(payload) }).then(() => undefined)),
+      };
+    }
+    return null;
+  };
+
+  const typeRevision = async (target: LiveTarget, next: string): Promise<void> => {
+    if (!target) return;
+    if (target.kind === "nook") {
+      await target.typist.revise(next);
+    } else if (target.kind === "range") {
+      target.el.setRangeText(next, target.start, target.end, "end");
+      target.end = target.start + next.length;
+      target.el.dispatchEvent(new Event("input", { bubbles: true }));
+    } else {
+      if (!target.node) {
+        const selection = window.getSelection();
+        if (!selection || selection.rangeCount === 0) return;
+        const range = selection.getRangeAt(0);
+        range.deleteContents();
+        target.node = document.createTextNode(next);
+        range.insertNode(target.node);
+      } else {
+        target.node.nodeValue = next;
+      }
+      const selection = window.getSelection();
+      if (selection) {
+        const caret = document.createRange();
+        caret.setStart(target.node, next.length);
+        caret.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(caret);
+      }
+      target.el.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+  };
+
+  const enqueueRevision = (target: LiveTarget, text: string): void => {
+    writeChain = writeChain.then(() => typeRevision(target, text)).catch((err) => {
+      console.warn("dictation live typing failed", err);
+    });
+  };
+
+  const doStop = async (target: LiveTarget): Promise<void> => {
     const capturedFocus = document.activeElement;
     const nookId = deps.getFocusedNookId();
     showPill("transcribing");
     try {
       const raw = await deps.invoke("app.dictationStop");
       const result = JSON.parse(String(raw)) as { text?: string };
-      await deliver(result.text ?? "", capturedFocus, nookId);
+      const text = result.text ?? "";
+      if (target) {
+        enqueueRevision(target, text);
+        await writeChain;
+      } else {
+        await deliver(text, capturedFocus, nookId);
+      }
       hidePill();
     } catch (err) {
       showPill("error", String(err));
@@ -262,17 +360,17 @@ export function setupDictation(deps: DictationDeps): void {
     }
   };
 
-  let startPending: Promise<boolean> | null = null;
+  let currentHold: { pending: Promise<boolean>; target: LiveTarget } | null = null;
 
   const release = (): void => {
     if (!held) return;
     held = false;
-    const pending = startPending;
-    startPending = null;
+    const hold = currentHold;
+    currentHold = null;
     void (async () => {
-      const started = pending ? await pending : false;
-      if (started) {
-        await doStop();
+      const started = hold ? await hold.pending : false;
+      if (started && hold) {
+        await doStop(hold.target);
       } else {
         hidePill();
       }
@@ -282,7 +380,9 @@ export function setupDictation(deps: DictationDeps): void {
   const beginHold = (): void => {
     if (held) return;
     held = true;
-    startPending = (async (): Promise<boolean> => {
+    const target = captureLiveTarget();
+    recordingTarget = target;
+    const pending = (async (): Promise<boolean> => {
       try {
         const raw = await deps.invoke("app.dictationStart");
         const result = JSON.parse(String(raw)) as { ok?: boolean; error?: string };
@@ -306,6 +406,7 @@ export function setupDictation(deps: DictationDeps): void {
         return false;
       }
     })();
+    currentHold = { pending, target };
   };
 
   let spaceFocus: Element | null = null;
@@ -367,7 +468,10 @@ export function setupDictation(deps: DictationDeps): void {
     const evt = data as { channel?: string; payload?: unknown };
     if (evt?.channel === "dictation.partial") {
       const text = (evt.payload as { text?: string } | undefined)?.text ?? "";
-      if (held && text) showPill("recording", partialPreview(text));
+      if (held && text) {
+        if (recordingTarget) enqueueRevision(recordingTarget, text);
+        else showPill("recording", partialPreview(text));
+      }
     } else if (evt?.channel === "dictation.progress") {
       const pct = Math.round((((evt.payload as { percent?: number } | undefined)?.percent ?? 0) * 100));
       showPill("downloading", `${pct}%`);
