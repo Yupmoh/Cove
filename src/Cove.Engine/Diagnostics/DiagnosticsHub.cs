@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Cove.Engine.Diagnostics;
 
-public sealed record DiagnosticsConfig(bool Enabled, bool WebInspectorOptIn, int MaxSnapshots, TimeSpan SnapshotInterval);
+public sealed record DiagnosticsConfig(bool Enabled, bool WebInspectorOptIn, int MaxSnapshots, TimeSpan SnapshotInterval, bool CaptureTerminalStats = true, bool CaptureMemoryStats = true, int FlushIntervalMs = 2000);
 
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 [JsonSerializable(typeof(DiagnosticsConfig))]
@@ -66,19 +66,21 @@ public sealed class DiagnosticsHub
         int activeAgents = 0,
         System.Collections.Generic.Dictionary<string, long>? nookScrollbackBytes = null)
     {
+        var captureMemory = _config.CaptureMemoryStats;
+        var captureTerminal = _config.CaptureTerminalStats;
         var snapshot = new DiagnosticsSnapshot(
             System.DateTimeOffset.UtcNow,
-            System.GC.GetTotalMemory(false),
-            System.Diagnostics.Process.GetCurrentProcess().WorkingSet64,
-            System.Diagnostics.Process.GetCurrentProcess().Threads.Count,
-            System.GC.CollectionCount(0),
-            System.GC.CollectionCount(1),
-            System.GC.CollectionCount(2),
+            captureMemory ? System.GC.GetTotalMemory(false) : 0,
+            captureMemory ? System.Diagnostics.Process.GetCurrentProcess().WorkingSet64 : 0,
+            captureMemory ? System.Diagnostics.Process.GetCurrentProcess().Threads.Count : 0,
+            captureMemory ? System.GC.CollectionCount(0) : 0,
+            captureMemory ? System.GC.CollectionCount(1) : 0,
+            captureMemory ? System.GC.CollectionCount(2) : 0,
             activeNooks,
             activeBays,
             activeAgents,
             0,
-            nookScrollbackBytes ?? new());
+            captureTerminal ? (nookScrollbackBytes ?? new()) : new());
 
         if (_config.Enabled)
         {

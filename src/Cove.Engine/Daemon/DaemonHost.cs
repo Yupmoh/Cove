@@ -366,7 +366,11 @@ public sealed class DaemonHost
             .Select(e => new Cove.Engine.Lsp.LspConfigEntry(e.Languages.ToArray(), e.Command, e.Args.ToArray()))
             .ToList();
         _lspService = new Cove.Engine.Lsp.LspService(logger, lspUserEntries);
-        _diagnostics = new Cove.Engine.Diagnostics.DiagnosticsHub(null, logger);
+        var diag = _config.GetDiagnosticsSection();
+        var diagConfig = new Cove.Engine.Diagnostics.DiagnosticsConfig(
+            diag.Enabled, false, 100, TimeSpan.FromMilliseconds(diag.FlushIntervalMs),
+            diag.CaptureTerminalStats, diag.CaptureMemoryStats, diag.FlushIntervalMs);
+        _diagnostics = new Cove.Engine.Diagnostics.DiagnosticsHub(diagConfig, logger);
         _perfBundles = new Cove.Engine.Diagnostics.PerformanceBundleService(_diagnostics, System.IO.Path.Combine(dataDir, "perf-bundles"), logger);
         _gitReadModel = new Cove.Engine.Bays.GitReadModel(new Cove.Engine.Bays.ProcessGitRunner(), logger);
         _searchService = new Cove.Engine.Search.SearchService(logger);

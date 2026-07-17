@@ -126,4 +126,77 @@ public sealed class DiagnosticsHubTests
         Assert.Equal(1024, snapshot.NookScrollbackBytes["nook-1"]);
         Assert.Equal(2048, snapshot.NookScrollbackBytes["nook-2"]);
     }
+
+    [Fact]
+    public void DisabledHub_CapturesNothing()
+    {
+        var hub = new DiagnosticsHub(new DiagnosticsConfig(false, false, 100, TimeSpan.FromMinutes(5)));
+        hub.TakeSnapshot();
+        hub.TakeSnapshot();
+        Assert.Empty(hub.GetSnapshots());
+    }
+
+    [Fact]
+    public void CaptureMemoryStatsFalse_ZeroesMemoryFields()
+    {
+        var hub = new DiagnosticsHub(new DiagnosticsConfig(true, false, 100, TimeSpan.FromMinutes(5), CaptureMemoryStats: false));
+        var snapshot = hub.TakeSnapshot();
+        Assert.Equal(0, snapshot.ManagedMemoryBytes);
+        Assert.Equal(0, snapshot.WorkingSetBytes);
+        Assert.Equal(0, snapshot.ThreadCount);
+        Assert.Equal(0, snapshot.GcGen0Collections);
+        Assert.Equal(0, snapshot.GcGen1Collections);
+        Assert.Equal(0, snapshot.GcGen2Collections);
+        Assert.Single(hub.GetSnapshots());
+    }
+
+    [Fact]
+    public void CaptureMemoryStatsTrue_CapturesMemoryFields()
+    {
+        var hub = new DiagnosticsHub(new DiagnosticsConfig(true, false, 100, TimeSpan.FromMinutes(5), CaptureMemoryStats: true));
+        var snapshot = hub.TakeSnapshot();
+        Assert.True(snapshot.ManagedMemoryBytes > 0);
+        Assert.True(snapshot.WorkingSetBytes > 0);
+        Assert.True(snapshot.ThreadCount > 0);
+    }
+
+    [Fact]
+    public void CaptureTerminalStatsFalse_ZeroesScrollback()
+    {
+        var hub = new DiagnosticsHub(new DiagnosticsConfig(true, false, 100, TimeSpan.FromMinutes(5), CaptureTerminalStats: false));
+        var scrollback = new Dictionary<string, long> { ["nook-1"] = 1024 };
+        var snapshot = hub.TakeSnapshot(nookScrollbackBytes: scrollback);
+        Assert.Empty(snapshot.NookScrollbackBytes);
+    }
+
+    [Fact]
+    public void CaptureTerminalStatsTrue_CapturesScrollback()
+    {
+        var hub = new DiagnosticsHub(new DiagnosticsConfig(true, false, 100, TimeSpan.FromMinutes(5), CaptureTerminalStats: true));
+        var scrollback = new Dictionary<string, long> { ["nook-1"] = 1024 };
+        var snapshot = hub.TakeSnapshot(nookScrollbackBytes: scrollback);
+        Assert.Equal(1024, snapshot.NookScrollbackBytes["nook-1"]);
+    }
+
+    [Fact]
+    public void FlushIntervalMs_StoredOnConfig()
+    {
+        var hub = new DiagnosticsHub(new DiagnosticsConfig(true, false, 100, TimeSpan.FromMinutes(5), FlushIntervalMs: 5000));
+        Assert.Equal(5000, hub.Config.FlushIntervalMs);
+    }
+
+    [Fact]
+    public void FlushIntervalMs_DefaultsTo2000()
+    {
+        var hub = new DiagnosticsHub(new DiagnosticsConfig(true, false, 100, TimeSpan.FromMinutes(5)));
+        Assert.Equal(2000, hub.Config.FlushIntervalMs);
+    }
+
+    [Fact]
+    public void CaptureFlags_DefaultAllTrue()
+    {
+        var hub = new DiagnosticsHub(new DiagnosticsConfig(true, false, 100, TimeSpan.FromMinutes(5)));
+        Assert.True(hub.Config.CaptureTerminalStats);
+        Assert.True(hub.Config.CaptureMemoryStats);
+    }
 }

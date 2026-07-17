@@ -30,9 +30,11 @@ public sealed class SettingDecorationTests
         Assert.Contains(entries, e => e.Key == "theme");
         Assert.Contains(entries, e => e.Key == "terminal.fontSize");
         Assert.Contains(entries, e => e.Key == "terminal.fontFamily");
-        Assert.Contains(entries, e => e.Key == "updates.channel");
-        Assert.Contains(entries, e => e.Key == "telemetry.enabled");
+        Assert.Contains(entries, e => e.Key == "updates.checkOnLaunch");
         Assert.Contains(entries, e => e.Key == "diagnostics.enabled");
+        Assert.DoesNotContain(entries, e => e.Key == "updates.channel");
+        Assert.DoesNotContain(entries, e => e.Key == "telemetry.enabled");
+        Assert.DoesNotContain(entries, e => e.Key == "terminal.fontLigatures");
     }
 
     [Fact]
@@ -76,7 +78,8 @@ public sealed class SettingDecorationTests
         Assert.Contains("# Configuration Reference", doc);
         Assert.Contains("theme", doc);
         Assert.Contains("terminal.fontSize", doc);
-        Assert.Contains("telemetry.enabled", doc);
+        Assert.Contains("diagnostics.enabled", doc);
+        Assert.DoesNotContain("telemetry.enabled", doc);
     }
 
     [Fact]
@@ -85,7 +88,9 @@ public sealed class SettingDecorationTests
         var doc = ConfigSchemaGenerator.GenerateReferenceDoc();
         Assert.Contains("## appearance", doc);
         Assert.Contains("## terminal", doc);
-        Assert.Contains("## privacy", doc);
+        Assert.Contains("## diagnostics", doc);
+        Assert.DoesNotContain("## privacy", doc);
+        Assert.DoesNotContain("## audio", doc);
     }
 
     [Fact]
@@ -95,7 +100,7 @@ public sealed class SettingDecorationTests
         Assert.Contains("Theme", doc);
     }
     [Fact]
-    public void Schema_IncludesAll13ConfigDomains()
+    public void Schema_IncludesSurvivingConfigDomains()
     {
         var entries = ConfigSchemaGenerator.Generate();
         var tabs = entries.Select(e => e.Tab).Distinct().ToList();
@@ -104,19 +109,26 @@ public sealed class SettingDecorationTests
         Assert.Contains("updates", tabs);
         Assert.Contains("diagnostics", tabs);
         Assert.Contains("bay", tabs);
-        Assert.Contains("privacy", tabs);
         Assert.Contains("keyboard", tabs);
-        Assert.Contains("audio", tabs);
         Assert.Contains("tools", tabs);
     }
 
     [Fact]
-    public void Schema_IncludesLspServersAndAdapterCommands()
+    public void Schema_ExcludesRemovedAudioPrivacySections()
     {
         var entries = ConfigSchemaGenerator.Generate();
-        Assert.Contains(entries, e => e.Key == "lspServers");
-        Assert.Contains(entries, e => e.Key == "adapterCommands");
+        var keys = entries.Select(e => e.Key).ToList();
+        Assert.DoesNotContain(keys, k => k.StartsWith("telemetry.", System.StringComparison.Ordinal));
+        Assert.DoesNotContain(keys, k => k.StartsWith("pushToTalk.", System.StringComparison.Ordinal));
+        Assert.DoesNotContain(keys, k => k.StartsWith("speech.", System.StringComparison.Ordinal));
+        Assert.DoesNotContain(keys, k => k.StartsWith("remoteConfig.", System.StringComparison.Ordinal));
+        Assert.DoesNotContain(keys, k => k.StartsWith("lspServers.", System.StringComparison.Ordinal));
+        Assert.DoesNotContain(keys, k => k.StartsWith("adapterCommands.", System.StringComparison.Ordinal));
+        Assert.DoesNotContain(keys, k => k == "terminal.fontLigatures");
+        Assert.DoesNotContain(keys, k => k.StartsWith("updates.autoInstall", System.StringComparison.Ordinal));
+        Assert.DoesNotContain(keys, k => k.StartsWith("updates.channel", System.StringComparison.Ordinal));
     }
+
 
     [Fact]
     public void Schema_EveryEntryHasNonEmptyLabelAndTab()

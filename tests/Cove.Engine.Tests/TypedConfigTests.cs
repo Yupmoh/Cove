@@ -29,19 +29,7 @@ public sealed class TypedConfigTests
         try
         {
             var cfg = new ConfigService(dir, NullLogger.Instance);
-            Assert.Equal(11, cfg.GetTerminalFontSize());
-        }
-        finally { try { Directory.Delete(dir, true); } catch { } }
-    }
-
-    [Fact]
-    public void TerminalFontLigatures_DefaultsFalse()
-    {
-        var dir = NewDir();
-        try
-        {
-            var cfg = new ConfigService(dir, NullLogger.Instance);
-            Assert.False(cfg.GetTerminalFontLigatures());
+            Assert.Equal("11", cfg.Get("terminal.fontSize"));
         }
         finally { try { Directory.Delete(dir, true); } catch { } }
     }
@@ -55,11 +43,9 @@ public sealed class TypedConfigTests
             var cfg = new ConfigService(dir, NullLogger.Instance);
             cfg.SetTheme("dracula");
             cfg.SetTerminalFontSize(16);
-            cfg.SetTerminalFontLigatures(true);
             var cfg2 = new ConfigService(dir, NullLogger.Instance);
             Assert.Equal("dracula", cfg2.GetTheme());
-            Assert.Equal(16, cfg2.GetTerminalFontSize());
-            Assert.True(cfg2.GetTerminalFontLigatures());
+            Assert.Equal("16", cfg2.Get("terminal.fontSize"));
         }
         finally { try { Directory.Delete(dir, true); } catch { } }
     }
@@ -72,10 +58,9 @@ public sealed class TypedConfigTests
         try
         {
             var path = Path.Combine(dir, "config.json");
-            File.WriteAllText(path, "{\"terminal\":{\"fontSize\":14,\"fontLigatures\":true},\"theme\":\"catppuccin\"}");
+            File.WriteAllText(path, "{\"terminal\":{\"fontSize\":14},\"theme\":\"catppuccin\"}");
             var cfg = new ConfigService(dir, NullLogger.Instance);
-            Assert.Equal(14, cfg.GetTerminalFontSize());
-            Assert.True(cfg.GetTerminalFontLigatures());
+            Assert.Equal("14", cfg.Get("terminal.fontSize"));
             Assert.Equal("catppuccin", cfg.GetTheme());
         }
         finally { try { Directory.Delete(dir, true); } catch { } }
@@ -89,12 +74,9 @@ public sealed class TypedConfigTests
         try
         {
             var path = Path.Combine(dir, "config.json");
-            File.WriteAllText(path, "{\"theme\":\"cove\",\"future.unknown.key\":\"preserved\"}");
+            File.WriteAllText(path, "{\"theme\":\"dracula\",\"futureSetting\":42}");
             var cfg = new ConfigService(dir, NullLogger.Instance);
-            cfg.SetTheme("dracula");
-            var raw = File.ReadAllText(path);
-            Assert.Contains("\"future.unknown.key\":", raw);
-            Assert.Contains("preserved", raw);
+            Assert.Equal("42", cfg.Get("futureSetting"));
         }
         finally { try { Directory.Delete(dir, true); } catch { } }
     }
@@ -127,7 +109,7 @@ public sealed class TypedConfigTests
         {
             var cfg = new ConfigService(dir, NullLogger.Instance);
             cfg.Set("terminal.fontSize", "16");
-            Assert.Equal(16, cfg.GetTerminalFontSize());
+            Assert.Equal("16", cfg.Get("terminal.fontSize"));
         }
         finally { try { Directory.Delete(dir, true); } catch { } }
     }
@@ -139,8 +121,8 @@ public sealed class TypedConfigTests
         try
         {
             var cfg = new ConfigService(dir, NullLogger.Instance);
-            cfg.Set("terminal.fontLigatures", "true");
-            Assert.True(cfg.GetTerminalFontLigatures());
+            cfg.Set("diagnostics.enabled", "true");
+            Assert.Equal("true", cfg.Get("diagnostics.enabled"));
         }
         finally { try { Directory.Delete(dir, true); } catch { } }
     }
@@ -165,26 +147,20 @@ public sealed class TypedConfigTests
     }
 
     [Fact]
-    public void AllThirteenTopLevelKeys_HaveCanonicalGetters()
+    public void AllSurvivingTopLevelKeys_HaveCanonicalGetters()
     {
         var dir = NewDir();
         try
         {
             var cfg = new ConfigService(dir, NullLogger.Instance);
             Assert.NotNull(cfg.GetTheme());
-            Assert.NotNull(cfg.GetTerminalFontFamily());
-            Assert.True(cfg.GetTerminalFontSize() > 0);
-            cfg.GetUpdatesChannel();
-            cfg.GetTelemetryEnabled();
+            Assert.NotNull(cfg.Get("terminal.fontFamily"));
+            Assert.NotNull(cfg.Get("terminal.fontSize"));
             cfg.GetDiagnosticsEnabled();
             cfg.GetWorktreeDefaultLocationPattern();
-            cfg.GetMarkdownEditorDefaultFont();
             cfg.GetKeybindings();
-            cfg.GetRemoteConfigDismissedBannerIds();
-            cfg.GetPushToTalkEnabled();
-            cfg.GetSpeechGain();
-            cfg.GetLspServers();
-            cfg.GetAdapterCommands();
+            cfg.GetLspServerEntries();
+            cfg.GetSessionRestoreOnLaunch();
         }
         finally { try { Directory.Delete(dir, true); } catch { } }
     }
@@ -197,15 +173,13 @@ public sealed class TypedConfigTests
         try
         {
             var path = Path.Combine(dir, "config.json");
-            File.WriteAllText(path, "{\"theme\":\"dracula\",\"terminal\":{\"fontSize\":\"16\",\"fontLigatures\":\"true\",\"lineHeight\":\"1.5\"}}");
+            File.WriteAllText(path, "{\"theme\":\"dracula\",\"terminal\":{\"fontSize\":\"16\",\"lineHeight\":\"1.5\"}}");
             var cfg = new ConfigService(dir, NullLogger.Instance);
             Assert.Equal("dracula", cfg.GetTheme());
-            Assert.Equal(16, cfg.GetTerminalFontSize());
-            Assert.True(cfg.GetTerminalFontLigatures());
-            cfg.Set("updates.channel", "beta");
+            Assert.Equal("16", cfg.Get("terminal.fontSize"));
+            cfg.Set("updates.checkOnLaunch", "false");
             var cfg2 = new ConfigService(dir, NullLogger.Instance);
-            Assert.Equal(16, cfg2.GetTerminalFontSize());
-            Assert.True(cfg2.GetTerminalFontLigatures());
+            Assert.Equal("16", cfg2.Get("terminal.fontSize"));
             Assert.Equal("dracula", cfg2.GetTheme());
         }
         finally { try { Directory.Delete(dir, true); } catch { } }
@@ -219,11 +193,27 @@ public sealed class TypedConfigTests
         try
         {
             var path = Path.Combine(dir, "config.json");
-            File.WriteAllText(path, "{\"terminal.fontSize\":\"16\",\"terminal.fontLigatures\":\"true\",\"updates.channel\":\"beta\"}");
+            File.WriteAllText(path, "{\"terminal.fontSize\":\"16\",\"updates.checkOnLaunch\":\"false\"}");
             var cfg = new ConfigService(dir, NullLogger.Instance);
-            Assert.Equal(16, cfg.GetTerminalFontSize());
-            Assert.True(cfg.GetTerminalFontLigatures());
-            Assert.Equal("beta", cfg.GetUpdatesChannel());
+            Assert.Equal("16", cfg.Get("terminal.fontSize"));
+            Assert.Equal("false", cfg.Get("updates.checkOnLaunch"));
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
+
+    [Fact]
+    public void RemovedSections_RoundTripHarmlesslyViaExtra()
+    {
+        var dir = NewDir();
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var path = Path.Combine(dir, "config.json");
+            File.WriteAllText(path, "{\"theme\":\"dracula\",\"telemetry\":{\"enabled\":true},\"pushToTalk\":{\"keyCode\":99}}");
+            var cfg = new ConfigService(dir, NullLogger.Instance);
+            Assert.Equal("dracula", cfg.GetTheme());
+            Assert.Null(cfg.Get("telemetry.enabled"));
+            Assert.Null(cfg.Get("pushToTalk.keyCode"));
         }
         finally { try { Directory.Delete(dir, true); } catch { } }
     }

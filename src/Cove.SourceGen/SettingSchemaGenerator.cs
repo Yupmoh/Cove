@@ -74,14 +74,8 @@ public sealed class SettingSchemaGenerator : IIncrementalGenerator
             "UpdatesSection" => "updates",
             "DiagnosticsSection" => "diagnostics",
             "WorktreeSection" => "worktree",
-            "TelemetrySection" => "telemetry",
-            "RemoteConfigSection" => "remoteConfig",
             "KeybindingsSection" => "keybindings",
-            "PushToTalkSection" => "pushToTalk",
-            "SpeechSection" => "speech",
-            "LspServersSection" => "lspServers",
             "LspSection" => "lsp",
-            "AdapterCommandsSection" => "adapterCommands",
             "SessionSection" => "session",
             _ => sectionName
         };

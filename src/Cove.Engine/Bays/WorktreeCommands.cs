@@ -13,10 +13,26 @@ public static class WorktreeCommands
             return ctx.Fail("no_bays", "bay manager unavailable");
         if (ctx.Request.Params is not JsonElement el
             || el.Deserialize(WorktreeJsonContext.Default.WorktreeCreateParams) is not { } p
-            || string.IsNullOrWhiteSpace(p.Branch) || string.IsNullOrWhiteSpace(p.Location))
-            return ctx.Fail("bad_params", "parentBayId, branch and location are required");
+            || string.IsNullOrWhiteSpace(p.ParentBayId)
+            || string.IsNullOrWhiteSpace(p.Branch))
+            return ctx.Fail("bad_params", "parentBayId and branch are required");
 
-        var bay = await manager.CreateWorktreeAsync(p.ParentBayId, p.Branch, p.Location, p.NewBranch, p.BaseRef).ConfigureAwait(false);
+        var parent = manager.Get(p.ParentBayId);
+        if (parent is null)
+            return ctx.Fail("not_found", "parent bay not found");
+
+        var location = p.Location;
+        if (string.IsNullOrWhiteSpace(location))
+        {
+            var pattern = ctx.Config?.GetWorktreeDefaultLocationPattern() ?? "";
+            if (string.IsNullOrWhiteSpace(pattern))
+                return ctx.Fail("bad_params", "location is required (no worktree.defaultLocationPattern configured)");
+            var repoName = WorktreePattern.DeriveRepoName(parent.State.ProjectDir);
+            location = WorktreePattern.Expand(pattern, repoName, p.Branch);
+        }
+        location = WorktreePattern.ResolveLocation(location, parent.State.ProjectDir);
+
+        var bay = await manager.CreateWorktreeAsync(p.ParentBayId, p.Branch, location, p.NewBranch, p.BaseRef).ConfigureAwait(false);
         return bay is null
             ? ctx.Fail("git_failed", "git worktree add failed or parent not found")
             : ctx.Ok(new WorktreeIdResult(bay.Id), WorktreeJsonContext.Default.WorktreeIdResult);
@@ -94,7 +110,7 @@ public static class WorktreeCommands
     }
 }
 
-public sealed record WorktreeCreateParams(string ParentBayId, string Branch, string Location, bool NewBranch = true, string? BaseRef = null);
+public sealed record WorktreeCreateParams(string ParentBayId, string Branch, string? Location = null, bool NewBranch = true, string? BaseRef = null);
 public sealed record WorktreeListParams(string ParentBayId);
 public sealed record WorktreeRemoveParams(string WorktreeBayId, bool Force = true);
 public sealed record WorktreeAdoptParams(string ParentBayId, string Location, string Branch);

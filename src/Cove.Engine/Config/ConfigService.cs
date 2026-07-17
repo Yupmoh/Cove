@@ -32,26 +32,15 @@ public sealed class ConfigService : System.IDisposable
     }
 
     public string GetTheme() { lock (_lock) return _config.Theme; }
-    public string GetTerminalFontFamily() { lock (_lock) return _config.Terminal.FontFamily; }
-    public int GetTerminalFontSize() { lock (_lock) return _config.Terminal.FontSize; }
-    public bool GetTerminalFontLigatures() { lock (_lock) return _config.Terminal.FontLigatures; }
-    public string GetUpdatesChannel() { lock (_lock) return _config.Updates.Channel; }
-    public bool GetTelemetryEnabled() { lock (_lock) return _config.Telemetry.Enabled; }
     public bool GetDiagnosticsEnabled() { lock (_lock) return _config.Diagnostics.Enabled; }
+    public Cove.Engine.Config.DiagnosticsSection GetDiagnosticsSection() { lock (_lock) return _config.Diagnostics; }
     public string GetWorktreeDefaultLocationPattern() { lock (_lock) return _config.Worktree.DefaultLocationPattern; }
-    public string GetMarkdownEditorDefaultFont() { lock (_lock) return _config.MarkdownEditor.DefaultFont; }
     public IReadOnlyDictionary<string, JsonElement> GetKeybindings() { lock (_lock) return _config.Keybindings.Bindings; }
-    public IReadOnlyList<string> GetRemoteConfigDismissedBannerIds() { lock (_lock) return _config.RemoteConfig.DismissedBannerIds; }
-    public bool GetPushToTalkEnabled() { lock (_lock) return _config.PushToTalk.Enabled; }
-    public double GetSpeechGain() { lock (_lock) return _config.Speech.Gain; }
-    public IReadOnlyDictionary<string, JsonElement> GetLspServers() { lock (_lock) return _config.LspServers.Servers; }
     public IReadOnlyList<LspConfigServerEntry> GetLspServerEntries() { lock (_lock) return _config.Lsp.Servers; }
-    public IReadOnlyDictionary<string, JsonElement> GetAdapterCommands() { lock (_lock) return _config.AdapterCommands.Commands; }
     public bool GetSessionRestoreOnLaunch() { lock (_lock) return _config.Session.RestoreOnLaunch; }
 
     public void SetTheme(string value) { if (!TrySet(() => _config.Theme = value, "theme")) return; }
     public void SetTerminalFontSize(int value) { if (!TrySet(() => _config.Terminal.FontSize = value, "terminal.fontSize")) return; }
-    public void SetTerminalFontLigatures(bool value) { if (!TrySet(() => _config.Terminal.FontLigatures = value, "terminal.fontLigatures")) return; }
 
     private bool TrySet(System.Action mutate, string key)
     {
@@ -102,7 +91,6 @@ public sealed class ConfigService : System.IDisposable
             "terminal.fontSize" => (true, _config.Terminal.FontSize),
             "terminal.lineHeight" => (true, _config.Terminal.LineHeight),
             "terminal.letterSpacing" => (true, _config.Terminal.LetterSpacing),
-            "terminal.fontLigatures" => (true, _config.Terminal.FontLigatures),
             "terminal.cursorStyle" => (true, _config.Terminal.CursorStyle),
             "terminal.cursorBlink" => (true, _config.Terminal.CursorBlink),
             "terminal.scrollbackLines" => (true, _config.Terminal.ScrollbackLines),
@@ -115,31 +103,12 @@ public sealed class ConfigService : System.IDisposable
             "markdown_editor.bookViewWidth" => (true, _config.MarkdownEditor.BookViewWidth),
             "markdown_editor.bookViewMargin" => (true, _config.MarkdownEditor.BookViewMargin),
             "markdown_editor.defaultViewMode" => (true, _config.MarkdownEditor.DefaultViewMode),
-            "markdown_editor.imagePasteFolder" => (true, _config.MarkdownEditor.ImagePasteFolder),
             "updates.checkOnLaunch" => (true, _config.Updates.CheckOnLaunch),
-            "updates.autoInstall" => (true, _config.Updates.AutoInstall),
-            "updates.autoUpdateAdapters" => (true, _config.Updates.AutoUpdateAdapters),
-            "updates.channel" => (true, _config.Updates.Channel),
-            "updates.checkIntervalHours" => (true, _config.Updates.CheckIntervalHours),
             "diagnostics.enabled" => (true, _config.Diagnostics.Enabled),
-            "telemetry.enabled" => (true, _config.Telemetry.Enabled),
-            "telemetry.analyticsOptIn" => (true, _config.Telemetry.AnalyticsOptIn),
-            "pushToTalk.enabled" => (true, _config.PushToTalk.Enabled),
-            "pushToTalk.isModifier" => (true, _config.PushToTalk.IsModifier),
-            "pushToTalk.keyCode" => (true, _config.PushToTalk.KeyCode),
-            "pushToTalk.requiredFlags" => (true, _config.PushToTalk.RequiredFlags),
-            "pushToTalk.label" => (true, _config.PushToTalk.Label),
-            "speech.gain" => (true, _config.Speech.Gain),
-            "speech.inputDevice" => (true, _config.Speech.InputDevice ?? ""),
-            "speech.onDeviceRecognition" => (true, _config.Speech.OnDeviceRecognition),
-            "diagnostics.captureLongTasks" => (true, _config.Diagnostics.CaptureLongTasks),
-            "diagnostics.captureRenderStats" => (true, _config.Diagnostics.CaptureRenderStats),
-            "diagnostics.captureIpcTimings" => (true, _config.Diagnostics.CaptureIpcTimings),
             "diagnostics.captureTerminalStats" => (true, _config.Diagnostics.CaptureTerminalStats),
             "diagnostics.captureMemoryStats" => (true, _config.Diagnostics.CaptureMemoryStats),
             "diagnostics.flushIntervalMs" => (true, _config.Diagnostics.FlushIntervalMs),
             "worktree.defaultLocationPattern" => (true, _config.Worktree.DefaultLocationPattern),
-            "telemetry.coreTelemetryDisclosed" => (true, _config.Telemetry.CoreTelemetryDisclosed),
             "session.restoreOnLaunch" => (true, _config.Session.RestoreOnLaunch),
             _ => _config.Extra.TryGetValue(key, out var extra) ? (true, (object?)extra) : (false, null),
         };
@@ -167,7 +136,6 @@ public sealed class ConfigService : System.IDisposable
                 case "terminal.fontSize": _config.Terminal.FontSize = AutoDetectInt(value); break;
                 case "terminal.lineHeight": _config.Terminal.LineHeight = AutoDetectDouble(value); break;
                 case "terminal.letterSpacing": _config.Terminal.LetterSpacing = AutoDetectDouble(value); break;
-                case "terminal.fontLigatures": _config.Terminal.FontLigatures = AutoDetectBool(value); break;
                 case "terminal.cursorStyle": _config.Terminal.CursorStyle = value; break;
                 case "terminal.cursorBlink": _config.Terminal.CursorBlink = AutoDetectBool(value); break;
                 case "terminal.scrollbackLines": _config.Terminal.ScrollbackLines = AutoDetectInt(value); break;
@@ -180,31 +148,12 @@ public sealed class ConfigService : System.IDisposable
                 case "markdown_editor.bookViewWidth": _config.MarkdownEditor.BookViewWidth = value; break;
                 case "markdown_editor.bookViewMargin": _config.MarkdownEditor.BookViewMargin = value; break;
                 case "markdown_editor.defaultViewMode": _config.MarkdownEditor.DefaultViewMode = value; break;
-                case "markdown_editor.imagePasteFolder": _config.MarkdownEditor.ImagePasteFolder = value; break;
                 case "updates.checkOnLaunch": _config.Updates.CheckOnLaunch = AutoDetectBool(value); break;
-                case "updates.autoInstall": _config.Updates.AutoInstall = AutoDetectBool(value); break;
-                case "updates.autoUpdateAdapters": _config.Updates.AutoUpdateAdapters = AutoDetectBool(value); break;
-                case "updates.channel": _config.Updates.Channel = value; break;
-                case "updates.checkIntervalHours": _config.Updates.CheckIntervalHours = AutoDetectInt(value); break;
                 case "diagnostics.enabled": _config.Diagnostics.Enabled = AutoDetectBool(value); break;
-                case "telemetry.enabled": _config.Telemetry.Enabled = AutoDetectBool(value); break;
-                case "telemetry.analyticsOptIn": _config.Telemetry.AnalyticsOptIn = AutoDetectBool(value); break;
-                case "pushToTalk.enabled": _config.PushToTalk.Enabled = AutoDetectBool(value); break;
-                case "pushToTalk.isModifier": _config.PushToTalk.IsModifier = AutoDetectBool(value); break;
-                case "pushToTalk.keyCode": _config.PushToTalk.KeyCode = AutoDetectInt(value); break;
-                case "pushToTalk.requiredFlags": _config.PushToTalk.RequiredFlags = AutoDetectInt(value); break;
-                case "pushToTalk.label": _config.PushToTalk.Label = value; break;
-                case "speech.gain": _config.Speech.Gain = AutoDetectDouble(value); break;
-                case "speech.inputDevice": _config.Speech.InputDevice = string.IsNullOrEmpty(value) ? null : value; break;
-                case "speech.onDeviceRecognition": _config.Speech.OnDeviceRecognition = AutoDetectBool(value); break;
-                case "diagnostics.captureLongTasks": _config.Diagnostics.CaptureLongTasks = AutoDetectBool(value); break;
-                case "diagnostics.captureRenderStats": _config.Diagnostics.CaptureRenderStats = AutoDetectBool(value); break;
-                case "diagnostics.captureIpcTimings": _config.Diagnostics.CaptureIpcTimings = AutoDetectBool(value); break;
                 case "diagnostics.captureTerminalStats": _config.Diagnostics.CaptureTerminalStats = AutoDetectBool(value); break;
                 case "diagnostics.captureMemoryStats": _config.Diagnostics.CaptureMemoryStats = AutoDetectBool(value); break;
                 case "diagnostics.flushIntervalMs": _config.Diagnostics.FlushIntervalMs = AutoDetectInt(value); break;
                 case "worktree.defaultLocationPattern": _config.Worktree.DefaultLocationPattern = value; break;
-                case "telemetry.coreTelemetryDisclosed": _config.Telemetry.CoreTelemetryDisclosed = AutoDetectBool(value); break;
                 case "session.restoreOnLaunch": _config.Session.RestoreOnLaunch = AutoDetectBool(value); break;
                 default:
                     _config.Extra[key] = AutoDetectJson(value);
@@ -337,7 +286,6 @@ public sealed class ConfigService : System.IDisposable
         d["terminal.fontSize"] = _config.Terminal.FontSize.ToString();
         d["terminal.lineHeight"] = _config.Terminal.LineHeight.ToString(System.Globalization.CultureInfo.InvariantCulture);
         d["terminal.letterSpacing"] = _config.Terminal.LetterSpacing.ToString(System.Globalization.CultureInfo.InvariantCulture);
-        d["terminal.fontLigatures"] = _config.Terminal.FontLigatures.ToString();
         d["terminal.cursorStyle"] = _config.Terminal.CursorStyle;
         d["terminal.cursorBlink"] = _config.Terminal.CursorBlink.ToString();
         d["terminal.scrollbackLines"] = _config.Terminal.ScrollbackLines.ToString();
@@ -350,45 +298,15 @@ public sealed class ConfigService : System.IDisposable
         d["markdown_editor.bookViewWidth"] = _config.MarkdownEditor.BookViewWidth;
         d["markdown_editor.bookViewMargin"] = _config.MarkdownEditor.BookViewMargin;
         d["markdown_editor.defaultViewMode"] = _config.MarkdownEditor.DefaultViewMode;
-        d["markdown_editor.imagePasteFolder"] = _config.MarkdownEditor.ImagePasteFolder;
         d["updates.checkOnLaunch"] = _config.Updates.CheckOnLaunch.ToString();
-        d["updates.autoInstall"] = _config.Updates.AutoInstall.ToString();
-        d["updates.autoUpdateAdapters"] = _config.Updates.AutoUpdateAdapters.ToString();
-        d["updates.channel"] = _config.Updates.Channel;
-        d["updates.checkIntervalHours"] = _config.Updates.CheckIntervalHours.ToString();
         d["diagnostics.enabled"] = _config.Diagnostics.Enabled.ToString();
-        d["diagnostics.captureLongTasks"] = _config.Diagnostics.CaptureLongTasks.ToString();
-        d["diagnostics.captureRenderStats"] = _config.Diagnostics.CaptureRenderStats.ToString();
-        d["diagnostics.captureIpcTimings"] = _config.Diagnostics.CaptureIpcTimings.ToString();
         d["diagnostics.captureTerminalStats"] = _config.Diagnostics.CaptureTerminalStats.ToString();
         d["diagnostics.captureMemoryStats"] = _config.Diagnostics.CaptureMemoryStats.ToString();
         d["diagnostics.flushIntervalMs"] = _config.Diagnostics.FlushIntervalMs.ToString();
         d["worktree.defaultLocationPattern"] = _config.Worktree.DefaultLocationPattern;
-        d["worktree.postCreateCommands"] = string.Join(",", _config.Worktree.PostCreateCommands);
-        d["telemetry.analyticsOptIn"] = _config.Telemetry.AnalyticsOptIn.ToString();
-        d["telemetry.coreTelemetryDisclosed"] = _config.Telemetry.CoreTelemetryDisclosed.ToString();
-        d["telemetry.enabled"] = _config.Telemetry.Enabled.ToString();
-        d["remoteConfig.dismissedBannerIds"] = string.Join(",", _config.RemoteConfig.DismissedBannerIds);
-        d["pushToTalk.enabled"] = _config.PushToTalk.Enabled.ToString();
-        d["pushToTalk.keyCode"] = _config.PushToTalk.KeyCode.ToString();
-        d["pushToTalk.isModifier"] = _config.PushToTalk.IsModifier.ToString();
-        d["pushToTalk.requiredFlags"] = _config.PushToTalk.RequiredFlags.ToString();
-        d["pushToTalk.label"] = _config.PushToTalk.Label;
-        d["speech.gain"] = _config.Speech.Gain.ToString(System.Globalization.CultureInfo.InvariantCulture);
-        d["speech.inputDevice"] = _config.Speech.InputDevice ?? "";
-        d["speech.onDeviceRecognition"] = _config.Speech.OnDeviceRecognition.ToString();
         d["session.restoreOnLaunch"] = _config.Session.RestoreOnLaunch.ToString();
         foreach (var kv in _config.Keybindings.Bindings)
             d["keybindings." + kv.Key] = kv.Value.GetRawText();
-        foreach (var kv in _config.LspServers.Servers)
-            d["lspServers." + kv.Key] = kv.Value.GetRawText();
-        for (var i = 0; i < _config.Lsp.Servers.Count; i++)
-        {
-            var entry = _config.Lsp.Servers[i];
-            d["lsp.servers." + i] = string.Join(",", entry.Languages) + " " + entry.Command + " " + string.Join(",", entry.Args);
-        }
-        foreach (var kv in _config.AdapterCommands.Commands)
-            d["adapterCommands." + kv.Key] = kv.Value.GetRawText();
         foreach (var kv in _config.Extra)
             d["extra." + kv.Key] = kv.Value.GetRawText();
         return d;
