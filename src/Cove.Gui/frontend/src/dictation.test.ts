@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifyDictationTarget, encodeNookText, type FocusDescriptor } from "./dictation";
+import { classifyDictationTarget, classifySpaceTarget, createSpaceHold, encodeNookText, spaceHoldTransition, SpaceHoldMs, type FocusDescriptor, type SpaceHoldEvent, type SpaceHoldState, type SpaceHoldHooks, type SpaceKeyEventLike, type SpaceTarget } from "./dictation";
 
 const focus = (partial: Partial<FocusDescriptor>): FocusDescriptor => ({
   tagName: "DIV",
@@ -55,5 +55,200 @@ describe("encodeNookText", () => {
   it("survives non-ascii", () => {
     const encoded = encodeNookText("héllo wörld");
     expect(new TextDecoder().decode(Uint8Array.from(atob(encoded), c => c.charCodeAt(0)))).toBe("héllo wörld");
+  });
+});
+
+describe("classifySpaceTarget", () => {
+  it("treats the xterm helper textarea as terminal", () => {
+    expect(classifySpaceTarget(focus({ tagName: "TEXTAREA", className: "xterm-helper-textarea" }))).toBe("terminal");
+  });
+
+  it("treats writable inputs as editable", () => {
+    expect(classifySpaceTarget(focus({ tagName: "INPUT", inputType: "text" }))).toBe("editable");
+    expect(classifySpaceTarget(focus({ tagName: "TEXTAREA" }))).toBe("editable");
+    expect(classifySpaceTarget(focus({ isContentEditable: true }))).toBe("editable");
+  });
+
+  it("treats buttons, checkboxes, and body focus as other", () => {
+    expect(classifySpaceTarget(focus({ tagName: "INPUT", inputType: "button" }))).toBe("other");
+    expect(classifySpaceTarget(focus({ tagName: "INPUT", inputType: "checkbox" }))).toBe("other");
+    expect(classifySpaceTarget(focus({ tagName: "BODY" }))).toBe("other");
+  });
+});
+
+describe("spaceHoldTransition", () => {
+  const down = (over: Partial<Extract<SpaceHoldEvent, { kind: "space-down" }>> = {}): SpaceHoldEvent =>
+    ({ kind: "space-down", repeat: false, modified: false, target: "terminal", ...over });
+  const step = (state: SpaceHoldState, event: SpaceHoldEvent) => spaceHoldTransition(state, event);
+
+  it("arms on a fresh unmodified space press over a typing target", () => {
+    expect(step("idle", down())).toEqual({ state: "armed", action: "arm" });
+    expect(step("idle", down({ target: "editable" }))).toEqual({ state: "armed", action: "arm" });
+  });
+
+  it("passes through modified, repeated, or non-typing-target presses", () => {
+    expect(step("idle", down({ modified: true }))).toEqual({ state: "idle", action: "none" });
+    expect(step("idle", down({ repeat: true }))).toEqual({ state: "idle", action: "none" });
+    expect(step("idle", down({ target: "other" }))).toEqual({ state: "idle", action: "none" });
+  });
+
+  it("flushes a plain space on a quick tap", () => {
+    expect(step("armed", { kind: "space-up" })).toEqual({ state: "idle", action: "flush" });
+  });
+
+  it("cancels and flushes when another key rolls over the held space", () => {
+    expect(step("armed", { kind: "other-key" })).toEqual({ state: "idle", action: "flush" });
+  });
+
+  it("starts dictation when the hold timer fires", () => {
+    expect(step("armed", { kind: "timeout" })).toEqual({ state: "dictating", action: "start" });
+  });
+
+  it("swallows key repeats while armed or dictating", () => {
+    expect(step("armed", down({ repeat: true }))).toEqual({ state: "armed", action: "swallow" });
+    expect(step("dictating", down({ repeat: true }))).toEqual({ state: "dictating", action: "swallow" });
+  });
+
+  it("stops dictation on release or window blur", () => {
+    expect(step("dictating", { kind: "space-up" })).toEqual({ state: "idle", action: "stop" });
+    expect(step("dictating", { kind: "blur" })).toEqual({ state: "idle", action: "stop" });
+  });
+
+  it("cancels silently when the window blurs while armed", () => {
+    expect(step("armed", { kind: "blur" })).toEqual({ state: "idle", action: "cancel" });
+  });
+
+  it("lets other keys pass while dictating and ignores stray events when idle", () => {
+    expect(step("dictating", { kind: "other-key" })).toEqual({ state: "dictating", action: "none" });
+    expect(step("idle", { kind: "space-up" })).toEqual({ state: "idle", action: "none" });
+    expect(step("idle", { kind: "timeout" })).toEqual({ state: "idle", action: "none" });
+    expect(step("idle", { kind: "blur" })).toEqual({ state: "idle", action: "none" });
+  });
+});
+
+interface FakeKeyEvent extends SpaceKeyEventLike {
+  prevented: boolean;
+  stopped: boolean;
+}
+
+function fakeKey(over: Partial<SpaceKeyEventLike> = {}): FakeKeyEvent {
+  const e: FakeKeyEvent = {
+    code: "Space",
+    key: " ",
+    repeat: false,
+    ctrlKey: false,
+    metaKey: false,
+    altKey: false,
+    prevented: false,
+    stopped: false,
+    preventDefault() { e.prevented = true; },
+    stopImmediatePropagation() { e.stopped = true; },
+    ...over,
+  };
+  return e;
+}
+
+function harness(target: SpaceTarget = "terminal") {
+  const calls: string[] = [];
+  let pendingTimer: (() => void) | null = null;
+  let scheduledMs = -1;
+  const hooks: SpaceHoldHooks = {
+    target: () => target,
+    captureFocus: () => { calls.push("capture"); },
+    cancelPending: () => { calls.push("cancel"); },
+    flush: () => { calls.push("flush"); },
+    begin: () => { calls.push("begin"); },
+    end: () => { calls.push("end"); },
+    schedule: (fn, ms) => { pendingTimer = fn; scheduledMs = ms; return 1; },
+    unschedule: () => { pendingTimer = null; },
+  };
+  return {
+    controller: createSpaceHold(hooks),
+    calls,
+    fireTimer: () => { const fn = pendingTimer; pendingTimer = null; fn?.(); },
+    timerArmed: () => pendingTimer !== null,
+    scheduledMs: () => scheduledMs,
+  };
+}
+
+describe("createSpaceHold", () => {
+  it("consumes the arming space so xterm never receives the real keydown", () => {
+    const h = harness();
+    const e = fakeKey();
+    h.controller.keydown(e);
+    expect(e.prevented).toBe(true);
+    expect(e.stopped).toBe(true);
+    expect(h.calls).toEqual(["capture"]);
+    expect(h.scheduledMs()).toBe(SpaceHoldMs);
+  });
+
+  it("flushes exactly one space on a quick tap and consumes the keyup", () => {
+    const h = harness();
+    h.controller.keydown(fakeKey());
+    const up = fakeKey();
+    h.controller.keyup(up);
+    expect(up.prevented).toBe(true);
+    expect(up.stopped).toBe(true);
+    expect(h.calls).toEqual(["capture", "flush"]);
+    expect(h.timerArmed()).toBe(false);
+  });
+
+  it("flushes the pending space when another key rolls over, leaving that key untouched", () => {
+    const h = harness();
+    h.controller.keydown(fakeKey());
+    const other = fakeKey({ code: "KeyA", key: "a" });
+    h.controller.keydown(other);
+    expect(other.prevented).toBe(false);
+    expect(other.stopped).toBe(false);
+    expect(h.calls).toEqual(["capture", "flush"]);
+  });
+
+  it("starts dictation after the hold threshold and stops on release without flushing", () => {
+    const h = harness();
+    h.controller.keydown(fakeKey());
+    h.fireTimer();
+    const up = fakeKey();
+    h.controller.keyup(up);
+    expect(up.prevented).toBe(true);
+    expect(up.stopped).toBe(true);
+    expect(h.calls).toEqual(["capture", "cancel", "begin", "end"]);
+  });
+
+  it("swallows auto-repeat spaces while armed and while dictating", () => {
+    const h = harness();
+    h.controller.keydown(fakeKey());
+    const armedRepeat = fakeKey({ repeat: true });
+    h.controller.keydown(armedRepeat);
+    expect(armedRepeat.stopped).toBe(true);
+    h.fireTimer();
+    const dictatingRepeat = fakeKey({ repeat: true });
+    h.controller.keydown(dictatingRepeat);
+    expect(dictatingRepeat.stopped).toBe(true);
+    expect(h.calls).toEqual(["capture", "cancel", "begin"]);
+  });
+
+  it("passes modified space and non-typing targets through untouched", () => {
+    const modified = fakeKey({ metaKey: true });
+    const h = harness();
+    h.controller.keydown(modified);
+    expect(modified.prevented).toBe(false);
+    expect(modified.stopped).toBe(false);
+    const other = harness("other");
+    const plain = fakeKey();
+    other.controller.keydown(plain);
+    expect(plain.prevented).toBe(false);
+    expect(other.calls).toEqual([]);
+  });
+
+  it("cancels silently on blur while armed and stops on blur while dictating", () => {
+    const armed = harness();
+    armed.controller.keydown(fakeKey());
+    armed.controller.blur();
+    expect(armed.calls).toEqual(["capture", "cancel"]);
+    const dictating = harness();
+    dictating.controller.keydown(fakeKey());
+    dictating.fireTimer();
+    dictating.controller.blur();
+    expect(dictating.calls).toEqual(["capture", "cancel", "begin", "end"]);
   });
 });

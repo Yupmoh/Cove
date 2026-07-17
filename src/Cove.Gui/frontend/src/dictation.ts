@@ -21,6 +21,147 @@ export function classifyDictationTarget(target: FocusDescriptor, focusedNookId: 
   return focusedNookId ? "nook" : "none";
 }
 
+export type SpaceTarget = "editable" | "terminal" | "other";
+
+export function classifySpaceTarget(target: FocusDescriptor): SpaceTarget {
+  if (target.className.includes("xterm-helper-textarea")) return "terminal";
+  return classifyDictationTarget(target, null) === "editable" ? "editable" : "other";
+}
+
+export type SpaceHoldState = "idle" | "armed" | "dictating";
+
+export type SpaceHoldEvent =
+  | { kind: "space-down"; repeat: boolean; modified: boolean; target: SpaceTarget }
+  | { kind: "space-up" }
+  | { kind: "other-key" }
+  | { kind: "timeout" }
+  | { kind: "blur" };
+
+export type SpaceHoldAction = "none" | "swallow" | "arm" | "flush" | "start" | "stop" | "cancel";
+
+export interface SpaceHoldResult {
+  state: SpaceHoldState;
+  action: SpaceHoldAction;
+}
+
+export function spaceHoldTransition(state: SpaceHoldState, event: SpaceHoldEvent): SpaceHoldResult {
+  if (state === "idle") {
+    if (event.kind === "space-down" && !event.repeat && !event.modified && event.target !== "other") {
+      return { state: "armed", action: "arm" };
+    }
+    return { state: "idle", action: "none" };
+  }
+  if (state === "armed") {
+    switch (event.kind) {
+      case "space-down": return { state: "armed", action: "swallow" };
+      case "space-up": return { state: "idle", action: "flush" };
+      case "other-key": return { state: "idle", action: "flush" };
+      case "timeout": return { state: "dictating", action: "start" };
+      case "blur": return { state: "idle", action: "cancel" };
+    }
+  }
+  switch (event.kind) {
+    case "space-down": return { state: "dictating", action: "swallow" };
+    case "space-up": return { state: "idle", action: "stop" };
+    case "blur": return { state: "idle", action: "stop" };
+    default: return { state: "dictating", action: "none" };
+  }
+}
+
+export const SpaceHoldMs = 300;
+
+export interface SpaceKeyEventLike {
+  code: string;
+  key: string;
+  repeat: boolean;
+  ctrlKey: boolean;
+  metaKey: boolean;
+  altKey: boolean;
+  preventDefault(): void;
+  stopImmediatePropagation(): void;
+}
+
+export interface SpaceHoldHooks {
+  target: () => SpaceTarget;
+  captureFocus: () => void;
+  cancelPending: () => void;
+  flush: () => void;
+  begin: () => void;
+  end: () => void;
+  schedule: (fn: () => void, ms: number) => number;
+  unschedule: (id: number) => void;
+}
+
+export interface SpaceHoldController {
+  keydown(e: SpaceKeyEventLike): void;
+  keyup(e: SpaceKeyEventLike): void;
+  blur(): void;
+}
+
+export function createSpaceHold(hooks: SpaceHoldHooks): SpaceHoldController {
+  let state: SpaceHoldState = "idle";
+  let timer: number | null = null;
+
+  const apply = (event: SpaceHoldEvent): SpaceHoldAction => {
+    const next = spaceHoldTransition(state, event);
+    state = next.state;
+    if (state !== "armed" && timer !== null) {
+      hooks.unschedule(timer);
+      timer = null;
+    }
+    return next.action;
+  };
+
+  const consume = (e: SpaceKeyEventLike): void => {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+  };
+
+  return {
+    keydown(e) {
+      if (e.code === "Space") {
+        const action = apply({
+          kind: "space-down",
+          repeat: e.repeat,
+          modified: e.ctrlKey || e.metaKey || e.altKey,
+          target: hooks.target(),
+        });
+        if (action === "arm") {
+          consume(e);
+          hooks.captureFocus();
+          timer = hooks.schedule(() => {
+            timer = null;
+            if (apply({ kind: "timeout" }) === "start") {
+              hooks.cancelPending();
+              hooks.begin();
+            }
+          }, SpaceHoldMs);
+        } else if (action === "swallow") {
+          consume(e);
+        }
+        return;
+      }
+      if (apply({ kind: "other-key" }) === "flush") hooks.flush();
+    },
+    keyup(e) {
+      if (e.code !== "Space") return;
+      const action = apply({ kind: "space-up" });
+      if (action === "flush") {
+        consume(e);
+        hooks.flush();
+      } else if (action === "stop") {
+        consume(e);
+        hooks.end();
+      }
+    },
+    blur() {
+      const action = apply({ kind: "blur" });
+      if (action === "cancel") hooks.cancelPending();
+      else if (action === "stop") hooks.end();
+    },
+  };
+}
+
 export function describeFocus(el: Element | null): FocusDescriptor {
   const input = el as HTMLInputElement | null;
   return {
@@ -133,9 +274,8 @@ export function setupDictation(deps: DictationDeps): void {
     })();
   };
 
-  window.addEventListener("keydown", (e) => {
-    if (e.key !== holdKey || e.repeat || held) return;
-    e.preventDefault();
+  const beginHold = (): void => {
+    if (held) return;
     held = true;
     startPending = (async (): Promise<boolean> => {
       try {
@@ -161,15 +301,60 @@ export function setupDictation(deps: DictationDeps): void {
         return false;
       }
     })();
+  };
+
+  let spaceFocus: Element | null = null;
+  let synthesizing = false;
+
+  const flushSpace = (): void => {
+    const el = spaceFocus;
+    spaceFocus = null;
+    if (!el || !el.isConnected) return;
+    if (classifySpaceTarget(describeFocus(el)) === "editable") {
+      insertIntoEditable(el, " ");
+      return;
+    }
+    const evt = new KeyboardEvent("keydown", { key: " ", code: "Space", bubbles: true, cancelable: true });
+    Object.defineProperty(evt, "keyCode", { value: 32 });
+    synthesizing = true;
+    try {
+      el.dispatchEvent(evt);
+    } finally {
+      synthesizing = false;
+    }
+  };
+
+  const spaceHold = createSpaceHold({
+    target: () => classifySpaceTarget(describeFocus(document.activeElement)),
+    captureFocus: () => { spaceFocus = document.activeElement; },
+    cancelPending: () => { spaceFocus = null; },
+    flush: flushSpace,
+    begin: beginHold,
+    end: release,
+    schedule: (fn, ms) => window.setTimeout(fn, ms),
+    unschedule: (id) => clearTimeout(id),
+  });
+
+  window.addEventListener("keydown", (e) => {
+    if (synthesizing) return;
+    spaceHold.keydown(e);
+    if (e.code === "Space") return;
+    if (e.key !== holdKey || e.repeat || held) return;
+    e.preventDefault();
+    beginHold();
   }, true);
 
   window.addEventListener("keyup", (e) => {
+    if (synthesizing) return;
+    spaceHold.keyup(e);
+    if (e.code === "Space") return;
     if (e.key !== holdKey) return;
     e.preventDefault();
     release();
   }, true);
 
   window.addEventListener("blur", () => {
+    spaceHold.blur();
     release();
   });
 
@@ -181,7 +366,7 @@ export function setupDictation(deps: DictationDeps): void {
     } else if (evt?.channel === "dictation.model") {
       const payload = evt.payload as { ready?: boolean; error?: string } | undefined;
       if (payload?.ready) {
-        showPill("downloading", "ready — hold F9 to dictate");
+        showPill("downloading", "ready — hold F9 or space to dictate");
         setTimeout(hidePill, 2500);
       } else if (payload?.error) {
         showPill("error", payload.error);
