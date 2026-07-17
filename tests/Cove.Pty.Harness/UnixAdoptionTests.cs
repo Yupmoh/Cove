@@ -88,9 +88,42 @@ public sealed class UnixAdoptionTests
             adopted.Kill();
             var sw = Stopwatch.StartNew();
             var exit = adopted.WaitForExit();
-            Assert.Equal(-1, exit);
+            Assert.Equal(OperatingSystem.IsMacOS() ? 137 : -1, exit);
             Assert.True(adopted.HasExited);
             Assert.True(sw.Elapsed.TotalSeconds < 10);
+        }
+        finally
+        {
+            adopted.Dispose();
+        }
+    }
+
+    [Fact]
+    public void AdoptedSession_ReportsExitCodeWhenWaitComesLate()
+    {
+        if (!OperatingSystem.IsMacOS()) return;
+        var logger = NullLogger.Instance;
+        var predecessor = PtyHostFactory.Create(logger);
+        var original = predecessor.Spawn(new PtySpawnRequest
+        {
+            Command = "/bin/sh",
+            Args = new[] { "-c", "sleep 0.4; exit 5" },
+            Cols = 80,
+            Rows = 24,
+        });
+        Assert.True(predecessor.TryExportSession(original, out var masterFd, out var pid));
+        var successor = PtyHostFactory.Create(logger);
+        var adopted = successor.AdoptSession(masterFd, pid);
+        try
+        {
+            var sw = Stopwatch.StartNew();
+            while (sw.Elapsed.TotalSeconds < 10)
+            {
+                try { System.Diagnostics.Process.GetProcessById(pid); Thread.Sleep(25); }
+                catch (ArgumentException) { break; }
+            }
+            Thread.Sleep(200);
+            Assert.Equal(5, adopted.WaitForExit());
         }
         finally
         {

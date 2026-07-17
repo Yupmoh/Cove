@@ -16,6 +16,7 @@ public sealed class UnixPtySession : IPtySession
     private int _firstReadLogged;
 
     private readonly bool _adopted;
+    private readonly Task<int>? _exitWatch;
 
     internal UnixPtySession(long sessionId, int masterFd, int pid, ILogger logger, bool adopted = false)
     {
@@ -24,6 +25,17 @@ public sealed class UnixPtySession : IPtySession
         _pid = pid;
         _logger = logger;
         _adopted = adopted;
+        if (adopted)
+        {
+            try
+            {
+                _exitWatch = ProcessExitWatch.WaitForExitAsync(pid);
+            }
+            catch (PtyIoException)
+            {
+                _exitWatch = null;
+            }
+        }
     }
 
     internal int MasterFd => _masterFd;
@@ -114,7 +126,7 @@ public sealed class UnixPtySession : IPtySession
             _exitCode = -1;
             try
             {
-                var wait = ProcessExitWatch.WaitForExitAsync(_pid);
+                var wait = _exitWatch ?? ProcessExitWatch.WaitForExitAsync(_pid);
                 if (wait.Wait(TimeSpan.FromSeconds(2)))
                     _exitCode = ProcessExitWatch.DecodeWaitStatus(wait.Result);
                 else
