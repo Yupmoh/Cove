@@ -50,7 +50,7 @@ FRONTEND="$ROOT/src/Cove.Gui/frontend"
 WWWROOT="$ROOT/src/Cove.Gui/wwwroot"
 frontend_stale() {
   [ -f "$WWWROOT/index.html" ] || return 0
-  [ -n "$(find "$FRONTEND/src" "$FRONTEND/package.json" "$FRONTEND/vite.config.ts" -newer "$WWWROOT/index.html" -print -quit 2>/dev/null)" ]
+  [ -n "$(find "$FRONTEND/src" "$FRONTEND/index.html" "$FRONTEND/perf" "$FRONTEND/package.json" "$FRONTEND/vite.config.ts" -newer "$WWWROOT/index.html" -print -quit 2>/dev/null)" ]
 }
 
 if frontend_stale; then
