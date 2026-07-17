@@ -2,7 +2,7 @@
   "sdkVersion": 2,
   "name": "codex",
   "displayName": "Codex",
-  "description": "OpenAI Codex agentic coding CLI.",
+  "description": "OpenAI's coding agent. GPT models with sandboxed command execution and a fast full-auto mode.",
   "accent": "#a6e3a1",
   "binary": "codex",
   "version": "1.0.0",

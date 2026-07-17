@@ -2,7 +2,7 @@
   "sdkVersion": 2,
   "name": "cursor-agent",
   "displayName": "Cursor Agent",
-  "description": "Cursor's terminal coding agent.",
+  "description": "Cursor's terminal agent. Same models and project rules as the Cursor editor, from your shell.",
   "accent": "#89b4fa",
   "binary": "cursor-agent",
   "version": "1.0.0",

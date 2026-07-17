@@ -2,7 +2,7 @@
   "sdkVersion": 2,
   "name": "claude-code",
   "displayName": "Claude Code",
-  "description": "Anthropic's Claude Code agentic coding CLI.",
+  "description": "Anthropic's agentic coding CLI. Deep multi-step reasoning with Claude models, subagents, hooks, and MCP tool support.",
   "accent": "#fab387",
   "binary": "claude",
   "version": "1.0.0",

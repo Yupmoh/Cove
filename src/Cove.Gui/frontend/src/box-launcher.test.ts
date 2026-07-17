@@ -9,6 +9,7 @@ import {
   launcherPlacement,
   placeableNookForAction,
   resolveLaunchCwd,
+  harnessInstallRows,
   type LauncherAdapter,
   type LauncherBuiltin,
   type PlaceholderTreeNode,
@@ -155,5 +156,44 @@ describe("isPlaceholderLeaf", () => {
   it("returns false when the id is absent", () => {
     expect(isPlaceholderLeaf(emptyLeaf, "missing")).toBe(false);
     expect(isPlaceholderLeaf(null, "empty-1")).toBe(false);
+  });
+});
+
+describe("harnessInstallRows", () => {
+  const adapter = (over: Partial<LauncherAdapter>): LauncherAdapter => ({
+    name: "x",
+    displayName: "X",
+    accent: "#fff",
+    binary: "x",
+    ...over,
+  });
+
+  it("lists only non-detected adapters that have an install command", () => {
+    const rows = harnessInstallRows([
+      adapter({ name: "a", status: "detected", installCommand: "brew install a" }),
+      adapter({ name: "b", status: "missing", installCommand: "brew install b" }),
+      adapter({ name: "c", status: "missing", installCommand: "  " }),
+    ]);
+    expect(rows.map((r) => r.name)).toEqual(["b"]);
+  });
+
+  it("sorts by display label and falls back to name", () => {
+    const rows = harnessInstallRows([
+      adapter({ name: "zeta", displayName: "", status: "missing", installCommand: "z" }),
+      adapter({ name: "b", displayName: "Alpha", status: "missing", installCommand: "a" }),
+    ]);
+    expect(rows.map((r) => r.label)).toEqual(["Alpha", "zeta"]);
+  });
+
+  it("carries description, trimmed command, and accent", () => {
+    const rows = harnessInstallRows([
+      adapter({ name: "pi", status: "missing", installCommand: " curl -fsSL x | sh ", description: "Minimal agent.", accent: "#abc" }),
+    ]);
+    expect(rows[0]).toEqual({ name: "pi", label: "X", description: "Minimal agent.", command: "curl -fsSL x | sh", accent: "#abc" });
+  });
+
+  it("defaults missing descriptions to empty", () => {
+    const rows = harnessInstallRows([adapter({ name: "pi", status: "missing", installCommand: "i" })]);
+    expect(rows[0].description).toBe("");
   });
 });

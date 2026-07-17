@@ -2,7 +2,7 @@
   "sdkVersion": 2,
   "name": "omp",
   "displayName": "omp",
-  "description": "oh-my-pi (pi-coding-agent) interactive coding CLI.",
+  "description": "oh-my-pi: hackable, provider-agnostic harness. Run any model, share sessions live, extend with custom tools and hooks.",
   "accent": "#cba6f7",
   "binary": "omp",
   "version": "1.0.0",

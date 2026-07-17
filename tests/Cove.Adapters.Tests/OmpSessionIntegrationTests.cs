@@ -79,6 +79,7 @@ public sealed class OmpSessionIntegrationTests
         using var document = JsonDocument.Parse(result.Stdout);
         var command = document.RootElement.GetProperty("command").EnumerateArray().Select(value => value.GetString()).ToArray();
         Assert.Contains("--hook", command);
+        Assert.Contains("--allow-home", command);
         Assert.Contains(command, value => value is not null && value.EndsWith("cove-hooks.ts", StringComparison.Ordinal));
         if (sessionId is not null)
         {

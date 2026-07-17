@@ -8,6 +8,7 @@ export interface LauncherAdapter {
   updateCommand?: string;
   installCommand?: string;
   uninstallCommand?: string;
+  description?: string;
 }
 
 export interface LauncherBuiltin {
@@ -37,6 +38,27 @@ export interface LauncherTile {
 
 export function shouldShowLauncher(shoreCount: number): boolean {
   return shoreCount <= 0;
+}
+
+export interface HarnessInstallRow {
+  name: string;
+  label: string;
+  description: string;
+  command: string;
+  accent: string;
+}
+
+export function harnessInstallRows(adapters: LauncherAdapter[]): HarnessInstallRow[] {
+  return adapters
+    .filter((a) => a.status !== "detected" && (a.installCommand ?? "").trim().length > 0)
+    .map((a) => ({
+      name: a.name,
+      label: a.displayName || a.name,
+      description: (a.description ?? "").trim(),
+      command: (a.installCommand ?? "").trim(),
+      accent: a.accent,
+    }))
+    .sort((x, y) => x.label.localeCompare(y.label));
 }
 
 export interface ShoreTreeNode {

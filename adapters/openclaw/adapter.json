@@ -2,7 +2,7 @@
   "sdkVersion": 2,
   "name": "openclaw",
   "displayName": "OpenClaw",
-  "description": "Open-source personal AI assistant and coding agent.",
+  "description": "Open-source personal AI assistant geared toward automation; drives local and remote agents beyond coding.",
   "accent": "#f38ba8",
   "binary": "openclaw",
   "version": "1.0.0",

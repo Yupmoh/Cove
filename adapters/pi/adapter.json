@@ -2,7 +2,7 @@
   "sdkVersion": 2,
   "name": "pi",
   "displayName": "pi",
-  "description": "Minimal, hackable coding agent.",
+  "description": "Minimal coding agent with a tiny readable core. The easiest harness to understand and modify.",
   "accent": "#f5c2e7",
   "binary": "pi",
   "version": "1.0.0",

@@ -59,7 +59,7 @@ import { detectChimes, playChime, chimesEnabledFrom, chimePrefValue, AGENT_CHIME
 import { NotificationBridge, type NotificationBridgeDeps, type NotificationDeliverPayload } from "./notifications";
 import { buildMenu, menuChordSet } from "./menu-model";
 import { toolbarTiles } from "./toolbar-tiles";
-import { shouldShowLauncher, buildAdapterTiles, buildBuiltinTiles, isEmptyShoreTree, isPlaceholderLeaf, placeableNookForAction, resolveLaunchCwd, type LauncherAdapter, type LauncherBuiltin, type LauncherTile } from "./box-launcher";
+import { shouldShowLauncher, buildAdapterTiles, buildBuiltinTiles, isEmptyShoreTree, isPlaceholderLeaf, placeableNookForAction, resolveLaunchCwd, harnessInstallRows, type LauncherAdapter, type LauncherBuiltin, type LauncherTile } from "./box-launcher";
 import { adapterAccent, toolAccent, assignHotkeys, detectedHarnessTiles, clampLauncherSelection, moveLauncherSelection, hotkeyTarget, shapeRecentSessions, tipAt, computeLauncherCols, resolveLauncherYolo, resolveLauncherProjectDir, type LauncherSelection, type LauncherGeometry, type LauncherArrowKey, type RecentSessionRow } from "./launcher-model";
 import { adapterIconSvg, fileIcon, iconSvg, iconForNookType } from "./icons";
 import { dropZoneFor, moveMutationFor, zoneOverlayRect } from "./nook-dnd";
@@ -5162,7 +5162,7 @@ launcherEl.addEventListener("mousedown", (e) => { if (e.target === launcherEl) c
 launcherEl.addEventListener("keydown", (e) => { if (e.key === "Escape") closeLauncher(); });
 
 const launchAgentsEl = document.getElementById("launch-agents")!;
-interface AdapterInfo { name: string; displayName: string; accent: string; binary: string; status?: string | null; version?: string | null; binaryPath?: string | null; updateCommand?: string | null; installCommand?: string | null; uninstallCommand?: string | null; }
+interface AdapterInfo { name: string; displayName: string; accent: string; binary: string; status?: string | null; version?: string | null; binaryPath?: string | null; updateCommand?: string | null; installCommand?: string | null; uninstallCommand?: string | null; description?: string | null; }
 interface AdapterListResult { adapters: AdapterInfo[]; }
 function mapLauncherAdapters(adapters: AdapterInfo[] | null | undefined): LauncherAdapter[] {
   return (adapters ?? []).map((a) => ({
@@ -5175,6 +5175,7 @@ function mapLauncherAdapters(adapters: AdapterInfo[] | null | undefined): Launch
     updateCommand: a.updateCommand ?? "",
     installCommand: a.installCommand ?? "",
     uninstallCommand: a.uninstallCommand ?? "",
+    description: a.description ?? "",
   }));
 }
 async function launchHarnessUpdate(tile: LauncherTile): Promise<void> {
@@ -5593,15 +5594,99 @@ function renderInstallHarnessCard(): HTMLElement {
   el.appendChild(label);
   el.addEventListener("click", (e) => {
     e.stopPropagation();
-    const options = installableHarnesses();
-    if (options.length === 0) return;
-    openContextMenuAt(e, options.map((a) => ({ id: `install:${a.name}`, label: a.displayName || a.name })), (id) => {
-      const picked = options.find((a) => `install:${a.name}` === id);
-      if (!picked?.installCommand) return;
-      void launchHarnessShellTask(picked.installCommand, `Install ${picked.displayName || picked.name}`);
-    });
+    openHarnessInstallModal();
   });
   return el;
+}
+
+function openHarnessInstallModal(): void {
+  const rows = harnessInstallRows(launcherAdapters);
+  if (rows.length === 0) return;
+  const overlay = document.createElement("div");
+  overlay.className = "hi-overlay";
+  const panel = document.createElement("div");
+  panel.className = "hi-panel";
+
+  const close = (): void => {
+    overlay.remove();
+    document.removeEventListener("keydown", onKey, true);
+  };
+  const onKey = (e: KeyboardEvent): void => {
+    if (e.key === "Escape") {
+      e.stopPropagation();
+      close();
+    }
+  };
+  document.addEventListener("keydown", onKey, true);
+  overlay.addEventListener("mousedown", (e) => {
+    if (e.target === overlay) close();
+  });
+
+  const head = document.createElement("div");
+  head.className = "hi-head";
+  const heading = document.createElement("div");
+  const title = document.createElement("div");
+  title.className = "hi-title";
+  title.textContent = "Install a harness";
+  const sub = document.createElement("div");
+  sub.className = "hi-sub";
+  sub.textContent = "Add a coding agent to Cove. Uninstalled harnesses stay listed here, ready to reinstall.";
+  heading.appendChild(title);
+  heading.appendChild(sub);
+  const x = document.createElement("span");
+  x.className = "hi-x";
+  x.textContent = "✕";
+  x.addEventListener("click", close);
+  head.appendChild(heading);
+  head.appendChild(x);
+  panel.appendChild(head);
+
+  const list = document.createElement("div");
+  list.className = "hi-list";
+  rows.forEach((row, index) => {
+    const card = document.createElement("div");
+    card.className = "hi-card";
+    card.style.setProperty("--card-accent", adapterAccent(row.name, row.accent));
+    card.style.animationDelay = `${index * 45}ms`;
+
+    const badge = document.createElement("span");
+    badge.className = "hi-badge";
+    badge.innerHTML = adapterIconSvg(row.name);
+
+    const body = document.createElement("div");
+    body.className = "hi-body";
+    const name = document.createElement("div");
+    name.className = "hi-name";
+    name.textContent = row.label;
+    body.appendChild(name);
+    if (row.description) {
+      const desc = document.createElement("div");
+      desc.className = "hi-desc";
+      desc.textContent = row.description;
+      body.appendChild(desc);
+    }
+    const cmd = document.createElement("div");
+    cmd.className = "hi-cmd";
+    cmd.textContent = row.command;
+    cmd.title = row.command;
+    body.appendChild(cmd);
+
+    const btn = document.createElement("button");
+    btn.className = "hi-install";
+    btn.textContent = "Install";
+    btn.addEventListener("click", () => {
+      close();
+      void launchHarnessShellTask(row.command, `Install ${row.label}`);
+    });
+
+    card.appendChild(badge);
+    card.appendChild(body);
+    card.appendChild(btn);
+    list.appendChild(card);
+  });
+  panel.appendChild(list);
+  overlay.appendChild(panel);
+  document.body.appendChild(overlay);
 }
 
 function renderHarnessCard(ctx: LauncherContext, tile: LauncherTile, letter: string, selected: boolean): HTMLElement {

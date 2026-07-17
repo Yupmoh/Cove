@@ -2,7 +2,7 @@
   "sdkVersion": 2,
   "name": "hermes",
   "displayName": "Hermes",
-  "description": "Nous Research's Hermes terminal agent.",
+  "description": "Nous Research's terminal agent built around the open-weight Hermes model family.",
   "accent": "#f9e2af",
   "binary": "hermes",
   "version": "1.0.0",

@@ -421,6 +421,30 @@
     .tools-dot { width: 8px; height: 8px; border-radius: 50%; }
     .tools-subtitle { color: var(--muted); font-size: 11.5px; word-break: break-all; }
     .tools-manifest { color: var(--muted); font-size: 10px; opacity: 0.75; }
+    .hi-overlay { position: fixed; inset: 0; z-index: 70; display: flex; align-items: center; justify-content: center; background: rgba(11, 11, 18, 0.55); backdrop-filter: blur(6px); animation: hi-fade 0.16s ease-out; }
+    @keyframes hi-fade { from { opacity: 0; } }
+    .hi-panel { width: 560px; max-width: 92vw; max-height: 80vh; display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 32px 80px rgba(0,0,0,0.55); overflow: hidden; animation: hi-pop 0.2s cubic-bezier(0.2, 0.9, 0.3, 1.15); }
+    @keyframes hi-pop { from { opacity: 0; transform: translateY(12px) scale(0.97); } }
+    .hi-head { padding: 18px 22px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+    .hi-title { font-size: 15px; font-weight: 650; color: var(--fg); }
+    .hi-sub { margin-top: 3px; font-size: 11.5px; color: var(--muted); }
+    .hi-x { cursor: pointer; color: var(--muted); font-size: 12px; padding: 3px 7px; border-radius: 6px; transition: color 0.12s, background 0.12s; }
+    .hi-x:hover { color: var(--fg); background: color-mix(in srgb, var(--border) 60%, transparent); }
+    .hi-list { padding: 14px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
+    .hi-card { position: relative; display: flex; gap: 14px; align-items: center; padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px; background: color-mix(in srgb, var(--panel-2, var(--panel)) 80%, transparent); transition: border-color 0.14s, transform 0.12s; animation: hi-rise 0.3s backwards ease-out; }
+    @keyframes hi-rise { from { opacity: 0; transform: translateY(8px); } }
+    .hi-card::before { content: ""; position: absolute; inset: 0; border-radius: inherit; background: radial-gradient(130% 150% at 0% 0%, color-mix(in srgb, var(--card-accent, var(--accent)) 9%, transparent), transparent 55%); opacity: 0; transition: opacity 0.16s; pointer-events: none; }
+    .hi-card:hover { border-color: color-mix(in srgb, var(--card-accent, var(--accent)) 55%, var(--border)); transform: translateY(-1px); }
+    .hi-card:hover::before { opacity: 1; }
+    .hi-badge { width: 38px; height: 38px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border-radius: 10px; background: color-mix(in srgb, var(--card-accent, var(--accent)) 14%, transparent); border: 1px solid color-mix(in srgb, var(--card-accent, var(--accent)) 35%, var(--border)); }
+    .hi-badge svg, .hi-badge .adapter-icon { width: 22px; height: 22px; display: block; }
+    .hi-body { flex: 1; min-width: 0; }
+    .hi-name { font-size: 13.5px; font-weight: 650; color: var(--fg); }
+    .hi-desc { margin-top: 2px; font-size: 11.5px; line-height: 1.45; color: var(--muted); }
+    .hi-cmd { margin-top: 5px; font-size: 10px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: color-mix(in srgb, var(--muted) 80%, transparent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .hi-install { flex-shrink: 0; padding: 7px 14px; font-size: 12px; font-weight: 600; color: var(--fg); background: color-mix(in srgb, var(--card-accent, var(--accent)) 18%, transparent); border: 1px solid color-mix(in srgb, var(--card-accent, var(--accent)) 45%, var(--border)); border-radius: 8px; cursor: pointer; font-family: inherit; transition: background 0.14s, transform 0.1s; }
+    .hi-install:hover { background: color-mix(in srgb, var(--card-accent, var(--accent)) 30%, transparent); }
+    .hi-install:active { transform: scale(0.97); }
     #onboarding { position: fixed; inset: 0; display: none; background: rgba(17, 17, 27, 0.6); align-items: center; justify-content: center; z-index: 60; }
     #onboarding.open { display: flex; }
     .ob-box { width: 440px; max-width: 90vw; background: var(--panel); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; box-shadow: 0 24px 60px rgba(0,0,0,0.5); }
