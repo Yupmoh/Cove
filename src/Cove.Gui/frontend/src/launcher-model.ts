@@ -215,6 +215,17 @@ export function shapeRecentSessions(rows: RecentSessionRow[], nowMs: number, lim
   });
 }
 
+export function filterSessionRows<T extends { label: string; cwd: string }>(rows: T[], query: string): T[] {
+  const tokens = query.trim().toLowerCase().split(/\s+/).filter((t) => t.length > 0);
+  if (tokens.length === 0) return rows;
+  return rows.filter((r) => {
+    const hay = `${r.label} ${r.cwd}`.toLowerCase();
+    return tokens.every((t) => hay.includes(t));
+  });
+}
+
+export const SESSION_FILTER_MIN_ROWS = 6;
+
 export const LAUNCHER_TIPS = [
   "press a letter to launch — hold shift to reveal them",
   "⌘↵ starts a new session in the selected harness",

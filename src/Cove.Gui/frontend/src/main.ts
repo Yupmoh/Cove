@@ -60,7 +60,7 @@ import { NotificationBridge, type NotificationBridgeDeps, type NotificationDeliv
 import { buildMenu, menuChordSet } from "./menu-model";
 import { toolbarTiles } from "./toolbar-tiles";
 import { shouldShowLauncher, buildAdapterTiles, buildBuiltinTiles, isEmptyShoreTree, isPlaceholderLeaf, placeableNookForAction, resolveLaunchCwd, harnessInstallRows, type LauncherAdapter, type LauncherBuiltin, type LauncherTile } from "./box-launcher";
-import { adapterAccent, toolAccent, assignHotkeys, detectedHarnessTiles, clampLauncherSelection, moveLauncherSelection, hotkeyTarget, shapeRecentSessions, tipAt, computeLauncherCols, resolveLauncherYolo, resolveLauncherProjectDir, type LauncherSelection, type LauncherGeometry, type LauncherArrowKey, type RecentSessionRow } from "./launcher-model";
+import { adapterAccent, toolAccent, assignHotkeys, detectedHarnessTiles, clampLauncherSelection, moveLauncherSelection, hotkeyTarget, shapeRecentSessions, tipAt, computeLauncherCols, resolveLauncherYolo, resolveLauncherProjectDir, filterSessionRows, SESSION_FILTER_MIN_ROWS, type LauncherSelection, type LauncherGeometry, type LauncherArrowKey, type RecentSessionRow } from "./launcher-model";
 import { adapterIconSvg, fileIcon, iconSvg, iconForNookType } from "./icons";
 import { dropZoneFor, moveMutationFor, zoneOverlayRect } from "./nook-dnd";
 import { cssPath, buildFeedbackReport, feedbackSlug, harnessPrompt } from "./inspect-mode";
@@ -5969,31 +5969,65 @@ function renderDetailDock(ctx: LauncherContext, tile: LauncherTile): HTMLElement
     dd.appendChild(trigger);
     const menu = document.createElement("div");
     menu.className = "cl-resume-menu";
-    for (const s of shaped) {
-      const row = document.createElement("div");
-      row.className = "cl-recent-row";
-      const rowDot = document.createElement("span");
-      rowDot.className = "cl-session-dot";
-      rowDot.style.background = accent;
-      const base = document.createElement("span");
-      base.className = "cl-recent-cwd";
-      base.textContent = s.label;
-      base.title = s.label;
-      const when = document.createElement("span");
-      when.className = "cl-recent-when";
-      when.textContent = s.relative;
-      row.appendChild(rowDot);
-      row.appendChild(base);
-      row.appendChild(when);
-      row.addEventListener("click", (e) => { e.stopPropagation(); void resumeRecentSession(s.adapter, s.sessionId, s.cwd, tile.label); });
-      menu.appendChild(row);
+    let filter: HTMLInputElement | null = null;
+    if (shaped.length >= SESSION_FILTER_MIN_ROWS) {
+      filter = document.createElement("input");
+      filter.className = "cl-resume-filter";
+      filter.type = "text";
+      filter.placeholder = "filter sessions…";
+      filter.addEventListener("click", (e) => e.stopPropagation());
+      filter.addEventListener("keydown", (e) => {
+        e.stopPropagation();
+        if (e.key === "Escape") {
+          e.preventDefault();
+          dd.classList.remove("open");
+        }
+      });
+      filter.addEventListener("input", () => renderRows(filterSessionRows(shaped, filter!.value)));
+      menu.appendChild(filter);
     }
+    const rowsHost = document.createElement("div");
+    rowsHost.className = "cl-resume-rows";
+    menu.appendChild(rowsHost);
+    const renderRows = (list: typeof shaped): void => {
+      rowsHost.innerHTML = "";
+      if (list.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "cl-resume-empty";
+        empty.textContent = "no matching sessions";
+        rowsHost.appendChild(empty);
+        return;
+      }
+      for (const s of list) {
+        const row = document.createElement("div");
+        row.className = "cl-recent-row";
+        const rowDot = document.createElement("span");
+        rowDot.className = "cl-session-dot";
+        rowDot.style.background = accent;
+        const base = document.createElement("span");
+        base.className = "cl-recent-cwd";
+        base.textContent = s.label;
+        base.title = s.label;
+        const when = document.createElement("span");
+        when.className = "cl-recent-when";
+        when.textContent = s.relative;
+        row.appendChild(rowDot);
+        row.appendChild(base);
+        row.appendChild(when);
+        row.addEventListener("click", (e) => { e.stopPropagation(); void resumeRecentSession(s.adapter, s.sessionId, s.cwd, tile.label); });
+        rowsHost.appendChild(row);
+      }
+    };
+    renderRows(shaped);
     dd.appendChild(menu);
     trigger.addEventListener("click", (e) => {
       e.stopPropagation();
       const wasOpen = dd.classList.contains("open");
       closeLauncherDropdowns();
-      if (!wasOpen) dd.classList.add("open");
+      if (!wasOpen) {
+        dd.classList.add("open");
+        filter?.focus();
+      }
     });
     controls.appendChild(dd);
   }

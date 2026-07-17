@@ -20,6 +20,8 @@ import {
   computeLauncherCols,
   resolveLauncherYolo,
   resolveLauncherProjectDir,
+  filterSessionRows,
+  SESSION_FILTER_MIN_ROWS,
   type LauncherGeometry,
   type LauncherSession,
   type RecentSessionRow,
@@ -262,5 +264,38 @@ describe("recent session shaping", () => {
     expect(shaped.map((s) => s.sessionId)).toEqual(["s1", "s2", "s3"]);
     expect(shaped[0].cwdBase).toBe("alpha");
     expect(shaped[0].relative).toBe("5m ago");
+  });
+});
+
+describe("filterSessionRows", () => {
+  const rows = [
+    { label: "fix inventory desync", cwd: "/Users/moh/Work/Raptor" },
+    { label: "voice dictation", cwd: "/Users/moh/Work/Cove" },
+    { label: "session", cwd: "/tmp/CLIProxyAPI-src" },
+  ];
+
+  it("returns all rows for an empty or whitespace query", () => {
+    expect(filterSessionRows(rows, "")).toEqual(rows);
+    expect(filterSessionRows(rows, "   ")).toEqual(rows);
+  });
+
+  it("matches label substrings case-insensitively", () => {
+    expect(filterSessionRows(rows, "DICT")).toEqual([rows[1]]);
+  });
+
+  it("matches against the cwd too", () => {
+    expect(filterSessionRows(rows, "cliproxy")).toEqual([rows[2]]);
+  });
+
+  it("requires every token to match somewhere", () => {
+    expect(filterSessionRows(rows, "cove voice")).toEqual([rows[1]]);
+    expect(filterSessionRows(rows, "cove desync")).toEqual([]);
+  });
+});
+
+describe("SESSION_FILTER_MIN_ROWS", () => {
+  it("keeps the filter hidden for short lists", () => {
+    expect(5 >= SESSION_FILTER_MIN_ROWS).toBe(false);
+    expect(6 >= SESSION_FILTER_MIN_ROWS).toBe(true);
   });
 });

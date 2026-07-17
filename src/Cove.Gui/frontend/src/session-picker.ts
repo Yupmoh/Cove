@@ -1,6 +1,6 @@
 import { invoke } from "./invoke";
 import type { RecentSessionRow } from "./launcher-model";
-import { adapterAccent } from "./launcher-model";
+import { adapterAccent, filterSessionRows, SESSION_FILTER_MIN_ROWS } from "./launcher-model";
 import { groupRecentsByAdapter, type AdapterLabel, type AdapterSessionGroup } from "./session-resume";
 
 interface SessionCorpusEntry {
@@ -112,34 +112,60 @@ function buildAdapterDropdown(group: AdapterSessionGroup, onResume: ResumeHandle
   const menu = document.createElement("div");
   menu.style.cssText = "display:none;flex-direction:column;gap:1px;padding:5px;background:var(--panel);border:1px solid var(--border);border-radius:10px;";
 
-  for (const s of group.sessions) {
-    const row = document.createElement("button");
-    row.type = "button";
-    row.className = "cl-recent-row";
-    row.style.cssText = "width:100%;border:none;background:transparent;font:inherit;text-align:left;";
-    const rowDot = document.createElement("span");
-    rowDot.className = "cl-session-dot";
-    rowDot.style.background = accent;
-    const label = document.createElement("span");
-    label.className = "cl-recent-cwd";
-    label.style.fontWeight = "500";
-    label.textContent = s.label;
-    label.title = s.label;
-    const when = document.createElement("span");
-    when.className = "cl-recent-when";
-    when.textContent = s.relative;
-    row.appendChild(rowDot);
-    row.appendChild(label);
-    row.appendChild(when);
-    row.addEventListener("click", () => onResume(s.adapter, s.sessionId, s.cwd, group.displayName));
-    menu.appendChild(row);
+  let filter: HTMLInputElement | null = null;
+  if (group.sessions.length >= SESSION_FILTER_MIN_ROWS) {
+    filter = document.createElement("input");
+    filter.className = "cl-resume-filter";
+    filter.type = "text";
+    filter.placeholder = "filter sessions…";
+    filter.addEventListener("keydown", (e) => e.stopPropagation());
+    filter.addEventListener("input", () => renderRows(filterSessionRows(group.sessions, filter!.value)));
+    menu.appendChild(filter);
   }
+  const rowsHost = document.createElement("div");
+  rowsHost.style.cssText = "display:flex;flex-direction:column;gap:1px;";
+  menu.appendChild(rowsHost);
+
+  const renderRows = (sessions: typeof group.sessions): void => {
+    rowsHost.innerHTML = "";
+    if (sessions.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "cl-resume-empty";
+      empty.textContent = "no matching sessions";
+      rowsHost.appendChild(empty);
+      return;
+    }
+    for (const s of sessions) {
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className = "cl-recent-row";
+      row.style.cssText = "width:100%;border:none;background:transparent;font:inherit;text-align:left;";
+      const rowDot = document.createElement("span");
+      rowDot.className = "cl-session-dot";
+      rowDot.style.background = accent;
+      const label = document.createElement("span");
+      label.className = "cl-recent-cwd";
+      label.style.fontWeight = "500";
+      label.textContent = s.label;
+      label.title = s.label;
+      const when = document.createElement("span");
+      when.className = "cl-recent-when";
+      when.textContent = s.relative;
+      row.appendChild(rowDot);
+      row.appendChild(label);
+      row.appendChild(when);
+      row.addEventListener("click", () => onResume(s.adapter, s.sessionId, s.cwd, group.displayName));
+      rowsHost.appendChild(row);
+    }
+  };
+  renderRows(group.sessions);
 
   let open = false;
   trigger.addEventListener("click", () => {
     open = !open;
     menu.style.display = open ? "flex" : "none";
     chev.style.transform = open ? "rotate(180deg)" : "";
+    if (open) filter?.focus();
   });
 
   dd.appendChild(trigger);
