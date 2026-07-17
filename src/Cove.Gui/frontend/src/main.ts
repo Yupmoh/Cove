@@ -541,6 +541,9 @@ function makeNook(nookId: string, since: number): NookView {
   el.style.flexGrow = "1";
   const header = document.createElement("div");
   header.className = "nook-header";
+  const stateDot = document.createElement("span");
+  stateDot.className = "nh-dot";
+  header.appendChild(stateDot);
   const titleSpan = document.createElement("span");
   titleSpan.className = "pt";
   titleSpan.textContent = "shell";
@@ -574,15 +577,76 @@ function makeNook(nookId: string, since: number): NookView {
   term.open(host);
   try { term.loadAddon(new CanvasAddon()); } catch (error) { console.warn("terminal canvas renderer unavailable", { nookId, error: String(error) }); }
 
-  header.addEventListener("contextmenu", (e) => {
+  const openNookMenu = (x: number, y: number): void => {
+    closeContextMenu();
+    closeNookMenus();
+    document.getElementById("nook-menu")?.remove();
     focusNook(nookId);
-    openContextMenuAt(e, [
-      { id: "nook.split-right", label: "Split Right" },
-      { id: "nook.split-down", label: "Split Down" },
-      { id: "nook.maximize", label: "Maximize" },
-      { id: "sep", label: "", separator: true },
-      { id: "nook.close", label: "Close", danger: true },
-    ], (id) => runAction(id));
+    const pop = document.createElement("div");
+    pop.id = "nook-menu";
+    pop.className = "nook-menu";
+    const close = (): void => {
+      pop.remove();
+      document.removeEventListener("mousedown", onAway, true);
+      document.removeEventListener("keydown", onKey, true);
+    };
+    const onAway = (ev: MouseEvent): void => {
+      if (!pop.contains(ev.target as Node)) close();
+    };
+    const onKey = (ev: KeyboardEvent): void => {
+      if (ev.key === "Escape") {
+        ev.stopPropagation();
+        close();
+      }
+    };
+    const addRow = (icon: { svg?: string; glyph?: string }, label: string, fn: () => void, opts?: { kbd?: string; danger?: boolean }): void => {
+      const r = document.createElement("button");
+      r.className = "nm-row" + (opts?.danger ? " danger" : "");
+      const g = document.createElement("span");
+      g.className = "nm-glyph";
+      if (icon.svg) g.innerHTML = icon.svg;
+      else g.textContent = icon.glyph ?? "";
+      const l = document.createElement("span");
+      l.className = "nm-label";
+      l.textContent = label;
+      r.appendChild(g);
+      r.appendChild(l);
+      if (opts?.kbd) {
+        const k = document.createElement("span");
+        k.className = "nm-kbd";
+        k.textContent = opts.kbd;
+        r.appendChild(k);
+      }
+      r.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        close();
+        fn();
+      });
+      pop.appendChild(r);
+    };
+    const addSep = (): void => {
+      const s = document.createElement("div");
+      s.className = "nm-sep";
+      pop.appendChild(s);
+    };
+    addRow({ glyph: "⤢" }, "Maximize", () => runAction("nook.maximize"));
+    addSep();
+    addRow({ glyph: "✎" }, "Rename", () => startRename());
+    addSep();
+    addRow({ glyph: "⊟" }, "Close Others", () => void closeOthers(nookId));
+    addRow({ glyph: "✕" }, "Close", () => { focusNook(nookId); void closeFocused(); }, { danger: true });
+    document.body.appendChild(pop);
+    const rect = pop.getBoundingClientRect();
+    pop.style.left = `${Math.max(8, Math.min(x, window.innerWidth - rect.width - 8))}px`;
+    pop.style.top = `${Math.max(8, Math.min(y, window.innerHeight - rect.height - 8))}px`;
+    setTimeout(() => {
+      document.addEventListener("mousedown", onAway, true);
+      document.addEventListener("keydown", onKey, true);
+    }, 0);
+  };
+  header.addEventListener("contextmenu", (e) => {
+    e.preventDefault();
+    openNookMenu(e.clientX, e.clientY);
   });
   host.addEventListener("contextmenu", (e) => {
     focusNook(nookId);
@@ -683,16 +747,8 @@ function makeNook(nookId: string, since: number): NookView {
   titleSpan.addEventListener("dblclick", startRename);
   moreBtn.addEventListener("click", (e) => {
     e.stopPropagation();
-    closeNookMenus();
-    const menu = document.createElement("div");
-    menu.className = "pmenu";
-    const mk = (label: string, fn: () => void) => { const r = document.createElement("div"); r.className = "pmi"; r.textContent = label; r.addEventListener("click", (ev) => { ev.stopPropagation(); closeNookMenus(); fn(); }); menu.appendChild(r); };
-    mk("Copy Nook ID", () => { if (navigator.clipboard) void navigator.clipboard.writeText(nookId); });
-    mk("Rename", startRename);
-    mk("New subtab", () => void addSubtab(nookId));
-    mk("Close", () => { focusNook(nookId); void closeFocused(); });
-    mk("Close Others", () => { void closeOthers(nookId); });
-    header.appendChild(menu);
+    const rect = moreBtn.getBoundingClientRect();
+    openNookMenu(rect.right - 190, rect.bottom + 5);
   });
   term.onTitleChange((t) => { pv.title = t; rememberNookTitle(nookId, pv.customTitle || t); setTitle(); refreshTitles(); });
   nooks.set(nookId, pv);
@@ -1592,17 +1648,89 @@ async function closeNookById(nookId: string): Promise<void> {
 }
 
 function openSplitChooser(e: MouseEvent, dir: "row" | "col"): void {
-  const harnesses = detectedHarnessTiles(buildAdapterTiles(launcherAdapters));
-  const items: ContextMenuItem[] = [
-    { id: "terminal", label: "Terminal" },
-    ...harnesses.map((h) => ({ id: `adapter:${h.adapterName}`, label: h.label })),
-    { id: "sep1", label: "", separator: true },
-    { id: "browser", label: "Browser" },
-    { id: "search", label: "Search" },
-    { id: "git", label: "Source Control" },
-    { id: "tasks-list", label: "Tasks" },
+  closeContextMenu();
+  closeNookMenus();
+  document.getElementById("mini-launcher")?.remove();
+  const pop = document.createElement("div");
+  pop.id = "mini-launcher";
+  pop.className = "mini-launcher";
+
+  const close = (): void => {
+    pop.remove();
+    document.removeEventListener("mousedown", onAway, true);
+    document.removeEventListener("keydown", onKey, true);
+  };
+  const onAway = (ev: MouseEvent): void => {
+    if (!pop.contains(ev.target as Node)) close();
+  };
+  const onKey = (ev: KeyboardEvent): void => {
+    if (ev.key === "Escape") {
+      ev.stopPropagation();
+      close();
+    }
+  };
+
+  const grid = document.createElement("div");
+  grid.className = "ml-grid";
+  const addTile = (accent: string, icon: { svg?: string; glyph?: string }, label: string, kind: string): void => {
+    const tile = document.createElement("button");
+    tile.className = "ml-tile";
+    tile.style.setProperty("--card-accent", accent);
+    const badge = document.createElement("span");
+    badge.className = "ml-badge";
+    if (icon.svg) badge.innerHTML = icon.svg;
+    else badge.textContent = icon.glyph ?? "";
+    const name = document.createElement("span");
+    name.className = "ml-name";
+    name.textContent = label;
+    tile.appendChild(badge);
+    tile.appendChild(name);
+    tile.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      close();
+      void splitActiveWith(dir, kind);
+    });
+    grid.appendChild(tile);
+  };
+  addTile("var(--accent)", { glyph: "▌" }, "Terminal", "terminal");
+  for (const h of detectedHarnessTiles(buildAdapterTiles(launcherAdapters)))
+    addTile(adapterAccent(h.adapterName, h.accent), { svg: adapterIconSvg(h.adapterName) }, h.label, `adapter:${h.adapterName}`);
+  pop.appendChild(grid);
+
+  const tools = document.createElement("div");
+  tools.className = "ml-tools";
+  const toolDefs: { glyph: string; label: string; kind: string }[] = [
+    { glyph: "◑", label: "Browser", kind: "browser" },
+    { glyph: "⌕", label: "Search", kind: "search" },
+    { glyph: "⎇", label: "Git", kind: "git" },
+    { glyph: "▤", label: "Tasks", kind: "tasks-list" },
   ];
-  openContextMenuAt(e, items, (id) => { void splitActiveWith(dir, id); });
+  for (const t of toolDefs) {
+    const btn = document.createElement("button");
+    btn.className = "ml-tool";
+    const g = document.createElement("span");
+    g.textContent = t.glyph;
+    const l = document.createElement("span");
+    l.textContent = t.label;
+    btn.appendChild(g);
+    btn.appendChild(l);
+    btn.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      close();
+      void splitActiveWith(dir, t.kind);
+    });
+    tools.appendChild(btn);
+  }
+  pop.appendChild(tools);
+
+  document.body.appendChild(pop);
+  const rect = pop.getBoundingClientRect();
+  pop.style.left = `${Math.max(8, Math.min(e.clientX, window.innerWidth - rect.width - 8))}px`;
+  pop.style.top = `${Math.max(8, Math.min(e.clientY + 6, window.innerHeight - rect.height - 8))}px`;
+  setTimeout(() => {
+    document.addEventListener("mousedown", onAway, true);
+    document.addEventListener("keydown", onKey, true);
+  }, 0);
 }
 
 async function splitActiveWith(dir: "row" | "col", kind: string): Promise<void> {
@@ -2212,11 +2340,9 @@ function buildNookCard(row: TreeRow, nookStates: Map<string, AgentState>, activa
   cardEl.addEventListener("contextmenu", (e) => {
     openContextMenuAt(e, [
       { id: "focus", label: "Go to" },
-      { id: "copy-id", label: "Copy nook id" },
       { id: "close", label: "Close", danger: true },
     ], (id) => {
       if (id === "focus") focusTreeRow("nook", row.shoreId, nookId);
-      else if (id === "copy-id") { if (navigator.clipboard) void navigator.clipboard.writeText(nookId); }
       else if (id === "close") {
         if (close) close();
         else closeTreeRow("nook", row.shoreId, nookId);
