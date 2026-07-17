@@ -143,4 +143,28 @@ public sealed class BinaryDiscoveryTests
         }
         finally { try { Directory.Delete(homeSub, true); } catch { } }
     }
+
+    [Fact]
+    public void Discover_HangingVersionProbe_ReturnsWithinTimeout()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var wkDir = NewDir();
+        try
+        {
+            MakeExecutable(wkDir, "hang-cli", "echo '4.2.0'; exec sleep 20");
+            var discovery = new BinaryDiscoveryService();
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var result = discovery.Discover(new BinaryDiscovery
+            {
+                Commands = ["hang-cli"],
+                VersionFlag = "--version",
+            }, wellKnownPaths: [wkDir]);
+            sw.Stop();
+
+            Assert.True(sw.Elapsed < TimeSpan.FromSeconds(10), $"probe took {sw.Elapsed}");
+            Assert.Equal(AdapterDetectionState.Detected, result.State);
+            Assert.Equal("4.2.0", result.Version);
+        }
+        finally { try { Directory.Delete(wkDir, true); } catch { } }
+    }
 }

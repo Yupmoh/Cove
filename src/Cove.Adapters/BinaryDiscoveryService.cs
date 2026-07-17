@@ -91,14 +91,17 @@ public sealed class BinaryDiscoveryService
                 using var proc = Process.Start(psi);
                 if (proc is not null)
                 {
-                    var stdout = proc.StandardOutput.ReadToEnd();
-                    var stderr = proc.StandardError.ReadToEnd();
+                    var stdoutTask = proc.StandardOutput.ReadToEndAsync();
+                    var stderrTask = proc.StandardError.ReadToEndAsync();
                     if (!proc.WaitForExit(3000))
                     {
                         try { proc.Kill(true); }
                         catch (Exception ex) { _logger?.BinaryVersionProbeKillFailed(binaryPath, ex.Message); }
                     }
 
+                    var drained = Task.WaitAll([stdoutTask, stderrTask], 2000);
+                    var stdout = drained || stdoutTask.IsCompletedSuccessfully ? stdoutTask.Result : "";
+                    var stderr = drained || stderrTask.IsCompletedSuccessfully ? stderrTask.Result : "";
                     var combined = (stdout + "\n" + stderr).Trim();
                     var match = VersionRegex.Match(combined);
                     if (match.Success)
