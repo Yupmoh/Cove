@@ -65,6 +65,9 @@ internal static partial class GuiLog
     [ZLoggerMessage(LogLevel.Warning, "engine event dropped no webview channel={channel}")]
     public static partial void EventForwardNoWebView(this ILogger logger, string channel);
 
+    [ZLoggerMessage(2074, LogLevel.Warning, "dictation model ensure failed error={error}")]
+    public static partial void DictationEnsureFailed(this ILogger logger, string error);
+
     [ZLoggerMessage(LogLevel.Trace, "engine event forwarded channel={channel}")]
     public static partial void EventForwarded(this ILogger logger, string channel);
 

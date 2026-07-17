@@ -30,6 +30,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Cove.Protocol\Cove.Protocol.csproj" />
     <ProjectReference Include="..\Cove.Platform\Cove.Platform.csproj" />
+    <ProjectReference Include="..\Cove.Dictation\Cove.Dictation.csproj" />
   </ItemGroup>
 
   <ItemGroup>

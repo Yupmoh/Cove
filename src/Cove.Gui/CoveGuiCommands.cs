@@ -10,7 +10,25 @@ public sealed class CoveGuiCommands
     private const int MaxFrontendMessageLength = 2000;
     private readonly EngineLink _link;
     private readonly ILogger<CoveGuiCommands> _log;
-    public CoveGuiCommands(EngineLink link, ILogger<CoveGuiCommands> log) { _link = link; _log = log; }
+    private readonly DictationHost _dictation;
+    public CoveGuiCommands(EngineLink link, ILogger<CoveGuiCommands> log, DictationHost dictation)
+    {
+        _link = link;
+        _log = log;
+        _dictation = dictation;
+    }
+
+    [RynCommand("app.dictationStatus")]
+    public string DictationStatus() => _dictation.Status();
+
+    [RynCommand("app.dictationEnsureModel")]
+    public string DictationEnsureModel() => _dictation.EnsureModel();
+
+    [RynCommand("app.dictationStart")]
+    public string DictationStart() => _dictation.StartDictation();
+
+    [RynCommand("app.dictationStop")]
+    public async ValueTask<string> DictationStop() => await _dictation.StopDictation();
 
     [RynCommand("app.nookList")]
     public async ValueTask<string> NookList(CancellationToken ct)

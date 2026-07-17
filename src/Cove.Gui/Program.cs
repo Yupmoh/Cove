@@ -55,6 +55,7 @@ internal static class Program
                 s.AddSingleton<ILoggerFactory>(loggerFactory);
                 s.AddSingleton(link);
                 s.AddSingleton<EngineEventForwarder>();
+                s.AddSingleton<DictationHost>();
                 s.AddSingleton<CoveGuiCommands>();
                 s.AddRynCommands();
                 s.AddAppCommands();

@@ -80,6 +80,7 @@ const RYN_MENUBAR_EVENTS_BROKEN = false;
 import { initHud, toggleHud, recordFrame, hudMetrics, readJsHeapBytes, hudLines, type HudState, type JsHeapProbe } from "./perf-hud";
 import { parseSnapshotExport, snapshotRows, summarizeSnapshots, formatBytes as formatSnapshotBytes, type DiagnosticsSnapshot } from "./diagnostics-snapshot";
 import { initialPerfBundlesState, applyBundleList, beginCreate, finishCreate, surfaceError, requestDelete, cancelDelete, bundleRows, PERF_BUNDLES_EMPTY_TEXT, type PerfBundlesState, type PerfBundleListResult, type PerfBundleDto } from "./perf-bundles";
+import { setupDictation } from "./dictation";
 
 let brandIndex = parseBrandIndex(localStorage.getItem("cove.brandLogo"));
 localStorage.setItem("cove.brandLogo", String(nextBrandIndex(brandIndex)));
@@ -6815,6 +6816,10 @@ async function createNote(): Promise<void> {
   try { await window.__ryn.invoke("window.center", {}); } catch (err) { console.warn("window center failed", err); }
   setupBadge();
   setupNotifications();
+  setupDictation({
+    invoke: (cmd, args) => window.__ryn.invoke(cmd, args ?? {}),
+    getFocusedNookId: () => focusedNookId,
+  });
   void setupBackdrop();
   void loadWings();
   void loadBayBoxes();
