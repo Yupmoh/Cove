@@ -5,6 +5,7 @@
   <Folder Name="/src/">
     <Project Path="src/Cove.Adapters/Cove.Adapters.csproj" />
     <Project Path="src/Cove.Cli/Cove.Cli.csproj" />
+    <Project Path="src/Cove.Dictation/Cove.Dictation.csproj" />
     <Project Path="src/Cove.Engine/Cove.Engine.csproj" />
     <Project Path="src/Cove.Gui/Cove.Gui.csproj" />
     <Project Path="src/Cove.Persistence/Cove.Persistence.csproj" />
@@ -18,6 +19,7 @@
     <Project Path="tests/Cove.Adapters.Tests/Cove.Adapters.Tests.csproj" />
     <Project Path="tests/Cove.Cli.Tests/Cove.Cli.Tests.csproj" />
     <Project Path="tests/Cove.Engine.Tests/Cove.Engine.Tests.csproj" />
+    <Project Path="tests/Cove.Dictation.Tests/Cove.Dictation.Tests.csproj" />
     <Project Path="tests/Cove.Gui.Tests/Cove.Gui.Tests.csproj" />
     <Project Path="tests/Cove.Persistence.AotProbe/Cove.Persistence.AotProbe.csproj" />
     <Project Path="tests/Cove.Persistence.Tests/Cove.Persistence.Tests.csproj" />
