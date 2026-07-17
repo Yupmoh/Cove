@@ -201,6 +201,11 @@ export function insertIntoEditable(el: Element, text: string): void {
   }
 }
 
+export function partialPreview(text: string, max = 72): string {
+  if (text.length <= max) return text;
+  return `…${text.slice(text.length - max + 1)}`;
+}
+
 interface DictationDeps {
   invoke: (command: string, args?: Record<string, unknown>) => Promise<unknown>;
   getFocusedNookId: () => string | null;
@@ -221,7 +226,7 @@ export function setupDictation(deps: DictationDeps): void {
       document.body.appendChild(pill);
     }
     pill.dataset.state = state;
-    pill.textContent = state === "recording" ? "● dictating"
+    pill.textContent = state === "recording" ? (detail ? `● ${detail}` : "● dictating")
       : state === "transcribing" ? "… transcribing"
       : state === "downloading" ? `⇣ speech model ${detail}`
       : `dictation: ${detail}`;
@@ -360,7 +365,10 @@ export function setupDictation(deps: DictationDeps): void {
 
   window.__ryn.on("engine.event", (data: unknown) => {
     const evt = data as { channel?: string; payload?: unknown };
-    if (evt?.channel === "dictation.progress") {
+    if (evt?.channel === "dictation.partial") {
+      const text = (evt.payload as { text?: string } | undefined)?.text ?? "";
+      if (held && text) showPill("recording", partialPreview(text));
+    } else if (evt?.channel === "dictation.progress") {
       const pct = Math.round((((evt.payload as { percent?: number } | undefined)?.percent ?? 0) * 100));
       showPill("downloading", `${pct}%`);
     } else if (evt?.channel === "dictation.model") {

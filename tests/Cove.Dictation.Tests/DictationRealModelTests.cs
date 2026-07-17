@@ -128,4 +128,34 @@ public sealed class DictationRealModelTests
         var silence = trimmer.Trim(new float[DictationService.SampleRate * 2]);
         Assert.Empty(silence);
     }
+
+    [Fact]
+    public void RealModel_PartialTracker_ProducesProgressivePreview()
+    {
+        if (!OperatingSystem.IsMacOS()) return;
+        if (ResolveModelDir() is not { } modelDir) return;
+
+        var first = Speak("hello world");
+        var pause = new float[DictationService.SampleRate];
+        var firstClip = new float[first.Length + pause.Length];
+        first.CopyTo(firstClip, 0);
+
+        using var trimmer = new SileroSpeechTrimmer(Path.Combine(ModelsRoot, DictationModelManager.VadFileName));
+        using var transcriber = new SherpaTranscriber(modelDir);
+        var tracker = new PartialTranscriptTracker(trimmer, transcriber);
+
+        var partial = tracker.Advance(new AudioSnapshot(firstClip, 0));
+        Assert.NotNull(partial);
+        Assert.Contains("hello", partial!.ToLowerInvariant());
+
+        var second = Speak("testing dictation");
+        var grown = new float[firstClip.Length + second.Length];
+        firstClip.CopyTo(grown, 0);
+        second.CopyTo(grown, firstClip.Length);
+
+        var partial2 = tracker.Advance(new AudioSnapshot(grown, 0));
+        Assert.NotNull(partial2);
+        Assert.Contains("hello", partial2!.ToLowerInvariant());
+        Assert.Contains("testing", partial2!.ToLowerInvariant());
+    }
 }

@@ -22,4 +22,10 @@ internal static partial class DictationLog
 
     [ZLoggerMessage(3505, LogLevel.Warning, "dictation model checksum mismatch expected={expected} actual={actual}")]
     public static partial void DictationChecksumMismatch(this ILogger logger, string expected, string actual);
+
+    [ZLoggerMessage(3506, LogLevel.Warning, "dictation partial loop stopped error={error}")]
+    public static partial void DictationPartialFailed(this ILogger logger, string error);
+
+    [ZLoggerMessage(3507, LogLevel.Warning, "dictation shutdown drain failed error={error}")]
+    public static partial void DictationShutdownDrainFailed(this ILogger logger, string error);
 }

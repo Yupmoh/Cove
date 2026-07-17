@@ -83,6 +83,28 @@ public sealed class PortAudioRecorder : IAudioRecorder, IDisposable
         return AudioResampler.Resample(clip, deviceRate, DictationService.SampleRate);
     }
 
+    public AudioSnapshot Snapshot(double maxSeconds)
+    {
+        int deviceRate;
+        lock (_lifecycle)
+        {
+            if (_stream is null)
+                return new AudioSnapshot([], 0);
+            deviceRate = _deviceRate;
+        }
+        float[] window;
+        int startDevice;
+        lock (_capture)
+        {
+            var take = Math.Min(_captured.Count, (int)(maxSeconds * deviceRate));
+            startDevice = _captured.Count - take;
+            window = new float[take];
+            _captured.CopyTo(startDevice, window, 0, take);
+        }
+        var offset = (int)((long)startDevice * DictationService.SampleRate / deviceRate);
+        return new AudioSnapshot(AudioResampler.Resample(window, deviceRate, DictationService.SampleRate), offset);
+    }
+
     private StreamCallbackResult OnAudio(IntPtr input, IntPtr output, uint frameCount,
         ref StreamCallbackTimeInfo timeInfo, StreamCallbackFlags statusFlags, IntPtr userData)
     {

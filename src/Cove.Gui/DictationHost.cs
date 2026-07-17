@@ -120,6 +120,8 @@ public sealed class DictationHost : IDisposable
             _trimmer = new SileroSpeechTrimmer(manager.VadPath);
             _transcriber = new SherpaTranscriber(modelDir);
             _service = new DictationService(_recorder, _trimmer, _transcriber, _log);
+            _service.PartialTranscript = text =>
+                Emit("dictation.partial", JsonSerializer.Serialize(new DictationPartialDto(text), DictationJsonContext.Default.DictationPartialDto));
             return _service;
         }
     }
@@ -136,6 +138,10 @@ public sealed class DictationHost : IDisposable
 
     public void Dispose()
     {
+        DictationService? service;
+        lock (_sync)
+            service = _service;
+        service?.Shutdown();
         lock (_sync)
         {
             _recorder?.Dispose();
@@ -151,6 +157,7 @@ public sealed record DictationProgressDto(double Percent);
 public sealed record DictationErrorDto(string Error);
 public sealed record DictationStartErrorDto(bool Ok, string Error);
 public sealed record DictationResultDto(string Text, double AudioSeconds, long TranscribeMs);
+public sealed record DictationPartialDto(string Text);
 
 [System.Text.Json.Serialization.JsonSourceGenerationOptions(PropertyNamingPolicy = System.Text.Json.Serialization.JsonKnownNamingPolicy.CamelCase)]
 [System.Text.Json.Serialization.JsonSerializable(typeof(DictationStatusDto))]
@@ -158,4 +165,5 @@ public sealed record DictationResultDto(string Text, double AudioSeconds, long T
 [System.Text.Json.Serialization.JsonSerializable(typeof(DictationErrorDto))]
 [System.Text.Json.Serialization.JsonSerializable(typeof(DictationStartErrorDto))]
 [System.Text.Json.Serialization.JsonSerializable(typeof(DictationResultDto))]
+[System.Text.Json.Serialization.JsonSerializable(typeof(DictationPartialDto))]
 public sealed partial class DictationJsonContext : System.Text.Json.Serialization.JsonSerializerContext { }

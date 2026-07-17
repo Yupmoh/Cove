@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifyDictationTarget, classifySpaceTarget, createSpaceHold, encodeNookText, spaceHoldTransition, SpaceHoldMs, type FocusDescriptor, type SpaceHoldEvent, type SpaceHoldState, type SpaceHoldHooks, type SpaceKeyEventLike, type SpaceTarget } from "./dictation";
+import { classifyDictationTarget, classifySpaceTarget, createSpaceHold, encodeNookText, partialPreview, spaceHoldTransition, SpaceHoldMs, type FocusDescriptor, type SpaceHoldEvent, type SpaceHoldState, type SpaceHoldHooks, type SpaceKeyEventLike, type SpaceTarget } from "./dictation";
 
 const focus = (partial: Partial<FocusDescriptor>): FocusDescriptor => ({
   tagName: "DIV",
@@ -250,5 +250,23 @@ describe("createSpaceHold", () => {
     dictating.fireTimer();
     dictating.controller.blur();
     expect(dictating.calls).toEqual(["capture", "cancel", "begin", "end"]);
+  });
+});
+
+describe("partialPreview", () => {
+  it("returns short text unchanged", () => {
+    expect(partialPreview("hello world")).toBe("hello world");
+  });
+
+  it("keeps the trailing portion of long text with a leading ellipsis", () => {
+    const text = "a".repeat(50) + " the quick brown fox jumps over the lazy dog";
+    const preview = partialPreview(text, 20);
+    expect(preview.length).toBe(20);
+    expect(preview.startsWith("…")).toBe(true);
+    expect(preview.endsWith("lazy dog")).toBe(true);
+  });
+
+  it("returns empty for empty text", () => {
+    expect(partialPreview("")).toBe("");
   });
 });

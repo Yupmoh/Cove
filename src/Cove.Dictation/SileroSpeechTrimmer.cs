@@ -21,7 +21,7 @@ public sealed class SileroSpeechTrimmer : ISpeechTrimmer, IDisposable
         _vad = new VoiceActivityDetector(config, bufferSizeInSeconds: (float)DictationService.MaxClipSeconds);
     }
 
-    public float[] Trim(float[] samples)
+    public SpeechSpan[] Analyze(float[] samples)
     {
         lock (_sync)
         {
@@ -45,29 +45,36 @@ public sealed class SileroSpeechTrimmer : ISpeechTrimmer, IDisposable
                 return [];
 
             var pad = DictationService.SampleRate / 4;
-            var merged = new List<(int Start, int End)>();
+            var merged = new List<SpeechSpan>();
             foreach (var span in spans)
             {
                 var start = Math.Max(0, span.Start - pad);
                 var end = Math.Min(samples.Length, span.End + pad);
                 if (merged.Count > 0 && start <= merged[^1].End)
-                    merged[^1] = (merged[^1].Start, Math.Max(merged[^1].End, end));
+                    merged[^1] = new SpeechSpan(merged[^1].Start, Math.Max(merged[^1].End, end));
                 else
-                    merged.Add((start, end));
+                    merged.Add(new SpeechSpan(start, end));
             }
-
-            var total = 0;
-            foreach (var (start, end) in merged)
-                total += end - start;
-            var result = new float[total];
-            var position = 0;
-            foreach (var (start, end) in merged)
-            {
-                Array.Copy(samples, start, result, position, end - start);
-                position += end - start;
-            }
-            return result;
+            return merged.ToArray();
         }
+    }
+
+    public float[] Trim(float[] samples)
+    {
+        var merged = Analyze(samples);
+        if (merged.Length == 0)
+            return [];
+        var total = 0;
+        foreach (var span in merged)
+            total += span.End - span.Start;
+        var result = new float[total];
+        var position = 0;
+        foreach (var span in merged)
+        {
+            Array.Copy(samples, span.Start, result, position, span.End - span.Start);
+            position += span.End - span.Start;
+        }
+        return result;
     }
 
     public void Dispose() => _vad.Dispose();
