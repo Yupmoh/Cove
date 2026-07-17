@@ -27,7 +27,7 @@ resolve_binary() {
 ADAPTER_DIR="${COVE_ADAPTER_DIR:-$(cd "$(dirname "$0")" && pwd)}"
 bin="$(resolve_binary omp "$HOME/.bun/bin/omp" /opt/homebrew/bin/omp /usr/local/bin/omp)"
 if [ "$session_known" -eq 1 ]; then
-  printf '{"command":["%s","--resume","%s","--hook","%s/cove-hooks.ts"]}\n' "$bin" "$SESSION_ID" "$ADAPTER_DIR"
+  printf '{"command":["%s","--resume","%s","--allow-home","--hook","%s/cove-hooks.ts"]}\n' "$bin" "$SESSION_ID" "$ADAPTER_DIR"
 else
-  printf '{"command":["%s","--hook","%s/cove-hooks.ts"]}\n' "$bin" "$ADAPTER_DIR"
+  printf '{"command":["%s","--allow-home","--hook","%s/cove-hooks.ts"]}\n' "$bin" "$ADAPTER_DIR"
 fi

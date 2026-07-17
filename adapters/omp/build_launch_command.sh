@@ -30,4 +30,4 @@ if [ -n "$custom_command" ]; then
 else
   bin="$(resolve_binary omp "$HOME/.bun/bin/omp" /opt/homebrew/bin/omp /usr/local/bin/omp)"
 fi
-printf '{"command":["%s","--hook","%s/cove-hooks.ts"]}\n' "$bin" "$ADAPTER_DIR"
+printf '{"command":["%s","--allow-home","--hook","%s/cove-hooks.ts"]}\n' "$bin" "$ADAPTER_DIR"
