@@ -274,7 +274,7 @@ export function setupDictation(deps: DictationDeps): void {
 
   type LiveTarget =
     | { kind: "range"; el: HTMLInputElement | HTMLTextAreaElement; start: number; end: number }
-    | { kind: "ce"; el: Element; node: Text | null }
+    | { kind: "ce"; el: Element; node: Text | null; range: Range | null }
     | { kind: "nook"; typist: NookTypist }
     | null;
 
@@ -290,7 +290,13 @@ export function setupDictation(deps: DictationDeps): void {
         const start = el.selectionStart ?? el.value.length;
         return { kind: "range", el, start, end: el.selectionEnd ?? start };
       }
-      return { kind: "ce", el, node: null };
+      const selection = window.getSelection();
+      let range: Range | null = null;
+      if (selection && selection.rangeCount > 0) {
+        const live = selection.getRangeAt(0);
+        if (el.contains(live.commonAncestorContainer)) range = live.cloneRange();
+      }
+      return { kind: "ce", el, node: null, range };
     }
     if (route === "nook" && nookId) {
       return {
@@ -312,12 +318,13 @@ export function setupDictation(deps: DictationDeps): void {
       target.el.dispatchEvent(new Event("input", { bubbles: true }));
     } else {
       if (!target.node) {
-        const selection = window.getSelection();
-        if (!selection || selection.rangeCount === 0) return;
-        const range = selection.getRangeAt(0);
-        range.deleteContents();
         target.node = document.createTextNode(next);
-        range.insertNode(target.node);
+        if (target.range) {
+          target.range.deleteContents();
+          target.range.insertNode(target.node);
+        } else {
+          target.el.appendChild(target.node);
+        }
       } else {
         target.node.nodeValue = next;
       }
