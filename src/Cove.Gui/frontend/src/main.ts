@@ -6949,6 +6949,7 @@ async function createNote(): Promise<void> {
   setupDictation({
     invoke: (cmd, args) => window.__ryn.invoke(cmd, args ?? {}),
     getFocusedNookId: () => focusedNookId,
+    writeNook: (nookId, dataBase64) => enqueueNookWrite(nookId, dataBase64, (id, b64) => invoke("app.nookWrite", { nookId: id, dataBase64: b64 }).then(() => undefined)),
   });
   window.__ryn.on("engine.event", (data: unknown) => {
     const evt = data as { channel?: string; payload?: unknown };

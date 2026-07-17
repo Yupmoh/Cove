@@ -209,6 +209,7 @@ export function partialPreview(text: string, max = 72): string {
 interface DictationDeps {
   invoke: (command: string, args?: Record<string, unknown>) => Promise<unknown>;
   getFocusedNookId: () => string | null;
+  writeNook: (nookId: string, dataBase64: string) => Promise<void>;
   holdKey?: string;
 }
 
@@ -283,7 +284,7 @@ export function setupDictation(deps: DictationDeps): void {
     if (route === "editable" && capturedFocus) {
       insertIntoEditable(capturedFocus, text);
     } else if (route === "nook" && nookId) {
-      await deps.invoke("app.nookWrite", { nookId, dataBase64: encodeNookText(text) });
+      await deps.writeNook(nookId, encodeNookText(text));
     }
   };
 
@@ -317,8 +318,7 @@ export function setupDictation(deps: DictationDeps): void {
     if (route === "nook" && nookId) {
       return {
         kind: "nook",
-        typist: createNookTypist((payload) =>
-          deps.invoke("app.nookWrite", { nookId, dataBase64: encodeNookText(payload) }).then(() => undefined)),
+        typist: createNookTypist((payload) => deps.writeNook(nookId, encodeNookText(payload))),
       };
     }
     return null;
@@ -433,32 +433,33 @@ export function setupDictation(deps: DictationDeps): void {
   };
 
   let spaceFocus: Element | null = null;
-  let synthesizing = false;
+  let spaceNook: string | null = null;
 
   const flushSpace = (): void => {
     const el = spaceFocus;
+    const nookId = spaceNook;
     spaceFocus = null;
+    spaceNook = null;
     if (!el || !el.isConnected) return;
     if (classifySpaceTarget(describeFocus(el)) === "editable") {
       insertIntoEditable(el, " ");
       return;
     }
-    const evt = new KeyboardEvent("keydown", { key: " ", code: "Space", bubbles: true, cancelable: true });
-    Object.defineProperty(evt, "keyCode", { value: 32 });
-    synthesizing = true;
-    try {
-      el.dispatchEvent(evt);
-    } finally {
-      synthesizing = false;
-    }
+    if (nookId) void deps.writeNook(nookId, encodeNookText(" "));
   };
 
   const spaceHold = createSpaceHold({
     target: () => dictationToggleEnabled(localStorage.getItem(DICTATION_SPACE_KEY))
       ? classifySpaceTarget(describeFocus(document.activeElement))
       : "other",
-    captureFocus: () => { spaceFocus = document.activeElement; },
-    cancelPending: () => { spaceFocus = null; },
+    captureFocus: () => {
+      spaceFocus = document.activeElement;
+      spaceNook = deps.getFocusedNookId();
+    },
+    cancelPending: () => {
+      spaceFocus = null;
+      spaceNook = null;
+    },
     flush: flushSpace,
     begin: beginHold,
     end: release,
@@ -467,7 +468,6 @@ export function setupDictation(deps: DictationDeps): void {
   });
 
   window.addEventListener("keydown", (e) => {
-    if (synthesizing) return;
     spaceHold.keydown(e);
     if (e.code === "Space") return;
     if (e.key !== holdKey || e.repeat || held) return;
@@ -476,7 +476,6 @@ export function setupDictation(deps: DictationDeps): void {
   }, true);
 
   window.addEventListener("keyup", (e) => {
-    if (synthesizing) return;
     spaceHold.keyup(e);
     if (e.code === "Space") return;
     if (e.key !== holdKey) return;
