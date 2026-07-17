@@ -45,7 +45,7 @@ internal static partial class CovePtyNative
     internal static partial int ExitWatchAdd(int watchFd, int pid);
 
     [LibraryImport(PtyConstants.NativeLibrary, EntryPoint = "cove_pty_exitwatch_next")]
-    internal static partial int ExitWatchNext(int watchFd);
+    internal static partial int ExitWatchNext(int watchFd, out int status);
 
     [LibraryImport(PtyConstants.NativeLibrary, EntryPoint = "cove_pty_dup")]
     internal static partial int Dup(int fd);

@@ -2,7 +2,7 @@ namespace Cove.Platform.Pty;
 
 public static class PtyConstants
 {
-    public const int AbiVersion = 1;
+    public const int AbiVersion = 2;
     public const int ReadBufferBytes = 65536;
     public const int MaxWriteBytes = 8 * 1024 * 1024;
     public const int DefaultRingCapacityBytes = 8 * 1024 * 1024;

@@ -6,13 +6,24 @@ public static class ProcessExitWatch
 {
     private static readonly Lazy<Watcher> Shared = new(() => new Watcher(), LazyThreadSafetyMode.ExecutionAndPublication);
 
-    public static Task WaitForExitAsync(int pid, CancellationToken cancellationToken = default)
+    public static Task<int> WaitForExitAsync(int pid, CancellationToken cancellationToken = default)
         => Shared.Value.Register(pid, cancellationToken);
+
+    public static int DecodeWaitStatus(int status)
+    {
+        if (status < 0)
+            return -1;
+        if ((status & 0x7f) == 0)
+            return (status >> 8) & 0xff;
+        if ((status & 0x7f) != 0x7f)
+            return 128 + (status & 0x7f);
+        return -1;
+    }
 
     private sealed class Watcher
     {
         private readonly int _watchFd;
-        private readonly ConcurrentDictionary<int, TaskCompletionSource> _pending = new();
+        private readonly ConcurrentDictionary<int, TaskCompletionSource<int>> _pending = new();
 
         internal Watcher()
         {
@@ -24,14 +35,14 @@ public static class ProcessExitWatch
             loop.Start();
         }
 
-        internal Task Register(int pid, CancellationToken cancellationToken)
+        internal Task<int> Register(int pid, CancellationToken cancellationToken)
         {
-            var tcs = _pending.GetOrAdd(pid, _ => new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously));
+            var tcs = _pending.GetOrAdd(pid, _ => new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously));
             var rc = CovePtyNative.ExitWatchAdd(_watchFd, pid);
             if (rc == 1)
             {
                 _pending.TryRemove(pid, out _);
-                tcs.TrySetResult();
+                tcs.TrySetResult(-1);
             }
             else if (rc < 0)
             {
@@ -45,11 +56,11 @@ public static class ProcessExitWatch
         {
             for (; ; )
             {
-                var pid = CovePtyNative.ExitWatchNext(_watchFd);
+                var pid = CovePtyNative.ExitWatchNext(_watchFd, out var status);
                 if (pid > 0)
                 {
                     if (_pending.TryRemove(pid, out var tcs))
-                        tcs.TrySetResult();
+                        tcs.TrySetResult(status);
                     continue;
                 }
                 foreach (var pending in _pending)

@@ -77,4 +77,34 @@ public sealed class ProcessExitWatchTests
         var second = ProcessExitWatch.WaitForExitAsync(pid);
         await Task.WhenAll(first, second).WaitAsync(TimeSpan.FromSeconds(10));
     }
+
+    [Fact]
+    public async Task WaitForExitAsync_ReportsExitCode()
+    {
+        if (!OperatingSystem.IsMacOS()) return;
+        var pid = SpawnOrphan("{ sleep 0.3; exit 7; }");
+        var status = await ProcessExitWatch.WaitForExitAsync(pid).WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.Equal(7, ProcessExitWatch.DecodeWaitStatus(status));
+    }
+
+    [Fact]
+    public async Task WaitForExitAsync_ReportsFatalSignal()
+    {
+        if (!OperatingSystem.IsMacOS()) return;
+        var pid = SpawnOrphan("sleep 30");
+        var wait = ProcessExitWatch.WaitForExitAsync(pid);
+        Process.Start("/bin/kill", new[] { "-9", pid.ToString() })!.WaitForExit();
+        var status = await wait.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.Equal(137, ProcessExitWatch.DecodeWaitStatus(status));
+    }
+
+    [Fact]
+    public void DecodeWaitStatus_MapsShapes()
+    {
+        Assert.Equal(0, ProcessExitWatch.DecodeWaitStatus(0));
+        Assert.Equal(7, ProcessExitWatch.DecodeWaitStatus(7 << 8));
+        Assert.Equal(137, ProcessExitWatch.DecodeWaitStatus(9));
+        Assert.Equal(-1, ProcessExitWatch.DecodeWaitStatus(-1));
+        Assert.Equal(-1, ProcessExitWatch.DecodeWaitStatus(0x7f));
+    }
 }
