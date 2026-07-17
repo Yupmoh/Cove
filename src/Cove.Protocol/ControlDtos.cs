@@ -149,6 +149,8 @@ public sealed record LauncherOverridesDto(bool Yolo, string? WorkingDir, string[
 
 public sealed record AdapterListItemDto(string Name, string DisplayName, string Accent, string Binary, string? Status = null, string? Version = null, string? BinaryPath = null, string? UpdateCommand = null, string? UninstallCommand = null, string? InstallCommand = null, string? Description = null);
 public sealed record AdapterListResult(System.Collections.Generic.IReadOnlyList<AdapterListItemDto> Adapters);
+public sealed record HarnessUpdateDto(string Name, string DisplayName, string InstalledVersion, string LatestVersion, string? UpdateCommand);
+public sealed record HarnessUpdatesResult(System.Collections.Generic.IReadOnlyList<HarnessUpdateDto> Updates);
 public sealed record RegistryEntryDto(string Name, string DisplayName, string Version, bool Official);
 public sealed record RegistryFetchResult(RegistryEntryDto[] Adapters);
 
@@ -574,6 +576,7 @@ public sealed record PerfBundleListResult(System.Collections.Generic.IReadOnlyLi
 [JsonSerializable(typeof(ResumeCommandDto))]
 [JsonSerializable(typeof(LauncherOverridesDto))]
 [JsonSerializable(typeof(AdapterListResult))]
+[JsonSerializable(typeof(HarnessUpdatesResult))]
 [JsonSerializable(typeof(RegistryFetchResult))]
 [JsonSerializable(typeof(ToolsListResult))]
 [JsonSerializable(typeof(ToolsAdapterDto))]

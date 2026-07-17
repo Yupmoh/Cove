@@ -52,6 +52,7 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/adapter.retention-get` | core |  |
 | `cove://commands/adapter.retention-set` | core |  |
 | `cove://commands/adapter.tools-list` | core |  |
+| `cove://commands/adapter.updates-check` | core |  |
 | `cove://commands/agent.close` | core |  |
 | `cove://commands/agent.definition.delete` | core |  |
 | `cove://commands/agent.definition.list` | core |  |
@@ -474,4 +475,4 @@ Generated from the command registry. Do not edit by hand.
 | `viewer get-state` | cli |  |
 | `viewer open` | cli |  |
 
-Total: 469 commands
+Total: 470 commands

@@ -22,6 +22,13 @@ internal static partial class AdapterLog
 
     [ZLoggerMessage(LogLevel.Warning, "skill remove failed adapter={adapter} path={path} error={error}")]
     public static partial void SkillRemoveFailed(this ILogger logger, string adapter, string path, string error);
+
+    [ZLoggerMessage(LogLevel.Warning, "harness latest version fetch failed package={package} error={error}")]
+    public static partial void HarnessLatestFetchFailed(this ILogger logger, string package, string error);
+
+    [ZLoggerMessage(LogLevel.Warning, "harness latest version unavailable package={package}")]
+    public static partial void HarnessLatestUnavailable(this ILogger logger, string package);
+
     [ZLoggerMessage(LogLevel.Warning, "hook skipped no bash found adapter={adapter} event={hookEvent}")]
     public static partial void HookSkippedNoBash(this ILogger logger, string adapter, string hookEvent);
 

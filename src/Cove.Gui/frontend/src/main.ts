@@ -1,4 +1,5 @@
 import { restoredSummaryText, shouldShowRestoreToast } from "./restore-summary";
+import { HARNESS_UPDATE_CHECK_INTERVAL_MS, HARNESS_UPDATE_DISMISSED_KEY, filterToastableUpdates, parseDismissed, recordDismissal, type HarnessUpdate } from "./harness-updates";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { CanvasAddon } from "@xterm/addon-canvas";
@@ -6967,7 +6968,9 @@ function toastHost(): HTMLElement {
   return host;
 }
 
-function showInAppToast(title: string, body: string, onClick: () => void): void {
+interface ToastAction { label: string; primary?: boolean; onClick: () => void; }
+
+function showInAppToast(title: string, body: string, onClick: () => void, opts?: { actions?: ToastAction[]; timeoutMs?: number }): void {
   const host = toastHost();
   const toast = document.createElement("div");
   toast.className = "toast";
@@ -6989,10 +6992,56 @@ function showInAppToast(title: string, body: string, onClick: () => void): void 
     toast.classList.add("leaving");
     setTimeout(() => toast.remove(), 200);
   };
+  if (opts?.actions?.length) {
+    const row = document.createElement("div");
+    row.className = "toast-actions";
+    for (const action of opts.actions) {
+      const btn = document.createElement("button");
+      btn.className = action.primary ? "toast-btn primary" : "toast-btn";
+      btn.textContent = action.label;
+      btn.addEventListener("click", (e) => { e.stopPropagation(); action.onClick(); dismiss(); });
+      row.appendChild(btn);
+    }
+    toast.appendChild(row);
+  }
   toast.addEventListener("click", () => { onClick(); dismiss(); });
   host.appendChild(toast);
   requestAnimationFrame(() => toast.classList.add("in"));
-  setTimeout(dismiss, 6000);
+  setTimeout(dismiss, opts?.timeoutMs ?? 6000);
+}
+
+function presentHarnessUpdateToast(u: HarnessUpdate): void {
+  const actions: ToastAction[] = [];
+  if (u.updateCommand) {
+    const cmd = u.updateCommand;
+    actions.push({ label: "Update", primary: true, onClick: () => void launchHarnessShellTask(cmd, `Update ${u.displayName}`) });
+  }
+  actions.push({ label: "Dismiss", onClick: () => {
+    let raw: string | null = null;
+    try { raw = localStorage.getItem(HARNESS_UPDATE_DISMISSED_KEY); } catch { raw = null; }
+    const next = recordDismissal(parseDismissed(raw), u);
+    try { localStorage.setItem(HARNESS_UPDATE_DISMISSED_KEY, JSON.stringify(next)); } catch { void 0; }
+  } });
+  showInAppToast(`${u.displayName} update available`, `${u.installedVersion} \u2192 ${u.latestVersion}`, () => {}, { actions, timeoutMs: 15000 });
+}
+
+async function runHarnessUpdateCheck(): Promise<void> {
+  let updates: HarnessUpdate[];
+  try {
+    const res = await invoke<{ updates: HarnessUpdate[] }>("cove://commands/adapter.updates-check", {});
+    updates = res.updates ?? [];
+  } catch (e) {
+    console.warn("harness update check failed", e);
+    return;
+  }
+  let raw: string | null = null;
+  try { raw = localStorage.getItem(HARNESS_UPDATE_DISMISSED_KEY); } catch { raw = null; }
+  for (const u of filterToastableUpdates(updates, parseDismissed(raw))) presentHarnessUpdateToast(u);
+}
+
+function startHarnessUpdateWatch(): void {
+  void runHarnessUpdateCheck();
+  window.setInterval(() => void runHarnessUpdateCheck(), HARNESS_UPDATE_CHECK_INTERVAL_MS);
 }
 
 function setupNotifications(): void {
@@ -7205,6 +7254,7 @@ async function createNote(): Promise<void> {
     const updRes = await invoke<{ ok: boolean; value?: string }>("app.configGet", { key: "updates.checkOnLaunch" });
     if (updRes.ok && updRes.value === "true") { void runUpdateCheck().catch((e) => console.warn("boot update check failed", e)); }
   } catch { void 0; }
+  startHarnessUpdateWatch();
   await loadSidebarModel();
   applySidebarModel();
   setupMenuBar();

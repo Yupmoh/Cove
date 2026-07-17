@@ -90,7 +90,7 @@ public static class AdapterListCommands
         return recipes.TryGetValue(platform, out var recipe) && !string.IsNullOrWhiteSpace(recipe.Cmd) ? recipe.Cmd : null;
     }
 
-    private static string? KnownNpmPackage(string adapterName) => adapterName switch
+    public static string? KnownNpmPackage(string adapterName) => adapterName switch
     {
         "claude-code" => "@anthropic-ai/claude-code",
         "codex" => "@openai/codex",
@@ -125,7 +125,7 @@ public static class AdapterListCommands
         return segment.Length > 0 ? segment : null;
     }
 
-    private static string? ResolveRealPath(string? path)
+    public static string? ResolveRealPath(string? path)
     {
         if (string.IsNullOrEmpty(path))
             return path;

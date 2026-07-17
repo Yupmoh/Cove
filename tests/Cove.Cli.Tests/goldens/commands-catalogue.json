@@ -192,6 +192,10 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/adapter.updates-check",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/agent.close",
     "source": "core"
   },

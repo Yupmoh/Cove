@@ -328,6 +328,7 @@ public sealed class DaemonHost
         _recentSessions = new Cove.Engine.Sessions.RecentSessionStore(dataDir, logger);
         _lifecycle = new Cove.Engine.Lifecycle.AgentLifecycleController(logger);
         _manifestStore = new Cove.Adapters.AdapterManifestStore(System.IO.Path.Combine(dataDir, "adapters"), logger);
+        Cove.Engine.Adapters.AdapterUpdateCommands.Configure(Cove.Adapters.HarnessUpdateChecker.CreateNpm(logger));
         _sessionService = new Cove.Adapters.SessionService(new Cove.Adapters.MethodRunner(logger: logger), logger: logger);
         var registryCachePath = System.IO.Path.Combine(dataDir, "adapters", "registry.json");
         var repoRoot = System.IO.Path.GetFullPath(System.IO.Path.Combine(System.AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
