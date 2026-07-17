@@ -80,7 +80,7 @@ const RYN_MENUBAR_EVENTS_BROKEN = false;
 import { initHud, toggleHud, recordFrame, hudMetrics, readJsHeapBytes, hudLines, type HudState, type JsHeapProbe } from "./perf-hud";
 import { parseSnapshotExport, snapshotRows, summarizeSnapshots, formatBytes as formatSnapshotBytes, type DiagnosticsSnapshot } from "./diagnostics-snapshot";
 import { initialPerfBundlesState, applyBundleList, beginCreate, finishCreate, surfaceError, requestDelete, cancelDelete, bundleRows, PERF_BUNDLES_EMPTY_TEXT, type PerfBundlesState, type PerfBundleListResult, type PerfBundleDto } from "./perf-bundles";
-import { setupDictation, dictationToggleEnabled, DICTATION_SPACE_KEY, DICTATION_LIVE_TYPING_KEY } from "./dictation";
+import { setupDictation, dictationToggleEnabled, modelPollOutcome, DICTATION_SPACE_KEY, DICTATION_LIVE_TYPING_KEY } from "./dictation";
 
 let brandIndex = parseBrandIndex(localStorage.getItem("cove.brandLogo"));
 localStorage.setItem("cove.brandLogo", String(nextBrandIndex(brandIndex)));
@@ -4998,6 +4998,8 @@ function dictationPrefRow(key: string, title: string, hint: string): HTMLElement
   return row;
 }
 
+let dictationModelError: string | null = null;
+
 function buildDictationModelControls(container: HTMLElement): void {
   const status = document.createElement("div");
   status.style.cssText = "display:flex;gap:10px;align-items:center;margin-top:10px;";
@@ -5028,18 +5030,33 @@ function buildDictationModelControls(container: HTMLElement): void {
   btn.addEventListener("click", () => {
     btn.disabled = true;
     btn.textContent = "Downloading…";
-    void window.__ryn.invoke("app.dictationEnsureModel", {}).catch((e) => console.warn("dictation model download failed", e));
+    dictationModelError = null;
+    const fail = (msg: string): void => {
+      if (!status.isConnected) return;
+      text.textContent = `Speech model: download failed — ${msg}`;
+      btn.disabled = false;
+      btn.textContent = "Retry";
+      btn.style.display = "";
+    };
+    void window.__ryn.invoke("app.dictationEnsureModel", {}).catch((e) => {
+      console.warn("dictation model download failed", e);
+      fail(String(e));
+    });
     const poll = window.setInterval(() => {
       void dictationStatus().then((s) => {
         if (!status.isConnected) {
           clearInterval(poll);
           return;
         }
-        if (s.modelReady) {
+        const outcome = modelPollOutcome(s.modelReady, dictationModelError);
+        if (outcome.kind === "ready") {
           clearInterval(poll);
           btn.disabled = false;
           btn.textContent = "Download now";
           void refresh();
+        } else if (outcome.kind === "failed") {
+          clearInterval(poll);
+          fail(outcome.error);
         }
       });
     }, 2000);
@@ -6932,6 +6949,13 @@ async function createNote(): Promise<void> {
   setupDictation({
     invoke: (cmd, args) => window.__ryn.invoke(cmd, args ?? {}),
     getFocusedNookId: () => focusedNookId,
+  });
+  window.__ryn.on("engine.event", (data: unknown) => {
+    const evt = data as { channel?: string; payload?: unknown };
+    if (evt?.channel !== "dictation.model") return;
+    const payload = evt.payload as { ready?: boolean; error?: string } | undefined;
+    if (payload?.error) dictationModelError = payload.error;
+    else if (payload?.ready) dictationModelError = null;
   });
   void setupBackdrop();
   void loadWings();

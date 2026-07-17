@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifyDictationTarget, classifySpaceTarget, createNookTypist, createSpaceHold, dictationToggleEnabled, DICTATION_LIVE_TYPING_KEY, DICTATION_SPACE_KEY, encodeNookText, partialPreview, spaceHoldTransition, SpaceHoldMs, typedRevision, type FocusDescriptor, type SpaceHoldEvent, type SpaceHoldState, type SpaceHoldHooks, type SpaceKeyEventLike, type SpaceTarget } from "./dictation";
+import { classifyDictationTarget, classifySpaceTarget, createNookTypist, createSpaceHold, dictationToggleEnabled, DICTATION_LIVE_TYPING_KEY, DICTATION_SPACE_KEY, encodeNookText, modelPollOutcome, partialPreview, spaceHoldTransition, SpaceHoldMs, typedRevision, type FocusDescriptor, type SpaceHoldEvent, type SpaceHoldState, type SpaceHoldHooks, type SpaceKeyEventLike, type SpaceTarget } from "./dictation";
 
 const focus = (partial: Partial<FocusDescriptor>): FocusDescriptor => ({
   tagName: "DIV",
@@ -358,5 +358,21 @@ describe("dictation preferences", () => {
   it("uses stable storage keys", () => {
     expect(DICTATION_SPACE_KEY).toBe("cove:dictation:space-hold");
     expect(DICTATION_LIVE_TYPING_KEY).toBe("cove:dictation:live-typing");
+  });
+});
+
+describe("modelPollOutcome", () => {
+  it("stays pending while downloading with no error", () => {
+    expect(modelPollOutcome(false, null)).toEqual({ kind: "pending" });
+    expect(modelPollOutcome(undefined, null)).toEqual({ kind: "pending" });
+  });
+
+  it("fails with the reported error so the poll terminates and retry appears", () => {
+    expect(modelPollOutcome(false, "checksum mismatch")).toEqual({ kind: "failed", error: "checksum mismatch" });
+  });
+
+  it("a ready model trumps a stale error", () => {
+    expect(modelPollOutcome(true, "old failure")).toEqual({ kind: "ready" });
+    expect(modelPollOutcome(true, null)).toEqual({ kind: "ready" });
   });
 });

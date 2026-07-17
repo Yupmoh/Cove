@@ -227,6 +227,14 @@ export function dictationToggleEnabled(stored: string | null): boolean {
   return stored !== "false";
 }
 
+export type ModelPollOutcome = { kind: "pending" } | { kind: "ready" } | { kind: "failed"; error: string };
+
+export function modelPollOutcome(modelReady: boolean | undefined, error: string | null): ModelPollOutcome {
+  if (modelReady) return { kind: "ready" };
+  if (error) return { kind: "failed", error };
+  return { kind: "pending" };
+}
+
 export interface NookTypist {
   revise(next: string): Promise<void>;
 }
