@@ -39,6 +39,38 @@ describe("resolveLauncherProjectDir", () => {
       [{ id: "in-spades", projectDir: "/work/InSpades" }],
     )).toBe("/work/InSpades");
   });
+
+  it("falls back to defaultDir when no layout or bay dir exists", () => {
+    expect(resolveLauncherProjectDir(
+      { id: "empty" },
+      [{ id: "empty" }],
+      "/home/user",
+    )).toBe("/home/user");
+  });
+
+  it("prefers an explicit bay dir over defaultDir", () => {
+    expect(resolveLauncherProjectDir(
+      { id: "in-spades" },
+      [{ id: "in-spades", projectDir: "/work/InSpades" }],
+      "/home/user",
+    )).toBe("/work/InSpades");
+  });
+
+  it("prefers the active layout project over defaultDir", () => {
+    expect(resolveLauncherProjectDir(
+      { id: "in-spades", projectDir: "/work/InSpades" },
+      [],
+      "/home/user",
+    )).toBe("/work/InSpades");
+  });
+
+  it("returns empty string when no dir and no defaultDir", () => {
+    expect(resolveLauncherProjectDir(null, [])).toBe("");
+  });
+
+  it("uses defaultDir when layout is null", () => {
+    expect(resolveLauncherProjectDir(null, [], "/home/user")).toBe("/home/user");
+  });
 });
 
 describe("resolveLauncherYolo", () => {

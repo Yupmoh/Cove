@@ -29,7 +29,7 @@ import { renderSearchNook } from "./search-nook";
 import { browserWebviewRegistry, closeBrowserWebview, reconcileBrowserBounds, renderBrowserNook } from "./browser-nook";
 import { buildAutomationJs, type AutomationExecEvent } from "./automation-snapshot";
 import { renderDiffViewerNook } from "./diff-viewer-nook";
-import { renderMarkdownNook } from "./markdown-nook";
+import { renderMarkdownNook, applyMarkdownSettings, resolveMarkdownSettings } from "./markdown-nook";
 import { renderPdfNook } from "./pdf-nook";
 import { renderVideoNook } from "./video-nook";
 import { partitionPinned, reorderShore, glyphForNookType, visibleShoreIds, buildWingModel, filterShoresByWing } from "./shore-tabs";
@@ -232,9 +232,9 @@ interface TermSettings {
   fontFamily: string;
   fontSize: number;
   lineHeight: number;
+  letterSpacing: number;
   cursorStyle: "block" | "bar" | "underline";
   cursorBlink: boolean;
-  ligatures: boolean;
   scrollback: number;
   padding: number;
   backgroundOpacity: number;
@@ -243,9 +243,9 @@ const defaultSettings: TermSettings = {
   fontFamily: "",
   fontSize: 13,
   lineHeight: 1.35,
+  letterSpacing: 0,
   cursorStyle: "block",
   cursorBlink: false,
-  ligatures: false,
   scrollback: 5000,
   padding: 8,
   backgroundOpacity: 1,
@@ -264,36 +264,16 @@ async function loadSettings(): Promise<TermSettings> {
   const fontSize = clampInt(await get("terminal.fontSize"), 9, 24, defaultSettings.fontSize);
   const lhRaw = Number(await get("terminal.lineHeight"));
   const lineHeight = clampFloat(lhRaw, 1, 2, defaultSettings.lineHeight);
+  const letterSpacing = clampFloat(Number(await get("terminal.letterSpacing")), -5, 20, defaultSettings.letterSpacing);
   const scrollback = clampInt(await get("terminal.scrollbackLines"), 100, 100000, defaultSettings.scrollback);
   const padding = clampInt(await get("terminal.padding"), 0, 40, defaultSettings.padding);
   const backgroundOpacity = clampFloat(await get("terminal.backgroundOpacity"), 0.2, 1, defaultSettings.backgroundOpacity);
   const cs = await get("terminal.cursorStyle");
   const cursorStyle: TermSettings["cursorStyle"] = cs === "bar" || cs === "underline" ? cs : "block";
   const cursorBlink = (await get("terminal.cursorBlink")) === "true";
-  const ligatures = (await get("terminal.ligatures")) === "true";
-  return { fontFamily, fontSize, lineHeight, cursorStyle, cursorBlink, ligatures, scrollback, padding, backgroundOpacity };
+  return { fontFamily, fontSize, lineHeight, letterSpacing, cursorStyle, cursorBlink, scrollback, padding, backgroundOpacity };
 }
 let settings: TermSettings = { ...defaultSettings };
-interface KeybindingOverride { chord: string; action: string; }
-function loadKeybindings(): Record<string, string> {
-  const out: Record<string, string> = {};
-  try {
-    const raw = localStorage.getItem("cove.keybindings");
-    if (!raw) return out;
-    const list = JSON.parse(raw) as KeybindingOverride[];
-    for (const o of list) out[o.chord] = o.action;
-  } catch { void 0; }
-  return out;
-}
-function normalizeChord(e: KeyboardEvent): string {
-  const parts: string[] = [];
-  if (e.ctrlKey) parts.push("ctrl");
-  if (e.altKey) parts.push("alt");
-  if (e.shiftKey) parts.push("shift");
-  if (e.metaKey) parts.push("cmd");
-  parts.push(e.key.toLowerCase());
-  return parts.join("+");
-}
 
 const gridEl = document.getElementById("grid")!;
 const paletteEl = document.getElementById("palette")!;
@@ -359,6 +339,7 @@ function applySettings() {
     if (settings.fontFamily) pv.term.options.fontFamily = settings.fontFamily;
     pv.term.options.fontSize = settings.fontSize;
     pv.term.options.lineHeight = settings.lineHeight;
+    pv.term.options.letterSpacing = settings.letterSpacing;
     pv.term.options.cursorStyle = settings.cursorStyle;
     pv.term.options.cursorBlink = settings.cursorBlink;
     pv.term.options.scrollback = settings.scrollback;
@@ -374,9 +355,9 @@ function persistSettings() {
     ["terminal.fontFamily", settings.fontFamily],
     ["terminal.fontSize", String(settings.fontSize)],
     ["terminal.lineHeight", String(settings.lineHeight)],
+    ["terminal.letterSpacing", String(settings.letterSpacing)],
     ["terminal.cursorStyle", settings.cursorStyle],
     ["terminal.cursorBlink", String(settings.cursorBlink)],
-    ["terminal.ligatures", String(settings.ligatures)],
     ["terminal.scrollbackLines", String(settings.scrollback)],
     ["terminal.padding", String(settings.padding)],
     ["terminal.backgroundOpacity", String(settings.backgroundOpacity)],
@@ -547,7 +528,7 @@ function attachWs(nook: NookView): void {
 }
 
 function makeNook(nookId: string, since: number): NookView {
-  const term = new Terminal({ allowTransparency: true, scrollback: settings.scrollback, convertEol: false, fontFamily: settings.fontFamily || "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: settings.fontSize, lineHeight: settings.lineHeight, cursorStyle: settings.cursorStyle, cursorBlink: settings.cursorBlink, theme: currentTermTheme() });
+  const term = new Terminal({ allowTransparency: true, scrollback: settings.scrollback, convertEol: false, fontFamily: settings.fontFamily || "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: settings.fontSize, lineHeight: settings.lineHeight, letterSpacing: settings.letterSpacing, cursorStyle: settings.cursorStyle, cursorBlink: settings.cursorBlink, theme: currentTermTheme() });
   const fitAddon = new FitAddon();
   term.loadAddon(fitAddon);
   const searchAddon = new SearchAddon();
@@ -625,14 +606,10 @@ function makeNook(nookId: string, since: number): NookView {
   const pv: NookView = { nookId, term, fit: fitAddon, serialize: serializeAddon, ws: null, el, consumed: since, expectedOffset: since, replayUntilOffset: since, lastAck: since, title: "", customTitle: "", headerTitleEl: titleSpan, search: searchAddon, replaying: true, resetOnReplay, restoringCheckpoint: false, keyboard: createKeyboardProtocolTracker(), lastSent: null, handlersBound: false, resizeObserver: null, fitFrame: null, reconnectTimer: null, checkpointTimer: null, exited: false };
 
   el.addEventListener("mousedown", () => { acknowledgeAgentAttention(nookId); focusNook(nookId); });
-  const overrides = loadKeybindings();
   term.attachCustomKeyEventHandler((e) => {
     if (e.shiftKey && e.key === "Enter" && e.type !== "keydown") return false;
     if (e.type !== "keydown") return true;
     if (e.key === "Tab") { e.preventDefault(); return true; }
-    const chord = normalizeChord(e);
-    const action = overrides[chord];
-    if (action && action.startsWith("send-text:")) { void enqueueNookWrite(nookId, toBase64Utf8(action.slice("send-text:".length)), (id, dataBase64) => invoke("app.nookWrite", { nookId: id, dataBase64 })); return false; }
     if (e.shiftKey && e.key === "Enter") { void enqueueNookWrite(nookId, toBase64Utf8(shiftEnterSequence(pv.keyboard.encoding())), (id, dataBase64) => invoke("app.nookWrite", { nookId: id, dataBase64 })); return false; }
     if (!e.metaKey || e.altKey || e.ctrlKey) return true;
     const k = e.key.toLowerCase();
@@ -1193,7 +1170,7 @@ function renderImageNook(nookId: string): HTMLElement {
   return el;
 }
 function activeProjectDir(): string {
-  return resolveLauncherProjectDir(layout, bayBoxItems);
+  return resolveLauncherProjectDir(layout, bayBoxItems, baysDefaultDir);
 }
 function renderGitNookWrapper(nookId: string): HTMLElement {
   const placeholder = document.createElement("div");
@@ -1782,6 +1759,7 @@ const acknowledgedDoneNooks = new Set<string>();
 const needsInputNooks = new Set<string>();
 let agentPollTimer: ReturnType<typeof setInterval> | null = null;
 let bayBoxItems: BayBoxInput[] = [];
+let baysDefaultDir = "";
 
 async function loadBayBoxes(): Promise<void> {
   try {
@@ -4382,6 +4360,18 @@ async function saveSetting(key: string, input: HTMLInputElement | HTMLSelectElem
     await invoke("cove://commands/config.set", { key, value });
     if (key.startsWith("terminal.")) { settings = await loadSettings(); applySettings(); }
     if (key.startsWith("appearance.")) { await applyAppearance(key); }
+    if (key.startsWith("markdown_editor.")) {
+      const mdKeys = [
+        "markdown_editor.defaultFont", "markdown_editor.fontSize", "markdown_editor.textAlign",
+        "markdown_editor.bookView", "markdown_editor.bookViewWidth", "markdown_editor.bookViewMargin",
+        "markdown_editor.defaultViewMode",
+      ];
+      const raw: Record<string, string> = {};
+      for (const k of mdKeys) {
+        try { const r = await invoke<{ value: string } | null>("cove://commands/config.get", { key: k }); if (r?.value) raw[k] = r.value; } catch { void 0; }
+      }
+      void applyMarkdownSettings(resolveMarkdownSettings(raw));
+    }
   } catch { void 0; }
 }
 
@@ -5120,7 +5110,7 @@ async function completeOnboarding(): Promise<void> {
     await invoke("app.configSet", { key: ONBOARDING_COMPLETED_KEY, value: "true" });
     if (onboardingState.defaultBayDir) { await invoke("app.configSet", { key: "bays.defaultDir", value: onboardingState.defaultBayDir }); }
     await invoke("app.configSet", { key: BACKDROP_PREF_KEY, value: onboardingState.backdrop });
-    if (onboardingState.theme) { await invoke("app.configSet", { key: "appearance.theme", value: onboardingState.theme }); }
+    if (onboardingState.theme) { await invoke("app.configSet", { key: "theme", value: onboardingState.theme }); }
   } catch (e) { console.warn("onboarding persist failed", e); }
 }
 
@@ -6209,10 +6199,9 @@ function renderWscIconGrid(): void {
 function closeBayDialog(): void {
   wsCreateEl.classList.remove("open");
 }
-
 function newBay(): void {
   wscNameEl.value = "";
-  wscPathEl.value = "";
+  wscPathEl.value = baysDefaultDir;
   wscErrorEl.textContent = "";
   wscSelectedIcon = null;
   renderWscIconGrid();
@@ -6937,6 +6926,14 @@ async function createNote(): Promise<void> {
   settings = await loadSettings();
   applySettings();
   void applyAppearance(null);
+  try {
+    const bayRes = await invoke<{ ok: boolean; value?: string }>("app.configGet", { key: "bays.defaultDir" });
+    baysDefaultDir = bayRes.ok ? (bayRes.value ?? "") : "";
+  } catch { baysDefaultDir = ""; }
+  try {
+    const updRes = await invoke<{ ok: boolean; value?: string }>("app.configGet", { key: "updates.checkOnLaunch" });
+    if (updRes.ok && updRes.value === "true") { void runUpdateCheck().catch((e) => console.warn("boot update check failed", e)); }
+  } catch { void 0; }
   await loadSidebarModel();
   applySidebarModel();
   setupMenuBar();

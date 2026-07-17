@@ -11,6 +11,79 @@ interface MarkdownState {
   scroll: number;
 }
 
+export interface MarkdownSettings {
+  defaultFont: string;
+  fontSize: number;
+  textAlign: string;
+  bookView: boolean;
+  bookViewWidth: string;
+  bookViewMargin: string;
+  defaultViewMode: string;
+}
+
+const DEFAULT_MARKDOWN_SETTINGS: MarkdownSettings = {
+  defaultFont: "",
+  fontSize: 14,
+  textAlign: "left",
+  bookView: false,
+  bookViewWidth: "720px",
+  bookViewMargin: "auto",
+  defaultViewMode: MarkdownViewMode.Rte,
+};
+
+export function resolveMarkdownSettings(config: Record<string, string>): MarkdownSettings {
+  const num = (v: string | undefined, lo: number, hi: number, dflt: number): number => {
+    const n = Number(v);
+    if (!Number.isFinite(n) || n < lo) return dflt;
+    return Math.trunc(Math.min(hi, n));
+  };
+  const bool = (v: string | undefined): boolean => (v ?? "").trim().toLowerCase() === "true";
+  const text = (v: string | undefined, dflt: string): string => {
+    const t = (v ?? "").trim();
+    return t.length > 0 ? t : dflt;
+  };
+  const mode = (v: string | undefined): string =>
+    (v ?? "").trim().toLowerCase() === MarkdownViewMode.Source ? MarkdownViewMode.Source : MarkdownViewMode.Rte;
+  return {
+    defaultFont: text(config["markdown_editor.defaultFont"], DEFAULT_MARKDOWN_SETTINGS.defaultFont),
+    fontSize: num(config["markdown_editor.fontSize"], 1, 28, DEFAULT_MARKDOWN_SETTINGS.fontSize),
+    textAlign: text(config["markdown_editor.textAlign"], DEFAULT_MARKDOWN_SETTINGS.textAlign),
+    bookView: bool(config["markdown_editor.bookView"]),
+    bookViewWidth: text(config["markdown_editor.bookViewWidth"], DEFAULT_MARKDOWN_SETTINGS.bookViewWidth),
+    bookViewMargin: text(config["markdown_editor.bookViewMargin"], DEFAULT_MARKDOWN_SETTINGS.bookViewMargin),
+    defaultViewMode: mode(config["markdown_editor.defaultViewMode"]),
+  };
+}
+
+export function markdownEditorCss(s: MarkdownSettings): string {
+  const fontFamily = s.defaultFont ? s.defaultFont : "ui-sans-serif,system-ui,sans-serif";
+  const parts: string[] = [
+    `font-family:${fontFamily}`,
+    `font-size:${s.fontSize}px`,
+    `line-height:1.6`,
+    `text-align:${s.textAlign}`,
+  ];
+  if (s.bookView) {
+    parts.push(`max-width:${s.bookViewWidth}`);
+    parts.push(`margin:${s.bookViewMargin} auto`);
+  }
+  return parts.join(";");
+}
+
+export function resolveInitialViewMode(value: string | null): string {
+  return (value ?? "").trim().toLowerCase() === MarkdownViewMode.Source ? MarkdownViewMode.Source : MarkdownViewMode.Rte;
+}
+
+
+interface MarkdownNookHandle {
+  reapply: (settings: MarkdownSettings) => void;
+}
+
+const markdownNookRegistry = new Map<string, MarkdownNookHandle>();
+
+export async function applyMarkdownSettings(settings: MarkdownSettings): Promise<void> {
+  for (const handle of markdownNookRegistry.values()) handle.reapply(settings);
+}
 export async function renderMarkdownNook(nookId: string, filePath: string): Promise<HTMLElement> {
   const el = document.createElement("div");
   el.className = "markdown-nook";
@@ -73,6 +146,33 @@ export async function renderMarkdownNook(nookId: string, filePath: string): Prom
   let monaco: typeof Monaco | null = null;
   let sourceEditor: Monaco.editor.IStandaloneCodeEditor | null = null;
   let sourceModel: Monaco.editor.ITextModel | null = null;
+
+  let mdSettings: MarkdownSettings = { ...DEFAULT_MARKDOWN_SETTINGS };
+  try {
+    const keys = [
+      "markdown_editor.defaultFont", "markdown_editor.fontSize", "markdown_editor.textAlign",
+      "markdown_editor.bookView", "markdown_editor.bookViewWidth", "markdown_editor.bookViewMargin",
+      "markdown_editor.defaultViewMode",
+    ];
+    const raw: Record<string, string> = {};
+    for (const k of keys) {
+      try {
+        const r = await invoke<{ value: string } | null>("cove://commands/config.get", { key: k });
+        if (r?.value) raw[k] = r.value;
+      } catch { void 0; }
+    }
+    mdSettings = resolveMarkdownSettings(raw);
+  } catch { void 0; }
+
+  const applyEditorStyle = () => {
+    rteContainer.style.cssText = `flex:1;min-height:0;overflow:auto;padding:12px 24px;${markdownEditorCss(mdSettings)}`;
+    rteContainer.style.outline = "none";
+    if (sourceEditor) sourceEditor.updateOptions({ fontFamily: mdSettings.defaultFont || "ui-monospace, monospace", fontSize: mdSettings.fontSize });
+  };
+  applyEditorStyle();
+  markdownNookRegistry.set(nookId, {
+    reapply: (next: MarkdownSettings) => { mdSettings = next; applyEditorStyle(); },
+  });
 
   try {
     const result = await invoke<{ content: string }>("cove://commands/editor.open", { filePath, nookId });
@@ -274,9 +374,13 @@ export async function renderMarkdownNook(nookId: string, filePath: string): Prom
   try {
     const state = await invoke<MarkdownState | null>("cove://commands/editor.get-state", { nookId });
     if (state?.viewMode === MarkdownViewMode.Source) void switchToSource();
+    else if (!state?.viewMode && mdSettings.defaultViewMode === MarkdownViewMode.Source) void switchToSource();
     if (state?.scroll) rteContainer.scrollTop = state.scroll;
   } catch { void 0; }
 
+  const cleanup = () => { markdownNookRegistry.delete(nookId); };
+  const removalObserver = new MutationObserver(() => { if (!el.isConnected) { cleanup(); removalObserver.disconnect(); } });
+  removalObserver.observe(el.parentElement ?? document.body, { childList: true, subtree: true });
   return el;
 }
 

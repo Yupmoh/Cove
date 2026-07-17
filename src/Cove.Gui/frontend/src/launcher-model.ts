@@ -5,9 +5,12 @@ export function detectedHarnessTiles<T extends { disabled: boolean }>(tiles: T[]
 export function resolveLauncherProjectDir(
   layout: { id: string; projectDir?: string } | null,
   bays: { id: string; projectDir?: string }[],
+  defaultDir = "",
 ): string {
   if (layout?.projectDir) return layout.projectDir;
-  return bays.find((bay) => bay.id === (layout?.id ?? ""))?.projectDir ?? "";
+  const bayDir = bays.find((bay) => bay.id === (layout?.id ?? ""))?.projectDir;
+  if (bayDir) return bayDir;
+  return defaultDir;
 }
 
 export const LAUNCHER_ACCENTS = ["#fab387", "#94e2d5", "#a6e3a1", "#89b4fa", "#f5c2e7"];
