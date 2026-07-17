@@ -3,6 +3,7 @@ export function orderSettingsTabs(schemaTabs: string[]): string[] {
     ? (schemaTabs.includes("keyboard") ? [...schemaTabs] : ["theme", "keyboard", ...schemaTabs])
     : (schemaTabs.includes("keyboard") ? ["theme", ...schemaTabs] : ["theme", "keyboard", ...schemaTabs]);
   if (tabs.length === 0) return tabs;
+  if (!tabs.includes("dictation")) tabs.push("dictation");
   if (!tabs.includes("tools")) tabs.push("tools");
   return tabs;
 }

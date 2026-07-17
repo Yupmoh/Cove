@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifyDictationTarget, classifySpaceTarget, createNookTypist, createSpaceHold, encodeNookText, partialPreview, spaceHoldTransition, SpaceHoldMs, typedRevision, type FocusDescriptor, type SpaceHoldEvent, type SpaceHoldState, type SpaceHoldHooks, type SpaceKeyEventLike, type SpaceTarget } from "./dictation";
+import { classifyDictationTarget, classifySpaceTarget, createNookTypist, createSpaceHold, dictationToggleEnabled, DICTATION_LIVE_TYPING_KEY, DICTATION_SPACE_KEY, encodeNookText, partialPreview, spaceHoldTransition, SpaceHoldMs, typedRevision, type FocusDescriptor, type SpaceHoldEvent, type SpaceHoldState, type SpaceHoldHooks, type SpaceKeyEventLike, type SpaceTarget } from "./dictation";
 
 const focus = (partial: Partial<FocusDescriptor>): FocusDescriptor => ({
   tagName: "DIV",
@@ -340,5 +340,23 @@ describe("createNookTypist", () => {
     await a.t.revise("hello world");
     expect(a.writes).toEqual(["hello", " world"]);
     expect(b.writes).toEqual(["hi"]);
+  });
+});
+
+describe("dictation preferences", () => {
+  it("defaults to enabled when nothing is stored", () => {
+    expect(dictationToggleEnabled(null)).toBe(true);
+    expect(dictationToggleEnabled("")).toBe(true);
+    expect(dictationToggleEnabled("true")).toBe(true);
+  });
+
+  it("disables only on an explicit false", () => {
+    expect(dictationToggleEnabled("false")).toBe(false);
+    expect(dictationToggleEnabled("garbage")).toBe(true);
+  });
+
+  it("uses stable storage keys", () => {
+    expect(DICTATION_SPACE_KEY).toBe("cove:dictation:space-hold");
+    expect(DICTATION_LIVE_TYPING_KEY).toBe("cove:dictation:live-typing");
   });
 });

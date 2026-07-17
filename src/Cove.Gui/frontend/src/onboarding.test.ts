@@ -21,12 +21,13 @@ import {
 } from "./onboarding";
 
 describe("ONBOARDING_STEPS", () => {
-  it("has the 4 first-run wizard steps in spec order", () => {
-    expect(ONBOARDING_STEPS.length).toBe(4);
+  it("has the 5 first-run wizard steps in spec order", () => {
+    expect(ONBOARDING_STEPS.length).toBe(5);
     expect(ONBOARDING_STEPS[0].id).toBe("harness");
     expect(ONBOARDING_STEPS[1].id).toBe("permissions");
     expect(ONBOARDING_STEPS[2].id).toBe("appearance");
     expect(ONBOARDING_STEPS[3].id).toBe("sound");
+    expect(ONBOARDING_STEPS[4].id).toBe("dictation");
   });
 });
 
@@ -117,8 +118,8 @@ describe("isLastStep / isFirstStep", () => {
 });
 
 describe("progressPercent", () => {
-  it("returns 25 on first step", () => {
-    expect(progressPercent(INITIAL_ONBOARDING_STATE)).toBe(25);
+  it("returns 20 on first step", () => {
+    expect(progressPercent(INITIAL_ONBOARDING_STATE)).toBe(20);
   });
   it("returns 100 on last step", () => {
     const s = { ...INITIAL_ONBOARDING_STATE, currentStep: ONBOARDING_STEPS.length - 1 };

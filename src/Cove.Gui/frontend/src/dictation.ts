@@ -220,6 +220,13 @@ export function typedRevision(prev: string, next: string): { erase: number; appe
   return { erase: a.length - common, append: b.slice(common).join("") };
 }
 
+export const DICTATION_SPACE_KEY = "cove:dictation:space-hold";
+export const DICTATION_LIVE_TYPING_KEY = "cove:dictation:live-typing";
+
+export function dictationToggleEnabled(stored: string | null): boolean {
+  return stored !== "false";
+}
+
 export interface NookTypist {
   revise(next: string): Promise<void>;
 }
@@ -282,6 +289,7 @@ export function setupDictation(deps: DictationDeps): void {
   let writeChain: Promise<void> = Promise.resolve();
 
   const captureLiveTarget = (): LiveTarget => {
+    if (!dictationToggleEnabled(localStorage.getItem(DICTATION_LIVE_TYPING_KEY))) return null;
     const el = document.activeElement;
     const nookId = deps.getFocusedNookId();
     const route = classifyDictationTarget(describeFocus(el), nookId);
@@ -438,7 +446,9 @@ export function setupDictation(deps: DictationDeps): void {
   };
 
   const spaceHold = createSpaceHold({
-    target: () => classifySpaceTarget(describeFocus(document.activeElement)),
+    target: () => dictationToggleEnabled(localStorage.getItem(DICTATION_SPACE_KEY))
+      ? classifySpaceTarget(describeFocus(document.activeElement))
+      : "other",
     captureFocus: () => { spaceFocus = document.activeElement; },
     cancelPending: () => { spaceFocus = null; },
     flush: flushSpace,

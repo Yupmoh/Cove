@@ -80,7 +80,7 @@ const RYN_MENUBAR_EVENTS_BROKEN = false;
 import { initHud, toggleHud, recordFrame, hudMetrics, readJsHeapBytes, hudLines, type HudState, type JsHeapProbe } from "./perf-hud";
 import { parseSnapshotExport, snapshotRows, summarizeSnapshots, formatBytes as formatSnapshotBytes, type DiagnosticsSnapshot } from "./diagnostics-snapshot";
 import { initialPerfBundlesState, applyBundleList, beginCreate, finishCreate, surfaceError, requestDelete, cancelDelete, bundleRows, PERF_BUNDLES_EMPTY_TEXT, type PerfBundlesState, type PerfBundleListResult, type PerfBundleDto } from "./perf-bundles";
-import { setupDictation } from "./dictation";
+import { setupDictation, dictationToggleEnabled, DICTATION_SPACE_KEY, DICTATION_LIVE_TYPING_KEY } from "./dictation";
 
 let brandIndex = parseBrandIndex(localStorage.getItem("cove.brandLogo"));
 localStorage.setItem("cove.brandLogo", String(nextBrandIndex(brandIndex)));
@@ -3433,6 +3433,10 @@ function renderSettings(): void {
     void renderToolsTab(setBodyEl);
     return;
   }
+  if (activeSettingsTab === "dictation") {
+    renderDictationTab(setBodyEl);
+    return;
+  }
   const entries = configSchema.filter((e) => e.tab === activeSettingsTab && (e.control === "section" || isRealSetting(e)));
   for (const entry of entries) {
     if (entry.control === "section") {
@@ -4754,6 +4758,7 @@ function renderOnboarding(): void {
   if (step.id === "permissions") { void renderPermissionsStep(body); }
   if (step.id === "appearance") { renderAppearanceStep(body); }
   if (step.id === "sound") { renderSoundStep(body); }
+  if (step.id === "dictation") { renderDictationStep(body); }
 
   const prevBtn = onboardingEl.querySelector(".ob-prev") as HTMLButtonElement;
   const nextBtn = onboardingEl.querySelector(".ob-next") as HTMLButtonElement;
@@ -4959,6 +4964,114 @@ function renderSoundStep(body: HTMLElement): void {
   toggle.appendChild(cb);
   toggle.appendChild(label);
   body.appendChild(toggle);
+}
+
+interface DictationStatusResult { state?: string; modelReady?: boolean }
+
+async function dictationStatus(): Promise<DictationStatusResult> {
+  try {
+    return JSON.parse(String(await window.__ryn.invoke("app.dictationStatus", {}))) as DictationStatusResult;
+  } catch (e) {
+    console.warn("dictation status failed", e);
+    return {};
+  }
+}
+
+function dictationPrefRow(key: string, title: string, hint: string): HTMLElement {
+  const row = document.createElement("div");
+  row.className = "set-row";
+  const label = document.createElement("label");
+  label.style.cssText = "display:flex;flex-direction:column;gap:2px;";
+  const name = document.createElement("span");
+  name.textContent = title;
+  const sub = document.createElement("span");
+  sub.style.cssText = "font-size:11px;color:var(--muted);";
+  sub.textContent = hint;
+  label.appendChild(name);
+  label.appendChild(sub);
+  const cb = document.createElement("input");
+  cb.type = "checkbox";
+  cb.checked = dictationToggleEnabled(localStorage.getItem(key));
+  cb.addEventListener("change", () => localStorage.setItem(key, cb.checked ? "true" : "false"));
+  row.appendChild(label);
+  row.appendChild(cb);
+  return row;
+}
+
+function buildDictationModelControls(container: HTMLElement): void {
+  const status = document.createElement("div");
+  status.style.cssText = "display:flex;gap:10px;align-items:center;margin-top:10px;";
+  const text = document.createElement("span");
+  text.style.cssText = "font-size:12px;color:var(--muted);";
+  text.textContent = "Speech model: checking…";
+  const btn = document.createElement("button");
+  btn.className = "diag-btn";
+  btn.style.cssText = "margin:0;";
+  btn.textContent = "Download now";
+  btn.style.display = "none";
+  status.appendChild(text);
+  status.appendChild(btn);
+  container.appendChild(status);
+
+  const refresh = async (): Promise<void> => {
+    const s = await dictationStatus();
+    if (!status.isConnected) return;
+    if (s.modelReady) {
+      text.textContent = "Speech model: Parakeet TDT 0.6B v3 — downloaded";
+      btn.style.display = "none";
+    } else {
+      text.textContent = "Speech model: Parakeet TDT 0.6B v3 (487 MB) — not downloaded";
+      btn.style.display = "";
+    }
+  };
+  void refresh();
+  btn.addEventListener("click", () => {
+    btn.disabled = true;
+    btn.textContent = "Downloading…";
+    void window.__ryn.invoke("app.dictationEnsureModel", {}).catch((e) => console.warn("dictation model download failed", e));
+    const poll = window.setInterval(() => {
+      void dictationStatus().then((s) => {
+        if (!status.isConnected) {
+          clearInterval(poll);
+          return;
+        }
+        if (s.modelReady) {
+          clearInterval(poll);
+          btn.disabled = false;
+          btn.textContent = "Download now";
+          void refresh();
+        }
+      });
+    }, 2000);
+  });
+}
+
+function renderDictationTab(container: HTMLElement): void {
+  container.innerHTML = "";
+  const info = document.createElement("p");
+  info.style.cssText = "font-size:12px;color:var(--muted);margin:12px 0;line-height:1.5;";
+  info.textContent = "Hold F9 — or hold Space in a terminal or text field — to dictate. Speech is recognized on this machine with NVIDIA Parakeet; audio never leaves it. Words stream in live and settle when you release.";
+  container.appendChild(info);
+  container.appendChild(dictationPrefRow(DICTATION_SPACE_KEY, "Hold Space to dictate", "Long-press Space (~300 ms) starts dictation; a quick tap still types a space."));
+  container.appendChild(dictationPrefRow(DICTATION_LIVE_TYPING_KEY, "Type live preview into the focused target", "Off shows the running transcript in the status pill only; text lands on release."));
+  buildDictationModelControls(container);
+}
+
+function renderDictationStep(body: HTMLElement): void {
+  const toggle = document.createElement("label");
+  toggle.className = "ob-telemetry-toggle";
+  toggle.style.cssText = "display:flex;align-items:center;gap:8px;";
+  const cb = document.createElement("input");
+  cb.type = "checkbox";
+  cb.checked = dictationToggleEnabled(localStorage.getItem(DICTATION_SPACE_KEY));
+  cb.addEventListener("change", () => localStorage.setItem(DICTATION_SPACE_KEY, cb.checked ? "true" : "false"));
+  const label = document.createElement("span");
+  label.textContent = "Hold Space to dictate — a quick tap still types a space (F9 always works)";
+  label.style.cssText = "font-size:12px;color:var(--fg);";
+  toggle.appendChild(cb);
+  toggle.appendChild(label);
+  body.appendChild(toggle);
+  buildDictationModelControls(body);
 }
 
 async function onOnboardingNext(): Promise<void> {

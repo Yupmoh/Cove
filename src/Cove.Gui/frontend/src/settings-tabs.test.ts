@@ -3,32 +3,34 @@ import { orderSettingsTabs, settingsTabLabel, resolveActiveSettingsTab } from ".
 
 describe("orderSettingsTabs", () => {
   it("prepends theme and keyboard when schema has neither", () => {
-    expect(orderSettingsTabs(["appearance", "audio"])).toEqual(["theme", "keyboard", "appearance", "audio", "tools"]);
+    expect(orderSettingsTabs(["appearance", "audio"])).toEqual(["theme", "keyboard", "appearance", "audio", "dictation", "tools"]);
   });
 
   it("prepends only keyboard when schema already has theme", () => {
-    expect(orderSettingsTabs(["theme", "appearance"])).toEqual(["theme", "keyboard", "theme", "appearance", "tools"]);
+    expect(orderSettingsTabs(["theme", "appearance"])).toEqual(["theme", "keyboard", "theme", "appearance", "dictation", "tools"]);
   });
 
   it("prepends only theme when schema already has keyboard", () => {
-    expect(orderSettingsTabs(["keyboard", "appearance"])).toEqual(["theme", "keyboard", "appearance", "tools"]);
+    expect(orderSettingsTabs(["keyboard", "appearance"])).toEqual(["theme", "keyboard", "appearance", "dictation", "tools"]);
   });
 
   it("keeps schema order when it already has theme and keyboard", () => {
-    expect(orderSettingsTabs(["theme", "keyboard", "appearance"])).toEqual(["theme", "keyboard", "appearance", "tools"]);
+    expect(orderSettingsTabs(["theme", "keyboard", "appearance"])).toEqual(["theme", "keyboard", "appearance", "dictation", "tools"]);
   });
 
-  it("appends tools when absent", () => {
+  it("appends dictation and tools when absent", () => {
     expect(orderSettingsTabs(["appearance"])).toContain("tools");
     expect(orderSettingsTabs(["appearance"]).filter((t) => t === "tools")).toHaveLength(1);
+    expect(orderSettingsTabs(["appearance"]).filter((t) => t === "dictation")).toHaveLength(1);
   });
 
-  it("does not duplicate tools when schema already provides it", () => {
+  it("does not duplicate dictation or tools when schema already provides them", () => {
     expect(orderSettingsTabs(["keyboard", "tools"]).filter((t) => t === "tools")).toHaveLength(1);
+    expect(orderSettingsTabs(["keyboard", "dictation"]).filter((t) => t === "dictation")).toHaveLength(1);
   });
 
   it("synthesizes theme and keyboard from an empty schema", () => {
-    expect(orderSettingsTabs([])).toEqual(["theme", "keyboard", "tools"]);
+    expect(orderSettingsTabs([])).toEqual(["theme", "keyboard", "dictation", "tools"]);
   });
 });
 

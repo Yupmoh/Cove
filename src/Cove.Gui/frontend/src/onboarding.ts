@@ -9,6 +9,7 @@ export const ONBOARDING_STEPS: ReadonlyArray<OnboardingStep> = [
   { id: "permissions", title: "Permission defaults", body: "Choose which adapters launch with bypass-permissions (YOLO) mode on by default. You can change this per session later." },
   { id: "appearance", title: "Appearance", body: "Set the window backdrop material and colour theme. These apply immediately and are saved to your settings." },
   { id: "sound", title: "Sound & notifications", body: "Agent chimes play a soft tone when an agent finishes or needs input. Toggle them and notifications here." },
+  { id: "dictation", title: "Voice dictation", body: "Hold F9 — or hold Space in a terminal or text field — to dictate. Speech is recognized entirely on this machine; audio never leaves it. The model downloads on first use, or grab it now." },
 ];
 
 export interface OnboardingState {
