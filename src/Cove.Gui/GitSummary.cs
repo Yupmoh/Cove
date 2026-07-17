@@ -9,31 +9,67 @@ public static class GitSummary
         if (!Directory.Exists(path)) return Fail("not_found");
         try
         {
-            var psi = new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = "git",
-                WorkingDirectory = path,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-            };
-            psi.ArgumentList.Add("status");
-            psi.ArgumentList.Add("--porcelain=v2");
-            psi.ArgumentList.Add("--branch");
-            using var proc = System.Diagnostics.Process.Start(psi);
-            if (proc is null) return Fail("git_unavailable");
-            var stdout = proc.StandardOutput.ReadToEnd();
-            if (!proc.WaitForExit(4000))
-            {
-                proc.Kill(true);
-                return Fail("timeout");
-            }
-            if (proc.ExitCode != 0) return Fail("not_a_repo");
-            return Parse(stdout);
+            return RunGit(path).GetAwaiter().GetResult();
         }
         catch (Exception)
         {
             return Fail("git_unavailable");
+        }
+    }
+
+    private static async Task<string> RunGit(string path)
+    {
+        var psi = new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = "git",
+            WorkingDirectory = path,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+        };
+        psi.ArgumentList.Add("status");
+        psi.ArgumentList.Add("--porcelain=v2");
+        psi.ArgumentList.Add("--branch");
+        using var proc = System.Diagnostics.Process.Start(psi);
+        if (proc is null) return Fail("git_unavailable");
+
+        var stdoutRead = proc.StandardOutput.ReadToEndAsync();
+        var stderrRead = proc.StandardError.ReadToEndAsync();
+        try
+        {
+            await proc.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(4)).ConfigureAwait(false);
+        }
+        catch (TimeoutException)
+        {
+            try
+            {
+                proc.Kill(true);
+            }
+            catch (InvalidOperationException)
+            {
+            }
+            await DrainOutput(stdoutRead, stderrRead).ConfigureAwait(false);
+            return Fail("timeout");
+        }
+
+        if (!await DrainOutput(stdoutRead, stderrRead).ConfigureAwait(false))
+            return Fail("git_unavailable");
+        if (proc.ExitCode != 0) return Fail("not_a_repo");
+        return Parse(await stdoutRead.ConfigureAwait(false));
+    }
+
+    private static async Task<bool> DrainOutput(Task<string> stdoutRead, Task<string> stderrRead)
+    {
+        try
+        {
+            await Task.WhenAll(stdoutRead, stderrRead)
+                .WaitAsync(TimeSpan.FromSeconds(1))
+                .ConfigureAwait(false);
+            return true;
+        }
+        catch (Exception)
+        {
+            return false;
         }
     }
 

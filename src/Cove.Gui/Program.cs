@@ -36,7 +36,7 @@ internal static class Program
         var link = new EngineLink(dial, version, channel);
         link.SetLogger(loggerFactory.CreateLogger<EngineLink>());
 
-        RynApplication.CreateBuilder()
+        var app = RynApplication.CreateBuilder()
             .ConfigureOptions(o =>
             {
                 o.Url = new Uri($"http://localhost:{LoopbackServer.DefaultPort}{startPath}");
@@ -75,7 +75,9 @@ internal static class Program
                 });
                 s.AddPerfResultsCommand();
             })
-            .Build()
-            .Run();
+            .Build();
+
+        _ = app.Services.GetRequiredService<EngineEventForwarder>();
+        app.Run();
     }
 }

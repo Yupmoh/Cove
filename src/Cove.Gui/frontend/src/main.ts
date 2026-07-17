@@ -141,6 +141,10 @@ async function invoke<T>(cmd: string, args: unknown): Promise<T> {
   return JSON.parse(result as string) as T;
 }
 
+function writeNook(nookId: string, dataBase64: string): Promise<void> {
+  return enqueueNookWrite(nookId, dataBase64, (id, queuedDataBase64) => invoke("app.nookWrite", { nookId: id, dataBase64: queuedDataBase64 }));
+}
+
 const locallySpawnedNookIds = new Set<string>();
 const renderedStreamNookIds = new Set<string>();
 
@@ -505,7 +509,6 @@ function attachWs(nook: NookView): void {
   }, 100);
   ws.onclose = () => {
     window.clearInterval(ackTimer);
-    nook.consumed = Math.max(nook.consumed, nook.expectedOffset);
     if (nook.ws === ws) nook.ws = null;
     if (!current() || nook.exited || nooks.get(nook.nookId) !== nook || !nook.el.isConnected) return;
     nook.reconnectTimer = window.setTimeout(() => {
@@ -517,7 +520,7 @@ function attachWs(nook: NookView): void {
   nook.handlersBound = true;
   nook.term.onData((d) => {
     if (nook.replaying) return;
-    void enqueueNookWrite(nook.nookId, toBase64Utf8(d), (nookId, dataBase64) => invoke("app.nookWrite", { nookId, dataBase64 }));
+    void writeNook(nook.nookId, toBase64Utf8(d));
   });
   nook.term.onResize(({ cols, rows }) => {
     if (nook.restoringCheckpoint) return;
@@ -660,7 +663,7 @@ function makeNook(nookId: string, since: number): NookView {
       { id: "find", label: "Find in Nook" },
     ], (id) => {
       if (id === "copy") { const s = term.getSelection(); if (s && navigator.clipboard) void navigator.clipboard.writeText(s); }
-      else if (id === "paste") { if (navigator.clipboard && navigator.clipboard.readText) void navigator.clipboard.readText().then((t) => { if (t) void invoke("app.nookWrite", { nookId, dataBase64: toBase64Utf8(t) }); }); }
+      else if (id === "paste") { if (navigator.clipboard && navigator.clipboard.readText) void navigator.clipboard.readText().then((t) => { if (t) void writeNook(nookId, toBase64Utf8(t)); }); }
       else if (id === "clear") term.clear();
       else if (id === "find") openFind();
     });
@@ -675,22 +678,22 @@ function makeNook(nookId: string, since: number): NookView {
     if (e.shiftKey && e.key === "Enter" && e.type !== "keydown") return false;
     if (e.type !== "keydown") return true;
     if (e.key === "Tab") { e.preventDefault(); return true; }
-    if (e.shiftKey && e.key === "Enter") { void enqueueNookWrite(nookId, toBase64Utf8(shiftEnterSequence(pv.keyboard.encoding())), (id, dataBase64) => invoke("app.nookWrite", { nookId: id, dataBase64 })); return false; }
+    if (e.shiftKey && e.key === "Enter") { void writeNook(nookId, toBase64Utf8(shiftEnterSequence(pv.keyboard.encoding()))); return false; }
     if (!e.metaKey || e.altKey || e.ctrlKey) return true;
     const k = e.key.toLowerCase();
     if (k === "c") {
       if (term.hasSelection()) { const s = term.getSelection(); if (s && navigator.clipboard) void navigator.clipboard.writeText(s); }
-      else { void invoke("app.nookWrite", { nookId, dataBase64: toBase64Utf8("\u0003") }); }
+      else { void writeNook(nookId, toBase64Utf8("\u0003")); }
       return false;
     }
     if (k === "a") { term.selectAll(); return false; }
     if (k === "v") {
-      if (navigator.clipboard && navigator.clipboard.readText) void navigator.clipboard.readText().then((t) => { if (t) void invoke("app.nookWrite", { nookId, dataBase64: toBase64Utf8(t) }); });
+      if (navigator.clipboard && navigator.clipboard.readText) void navigator.clipboard.readText().then((t) => { if (t) void writeNook(nookId, toBase64Utf8(t)); });
       return false;
     }
-    if (e.key === "ArrowLeft") { void invoke("app.nookWrite", { nookId, dataBase64: toBase64Utf8("\u0001") }); return false; }
-    if (e.key === "ArrowRight") { void invoke("app.nookWrite", { nookId, dataBase64: toBase64Utf8("\u0005") }); return false; }
-    if (e.key === "Backspace") { void invoke("app.nookWrite", { nookId, dataBase64: toBase64Utf8("\u0015") }); return false; }
+    if (e.key === "ArrowLeft") { void writeNook(nookId, toBase64Utf8("\u0001")); return false; }
+    if (e.key === "ArrowRight") { void writeNook(nookId, toBase64Utf8("\u0005")); return false; }
+    if (e.key === "Backspace") { void writeNook(nookId, toBase64Utf8("\u0015")); return false; }
     return true;
   });
   const setTitle = () => { titleSpan.textContent = pv.customTitle || pv.title || "shell"; };
@@ -799,7 +802,6 @@ function pauseNookStream(pv: NookView): void {
     window.clearTimeout(pv.reconnectTimer);
     pv.reconnectTimer = null;
   }
-  pv.consumed = Math.max(pv.consumed, pv.expectedOffset);
   const ws = pv.ws;
   pv.ws = null;
   try { ws.close(1000, "terminal hidden"); } catch { void 0; }

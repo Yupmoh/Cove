@@ -32,10 +32,21 @@ public sealed class SettingSchemaGenerator : IIncrementalGenerator
         var tab = attr.ConstructorArguments[1].Value as string;
         var control = attr.ConstructorArguments.Length >= 3 ? attr.ConstructorArguments[2].Value as string ?? "text" : "text";
         string? description = null;
+        if (attr.AttributeConstructor is { } constructor)
+        {
+            for (var i = 0; i < constructor.Parameters.Length && i < attr.ConstructorArguments.Length; i++)
+            {
+                if (constructor.Parameters[i].Name == "description")
+                {
+                    description = attr.ConstructorArguments[i].Value as string;
+                    break;
+                }
+            }
+        }
         string[]? options = null;
         foreach (var na in attr.NamedArguments)
         {
-            if (na.Key == "Description" && na.Value.Value is string d) description = d;
+            if (na.Key == "Description") description = na.Value.Value as string;
             if (na.Key == "Options" && na.Value.Values is { } vals)
             {
                 var list = new System.Collections.Generic.List<string>();

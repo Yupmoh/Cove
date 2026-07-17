@@ -62,6 +62,10 @@ public static class BayCommands
         }
         if (!await manager.DeleteBayAsync(p.Id).ConfigureAwait(false))
             return ctx.Fail("not_found", $"bay {p.Id} not found");
+        Cove.Engine.Layout.BayPersistence.Delete(
+            p.Id,
+            ctx.BaysDir,
+            ctx.Restoration?.Logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
         if (ctx.Layout is { } layout2 && manager.Registry.FocusedBayId is { } focused)
             layout2.SetActiveBay(focused);
         return ctx.Ok();

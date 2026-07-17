@@ -31,6 +31,23 @@
     <PackageReference Include="ZLogger" />
   </ItemGroup>
 
+  <Target Name="GenerateCoveVersionConstant" BeforeTargets="CoreCompile" DependsOnTargets="MinVer">
+    <MakeDir Directories="$(IntermediateOutputPath)" />
+    <ItemGroup>
+      <_CoveVersionConstantLines Include="namespace Cove.Platform%3B" />
+      <_CoveVersionConstantLines Include="internal static class CoveVersionConstant" />
+      <_CoveVersionConstantLines Include="{" />
+      <_CoveVersionConstantLines Include="public const string Value = &quot;$(Version)&quot;%3B" />
+      <_CoveVersionConstantLines Include="}" />
+      <Compile Include="$(IntermediateOutputPath)CoveVersionConstant.g.cs" />
+    </ItemGroup>
+    <WriteLinesToFile
+      File="$(IntermediateOutputPath)CoveVersionConstant.g.cs"
+      Lines="@(_CoveVersionConstantLines)"
+      Overwrite="true"
+      WriteOnlyWhenDifferent="true" />
+  </Target>
+
   <Target Name="BuildCovePtyNative" BeforeTargets="Build" Condition="'$(OS)' != 'Windows_NT'">
     <Exec Command="bash &quot;$(MSBuildProjectDirectory)/../../native/cove_pty/build-unix.sh&quot; &quot;$(OutDir)&quot;" />
   </Target>

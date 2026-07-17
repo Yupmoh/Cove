@@ -2,6 +2,7 @@ using System.Text.Json;
 using Cove.Gui;
 using Xunit;
 
+[Collection("GitSummary process")]
 public class GitSummaryTests
 {
     [Fact]
@@ -65,4 +66,41 @@ public class GitSummaryTests
         Assert.Equal("not_a_repo", doc.RootElement.GetProperty("error").GetString());
         Directory.Delete(root, true);
     }
+
+    [Fact]
+    public void RunTimesOutWhenGitKeepsRedirectedStreamsOpen()
+    {
+        if (OperatingSystem.IsWindows()) return;
+
+        var toolRoot = Directory.CreateTempSubdirectory("cove-fake-git").FullName;
+        var repositoryRoot = Directory.CreateTempSubdirectory("cove-git-timeout").FullName;
+        var gitPath = Path.Combine(toolRoot, "git");
+        var originalPath = Environment.GetEnvironmentVariable("PATH");
+        File.WriteAllText(gitPath, "#!/bin/sh\n(sleep 7; kill -TERM $$) &\ni=0\nwhile [ \"$i\" -lt 8192 ]\ndo\nprintf 'blocked stderr output' >&2\ni=$((i + 1))\ndone\nsleep 30\n");
+        File.SetUnixFileMode(gitPath, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+
+        try
+        {
+            Environment.SetEnvironmentVariable("PATH", $"{toolRoot}{Path.PathSeparator}{originalPath}");
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            var json = GitSummary.Run(repositoryRoot);
+            stopwatch.Stop();
+            using var doc = JsonDocument.Parse(json);
+
+            Assert.False(doc.RootElement.GetProperty("ok").GetBoolean());
+            Assert.Equal("timeout", doc.RootElement.GetProperty("error").GetString());
+            Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(8), $"Timeout took {stopwatch.Elapsed}.");
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("PATH", originalPath);
+            Directory.Delete(repositoryRoot, true);
+            Directory.Delete(toolRoot, true);
+        }
+    }
+}
+
+[CollectionDefinition("GitSummary process", DisableParallelization = true)]
+public sealed class GitSummaryProcessCollection
+{
 }

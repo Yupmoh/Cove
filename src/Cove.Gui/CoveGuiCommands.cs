@@ -209,7 +209,11 @@ public sealed class CoveGuiCommands
         _log.CommandInvoked(uri);
         var r = await _link.RequestAsync(uri, p, ct);
         if (!r.Ok)
-            _log.CommandEngineFailed(uri, r.Error?.Message ?? r.Error?.Code ?? "engine_error");
+        {
+            var error = r.Error?.Message ?? r.Error?.Code ?? "engine_error";
+            _log.CommandEngineFailed(uri, error);
+            throw new InvalidOperationException(error);
+        }
         return r.Data is { } d ? d.GetRawText() : "{}";
     }
 }

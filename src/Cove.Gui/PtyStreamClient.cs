@@ -71,10 +71,14 @@ public sealed class PtyStreamClient : IAsyncDisposable
             switch (f.Type)
             {
                 case FrameType.StreamData:
+                    if (f.Payload.Length < 8)
+                        throw new InvalidDataException($"StreamData payload is too short: expected at least 8 bytes, received {f.Payload.Length}");
                     var offset = BinaryPrimitives.ReadUInt64LittleEndian(f.Payload);
                     await onData(offset, f.Payload.AsMemory(8), ct);
                     break;
                 case FrameType.Resync:
+                    if (f.Payload.Length < 8)
+                        throw new InvalidDataException($"Resync payload is too short: expected at least 8 bytes, received {f.Payload.Length}");
                     ulong newBase = BinaryPrimitives.ReadUInt64LittleEndian(f.Payload);
                     if (f.Payload.Length < 20)
                     {
@@ -91,6 +95,8 @@ public sealed class PtyStreamClient : IAsyncDisposable
                     await onResync(newBase, modes, checkpoint, cols, rows, ct);
                     break;
                 case FrameType.StreamEnd:
+                    if (f.Payload.Length < 12)
+                        throw new InvalidDataException($"StreamEnd payload is too short: expected at least 12 bytes, received {f.Payload.Length}");
                     var final = BinaryPrimitives.ReadUInt64LittleEndian(f.Payload);
                     var code = BinaryPrimitives.ReadInt32LittleEndian(f.Payload.AsSpan(8));
                     await onEnd(final, code, ct);

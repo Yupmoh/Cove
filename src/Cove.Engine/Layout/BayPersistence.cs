@@ -17,6 +17,39 @@ public static class BayPersistence
             AtomicJsonStore.Write(Path.Combine(wsDir, "nooks", d.NookId, "session.json"), d, CoveJsonContext.Default.NookDescriptor);
     }
 
+    public static void Delete(string bayId, string? baysRoot, ILogger logger)
+    {
+        string root;
+        string bayDir;
+        try
+        {
+            if (string.IsNullOrWhiteSpace(baysRoot) || string.IsNullOrWhiteSpace(bayId))
+            {
+                logger.BayDeletePathUnresolvable(bayId, baysRoot ?? "", "bay id and bays root are required");
+                return;
+            }
+            root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(baysRoot));
+            bayDir = Path.TrimEndingDirectorySeparator(Path.GetFullPath(Path.Combine(root, bayId)));
+        }
+        catch (System.Exception ex) when (ex is System.ArgumentException or System.IO.IOException or System.NotSupportedException)
+        {
+            logger.BayDeletePathUnresolvable(bayId, baysRoot ?? "", ex.Message);
+            return;
+        }
+
+        if (!string.Equals(Path.GetDirectoryName(bayDir), root, System.StringComparison.Ordinal))
+        {
+            logger.BayDeletePathUnresolvable(bayId, root, "resolved path is outside the bays root");
+            return;
+        }
+        if (!Directory.Exists(bayDir))
+        {
+            logger.BayDeleteDirectoryMissing(bayId, bayDir);
+            return;
+        }
+        Directory.Delete(bayDir, true);
+    }
+
     public static (BaySnapshot? Layout, Dictionary<string, NookDescriptor> Sessions) Load(string wsDir, ILogger logger)
     {
         var layout = AtomicJsonStore.Read<BaySnapshot>(Path.Combine(wsDir, "bay.json"), CoveJsonContext.Default.BaySnapshot, logger);
@@ -125,4 +158,10 @@ internal static partial class BayPersistenceLog
 {
     [ZLoggerMessage(LogLevel.Warning, "terminal restore state load failed path={path} error={error}")]
     public static partial void TerminalRestoreStateLoadFailed(this ILogger logger, string path, string error);
+
+    [ZLoggerMessage(LogLevel.Warning, "bay persistence delete skipped unresolvable path bayId={bayId} baysRoot={baysRoot} reason={reason}")]
+    public static partial void BayDeletePathUnresolvable(this ILogger logger, string bayId, string baysRoot, string reason);
+
+    [ZLoggerMessage(LogLevel.Warning, "bay persistence delete skipped missing directory bayId={bayId} path={path}")]
+    public static partial void BayDeleteDirectoryMissing(this ILogger logger, string bayId, string path);
 }

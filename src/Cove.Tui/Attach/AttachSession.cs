@@ -10,7 +10,6 @@ public sealed class AttachSession
     private readonly string _nookId;
     private ulong _streamId;
     private ulong _ackedOffset;
-    private readonly SemaphoreSlim _writeGate = new(1, 1);
     private uint _seq;
 
     public ulong StreamId => _streamId;
@@ -31,8 +30,8 @@ public sealed class AttachSession
         await ReadResponseAsync("h", ct).ConfigureAwait(false);
 
         var subEl = JsonSerializer.SerializeToElement(new SubscribeParams(_nookId, 0), CoveJsonContext.Default.SubscribeParams);
-        var subResp = await ReadResponseAsync("s", ct).ConfigureAwait(false);
         await SendRequestAsync("s", "cove://commands/nook.subscribe", subEl, ct).ConfigureAwait(false);
+        var subResp = await ReadResponseAsync("s", ct).ConfigureAwait(false);
         if (!subResp.Ok || subResp.Data is null)
             throw new InvalidOperationException($"subscribe failed: {subResp.Error?.Code}");
         var result = JsonSerializer.Deserialize(subResp.Data.Value, CoveJsonContext.Default.SubscribeResult)
@@ -55,7 +54,7 @@ public sealed class AttachSession
                     var offset = BinaryPrimitives.ReadUInt64LittleEndian(f.Value.Payload);
                     var raw = f.Value.Payload.AsMemory(8);
                     await onData(raw, ct).ConfigureAwait(false);
-                    _ackedOffset = offset + (ulong)raw.Length;
+                    _ackedOffset = AttachFrameDecode.NextAckOffset(_ackedOffset, offset, raw.Length);
                     await AckAsync(_ackedOffset, ct).ConfigureAwait(false);
                     break;
                 case FrameType.Resync:
@@ -79,9 +78,7 @@ public sealed class AttachSession
 
     public async Task AckAsync(ulong ackOffset, CancellationToken ct)
     {
-        var seq = Interlocked.Increment(ref _seq);
-        var payload = new byte[8];
-        BinaryPrimitives.WriteUInt64LittleEndian(payload, ackOffset);
+        var payload = AttachFrameDecode.EncodeCredit(ackOffset);
         await _conn.WriteFrameAsync(FrameType.Credit, _streamId, payload, ct).ConfigureAwait(false);
     }
 
