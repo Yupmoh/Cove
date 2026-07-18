@@ -353,7 +353,6 @@ function applySettings() {
   document.documentElement.style.setProperty("--workspace-padding", `${settings.padding}px`);
   document.documentElement.style.setProperty("--cove-bg-opacity", String(settings.backgroundOpacity));
   fitAll();
-  persistSettings();
 }
 function persistSettings() {
   const entries: [string, string][] = [
@@ -2910,7 +2909,7 @@ async function loadWings(): Promise<void> {
 }
 async function switchWingActive(wingId: string): Promise<void> {
   activeWingId = wingId;
-  try { await invoke("cove://commands/wing.switch", { bayId: "default", wingId }); } catch { void 0; }
+  try { await invoke("cove://commands/wing.switch", { bayId: layout?.id ?? "default", wingId }); } catch { void 0; }
   await loadWings();
   await reload();
   renderShoreTabs();
@@ -3211,9 +3210,9 @@ function baseActions(): Action[] {
     { label: "Show bays", icon: "\u25c9", key: "Cmd Shift A", run: () => revealSidebarMode("bays") },
     { label: "Toggle window backdrop", icon: "\u25d0", run: () => void toggleBackdrop() },
     { label: "Toggle performance HUD", icon: "\ud83d\udcc8", run: doTogglePerfHud },
-    { label: "Increase font size", icon: "+", key: "Cmd =", run: () => { settings.fontSize = Math.min(24, settings.fontSize + 1); applySettings(); } },
-    { label: "Decrease font size", icon: "-", key: "Cmd -", run: () => { settings.fontSize = Math.max(9, settings.fontSize - 1); applySettings(); } },
-    { label: "Reset font size", icon: "\u21ba", key: "Cmd 0", run: () => { settings.fontSize = 13; applySettings(); } },
+    { label: "Increase font size", icon: "+", key: "Cmd =", run: () => { settings.fontSize = Math.min(24, settings.fontSize + 1); applySettings(); persistSettings(); } },
+    { label: "Decrease font size", icon: "-", key: "Cmd -", run: () => { settings.fontSize = Math.max(9, settings.fontSize - 1); applySettings(); persistSettings(); } },
+    { label: "Reset font size", icon: "\u21ba", key: "Cmd 0", run: () => { settings.fontSize = 13; applySettings(); persistSettings(); } },
     { label: "Settings", icon: "\u2699", key: "Cmd ,", run: openSettings },
     { label: "Inspect UI (report a bug)", icon: "\u2316", run: startInspectMode },
   ];
@@ -6631,9 +6630,9 @@ function runAction(action: string): void {
     case "view.toggle-sidebar": toggleLeftSidebar(); break;
     case "view.toggle-notepad": revealSidebarMode("notepad"); break;
     case "view.zen-mode": doToggleZen(); break;
-    case "view.zoom-in": settings.fontSize = Math.min(24, settings.fontSize + 1); applySettings(); break;
-    case "view.zoom-out": settings.fontSize = Math.max(9, settings.fontSize - 1); applySettings(); break;
-    case "view.zoom-reset": settings.fontSize = 13; applySettings(); break;
+    case "view.zoom-in": settings.fontSize = Math.min(24, settings.fontSize + 1); applySettings(); persistSettings(); break;
+    case "view.zoom-out": settings.fontSize = Math.max(9, settings.fontSize - 1); applySettings(); persistSettings(); break;
+    case "view.zoom-reset": settings.fontSize = 13; applySettings(); persistSettings(); break;
     case "view.toggle-backdrop": void toggleBackdrop(); break;
     case "tool.inspect": startInspectMode(); break;
     case "tool.git": void openToolShore("git", "Source Control"); break;
