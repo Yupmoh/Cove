@@ -206,7 +206,7 @@ public sealed class LoopbackServer : IAsyncDisposable
         var rel = path == "/" ? "index.html" : path.TrimStart('/');
         if (!Path.HasExtension(rel)) rel = rel.TrimEnd('/') + "/index.html";
         var full = Path.GetFullPath(Path.Combine(_webRoot, rel));
-        if (!PathContainment.IsContained(_webRoot, full) || !File.Exists(full))
+        if (!PathContainment.IsContainedPhysical(_webRoot, full) || !File.Exists(full))
         {
             await stream.WriteAsync(Encoding.ASCII.GetBytes("HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"), ct);
             return;

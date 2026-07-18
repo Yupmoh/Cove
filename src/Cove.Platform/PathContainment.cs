@@ -32,6 +32,61 @@ public static class PathContainment
         return canonicalCandidate.StartsWith(prefix, comparison);
     }
 
+    public static bool IsContainedPhysical(string root, string candidate)
+    {
+        if (string.IsNullOrEmpty(root) || string.IsNullOrEmpty(candidate))
+            return false;
+        try
+        {
+            return IsContained(ResolvePhysical(root), ResolvePhysical(candidate));
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException or IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
+    public static string ResolvePhysical(string path)
+        => ResolvePhysicalCore(path, 0);
+
+    private static string ResolvePhysicalCore(string path, int depth)
+    {
+        if (depth > 10)
+            throw new IOException($"symlink resolution exceeded depth limit for '{path}'");
+        var full = Path.GetFullPath(path);
+        var pathRoot = Path.GetPathRoot(full);
+        if (string.IsNullOrEmpty(pathRoot))
+            return full;
+        var current = pathRoot;
+        var components = full[pathRoot.Length..].Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries);
+        var missingTail = false;
+        foreach (var component in components)
+        {
+            current = Path.Combine(current, component);
+            if (missingTail)
+                continue;
+            FileSystemInfo info = Directory.Exists(current)
+                ? new DirectoryInfo(current)
+                : new FileInfo(current);
+            if (!info.Exists)
+            {
+                var entryLink = new FileInfo(current).LinkTarget ?? new DirectoryInfo(current).LinkTarget;
+                if (entryLink is null)
+                {
+                    missingTail = true;
+                    continue;
+                }
+                var baseDir = Path.GetDirectoryName(current) ?? pathRoot;
+                current = ResolvePhysicalCore(Path.IsPathRooted(entryLink) ? entryLink : Path.Combine(baseDir, entryLink), depth + 1);
+                continue;
+            }
+            var target = info.ResolveLinkTarget(returnFinalTarget: true);
+            if (target is not null)
+                current = ResolvePhysicalCore(target.FullName, depth + 1);
+        }
+        return current;
+    }
+
     public static bool TryResolveContained(string root, out string resolvedRoot, out string resolvedCandidate, params string[] segments)
     {
         resolvedRoot = string.Empty;

@@ -87,4 +87,103 @@ public sealed class PathContainmentTests
     {
         Assert.Equal(expected, PathContainment.IsSafeSegment(segment));
     }
+
+    private static string MakeRealRoot()
+    {
+        var root = Root();
+        Directory.CreateDirectory(root);
+        return root;
+    }
+
+    [Fact]
+    public void IsContainedPhysical_AcceptsRealChild()
+    {
+        var root = MakeRealRoot();
+        var child = Path.Combine(root, "inner", "file.txt");
+        Directory.CreateDirectory(Path.GetDirectoryName(child)!);
+        File.WriteAllText(child, "x");
+        Assert.True(PathContainment.IsContainedPhysical(root, child));
+    }
+
+    [Fact]
+    public void IsContainedPhysical_AcceptsNonexistentTailUnderRoot()
+    {
+        var root = MakeRealRoot();
+        Assert.True(PathContainment.IsContainedPhysical(root, Path.Combine(root, "not-yet", "created.txt")));
+    }
+
+    [Fact]
+    public void IsContainedPhysical_RejectsSymlinkFileEscapingRoot()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var root = MakeRealRoot();
+        var outside = Path.Combine(Path.GetTempPath(), "cove-contain-secret-" + Guid.NewGuid().ToString("N"));
+        File.WriteAllText(outside, "secret");
+        var link = Path.Combine(root, "innocent.txt");
+        File.CreateSymbolicLink(link, outside);
+        Assert.True(PathContainment.IsContained(root, link));
+        Assert.False(PathContainment.IsContainedPhysical(root, link));
+    }
+
+    [Fact]
+    public void IsContainedPhysical_RejectsSymlinkDirectoryEscapingRoot()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var root = MakeRealRoot();
+        var outsideDir = Path.Combine(Path.GetTempPath(), "cove-contain-outside-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(outsideDir);
+        File.WriteAllText(Path.Combine(outsideDir, "target.txt"), "x");
+        var linkDir = Path.Combine(root, "sub");
+        Directory.CreateSymbolicLink(linkDir, outsideDir);
+        Assert.False(PathContainment.IsContainedPhysical(root, Path.Combine(linkDir, "target.txt")));
+    }
+
+    [Fact]
+    public void IsContainedPhysical_AcceptsRootReachedThroughSymlink()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var realRoot = MakeRealRoot();
+        var linkRoot = Path.Combine(Path.GetTempPath(), "cove-contain-link-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateSymbolicLink(linkRoot, realRoot);
+        var child = Path.Combine(linkRoot, "file.txt");
+        File.WriteAllText(child, "x");
+        Assert.True(PathContainment.IsContainedPhysical(linkRoot, child));
+        Assert.True(PathContainment.IsContainedPhysical(realRoot, child));
+    }
+
+    [Fact]
+    public void IsContainedPhysical_RejectsSymlinkChainEscape()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var root = MakeRealRoot();
+        var outside = Path.Combine(Path.GetTempPath(), "cove-contain-chain-" + Guid.NewGuid().ToString("N"));
+        File.WriteAllText(outside, "secret");
+        var hop = Path.Combine(root, "hop");
+        var entry = Path.Combine(root, "entry");
+        File.CreateSymbolicLink(hop, outside);
+        File.CreateSymbolicLink(entry, hop);
+        Assert.False(PathContainment.IsContainedPhysical(root, entry));
+    }
+
+    [Fact]
+    public void IsContainedPhysical_RejectsLinkWithUnresolvedOutsideTarget()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var root = MakeRealRoot();
+        var pendingOutside = Path.Combine(Path.GetTempPath(), "cove-contain-pending-" + Guid.NewGuid().ToString("N"), "later.txt");
+        var link = Path.Combine(root, "later.txt");
+        File.CreateSymbolicLink(link, pendingOutside);
+        Assert.False(PathContainment.IsContainedPhysical(root, link));
+    }
+
+    [Fact]
+    public void IsContainedPhysical_AcceptsLinkWithUnresolvedInsideTarget()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var root = MakeRealRoot();
+        var pendingInside = Path.Combine(root, "future", "later.txt");
+        var link = Path.Combine(root, "alias.txt");
+        File.CreateSymbolicLink(link, pendingInside);
+        Assert.True(PathContainment.IsContainedPhysical(root, link));
+    }
 }

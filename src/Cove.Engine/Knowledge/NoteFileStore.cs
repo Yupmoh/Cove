@@ -255,7 +255,7 @@ public sealed class NoteFileStore
 
         var mediaId = $"img-{System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}-{fileName}";
         if (!PathContainment.TryResolveContained(_notesRoot, out _, out var mediaPath, bayId, id, "media", mediaId)
-            || !PathContainment.IsContained(_notesRoot, mediaPath))
+            || !PathContainment.IsContainedPhysical(_notesRoot, mediaPath))
         {
             _logger.NoteMediaOutsideRoot(fileName, id, bayId);
             throw new System.ArgumentException("media path must stay within the notes root", nameof(fileName));
@@ -273,7 +273,7 @@ public sealed class NoteFileStore
         bayDir = string.Empty;
         if (!PathContainment.IsSafeSegment(bayId)
             || !PathContainment.TryResolveContained(_notesRoot, out _, out bayDir, bayId)
-            || !PathContainment.IsContained(_notesRoot, bayDir))
+            || !PathContainment.IsContainedPhysical(_notesRoot, bayDir))
         {
             _logger.NoteUnsafeBayIdentifier(bayId);
             return false;
@@ -287,7 +287,7 @@ public sealed class NoteFileStore
         if (!PathContainment.IsSafeSegment(bayId)
             || !PathContainment.IsSafeSegment(noteId)
             || !PathContainment.TryResolveContained(_notesRoot, out _, out noteDir, bayId, noteId)
-            || !PathContainment.IsContained(_notesRoot, noteDir))
+            || !PathContainment.IsContainedPhysical(_notesRoot, noteDir))
         {
             _logger.NoteUnsafeIdentifiers(noteId, bayId);
             return false;

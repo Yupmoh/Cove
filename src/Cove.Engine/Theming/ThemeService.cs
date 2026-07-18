@@ -135,7 +135,7 @@ public sealed class ThemeService
         if (!System.IO.Directory.Exists(_themesDir)) return;
         foreach (var file in System.IO.Directory.EnumerateFiles(_themesDir, "*.json"))
         {
-            if (!PathContainment.IsContained(_themesDir, file))
+            if (!PathContainment.IsContainedPhysical(_themesDir, file))
             {
                 _logger.ThemeFileOutsideRoot(file);
                 continue;
@@ -169,7 +169,7 @@ public sealed class ThemeService
         var fileName = $"{name}.json";
         if (!PathContainment.IsSafeSegment(name)
             || !PathContainment.TryResolveContained(_themesDir, out _, out path, fileName)
-            || !PathContainment.IsContained(_themesDir, path))
+            || !PathContainment.IsContainedPhysical(_themesDir, path))
         {
             _logger.ThemeUnsafeCustomName(name);
             return false;
