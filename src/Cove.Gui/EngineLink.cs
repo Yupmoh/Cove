@@ -100,9 +100,15 @@ public sealed class EngineLink : IAsyncDisposable
                     Interlocked.CompareExchange(ref _stream, null, s);
                     throw new IOException("control connection closed during hello");
                 }
+                var wasConnected = _everConnected;
                 _everConnected = true;
                 var engineVersion = hello.Data is { } hd && hd.TryGetProperty("engineVersion", out var ev) ? ev.GetString() ?? "" : "";
                 _log.EngineConnected(_channel, _endpoint, engineVersion);
+                if (wasConnected)
+                {
+                    using var reconnectPayload = JsonDocument.Parse("{}");
+                    _onEngineEvent?.Invoke("engine.reconnected", reconnectPayload.RootElement.Clone());
+                }
                 return s;
             }
             catch

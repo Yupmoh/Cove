@@ -6920,6 +6920,7 @@ function setupBadge(): void {
   engineEventHandlers.set("dock.badge.clear", () => { needsInputNooks.clear(); onNeedsInputChanged(); });
   engineEventHandlers.set("state.changed", () => { if (agentsVisible()) void refreshAgents(); });
   engineEventHandlers.set("agent.changed", () => { if (agentsVisible()) void refreshAgents(); });
+  engineEventHandlers.set("engine.reconnected", () => { void refreshAgents(); });
   engineEventHandlers.set("restore.summary", (payload) => {
     const p = payload as { restored?: number; fresh?: number; skipped?: number; bootedAt?: string };
     presentRestoreToast(p.restored ?? 0, p.fresh ?? 0, p.skipped ?? 0, p.bootedAt ?? "");
