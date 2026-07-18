@@ -1,4 +1,5 @@
 import { invoke } from "./invoke";
+import { FrontendCommand } from "./app/frontend-command";
 
 interface TaskCard {
   id: string;
@@ -49,8 +50,8 @@ export async function renderKanbanBoard(bayId: string): Promise<HTMLElement> {
 async function refreshBoard(el: HTMLElement, bayId: string): Promise<void> {
   try {
     const [statusResult, cardResult] = await Promise.all([
-      invoke<StatusListResult>("cove://commands/task.status.list", { bayId }),
-      invoke<TaskListResult>("cove://commands/task.list", { bayId }),
+      invoke<StatusListResult>(FrontendCommand.TaskStatusList, { bayId }),
+      invoke<TaskListResult>(FrontendCommand.TaskList, { bayId }),
     ]);
 
     const statuses = statusResult.statuses.filter(s => !s.hidden).sort((a, b) => a.position - b.position);
@@ -96,7 +97,7 @@ function createColumn(status: StatusRow, cards: TaskCard[], bayId: string): HTML
     cardList.style.background = "";
     const cardId = e.dataTransfer?.getData("text/plain");
     if (cardId) {
-      await invoke("cove://commands/task.update", { id: cardId, bayId, statusId: status.id, source: "user:gui" });
+      await invoke(FrontendCommand.TaskUpdate, { id: cardId, bayId, statusId: status.id, source: "user:gui" });
       await refreshBoard(col.parentElement as HTMLElement, bayId);
     }
   });
@@ -167,10 +168,10 @@ function showQuickActions(card: TaskCard, bayId: string, x: number, y: number): 
   menu.style.cssText = `position:fixed;left:${x}px;top:${y}px;background:#1a2838;border:1px solid #2b3d52;border-radius:6px;padding:4px;z-index:1000;min-width:140px;box-shadow:0 4px 12px rgba(0,0,0,0.4);`;
 
   const actions: { label: string; action: () => Promise<void> }[] = [
-    { label: "Set In-Review", action: async () => { await invoke("cove://commands/task.set-in-review", { runId: card.currentPrimaryRunId }); } },
-    { label: "Set Done", action: async () => { await invoke("cove://commands/task.set-done", { runId: card.currentPrimaryRunId }); } },
-    { label: "Claim", action: async () => { await invoke("cove://commands/task.claim", { cardId: card.id }); } },
-    { label: "Launch", action: async () => { await invoke("cove://commands/task.launch", { cardId: card.id }); } },
+    { label: "Set In-Review", action: async () => { await invoke(FrontendCommand.TaskSetInReview, { runId: card.currentPrimaryRunId }); } },
+    { label: "Set Done", action: async () => { await invoke(FrontendCommand.TaskSetDone, { runId: card.currentPrimaryRunId }); } },
+    { label: "Claim", action: async () => { await invoke(FrontendCommand.TaskClaim, { cardId: card.id }); } },
+    { label: "Launch", action: async () => { await invoke(FrontendCommand.TaskLaunch, { cardId: card.id }); } },
   ];
 
   for (const a of actions) {

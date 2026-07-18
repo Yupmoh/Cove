@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifyDictationTarget, classifySpaceTarget, createNookTypist, createSpaceHold, dictationToggleEnabled, DICTATION_LIVE_TYPING_KEY, DICTATION_SPACE_KEY, encodeNookText, modelPollOutcome, partialPreview, spaceHoldTransition, SpaceHoldMs, typedRevision, type FocusDescriptor, type SpaceHoldEvent, type SpaceHoldState, type SpaceHoldHooks, type SpaceKeyEventLike, type SpaceTarget } from "./dictation";
+import { classifyDictationTarget, classifySpaceTarget, createDictationEventSubscriptions, createNookTypist, createSpaceHold, dictationToggleEnabled, DICTATION_LIVE_TYPING_KEY, DICTATION_SPACE_KEY, encodeNookText, modelPollOutcome, partialPreview, spaceHoldTransition, SpaceHoldMs, typedRevision, type FocusDescriptor, type SpaceHoldEvent, type SpaceHoldState, type SpaceHoldHooks, type SpaceKeyEventLike, type SpaceTarget } from "./dictation";
 
 const focus = (partial: Partial<FocusDescriptor>): FocusDescriptor => ({
   tagName: "DIV",
@@ -268,6 +268,29 @@ describe("partialPreview", () => {
 
   it("returns empty for empty text", () => {
     expect(partialPreview("")).toBe("");
+  });
+});
+
+describe("createDictationEventSubscriptions", () => {
+  it("registers every typed channel and disposes every registration once", async () => {
+    const channels: string[] = [];
+    const disposed: string[] = [];
+    const subscriptions = createDictationEventSubscriptions(
+      (channel) => {
+        channels.push(channel);
+        return { dispose: () => { disposed.push(channel); } };
+      },
+      {
+        partial: () => {},
+        progress: () => {},
+        model: () => {},
+      },
+    );
+
+    expect(channels).toEqual(["dictation.partial", "dictation.progress", "dictation.model"]);
+    await subscriptions.dispose();
+    await subscriptions.dispose();
+    expect(disposed).toEqual(["dictation.model", "dictation.progress", "dictation.partial"]);
   });
 });
 

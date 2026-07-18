@@ -1,0 +1,10 @@
+
+#shores-row { flex-shrink: 0; display: flex; align-items: stretch; height: 36px; padding: 0 var(--workspace-padding); background: transparent; border-bottom: 0; }
+#shores-row #shore-tabs { height: 100%; padding: 0 6px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; }
+.rtab-glyph { flex-shrink: 0; opacity: 0.85; line-height: 0; }
+.rtab-glyph svg { width: 13px; height: 13px; display: block; }
+.rbox-ctl { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 26px; height: 22px; border-radius: 6px; cursor: pointer; color: var(--muted); font-size: 14px; }
+.rbox-ctl svg { width: 14px; height: 14px; display: block; }
+.rbox-ctl:hover { background: var(--panel-2); color: var(--fg); }
+.rbox-home { margin-right: 2px; }
+.rbox-home.active { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }

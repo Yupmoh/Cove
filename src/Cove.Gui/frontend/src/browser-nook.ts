@@ -1,18 +1,197 @@
-import { invoke } from "./invoke";
+import { invoke, onRyn } from "./invoke";
+import { FrontendCommand } from "./app/frontend-command";
+import { FrontendEvent } from "./app/frontend-event";
+import { LifecycleScope } from "./app/lifecycle";
 import { FindBarState, type FindResult } from "./browser-find";
 import { NookCrashState, crashReasonText } from "./browser-crash";
 import { PermissionPromptQueue, formatPermissionKinds, permissionOrigin, type PermissionRequest } from "./browser-permissions";
 import { DownloadShelfState, downloadPercent, formatBytes, joinPath, type DownloadItem } from "./browser-downloads";
 
-export const browserWebviewRegistry = new Map<string, number>();
+export interface BrowserSessionDependencies {
+  invoke(command: FrontendCommand, args: unknown): Promise<unknown>;
+  observe(event: FrontendEvent, callback: (data: unknown) => void): () => void;
+  warn(message: string, context: unknown): void;
+}
 
-interface BrowserNookInstance {
-  el: HTMLElement;
-  sync: () => void;
-  resizeObserver: ResizeObserver | null;
-  resizeListener: () => void;
-  bridgeDisposers: Array<() => void>;
-  closed: boolean;
+const browserSessionDependencies: BrowserSessionDependencies = {
+  invoke,
+  observe: onRyn,
+  warn: (message, context) => console.warn(message, context),
+};
+
+export class BrowserSession {
+  private readonly lifecycle = new LifecycleScope();
+  private boundsSync: () => void = () => {};
+  private disposal: Promise<void> | null = null;
+  private nativeOperations: Promise<void> = Promise.resolve();
+  private nativePanelId: number | null = null;
+  private readonly permissionTimers = new Map<string, ReturnType<typeof globalThis.setTimeout>>();
+  readonly nav: BrowserNavState;
+  readonly crashState = new NookCrashState();
+  readonly permissions = new PermissionPromptQueue();
+  readonly downloads = new DownloadShelfState();
+  zoomLevel = 1;
+  devToolsOpen = false;
+  suspended = false;
+  expectedNavigationUrl: string | null = null;
+
+  constructor(
+    readonly nookId: string,
+    readonly element: HTMLElement,
+    initialUrl: string,
+    private readonly dependencies: BrowserSessionDependencies = browserSessionDependencies,
+  ) {
+    this.nav = new BrowserNavState(initialUrl);
+    this.lifecycle.own(() => {
+      for (const timer of this.permissionTimers.values()) globalThis.clearTimeout(timer);
+      this.permissionTimers.clear();
+    });
+  }
+
+  get isClosed(): boolean {
+    return this.lifecycle.isDisposed;
+  }
+
+  get webviewId(): number | null {
+    return this.nativePanelId;
+  }
+
+  setBoundsSync(sync: () => void): void {
+    this.boundsSync = sync;
+  }
+
+  own(disposer: () => void | Promise<void>): void {
+    this.lifecycle.own(disposer);
+  }
+
+  ownObserver(observer: ResizeObserver | IntersectionObserver): void {
+    this.lifecycle.own(() => observer.disconnect());
+  }
+
+  observe(event: FrontendEvent, callback: (data: unknown) => void): void {
+    const unsubscribe = this.dependencies.observe(event, (data) => {
+      if (!this.isClosed) callback(data);
+    });
+    this.lifecycle.own(unsubscribe);
+  }
+
+  listen(target: EventTarget, event: string, callback: EventListenerOrEventListenerObject): void {
+    this.lifecycle.listen(target, event, callback);
+  }
+
+  schedulePermissionTimeout(requestId: string, callback: () => void, delayMs = permissionAutoDenyMs): void {
+    if (this.isClosed) return;
+    this.clearPermissionTimeout(requestId);
+    const timer = globalThis.setTimeout(() => {
+      this.permissionTimers.delete(requestId);
+      if (this.isClosed) return;
+      callback();
+    }, delayMs);
+    this.permissionTimers.set(requestId, timer);
+  }
+
+  clearPermissionTimeout(requestId: string): void {
+    const timer = this.permissionTimers.get(requestId);
+    if (timer === undefined) return;
+    globalThis.clearTimeout(timer);
+    this.permissionTimers.delete(requestId);
+  }
+
+  openPanel(options: Record<string, unknown>): Promise<{ id: number; created: boolean } | null> {
+    return this.serializeNativeOperation(async () => {
+      if (this.isClosed) return null;
+      if (this.webviewId !== null) return { id: this.webviewId, created: false };
+      const result = await this.dependencies.invoke(FrontendCommand.WebviewPaneOpen, { options });
+      const id = extractWebviewId(result);
+      if (id === null) {
+        this.dependencies.warn("webviewPane.open returned no usable id", { nookId: this.nookId, result });
+        return null;
+      }
+      if (this.isClosed) {
+        await this.closePanel(id);
+        return null;
+      }
+      this.nativePanelId = id;
+      return { id, created: true };
+    });
+  }
+
+  invokePanel<Result>(
+    command: FrontendCommand,
+    args: Record<string, unknown>,
+    includePanelId = true,
+  ): Promise<Result | null> {
+    return this.invokeOwnedPanel<Result>(command, args, includePanelId).then((result) =>
+      result.found ? result.value as Result : null
+    );
+  }
+
+  invokeOwnedPanel<Result>(
+    command: FrontendCommand,
+    args: Record<string, unknown>,
+    includePanelId = true,
+  ): Promise<BrowserPanelInvocationResult<Result>> {
+    return this.serializeNativeOperation(async () => {
+      const id = this.webviewId;
+      if (id === null || this.isClosed) return { found: false };
+      const callArgs = includePanelId ? { id, ...args } : args;
+      const result = await this.dependencies.invoke(command, callArgs);
+      if (this.isClosed || this.webviewId !== id) return { found: false };
+      return { found: true, value: result as Result };
+    });
+  }
+
+  panelClosed(id: number): void {
+    if (this.webviewId === id) this.nativePanelId = null;
+  }
+
+  reconcileBounds(): void {
+    if (this.webviewId === null || this.isClosed) return;
+    if (this.element.isConnected) {
+      this.boundsSync();
+      return;
+    }
+    void this.invokePanel(FrontendCommand.WebviewPaneSetBounds, {
+      x: -20000,
+      y: 0,
+      width: 2,
+      height: 2,
+    }).catch((error: unknown) => {
+      this.dependencies.warn("detached browser bounds update failed", { nookId: this.nookId, error: String(error) });
+    });
+  }
+
+  dispose(): Promise<void> {
+    this.disposal ??= this.disposeOwned();
+    return this.disposal;
+  }
+
+  private async disposeOwned(): Promise<void> {
+    let lifecycleError: unknown = null;
+    try {
+      await this.lifecycle.dispose();
+    } catch (error) {
+      lifecycleError = error;
+    }
+    await this.serializeNativeOperation(async () => {
+      const id = this.webviewId;
+      this.nativePanelId = null;
+      if (id !== null) await this.closePanel(id);
+    });
+    if (lifecycleError !== null) throw lifecycleError;
+  }
+
+  private serializeNativeOperation<Result>(operation: () => Promise<Result>): Promise<Result> {
+    const result = this.nativeOperations.then(operation);
+    this.nativeOperations = result.then(() => void 0, () => void 0);
+    return result;
+  }
+
+  private async closePanel(id: number): Promise<void> {
+    await this.dependencies.invoke(FrontendCommand.WebviewPaneClose, { id }).catch((error: unknown) => {
+      this.dependencies.warn("webviewPane.close failed", { nookId: this.nookId, error: String(error) });
+    });
+  }
 }
 
 interface BrowserNookDto {
@@ -20,15 +199,43 @@ interface BrowserNookDto {
   history: string[];
   historyIndex: number;
 }
-const browserNookInstances = new Map<string, BrowserNookInstance>();
+const browserSessions = new Map<string, BrowserSession>();
 
 export function reconcileBrowserBounds(): void {
-  for (const [nookId, instance] of browserNookInstances) {
-    const id = browserWebviewRegistry.get(nookId);
-    if (id === undefined) continue;
-    if (instance.el.isConnected) instance.sync();
-    else void invoke("webviewPane.setBounds", { id, x: -20000, y: 0, width: 2, height: 2 }).catch(() => void 0);
+  for (const session of browserSessions.values()) session.reconcileBounds();
+}
+
+export type BrowserPanelAction =
+  | { kind: "screenshot" }
+  | { kind: "setUserAgent"; userAgent: string }
+  | { kind: "evaluate"; code: string };
+
+export interface BrowserPanelInvocationResult<Result = unknown> {
+  found: boolean;
+  value?: Result;
+}
+
+export type BrowserPanelActionResult = BrowserPanelInvocationResult;
+
+export async function invokeBrowserAction(
+  nookId: string,
+  action: BrowserPanelAction,
+): Promise<BrowserPanelActionResult> {
+  const session = browserSessions.get(nookId);
+  if (!session || session.isClosed) return { found: false };
+  let result: BrowserPanelActionResult;
+  if (action.kind === "screenshot") {
+    result = await session.invokeOwnedPanel(FrontendCommand.WebviewPaneScreenshot, {});
+  } else if (action.kind === "setUserAgent") {
+    result = await session.invokeOwnedPanel(FrontendCommand.WebviewPaneSetUserAgent, {
+      userAgent: action.userAgent,
+    });
+  } else {
+    result = await session.invokeOwnedPanel(FrontendCommand.WebviewPaneEval, {
+      code: action.code,
+    });
   }
+  return result;
 }
 
 export let browserDownloadsDir = "";
@@ -115,15 +322,18 @@ export function themeBackgroundColor(cssValue: string): string | null {
   return null;
 }
 
-async function whenLaidOut(el: HTMLElement): Promise<void> {
+async function whenLaidOut(el: HTMLElement, cancelled: () => boolean): Promise<boolean> {
   for (let i = 0; i < 120; i++) {
+    if (cancelled()) return false;
     if (el.isConnected) {
       const r = el.getBoundingClientRect();
-      if (r.width >= 1 && r.height >= 1) return;
+      if (r.width >= 1 && r.height >= 1) return true;
     }
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
   }
+  if (cancelled()) return false;
   console.warn("browser nook content area never got a size, opening webview anyway");
+  return true;
 }
 
 export function extractWebviewId(openResult: unknown): number | null {
@@ -136,26 +346,22 @@ export function extractWebviewId(openResult: unknown): number | null {
 }
 
 export async function closeBrowserWebview(nookId: string): Promise<void> {
-  const instance = browserNookInstances.get(nookId);
-  browserNookInstances.delete(nookId);
-  if (instance) {
-    instance.closed = true;
-    instance.resizeObserver?.disconnect();
-    instance.resizeObserver = null;
-    window.removeEventListener("resize", instance.resizeListener);
-    for (const dispose of instance.bridgeDisposers.splice(0)) dispose();
-  }
-  const id = browserWebviewRegistry.get(nookId);
-  if (id === undefined) return;
-  browserWebviewRegistry.delete(nookId);
-  await invoke("webviewPane.close", { id }).catch((err) => console.warn("webviewPane.close failed", nookId, err));
+  const session = browserSessions.get(nookId);
+  browserSessions.delete(nookId);
+  await session?.dispose();
+}
+
+export async function disposeBrowserSessions(): Promise<void> {
+  const sessions = [...browserSessions.values()];
+  browserSessions.clear();
+  await Promise.all(sessions.map((session) => session.dispose()));
 }
 
 export async function renderBrowserNook(nookId: string, initialUrl: string, userAgent?: string): Promise<HTMLElement> {
-  const cached = browserNookInstances.get(nookId);
+  const cached = browserSessions.get(nookId);
   if (cached) {
     requestAnimationFrame(() => requestAnimationFrame(() => reconcileBrowserBounds()));
-    return cached.el;
+    return cached.element;
   }
   const el = document.createElement("div");
   el.className = "browser-nook";
@@ -252,16 +458,11 @@ export async function renderBrowserNook(nookId: string, initialUrl: string, user
   loadingBar.style.cssText = "position:absolute;top:0;left:0;right:0;height:2px;background:#34c2b0;transform-origin:left;transform:scaleX(0);transition:transform 0.2s;z-index:10;";
   el.appendChild(loadingBar);
 
-  const nav = new BrowserNavState(initialUrl);
-  const crashState = new NookCrashState();
-  const permQueue = new PermissionPromptQueue();
-  const permTimers = new Map<string, ReturnType<typeof setTimeout>>();
-  const downloads = new DownloadShelfState();
-  let webviewId: number | null = null;
-  let zoomLevel = 1.0;
-  let devToolsOpen = false;
-  let suspended = false;
-  let expectedNavigationUrl: string | null = null;
+  const session = new BrowserSession(nookId, el, initialUrl);
+  const nav = session.nav;
+  const crashState = session.crashState;
+  const permQueue = session.permissions;
+  const downloads = session.downloads;
 
   const updateChrome = () => {
     urlBar.value = nav.currentUrl;
@@ -270,7 +471,7 @@ export async function renderBrowserNook(nookId: string, initialUrl: string, user
     if (nav.currentUrl.startsWith("https://")) securityGlyph.textContent = "🔒";
     else if (nav.currentUrl.startsWith("http://")) securityGlyph.textContent = "⚠";
     else securityGlyph.textContent = "";
-    zoomResetBtn.textContent = Math.round(zoomLevel * 100) + "%";
+    zoomResetBtn.textContent = Math.round(session.zoomLevel * 100) + "%";
   };
 
   const setLoading = (loading: boolean) => {
@@ -278,109 +479,106 @@ export async function renderBrowserNook(nookId: string, initialUrl: string, user
   };
 
   const syncBounds = () => {
-    if (webviewId === null || crashState.isCrashed) return;
+    if (session.isClosed || session.webviewId === null || crashState.isCrashed) return;
     const rect = contentArea.getBoundingClientRect();
     if (rect.width < 1 || rect.height < 1) return;
     const bounds = nativeWebviewBounds(rect);
-    void invoke("webviewPane.setBounds", { id: webviewId, x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height }).catch(() => void 0);
+    void session.invokePanel(FrontendCommand.WebviewPaneSetBounds, {
+      x: bounds.x,
+      y: bounds.y,
+      width: bounds.width,
+      height: bounds.height,
+    }).catch(() => void 0);
   };
-  const instance: BrowserNookInstance = {
-    el,
-    sync: syncBounds,
-    resizeObserver: null,
-    resizeListener: syncBounds,
-    bridgeDisposers: [],
-    closed: false,
-  };
-
-  const onBridge = (event: string, callback: (data: unknown) => void): void => {
-    window.__ryn.on(event, callback);
-    instance.bridgeDisposers.push(() => window.__ryn.off(event, callback));
-  };
-  instance.bridgeDisposers.push(() => {
-    for (const timer of permTimers.values()) clearTimeout(timer);
-    permTimers.clear();
-  });
-
+  session.setBoundsSync(syncBounds);
+  const onBridge = (event: FrontendEvent, callback: (data: unknown) => void): void => session.observe(event, callback);
+  let boundsOwnershipInstalled = false;
   const openWebView = async (url: string) => {
     const storagePath = `/tmp/cove-webview-${nookId}`;
-    await whenLaidOut(contentArea);
+    if (!await whenLaidOut(contentArea, () => session.isClosed)) return null;
     const bounds = nativeWebviewBounds(contentArea.getBoundingClientRect());
     const openArgs: Record<string, unknown> = {
       url,
       x: bounds.x, y: bounds.y,
       width: bounds.width, height: bounds.height,
-      storagePath, devTools: false, zoom: zoomLevel,
+      storagePath, devTools: false, zoom: session.zoomLevel,
     };
     const nookBackground = themeBackgroundColor(getComputedStyle(document.body).getPropertyValue("--bg"));
     if (nookBackground) openArgs.background = nookBackground;
     if (userAgent && userAgent.length > 0) openArgs.userAgent = userAgent;
-    const result = await invoke<unknown>("webviewPane.open", { options: openArgs });
-    const id = extractWebviewId(result);
-    if (id === null) {
-      console.error("webviewPane.open returned no usable id, nook stays blank", nookId, result);
-      return;
-    }
-    webviewId = id;
-    if (instance.closed) {
-      webviewId = null;
-      await invoke("webviewPane.close", { id }).catch((err) => console.warn("webviewPane.close failed", nookId, err));
-      return;
-    }
-    browserWebviewRegistry.set(nookId, id);
+    const panel = await session.openPanel(openArgs);
+    if (panel === null) return null;
     syncBounds();
-    instance.resizeObserver = new ResizeObserver(() => syncBounds());
-    instance.resizeObserver.observe(contentArea);
-    window.addEventListener("resize", instance.resizeListener);
+    if (!boundsOwnershipInstalled) {
+      boundsOwnershipInstalled = true;
+      const resizeObserver = new ResizeObserver(() => syncBounds());
+      resizeObserver.observe(contentArea);
+      session.ownObserver(resizeObserver);
+      session.listen(window, "resize", syncBounds);
+    }
+    return panel;
   };
 
   const doNavigate = async (url: string) => {
     nav.navigate(url);
-    expectedNavigationUrl = nav.currentUrl;
+    session.expectedNavigationUrl = nav.currentUrl;
     updateChrome();
-    if (webviewId !== null) {
-      setLoading(true);
-      await invoke("webviewPane.navigate", { id: webviewId, url: nav.currentUrl }).catch((err) => { console.warn("webview navigate failed", nav.currentUrl, err); setLoading(false); });
+    const targetUrl = nav.currentUrl;
+    setLoading(true);
+    if (session.webviewId !== null) {
+      await session.invokePanel(FrontendCommand.WebviewPaneNavigate, { url: targetUrl }).catch((err) => {
+        console.warn("webview navigate failed", targetUrl, err);
+        if (!session.isClosed) setLoading(false);
+      });
     } else {
-      setLoading(true);
-      await openWebView(nav.currentUrl).catch((err) => { console.warn("webview open failed", nav.currentUrl, err); setLoading(false); });
+      await openWebView(targetUrl).then(async (panel) => {
+        if (panel && !panel.created) await session.invokePanel(FrontendCommand.WebviewPaneNavigate, { url: targetUrl });
+      }).catch((err) => {
+        console.warn("webview open failed", targetUrl, err);
+        if (!session.isClosed) setLoading(false);
+      });
     }
-    void invoke("cove://commands/browser.navigate", { nookId, url: nav.currentUrl }).catch((err) => console.warn("engine browser.navigate failed", err));
+    if (session.isClosed) return;
+    void invoke(FrontendCommand.BrowserNavigate, { nookId, url: nav.currentUrl }).catch((err) => console.warn("engine browser.navigate failed", err));
   };
 
   const doBack = async () => {
     if (!nav.canGoBack) return;
     nav.back();
-    expectedNavigationUrl = nav.currentUrl;
+    session.expectedNavigationUrl = nav.currentUrl;
     updateChrome();
-    if (webviewId !== null) await invoke("webviewPane.navigate", { id: webviewId, url: nav.currentUrl }).catch(() => void 0);
-    void invoke("cove://commands/browser.back", { nookId }).catch(() => void 0);
+    await session.invokePanel(FrontendCommand.WebviewPaneNavigate, { url: nav.currentUrl }).catch(() => void 0);
+    if (session.isClosed) return;
+    void invoke(FrontendCommand.BrowserBack, { nookId }).catch(() => void 0);
   };
 
   const doForward = async () => {
     if (!nav.canGoForward) return;
     nav.forward();
-    expectedNavigationUrl = nav.currentUrl;
+    session.expectedNavigationUrl = nav.currentUrl;
     updateChrome();
-    if (webviewId !== null) await invoke("webviewPane.navigate", { id: webviewId, url: nav.currentUrl }).catch(() => void 0);
-    void invoke("cove://commands/browser.forward", { nookId }).catch(() => void 0);
+    await session.invokePanel(FrontendCommand.WebviewPaneNavigate, { url: nav.currentUrl }).catch(() => void 0);
+    if (session.isClosed) return;
+    void invoke(FrontendCommand.BrowserForward, { nookId }).catch(() => void 0);
   };
 
   const doReload = async () => {
-    if (webviewId !== null) await invoke("webviewPane.reload", { id: webviewId }).catch(() => void 0);
-    void invoke("cove://commands/browser.reload", { nookId }).catch(() => void 0);
+    await session.invokePanel(FrontendCommand.WebviewPaneReload, {}).catch(() => void 0);
+    if (session.isClosed) return;
+    void invoke(FrontendCommand.BrowserReload, { nookId }).catch(() => void 0);
   };
 
   const setZoom = async (level: number) => {
-    zoomLevel = Math.max(0.25, Math.min(5.0, level));
+    session.zoomLevel = Math.max(0.25, Math.min(5.0, level));
     updateChrome();
-    if (webviewId !== null) await invoke("webviewPane.setZoom", { id: webviewId, factor: zoomLevel }).catch((err) => console.warn("webview setZoom failed", err));
+    await session.invokePanel(FrontendCommand.WebviewPaneSetZoom, { factor: session.zoomLevel }).catch((err) => console.warn("webview setZoom failed", err));
   };
 
   const toggleDevTools = async () => {
-    devToolsOpen = !devToolsOpen;
-    if (webviewId !== null) await invoke("webviewPane.setDevTools", { id: webviewId, enabled: devToolsOpen }).catch((err) => console.warn("webview setDevTools failed", err));
-    devToolsBtn.style.background = devToolsOpen ? "#34c2b0" : "";
+    session.devToolsOpen = !session.devToolsOpen;
+    await session.invokePanel(FrontendCommand.WebviewPaneSetDevTools, { enabled: session.devToolsOpen }).catch((err) => console.warn("webview setDevTools failed", err));
+    if (session.isClosed) return;
+    devToolsBtn.style.background = session.devToolsOpen ? "#34c2b0" : "";
   };
 
   const renderFind = () => {
@@ -390,21 +588,28 @@ export async function renderBrowserNook(nookId: string, initialUrl: string, user
   };
 
   const runFind = async (forward: boolean) => {
-    if (webviewId === null) return;
+    if (session.webviewId === null) return;
     if (!findState.canSearch) {
-      await invoke("webviewPane.findStop", { id: webviewId, clearHighlights: true }).catch(() => void 0);
+      await session.invokePanel(FrontendCommand.WebviewPaneFindStop, { clearHighlights: true }).catch(() => void 0);
+      if (session.isClosed) return;
       findState.applyResult({ matches: 0, activeIndex: 0 });
       renderFind();
       return;
     }
-    const result = await invoke<FindResult>("webviewPane.find", { id: webviewId, text: findState.query, forward, matchCase: findState.matchCase }).catch(() => null);
+    const result = await session.invokePanel<FindResult>(FrontendCommand.WebviewPaneFind, {
+      text: findState.query,
+      forward,
+      matchCase: findState.matchCase,
+    }).catch(() => null);
+    if (session.isClosed) return;
     if (result) findState.applyResult(result);
     renderFind();
   };
 
   const runFindNext = async (forward: boolean) => {
-    if (webviewId === null || !findState.canSearch) return;
-    const result = await invoke<FindResult>("webviewPane.findNext", { id: webviewId, forward }).catch(() => null);
+    if (session.webviewId === null || !findState.canSearch) return;
+    const result = await session.invokePanel<FindResult>(FrontendCommand.WebviewPaneFindNext, { forward }).catch(() => null);
+    if (session.isClosed) return;
     if (result) findState.applyResult(result);
     renderFind();
   };
@@ -420,7 +625,7 @@ export async function renderBrowserNook(nookId: string, initialUrl: string, user
   const closeFind = () => {
     findState.closeBar();
     renderFind();
-    if (webviewId !== null) void invoke("webviewPane.findStop", { id: webviewId, clearHighlights: true }).catch(() => void 0);
+    void session.invokePanel(FrontendCommand.WebviewPaneFindStop, { clearHighlights: true }).catch(() => void 0);
     el.focus();
   };
 
@@ -442,8 +647,7 @@ export async function renderBrowserNook(nookId: string, initialUrl: string, user
   };
 
   const clearPermTimer = (requestId: string) => {
-    const t = permTimers.get(requestId);
-    if (t) { clearTimeout(t); permTimers.delete(requestId); }
+    session.clearPermissionTimeout(requestId);
   };
 
   const resolvePermission = async (requestId: string, grant: boolean) => {
@@ -451,7 +655,7 @@ export async function renderBrowserNook(nookId: string, initialUrl: string, user
     clearPermTimer(requestId);
     permQueue.remove(requestId);
     renderPermission();
-    await invoke("webviewPane.resolvePermission", { requestId, grant }).catch(() => void 0);
+    await session.invokePanel(FrontendCommand.WebviewPaneResolvePermission, { requestId, grant }, false).catch(() => void 0);
   };
 
   const dismissPermissionOnTimeout = (requestId: string) => {
@@ -494,7 +698,7 @@ export async function renderBrowserNook(nookId: string, initialUrl: string, user
     }
     renderDownloadPrompt();
     renderDownloadShelf();
-    await invoke("webviewPane.resolveDownload", args).catch(() => void 0);
+    await session.invokePanel(FrontendCommand.WebviewPaneResolveDownload, args, false).catch(() => void 0);
   };
 
   const renderDownloadShelf = () => {
@@ -508,8 +712,8 @@ export async function renderBrowserNook(nookId: string, initialUrl: string, user
   backBtn.addEventListener("click", () => void doBack());
   fwdBtn.addEventListener("click", () => void doForward());
   reloadBtn.addEventListener("click", () => void doReload());
-  zoomInBtn.addEventListener("click", () => void setZoom(zoomLevel + 0.1));
-  zoomOutBtn.addEventListener("click", () => void setZoom(zoomLevel - 0.1));
+  zoomInBtn.addEventListener("click", () => void setZoom(session.zoomLevel + 0.1));
+  zoomOutBtn.addEventListener("click", () => void setZoom(session.zoomLevel - 0.1));
   zoomResetBtn.addEventListener("click", () => void setZoom(1.0));
   devToolsBtn.addEventListener("click", () => void toggleDevTools());
   findBtn.addEventListener("click", () => { if (findState.open) closeFind(); else openFind(); });
@@ -566,14 +770,14 @@ export async function renderBrowserNook(nookId: string, initialUrl: string, user
     crashOverlay.style.display = "none";
     titleBar.textContent = "Loading…";
     setLoading(true);
-    if (webviewId !== null) await invoke("webviewPane.reloadFromCrash", { id: webviewId }).catch(() => void 0);
+    await session.invokePanel(FrontendCommand.WebviewPaneReloadFromCrash, {}).catch(() => void 0);
     syncBounds();
   };
 
   const setSuspended = async (value: boolean) => {
-    if (suspended === value || webviewId === null) return;
-    suspended = value;
-    await invoke("webviewPane.setSuspended", { id: webviewId, suspended: value }).catch(() => void 0);
+    if (session.isClosed || session.suspended === value || session.webviewId === null) return;
+    session.suspended = value;
+    await session.invokePanel(FrontendCommand.WebviewPaneSetSuspended, { suspended: value }).catch(() => void 0);
   };
 
   const visObserver = new IntersectionObserver((entries) => {
@@ -584,37 +788,37 @@ export async function renderBrowserNook(nookId: string, initialUrl: string, user
     }
   }, { threshold: 0 });
   visObserver.observe(el);
-  instance.bridgeDisposers.push(() => visObserver.disconnect());
+  session.ownObserver(visObserver);
 
-  onBridge("webviewPane.navigated", (data: unknown) => {
+  onBridge(FrontendEvent.WebviewPaneNavigated, (data: unknown) => {
     const evt = data as { id: number; url: string };
-    if (evt.id !== webviewId) return;
-    const persistNavigation = nav.webviewNavigated(evt.url, expectedNavigationUrl);
-    expectedNavigationUrl = null;
+    if (evt.id !== session.webviewId) return;
+    const persistNavigation = nav.webviewNavigated(evt.url, session.expectedNavigationUrl);
+    session.expectedNavigationUrl = null;
     updateChrome();
     findState.onNavigate();
     renderFind();
     if (persistNavigation) {
-      void invoke("cove://commands/browser.navigate", { nookId, url: nav.currentUrl }).catch((err) => console.warn("engine browser.navigate failed", err));
+      void invoke(FrontendCommand.BrowserNavigate, { nookId, url: nav.currentUrl }).catch((err) => console.warn("engine browser.navigate failed", err));
     }
   });
 
-  onBridge("webviewPane.titleChanged", (data: unknown) => {
+  onBridge(FrontendEvent.WebviewPaneTitleChanged, (data: unknown) => {
     const evt = data as { id: number; title: string };
-    if (evt.id !== webviewId) return;
+    if (evt.id !== session.webviewId) return;
     if (crashState.isCrashed) return;
     titleBar.textContent = evt.title;
   });
 
-  onBridge("webviewPane.loadStateChanged", (data: unknown) => {
+  onBridge(FrontendEvent.WebviewPaneLoadStateChanged, (data: unknown) => {
     const evt = data as { id: number; state: string };
-    if (evt.id !== webviewId) return;
+    if (evt.id !== session.webviewId) return;
     setLoading(evt.state === "started");
   });
 
-  onBridge("webviewPane.faviconChanged", (data: unknown) => {
+  onBridge(FrontendEvent.WebviewPaneFaviconChanged, (data: unknown) => {
     const evt = data as { id: number; dataUrl: string };
-    if (evt.id !== webviewId) return;
+    if (evt.id !== session.webviewId) return;
     if (evt.dataUrl) {
       titleBar.style.backgroundImage = `url(${evt.dataUrl})`;
       titleBar.style.backgroundRepeat = "no-repeat";
@@ -624,72 +828,75 @@ export async function renderBrowserNook(nookId: string, initialUrl: string, user
     }
   });
 
-  onBridge("webviewPane.closed", (data: unknown) => {
+  onBridge(FrontendEvent.WebviewPaneClosed, (data: unknown) => {
     const evt = data as { id: number };
-    if (evt.id !== webviewId) return;
-    webviewId = null;
+    if (evt.id !== session.webviewId) return;
+    session.panelClosed(evt.id);
     contentArea.style.background = "#0d1117";
     titleBar.textContent = "Closed";
   });
 
-  onBridge("webviewPane.processTerminated", (data: unknown) => {
+  onBridge(FrontendEvent.WebviewPaneProcessTerminated, (data: unknown) => {
     const evt = data as { id: number; reason?: string };
-    if (evt.id !== webviewId) return;
+    if (evt.id !== session.webviewId) return;
     enterCrash(evt.reason ?? null);
   });
 
-  onBridge("webviewPane.permissionRequested", (data: unknown) => {
+  onBridge(FrontendEvent.WebviewPanePermissionRequested, (data: unknown) => {
     const evt = data as { id: number; requestId: string; kinds: string[]; url: string };
-    if (evt.id !== webviewId) return;
+    if (evt.id !== session.webviewId) return;
     const req: PermissionRequest = { requestId: evt.requestId, kinds: evt.kinds ?? [], url: evt.url ?? nav.currentUrl };
     permQueue.add(req);
-    permTimers.set(req.requestId, setTimeout(() => dismissPermissionOnTimeout(req.requestId), permissionAutoDenyMs));
+    session.schedulePermissionTimeout(req.requestId, () => dismissPermissionOnTimeout(req.requestId));
     renderPermission();
   });
 
-  onBridge("webviewPane.downloadRequested", (data: unknown) => {
+  onBridge(FrontendEvent.WebviewPaneDownloadRequested, (data: unknown) => {
     const evt = data as { id: number; downloadId: string; url: string; suggestedName: string };
-    if (evt.id !== webviewId) return;
+    if (evt.id !== session.webviewId) return;
     downloads.requested(evt.downloadId, evt.url, evt.suggestedName || "download");
     renderDownloadPrompt();
   });
 
-  onBridge("webviewPane.downloadProgress", (data: unknown) => {
+  onBridge(FrontendEvent.WebviewPaneDownloadProgress, (data: unknown) => {
     const evt = data as { id: number; downloadId: string; receivedBytes: number; totalBytes: number };
-    if (evt.id !== webviewId) return;
+    if (evt.id !== session.webviewId) return;
     downloads.progress(evt.downloadId, evt.receivedBytes ?? 0, evt.totalBytes ?? 0);
     renderDownloadShelf();
   });
 
-  onBridge("webviewPane.downloadCompleted", (data: unknown) => {
+  onBridge(FrontendEvent.WebviewPaneDownloadCompleted, (data: unknown) => {
     const evt = data as { id: number; downloadId: string; path?: string };
-    if (evt.id !== webviewId) return;
+    if (evt.id !== session.webviewId) return;
     downloads.completed(evt.downloadId, evt.path);
     renderDownloadShelf();
   });
 
-  onBridge("webviewPane.downloadFailed", (data: unknown) => {
+  onBridge(FrontendEvent.WebviewPaneDownloadFailed, (data: unknown) => {
     const evt = data as { id: number; downloadId: string; reason?: string };
-    if (evt.id !== webviewId) return;
+    if (evt.id !== session.webviewId) return;
     downloads.failed(evt.downloadId, evt.reason ?? "download failed");
     renderDownloadShelf();
   });
 
-  void invoke<BrowserNookDto>("cove://commands/browser.open", { nookId, url: nav.currentUrl })
+  void invoke<BrowserNookDto>(FrontendCommand.BrowserOpen, { nookId, url: nav.currentUrl })
     .catch(() => null)
     .then((retained) => {
+      if (session.isClosed) return null;
       if (retained) nav.restore(retained.history, retained.historyIndex);
       updateChrome();
-      expectedNavigationUrl = nav.currentUrl;
+      session.expectedNavigationUrl = nav.currentUrl;
       return openWebView(nav.currentUrl);
     })
-    .then(() => setLoading(true))
+    .then(() => {
+      if (!session.isClosed) setLoading(true);
+    })
     .catch((err) => console.warn("webview open failed", nav.currentUrl, err));
 
   updateChrome();
   renderFind();
 
-  browserNookInstances.set(nookId, instance);
+  browserSessions.set(nookId, session);
   return el;
 }
 

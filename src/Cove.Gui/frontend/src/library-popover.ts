@@ -1,4 +1,5 @@
 import { invoke } from "./invoke";
+import { FrontendCommand } from "./app/frontend-command";
 
 interface LibraryEntry {
   id: string;
@@ -55,7 +56,7 @@ export async function renderLibraryPopover(bayId: string): Promise<HTMLElement> 
 
   const refresh = async () => {
     try {
-      const result = await invoke<LibraryListResult>("cove://commands/library.list", { bayId, kind: currentKind });
+      const result = await invoke<LibraryListResult>(FrontendCommand.LibraryList, { bayId, kind: currentKind });
       allEntries = result.entries || [];
       renderList();
     } catch (e) {
@@ -146,7 +147,7 @@ function buildEntryRow(entry: LibraryEntry, bayId: string): HTMLElement {
   row.appendChild(info);
 
   row.addEventListener("click", () => {
-    invoke("cove://commands/library.materialize", { bayId, entryId: entry.id }).catch(e => {
+    invoke(FrontendCommand.LibraryMaterialize, { bayId, entryId: entry.id }).catch(e => {
       console.error("Materialize failed:", e);
     });
   });

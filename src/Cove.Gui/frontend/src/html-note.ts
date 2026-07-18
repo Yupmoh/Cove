@@ -1,4 +1,5 @@
 import { invoke } from "./invoke";
+import { FrontendCommand } from "./app/frontend-command";
 
 interface NoteReadResult {
   id: string;
@@ -23,10 +24,10 @@ export async function renderHtmlNote(bayId: string, noteId: string): Promise<HTM
   currentBayId = bayId;
 
   try {
-    const result = await invoke<NoteReadResult>("cove://commands/note.read", { bayId, id: noteId });
+    const result = await invoke<NoteReadResult>(FrontendCommand.NoteRead, { bayId, id: noteId });
     currentContent = result.content;
 
-    const stateJson = await invoke<{ state: string | null }>("cove://commands/note.get-state", {
+    const stateJson = await invoke<{ state: string | null }>(FrontendCommand.NoteGetState, {
       bayId,
       id: noteId,
     }).catch(() => ({ state: null }));
@@ -129,7 +130,7 @@ function setupPostMessageListener(iframe: HTMLIFrameElement): void {
 async function persistRuntimeState(): Promise<void> {
   if (!currentBayId || !currentNoteId) return;
   try {
-    await invoke("cove://commands/note.save-state", {
+    await invoke(FrontendCommand.NoteSaveState, {
       bayId: currentBayId,
       id: currentNoteId,
       stateJson: JSON.stringify(runtimeState),
@@ -149,7 +150,7 @@ function rerender(): void {
 async function saveHtmlNote(): Promise<void> {
   if (!currentBayId || !currentNoteId) return;
   try {
-    await invoke("cove://commands/note.write", {
+    await invoke(FrontendCommand.NoteWrite, {
       bayId: currentBayId,
       id: currentNoteId,
       content: currentContent,

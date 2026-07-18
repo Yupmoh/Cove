@@ -1,5 +1,6 @@
 import type * as Monaco from "monaco-editor";
 import { invoke } from "./invoke";
+import { FrontendCommand } from "./app/frontend-command";
 import { MonacoLoader, detectLanguage } from "./monaco-loader";
 import { DiffViewMode, parseRefSpec } from "./diff-view-model";
 
@@ -55,7 +56,7 @@ export async function renderDiffViewerNook(nookId: string, filePath: string, ref
 
   let diff: DiffContent = { originalContent: "", modifiedContent: "" };
   try {
-    const result = await invoke<DiffContent>("cove://commands/scm.diff", { filePath, ref: refSpec.ref, nookId });
+    const result = await invoke<DiffContent>(FrontendCommand.ScmDiff, { filePath, ref: refSpec.ref, nookId });
     diff = result;
   } catch (e) {
     diff = { originalContent: "", modifiedContent: `Failed to load: ${(e as Error).message}` };

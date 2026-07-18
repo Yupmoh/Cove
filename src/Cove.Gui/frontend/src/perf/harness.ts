@@ -3,6 +3,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { CanvasAddon } from "@xterm/addon-canvas";
 import "@xterm/xterm/css/xterm.css";
+import { FrontendCommand } from "../app/frontend-command";
 import { computeStats, fps, throughputMBs, round1 } from "./instrument";
 import { detectWebgl2 } from "./renderer";
 import type { RendererKind } from "./renderer";
@@ -114,6 +115,6 @@ function toMarkdown(rows: Row[], meta: string): string {
     rows.push(await runCell(r, n, s));
   }
   const md = toMarkdown(rows, meta);
-  const dir = (await window.__ryn.invoke("app.savePerf", { json: JSON.stringify({ done: true, meta, rows }, null, 2), markdown: md })) as string;
+  const dir = (await window.__ryn.invoke(FrontendCommand.AppSavePerf, { json: JSON.stringify({ done: true, meta, rows }, null, 2), markdown: md })) as string;
   status.textContent = `PERF_DONE -> ${dir}`;
 })();

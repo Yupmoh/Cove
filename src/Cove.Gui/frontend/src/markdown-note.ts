@@ -1,4 +1,5 @@
 import { invoke } from "./invoke";
+import { FrontendCommand } from "./app/frontend-command";
 
 interface Note {
   id: string;
@@ -38,7 +39,7 @@ export async function renderMarkdownNote(bayId: string, noteId: string): Promise
   el.style.cssText = "display:flex;flex-direction:column;height:100%;background:#0b1622;color:#e5e9f0;font-family:system-ui,sans-serif;";
 
   try {
-    const result = await invoke<NoteReadResult>("cove://commands/note.read", {
+    const result = await invoke<NoteReadResult>(FrontendCommand.NoteRead, {
       bayId,
       id: noteId,
     });
@@ -213,7 +214,7 @@ async function handleImagePaste(file: File, bayId: string, editor: HTMLTextAreaE
     if (!base64 || !currentNote) return;
 
     try {
-      const result = await invoke<{ mediaPath: string }>("cove://commands/note.media.save", {
+      const result = await invoke<{ mediaPath: string }>(FrontendCommand.NoteMediaSave, {
         bayId,
         id: currentNote.id,
         fileName: file.name,
@@ -225,7 +226,7 @@ async function handleImagePaste(file: File, bayId: string, editor: HTMLTextAreaE
       editor.value = editor.value.slice(0, pos) + insertText + editor.value.slice(pos);
       currentNote.content = editor.value;
 
-      await invoke("cove://commands/note.write", {
+      await invoke(FrontendCommand.NoteWrite, {
         bayId,
         id: currentNote.id,
         content: currentNote.content,
@@ -241,7 +242,7 @@ async function saveNote(bayId: string, el: HTMLElement): Promise<void> {
   if (!currentNote) return;
   try {
     const contentWithComments = serializeContentWithComments(currentNote.content);
-    await invoke("cove://commands/note.write", {
+    await invoke(FrontendCommand.NoteWrite, {
       bayId,
       id: currentNote.id,
       title: currentNote.title,

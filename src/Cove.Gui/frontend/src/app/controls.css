@@ -1,0 +1,30 @@
+
+select {
+  -webkit-appearance: none; appearance: none;
+  background-color: var(--panel-2); color: var(--fg);
+  border: 1px solid var(--border); border-radius: 7px;
+  padding: 5px 26px 5px 10px; font-size: 12px; font-family: inherit; cursor: pointer; outline: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a6adc8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9.5 12 15.5 18 9.5'/></svg>");
+  background-repeat: no-repeat; background-position: right 8px center; background-size: 12px;
+}
+select:hover { border-color: var(--accent-dim); }
+select:focus { border-color: var(--accent); }
+input[type="checkbox"] {
+  -webkit-appearance: none; appearance: none;
+  width: 15px; height: 15px; border-radius: 4px; cursor: pointer;
+  background: var(--panel-2); border: 1px solid var(--border); position: relative; vertical-align: middle;
+}
+input[type="checkbox"]:checked { background: var(--accent); border-color: var(--accent); }
+input[type="checkbox"]:checked::after {
+  content: ""; position: absolute; left: 4.5px; top: 1.5px; width: 4px; height: 8px;
+  border: solid #11111b; border-width: 0 1.8px 1.8px 0; transform: rotate(45deg);
+}
+body {
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  color: var(--fg);
+  font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  font-size: 13px;
+}
+#app { display: flex; flex: 1; flex-direction: column; min-height: 0; }

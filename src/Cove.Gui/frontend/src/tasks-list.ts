@@ -1,4 +1,5 @@
 import { invoke } from "./invoke";
+import { FrontendCommand } from "./app/frontend-command";
 
 interface TaskCard {
   id: string;
@@ -51,8 +52,8 @@ export async function renderTaskList(bayId: string): Promise<HTMLElement> {
 async function refreshList(el: HTMLElement, bayId: string): Promise<void> {
   try {
     const [statusResult, cardResult] = await Promise.all([
-      invoke<StatusListResult>("cove://commands/task.status.list", { bayId }),
-      invoke<TaskListResult>("cove://commands/task.list", { bayId }),
+      invoke<StatusListResult>(FrontendCommand.TaskStatusList, { bayId }),
+      invoke<TaskListResult>(FrontendCommand.TaskList, { bayId }),
     ]);
 
     statusMap = {};
@@ -222,7 +223,7 @@ function openDetailModal(card: TaskCard, bayId: string): void {
   launchBtn.style.cssText = "padding:6px 16px;background:#4cc2d6;border:none;border-radius:4px;color:#0b1622;cursor:pointer;font-size:13px;margin-right:8px;";
   launchBtn.addEventListener("click", async () => {
     try {
-      await invoke("cove://commands/task.launch", { cardId: card.id });
+      await invoke(FrontendCommand.TaskLaunch, { cardId: card.id });
       overlay.remove();
     } catch (e) {
       alert("Launch failed: " + (e as Error).message);

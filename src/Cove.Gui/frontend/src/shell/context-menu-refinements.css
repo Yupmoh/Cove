@@ -1,0 +1,3 @@
+
+.ctx-menu { border-radius: 11px; padding: 6px; background: color-mix(in srgb, var(--panel) 88%, var(--panel-2)); }
+.ctx-item { border-radius: 7px; padding: 7px 11px; }

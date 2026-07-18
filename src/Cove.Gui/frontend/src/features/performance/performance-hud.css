@@ -1,0 +1,13 @@
+
+#perf-hud {
+  position: fixed; top: 48px; right: 12px; z-index: 70; display: none;
+  min-width: 120px; padding: 8px 10px; border-radius: 8px;
+  background: rgba(17, 17, 27, 0.82); border: 1px solid var(--border);
+  color: var(--fg); font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px; pointer-events: none; box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+#perf-hud.open { display: block; }
+.hud-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 1px 0; }
+.hud-row .hud-label { color: var(--muted); }
+.hud-row .hud-value { color: var(--accent); font-variant-numeric: tabular-nums; }
+.hud-caption { margin-top: 5px; padding-top: 5px; border-top: 1px solid var(--border); color: var(--muted); font-size: 9.5px; line-height: 1.3; }

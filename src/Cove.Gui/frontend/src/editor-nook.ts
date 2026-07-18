@@ -1,5 +1,6 @@
 import type * as Monaco from "monaco-editor";
 import { invoke } from "./invoke";
+import { FrontendCommand } from "./app/frontend-command";
 import { MonacoLoader, detectLanguage, defineCoveMonacoTheme } from "./monaco-loader";
 import {
   buildBreadcrumbs,
@@ -122,7 +123,7 @@ export async function renderEditorNook(nookId: string, filePath: string): Promis
     crumb.textContent = seg.label;
     crumb.title = seg.path;
     crumb.addEventListener("click", () => {
-      invoke("cove://commands/sidebar.reveal", { path: seg.path }).catch(() => {});
+      invoke(FrontendCommand.SidebarReveal, { path: seg.path }).catch(() => {});
     });
     breadcrumbs.appendChild(crumb);
   });
@@ -180,7 +181,7 @@ export async function renderEditorNook(nookId: string, filePath: string): Promis
   let largeFile = false;
 
   try {
-    const result = await invoke<{ content: string; size: number }>("cove://commands/editor.open", { filePath, nookId });
+    const result = await invoke<{ content: string; size: number }>(FrontendCommand.EditorOpen, { filePath, nookId });
     content = result.content ?? "";
     readOnly = (result.size ?? 0) > LARGE_FILE_THRESHOLD;
     largeFile = readOnly;
@@ -229,7 +230,7 @@ export async function renderEditorNook(nookId: string, filePath: string): Promis
     renderMinimapBtn();
   });
 
-  invoke<AttributionListResult>("cove://commands/attribution.find-by-range", { filePath, startLine: 1, endLine: 1000000 })
+  invoke<AttributionListResult>(FrontendCommand.AttributionFindByRange, { filePath, startLine: 1, endLine: 1000000 })
     .then((res) => {
       const chip = latestAgentEdit(res.entries ?? []);
       if (chip) {
@@ -254,7 +255,7 @@ export async function renderEditorNook(nookId: string, filePath: string): Promis
   const refreshLspDiagnostics = async () => {
     if (lspLanguageForPath(filePath) === null) return;
     try {
-      const result = await invoke<LspDiagnosticsResult>("cove://commands/lsp.diagnostics", {
+      const result = await invoke<LspDiagnosticsResult>(FrontendCommand.LspDiagnostics, {
         filePath,
         content: model.getValue(),
         rootDir: lspRootDir,
@@ -306,7 +307,7 @@ export async function renderEditorNook(nookId: string, filePath: string): Promis
 
   const refreshDecorations = async () => {
     try {
-      const diff = await invoke<ScmDiffResult>("cove://commands/scm.diff", { repoRoot: repoDir, filePath: fileName, ref: "HEAD" });
+      const diff = await invoke<ScmDiffResult>(FrontendCommand.ScmDiff, { repoRoot: repoDir, filePath: fileName, ref: "HEAD" });
       const marks = parseDiffDecorations(diff.newContent ?? "");
       const lineCount = model.getLineCount();
       decorations.set(
@@ -324,7 +325,7 @@ export async function renderEditorNook(nookId: string, filePath: string): Promis
 
   const refreshBlame = async () => {
     try {
-      const blame = await invoke<ScmBlameResult>("cove://commands/scm.blame", { repoRoot: repoDir, filePath: fileName });
+      const blame = await invoke<ScmBlameResult>(FrontendCommand.ScmBlame, { repoRoot: repoDir, filePath: fileName });
       blameLines = blame.lines ?? [];
     } catch {
       void 0;
@@ -359,7 +360,7 @@ export async function renderEditorNook(nookId: string, filePath: string): Promis
     if (!line) return;
     const entry = blameForLine(blameLines, line);
     if (entry && e.event.leftButton && e.target.type === monaco.editor.MouseTargetType.GUTTER_LINE_DECORATIONS) {
-      invoke("cove://commands/tool.git", { repoRoot: repoDir, commit: entry.commit }).catch(() => {});
+      invoke(FrontendCommand.ToolGit, { repoRoot: repoDir, commit: entry.commit }).catch(() => {});
     }
   });
 
@@ -369,7 +370,7 @@ export async function renderEditorNook(nookId: string, filePath: string): Promis
   const doSave = async () => {
     if (readOnly) return;
     try {
-      await invoke("cove://commands/editor.save", { filePath, nookId, content: model.getValue() });
+      await invoke(FrontendCommand.EditorSave, { filePath, nookId, content: model.getValue() });
       dirty = false;
       saveStatus.textContent = "Saved";
       saveStatus.style.color = "var(--muted)";
@@ -392,7 +393,7 @@ export async function renderEditorNook(nookId: string, filePath: string): Promis
   editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => { void doSave(); });
 
   try {
-    const state = await invoke<EditorState | null>("cove://commands/editor.get-state", { nookId });
+    const state = await invoke<EditorState | null>(FrontendCommand.EditorGetState, { nookId });
     if (state) {
       if (state.cursor) {
         try {
@@ -410,7 +411,7 @@ export async function renderEditorNook(nookId: string, filePath: string): Promis
     try {
       const cursor = JSON.stringify(editor.getSelection());
       const scroll = JSON.stringify(editor.getScrollTop());
-      await invoke("cove://commands/editor.set-state", { nookId, cursor, scroll });
+      await invoke(FrontendCommand.EditorSetState, { nookId, cursor, scroll });
     } catch { void 0; }
   };
 

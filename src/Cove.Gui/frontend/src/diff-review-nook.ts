@@ -1,4 +1,5 @@
 import { invoke } from "./invoke";
+import { FrontendCommand } from "./app/frontend-command";
 
 interface SnapshotListItem {
   id: string;
@@ -136,9 +137,9 @@ async function loadDiffReview(commitSha: string, container: HTMLElement, isIniti
 
   try {
     const [snapshots, comments, attribution] = await Promise.all([
-      invoke<SnapshotListResult>("cove://commands/snapshot.list", {}),
-      invoke<ReviewListCommentsResult>("cove://commands/review.list-comments", { commitSha }).catch(() => ({ comments: [] as ReviewCommentDto[] })),
-      invoke<AttributionListResult>("cove://commands/attribution.find-by-range", { filePath: "", startLine: 1, endLine: 999999 }).catch(() => ({ entries: [] as AttributionEntryDto[] })),
+      invoke<SnapshotListResult>(FrontendCommand.SnapshotList, {}),
+      invoke<ReviewListCommentsResult>(FrontendCommand.ReviewListComments, { commitSha }).catch(() => ({ comments: [] as ReviewCommentDto[] })),
+      invoke<AttributionListResult>(FrontendCommand.AttributionFindByRange, { filePath: "", startLine: 1, endLine: 999999 }).catch(() => ({ entries: [] as AttributionEntryDto[] })),
     ]);
 
     const detached = document.createElement("div");
@@ -146,7 +147,7 @@ async function loadDiffReview(commitSha: string, container: HTMLElement, isIniti
 
     const latestSnap = snapshots.snapshots[0];
     if (latestSnap) {
-      const diffResult = await invoke<SnapshotInspectResult>("cove://commands/snapshot.inspect", { id: latestSnap.id });
+      const diffResult = await invoke<SnapshotInspectResult>(FrontendCommand.SnapshotInspect, { id: latestSnap.id });
       renderDiffLines(diffResult.diffs, detached, comments.comments, attribution.entries);
     }
 

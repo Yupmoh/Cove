@@ -1,0 +1,35 @@
+
+#app-row { display: flex; flex: 1; min-height: 0; gap: 6px; padding: 6px; }
+#titlebar {
+  display: flex; align-items: center; gap: 0;
+  height: 44px; min-height: 44px; flex-shrink: 0; padding: 0 10px;
+  position: relative; background: var(--bg); border-bottom: 1px solid transparent;
+  box-shadow: inset 0 -1px color-mix(in srgb, var(--border) 50%, transparent);
+  user-select: none; -webkit-user-select: none;
+}
+body.window-inactive #titlebar { opacity: 0.65; }
+body.backdrop-translucent { background: rgba(30, 30, 46, 0.62); }
+body.backdrop-translucent #titlebar { background: rgba(17, 17, 27, 0.55); }
+body.backdrop-translucent #sidebar { background: rgba(24, 24, 37, 0.5); }
+#tl-zone { width: var(--ryn-titlebar-inset-left, 70px); height: 100%; flex-shrink: 0; display: none; align-items: center; }
+body.platform-mac #tl-zone { display: flex; }
+body.platform-mac #win-controls { display: none; }
+#wordmark { display: flex; align-items: center; width: 18px; height: 22px; flex: 0 0 18px; overflow: hidden; }
+#wordmark-img { height: 18px; width: auto; max-width: none; display: block; cursor: pointer; -webkit-user-drag: none; user-select: none; }
+#wordmark-ver { display: none; }
+#tb-cluster { position: absolute; inset: 0 176px 0 var(--cove-workspace-left, 297px); display: flex; align-items: center; justify-content: center; gap: 8px; min-width: 0; z-index: 1; }
+#tb-right { display: flex; align-items: center; gap: 3px; flex-shrink: 0; margin-left: auto; position: relative; z-index: 2; }
+.tb-find-anything { display: flex; align-items: center; gap: 7px; height: 27px; padding: 0 12px; border-radius: 8px; background: color-mix(in srgb, var(--panel) 72%, transparent); border: 1px solid color-mix(in srgb, var(--border) 68%, transparent); color: var(--muted); cursor: pointer; font-size: 12.5px; width: min(480px, calc(100% - 48px)); min-width: 0; box-shadow: none; }
+.tb-find-ph { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tb-cluster-btn svg { width: 18px; height: 18px; display: block; }
+.tb-find-anything:hover { color: var(--fg); background: color-mix(in srgb, var(--panel-2) 64%, transparent); border-color: color-mix(in srgb, var(--muted) 58%, var(--border)); }
+.tb-find-ic { font-size: 13px; line-height: 0; }
+.tb-find-ic svg { width: 13px; height: 13px; display: block; }
+.tb-find-ph { white-space: nowrap; }
+.tb-cluster-btn { width: 32px; height: 30px; justify-content: center; font-size: 14px; border-radius: 8px; }
+#tb-zoom-label { min-width: 40px; text-align: center; font-size: 12px; color: color-mix(in srgb, var(--muted) 88%, transparent); cursor: default; pointer-events: none; padding: 6px 2px; border-radius: 7px; font-variant-numeric: tabular-nums; }
+.tb-cluster-btn.tb-update { color: var(--accent); }
+#win-controls { display: flex; align-items: center; gap: 2px; flex-shrink: 0; margin-left: 4px; position: relative; z-index: 2; }
+.wc { width: 30px; height: 26px; display: flex; align-items: center; justify-content: center; border-radius: 6px; cursor: pointer; color: var(--muted); font-size: 12px; }
+.wc:hover { background: var(--panel-2); color: var(--fg); }
+.wc-close:hover { background: #b3364a; color: #fff; }

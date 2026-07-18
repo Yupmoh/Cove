@@ -32,6 +32,24 @@ export function streamVisibilityAction(state: { visible: boolean; connected: boo
   return "none";
 }
 
+export type StreamReconciliationAction = Exclude<StreamVisibilityAction, "none"> | "dispose";
+
+export function streamReconciliationActions(state: {
+  inLayout: boolean;
+  visible: boolean;
+  connected: boolean;
+  socketClosed: boolean;
+}): StreamReconciliationAction[] {
+  const actions: StreamReconciliationAction[] = [];
+  const visibilityAction = streamVisibilityAction(state);
+  if (visibilityAction !== "none") actions.push(visibilityAction);
+  const socketClosed = state.socketClosed || visibilityAction === "disconnect";
+  if (shouldDisposeNook({ inLayout: state.inLayout, wsClosed: socketClosed })) {
+    actions.push("dispose");
+  }
+  return actions;
+}
+
 export function createStreamGenerations(): StreamGenerations {
   const generations = new Map<string, number>();
   const bump = (nookId: string): number => {

@@ -1,4 +1,5 @@
 import { invoke } from "./invoke";
+import { FrontendCommand } from "./app/frontend-command";
 import type { RecentSessionRow } from "./launcher-model";
 import { adapterAccent, filterSessionRows, SESSION_FILTER_MIN_ROWS } from "./launcher-model";
 import { groupRecentsByAdapter, type AdapterLabel, type AdapterSessionGroup } from "./session-resume";
@@ -57,7 +58,7 @@ async function buildRecentsArea(projectDir: string, adapters: AdapterLabel[], on
 
   let groups: AdapterSessionGroup[] = [];
   try {
-    const res = await invoke<RecentResults>("cove://commands/session.recent", { cwd: projectDir, limit: 50 });
+    const res = await invoke<RecentResults>(FrontendCommand.SessionRecent, { cwd: projectDir, limit: 50 });
     groups = groupRecentsByAdapter(res.sessions ?? [], projectDir, adapters, Date.now());
   } catch (e) {
     console.warn("session.recent unavailable", e);
@@ -209,7 +210,7 @@ function buildSearchArea(bayId: string): HTMLElement {
       return;
     }
     try {
-      const result = await invoke<SearchResults>("cove://commands/vault.search", { bayId, query });
+      const result = await invoke<SearchResults>(FrontendCommand.VaultSearch, { bayId, query });
       const entries = result.entries || [];
       if (entries.length === 0) {
         resultsList.appendChild(buildEmptyNotice("No sessions found"));
@@ -337,7 +338,7 @@ function buildSettingsPanel(bayId: string): HTMLElement {
 
 async function updateVaultSetting(bayId: string, key: string, value: string): Promise<void> {
   try {
-    await invoke("cove://commands/vault.set-setting", { bayId, key, value });
+    await invoke(FrontendCommand.VaultSetSetting, { bayId, key, value });
   } catch (e) {
     console.error("Setting update failed:", e);
   }
@@ -345,7 +346,7 @@ async function updateVaultSetting(bayId: string, key: string, value: string): Pr
 
 async function reindexVault(bayId: string): Promise<void> {
   try {
-    await invoke("cove://commands/vault.reindex", { bayId });
+    await invoke(FrontendCommand.VaultReindex, { bayId });
   } catch (e) {
     console.error("Reindex failed:", e);
   }

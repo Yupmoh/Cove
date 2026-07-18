@@ -1,5 +1,6 @@
 import type * as Monaco from "monaco-editor";
 import { invoke } from "./invoke";
+import { FrontendCommand } from "./app/frontend-command";
 import { MonacoLoader } from "./monaco-loader";
 import { MarkdownViewMode } from "./markdown-view-mode";
 import { parseComments, insertComment, resolveComment, deleteComment, type CommentEntry } from "./markdown-comments";
@@ -157,7 +158,7 @@ export async function renderMarkdownNook(nookId: string, filePath: string): Prom
     const raw: Record<string, string> = {};
     for (const k of keys) {
       try {
-        const r = await invoke<{ value: string } | null>("cove://commands/config.get", { key: k });
+        const r = await invoke<{ value: string } | null>(FrontendCommand.ConfigGet, { key: k });
         if (r?.value) raw[k] = r.value;
       } catch { void 0; }
     }
@@ -175,7 +176,7 @@ export async function renderMarkdownNook(nookId: string, filePath: string): Prom
   });
 
   try {
-    const result = await invoke<{ content: string }>("cove://commands/editor.open", { filePath, nookId });
+    const result = await invoke<{ content: string }>(FrontendCommand.EditorOpen, { filePath, nookId });
     content = result.content ?? "";
   } catch (e) {
     content = `Failed to open: ${(e as Error).message}`;
@@ -190,7 +191,7 @@ export async function renderMarkdownNook(nookId: string, filePath: string): Prom
     const saveContent = canonicalMarkdown();
     content = saveContent;
     try {
-      await invoke("cove://commands/editor.save", { filePath, nookId, content: saveContent });
+      await invoke(FrontendCommand.EditorSave, { filePath, nookId, content: saveContent });
       dirty = false;
       saveStatus.textContent = "Saved";
       saveStatus.style.color = "#858585";
@@ -353,7 +354,7 @@ export async function renderMarkdownNook(nookId: string, filePath: string): Prom
     }
     try {
       const fileName = pastedImageFileName(file.type, Date.now());
-      const res = await invoke<{ mediaPath: string }>("cove://commands/note.media.save", {
+      const res = await invoke<{ mediaPath: string }>(FrontendCommand.NoteMediaSave, {
         bayId: "default", id: nookId, fileName, base64Data: base64,
       });
       const link = buildImageMarkdown(res.mediaPath);
@@ -372,7 +373,7 @@ export async function renderMarkdownNook(nookId: string, filePath: string): Prom
   }
 
   try {
-    const state = await invoke<MarkdownState | null>("cove://commands/editor.get-state", { nookId });
+    const state = await invoke<MarkdownState | null>(FrontendCommand.EditorGetState, { nookId });
     if (state?.viewMode === MarkdownViewMode.Source) void switchToSource();
     else if (!state?.viewMode && mdSettings.defaultViewMode === MarkdownViewMode.Source) void switchToSource();
     if (state?.scroll) rteContainer.scrollTop = state.scroll;

@@ -1,0 +1,39 @@
+
+.drop-overlay {
+  position: absolute; z-index: 15; pointer-events: none; border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  border: 1.5px solid var(--accent);
+  transition: left 0.08s, top 0.08s, width 0.08s, height 0.08s;
+}
+.nook-header {
+  position: relative; flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 3px;
+  height: 28px; padding: 0 6px 0 11px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--agent-accent, var(--accent)) 9%, var(--panel)), var(--panel) 62%);
+  border-bottom: 1px solid var(--border);
+  font-size: 11px; color: var(--muted); user-select: none;
+}
+.nook-header::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; pointer-events: none;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--agent-accent, var(--accent)) 60%, transparent), transparent);
+  background-size: 200% 100%; opacity: 0; transition: opacity 0.3s;
+}
+.nook.focused .nook-header::after { opacity: 0.55; }
+.nook.agent-running .nook-header::after { opacity: 1; animation: nook-shimmer 3.4s linear infinite; }
+@keyframes nook-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+.nook.focused .nook-header { color: var(--fg); }
+.nh-dot {
+  width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; margin-right: 8px;
+  background: var(--agent-accent, color-mix(in srgb, var(--muted) 45%, transparent));
+  box-shadow: 0 0 6px color-mix(in srgb, var(--agent-accent, transparent) 50%, transparent);
+  transition: background 0.2s, box-shadow 0.2s;
+}
+.nook-header .pt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; font-weight: 600; letter-spacing: 0.01em; }
+.pmore {
+  background: none; border: none; color: var(--muted); cursor: pointer; font-size: 13px; line-height: 1;
+  width: 22px; height: 20px; display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 6px; padding: 0; flex-shrink: 0; transition: background 0.12s, color 0.12s;
+}
+.pmore:hover { color: var(--fg); background: color-mix(in srgb, var(--border) 62%, transparent); }
+.pclose { font-size: 11px; }
+.pclose:hover { background: color-mix(in srgb, #f38ba8 24%, transparent); color: #f38ba8; }
+.psplit svg { width: 12px; height: 12px; display: block; }

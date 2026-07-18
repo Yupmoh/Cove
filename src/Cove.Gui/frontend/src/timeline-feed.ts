@@ -1,4 +1,5 @@
 import { invoke } from "./invoke";
+import { FrontendCommand } from "./app/frontend-command";
 
 interface TimelineEntry {
   id: string;
@@ -29,7 +30,7 @@ export async function renderTimelineFeed(bayId: string): Promise<HTMLElement> {
 
 async function refreshFeed(el: HTMLElement, bayId: string): Promise<void> {
   try {
-    const result = await invoke<TimelineListResult>("cove://commands/timeline.list", { bayId });
+    const result = await invoke<TimelineListResult>(FrontendCommand.TimelineList, { bayId });
     allEntries = result.entries || [];
     el.innerHTML = "";
     el.appendChild(buildToolbar(bayId, el));

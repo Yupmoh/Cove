@@ -1,0 +1,9 @@
+
+.nook {
+  position: relative; flex: 1; min-width: 0; min-height: 0;
+  border-radius: 9px; overflow: hidden; background: color-mix(in srgb, var(--bg) calc(var(--cove-bg-opacity) * 100%), transparent); border: 1px solid var(--border);
+  display: flex; flex-direction: column;
+}
+.nook.focused { border-color: var(--accent-dim); box-shadow: 0 0 0 1px var(--accent-dim); }
+.nook.agent-running { border-color: color-mix(in srgb, var(--agent-accent, #34c2b0) 62%, var(--border)); box-shadow: 0 0 0 1px color-mix(in srgb, var(--agent-accent, #34c2b0) 32%, transparent), 0 0 18px color-mix(in srgb, var(--agent-accent, #34c2b0) 20%, transparent); }
+.nook.agent-running.focused { box-shadow: 0 0 0 1px color-mix(in srgb, var(--agent-accent, #34c2b0) 48%, transparent), 0 0 22px color-mix(in srgb, var(--agent-accent, #34c2b0) 24%, transparent); }

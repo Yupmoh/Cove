@@ -1,4 +1,5 @@
 import { invoke } from "./invoke";
+import { FrontendCommand } from "./app/frontend-command";
 
 interface NoteReadResult {
   id: string;
@@ -20,7 +21,7 @@ export async function renderMermaidNote(bayId: string, noteId: string): Promise<
   currentBayId = bayId;
 
   try {
-    const result = await invoke<NoteReadResult>("cove://commands/note.read", { bayId, id: noteId });
+    const result = await invoke<NoteReadResult>(FrontendCommand.NoteRead, { bayId, id: noteId });
     el.appendChild(buildToolbar());
     el.appendChild(buildEditor(result.content));
   } catch (e) {
@@ -189,7 +190,7 @@ async function saveMermaid(): Promise<void> {
   const textarea = document.querySelector(".mermaid-source") as HTMLTextAreaElement;
   if (!textarea) return;
   try {
-    await invoke("cove://commands/note.write", {
+    await invoke(FrontendCommand.NoteWrite, {
       bayId: currentBayId,
       id: currentNoteId,
       content: textarea.value,

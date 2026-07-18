@@ -1,3 +1,7 @@
+import { LifecycleScope, type ComponentHandle } from "./app/lifecycle";
+import type { EngineEventPayloads } from "./app/engine-event-router";
+import { FrontendCommand } from "./app/frontend-command";
+
 export interface FocusDescriptor {
   tagName: string;
   inputType: string;
@@ -207,10 +211,40 @@ export function partialPreview(text: string, max = 72): string {
 }
 
 interface DictationDeps {
-  invoke: (command: string, args?: Record<string, unknown>) => Promise<unknown>;
+  invoke: (command: FrontendCommand, args?: Record<string, unknown>) => Promise<unknown>;
+  events: DictationEventSource;
   getFocusedNookId: () => string | null;
   writeNook: (nookId: string, dataBase64: string) => Promise<void>;
   holdKey?: string;
+}
+
+type DictationEventChannel = "dictation.partial" | "dictation.progress" | "dictation.model";
+
+export interface DictationEventSource {
+  register<K extends DictationEventChannel>(
+    channel: K,
+    handler: (payload: EngineEventPayloads[K]) => void,
+  ): ComponentHandle;
+}
+
+export interface DictationEventHandlers {
+  partial(payload: EngineEventPayloads["dictation.partial"]): void;
+  progress(payload: EngineEventPayloads["dictation.progress"]): void;
+  model(payload: EngineEventPayloads["dictation.model"]): void;
+}
+
+export function createDictationEventSubscriptions(
+  register: DictationEventSource["register"],
+  handlers: DictationEventHandlers,
+): ComponentHandle {
+  const lifecycle = new LifecycleScope();
+  const partial = register("dictation.partial", handlers.partial);
+  const progress = register("dictation.progress", handlers.progress);
+  const model = register("dictation.model", handlers.model);
+  lifecycle.own(() => partial.dispose());
+  lifecycle.own(() => progress.dispose());
+  lifecycle.own(() => model.dispose());
+  return lifecycle;
 }
 
 export function typedRevision(prev: string, next: string): { erase: number; append: string } {
@@ -255,7 +289,8 @@ export function createNookTypist(write: (payload: string) => Promise<void>): Noo
 
 type PillState = "recording" | "transcribing" | "downloading" | "error";
 
-export function setupDictation(deps: DictationDeps): () => void {
+export function setupDictation(deps: DictationDeps): ComponentHandle {
+  const lifecycle = new LifecycleScope();
   const holdKey = deps.holdKey ?? "F9";
   let held = false;
   let pill: HTMLElement | null = null;
@@ -367,7 +402,7 @@ export function setupDictation(deps: DictationDeps): () => void {
     const nookId = deps.getFocusedNookId();
     showPill("transcribing");
     try {
-      const raw = await deps.invoke("app.dictationStop");
+      const raw = await deps.invoke(FrontendCommand.AppDictationStop);
       const result = JSON.parse(String(raw)) as { text?: string };
       const text = result.text ?? "";
       if (target) {
@@ -407,7 +442,7 @@ export function setupDictation(deps: DictationDeps): () => void {
     recordingTarget = target;
     const pending = (async (): Promise<boolean> => {
       try {
-        const raw = await deps.invoke("app.dictationStart");
+        const raw = await deps.invoke(FrontendCommand.AppDictationStart);
         const result = JSON.parse(String(raw)) as { ok?: boolean; error?: string };
         if (result.ok) {
           if (held) showPill("recording");
@@ -416,7 +451,7 @@ export function setupDictation(deps: DictationDeps): () => void {
         held = false;
         if (result.error?.includes("model")) {
           showPill("downloading", "starting…");
-          await deps.invoke("app.dictationEnsureModel");
+          await deps.invoke(FrontendCommand.AppDictationEnsureModel);
         } else {
           showPill("error", result.error ?? "failed");
           setTimeout(hidePill, 3000);
@@ -488,37 +523,35 @@ export function setupDictation(deps: DictationDeps): () => void {
     release();
   };
 
-  window.addEventListener("keydown", onKeyDown, true);
-  window.addEventListener("keyup", onKeyUp, true);
-  window.addEventListener("blur", onBlur);
+  lifecycle.listen(window, "keydown", onKeyDown as EventListener, true);
+  lifecycle.listen(window, "keyup", onKeyUp as EventListener, true);
+  lifecycle.listen(window, "blur", onBlur);
 
-  const onEngineEvent = (data: unknown): void => {
-    const evt = data as { channel?: string; payload?: unknown };
-    if (evt?.channel === "dictation.partial") {
-      const text = (evt.payload as { text?: string } | undefined)?.text ?? "";
+  const eventSubscriptions = createDictationEventSubscriptions(
+    (channel, handler) => deps.events.register(channel, handler),
+    {
+      partial: (payload) => {
+        const text = payload?.text ?? "";
       if (held && text) {
         if (recordingTarget) enqueueRevision(recordingTarget, text);
         else showPill("recording", partialPreview(text));
       }
-    } else if (evt?.channel === "dictation.progress") {
-      const pct = Math.round((((evt.payload as { percent?: number } | undefined)?.percent ?? 0) * 100));
-      showPill("downloading", `${pct}%`);
-    } else if (evt?.channel === "dictation.model") {
-      const payload = evt.payload as { ready?: boolean; error?: string } | undefined;
-      if (payload?.ready) {
-        showPill("downloading", "ready — hold F9 or space to dictate");
-        setTimeout(hidePill, 2500);
-      } else if (payload?.error) {
-        showPill("error", payload.error);
-        setTimeout(hidePill, 5000);
-      }
-    }
-  };
-  window.__ryn.on("engine.event", onEngineEvent);
-  return () => {
-    window.removeEventListener("keydown", onKeyDown, true);
-    window.removeEventListener("keyup", onKeyUp, true);
-    window.removeEventListener("blur", onBlur);
-    window.__ryn.off("engine.event", onEngineEvent);
-  };
+      },
+      progress: (payload) => {
+        const pct = Math.round((payload?.percent ?? 0) * 100);
+        showPill("downloading", `${pct}%`);
+      },
+      model: (payload) => {
+        if (payload?.ready) {
+          showPill("downloading", "ready — hold F9 or space to dictate");
+          setTimeout(hidePill, 2500);
+        } else if (payload?.error) {
+          showPill("error", payload.error);
+          setTimeout(hidePill, 5000);
+        }
+      },
+    },
+  );
+  lifecycle.own(() => eventSubscriptions.dispose());
+  return lifecycle;
 }

@@ -1,0 +1,14 @@
+
+.diag-caption { font-size: 11px; color: var(--muted); line-height: 1.5; padding: 4px 0 8px; }
+.diag-note { font-size: 11px; color: var(--muted); line-height: 1.5; padding: 6px 10px; margin: 6px 0; background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; }
+.diag-input { width: 100%; min-height: 88px; resize: vertical; background: var(--panel-2); border: 1px solid var(--border); color: var(--fg); border-radius: 6px; padding: 6px 8px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; outline: none; }
+.diag-btn { margin-top: 8px; padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--panel-2); color: var(--fg); font-size: 12px; cursor: pointer; }
+.diag-btn:hover { border-color: var(--accent-dim); color: var(--accent); }
+.diag-toggle { padding: 4px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--panel-2); color: var(--fg); font-size: 12px; cursor: pointer; min-width: 64px; }
+.diag-toggle.on { border-color: var(--accent); color: var(--accent); }
+.diag-snap { margin-top: 8px; }
+.diag-snap-card { margin-top: 8px; padding: 8px 10px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; }
+.diag-snap-row { display: flex; justify-content: space-between; gap: 12px; padding: 1px 0; font-size: 11px; }
+.diag-snap-row .k { color: var(--muted); }
+.diag-snap-row .v { color: var(--fg); font-variant-numeric: tabular-nums; }
+.diag-error { color: #f38ba8; font-size: 11px; margin-top: 6px; }

@@ -1,0 +1,19 @@
+
+
+.nook { border-radius: 11px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14); }
+.nook.focused { border-color: var(--accent-dim); box-shadow: 0 0 0 1px var(--accent-dim), 0 3px 10px rgba(0, 0, 0, 0.18); }
+.nook.agent-running { border-color: color-mix(in srgb, var(--agent-accent, #34c2b0) 62%, var(--border)); box-shadow: 0 0 0 1px color-mix(in srgb, var(--agent-accent, #34c2b0) 32%, transparent), 0 0 18px color-mix(in srgb, var(--agent-accent, #34c2b0) 20%, transparent); }
+.nook.agent-running.focused { box-shadow: 0 0 0 1px color-mix(in srgb, var(--agent-accent, #34c2b0) 48%, transparent), 0 0 22px color-mix(in srgb, var(--agent-accent, #34c2b0) 24%, transparent); }
+.agent-row { transition: background 0.12s; }
+.tree-row { border-radius: 8px; transition: background 0.1s, color 0.1s; }
+.tree-row.active { box-shadow: none; }
+.tree-row.active .tw-dot { box-shadow: none; }
+.rtab { border: 1px solid transparent; }
+.rtab:hover { background: color-mix(in srgb, var(--panel-2) 70%, transparent); color: var(--fg); }
+.rtab.active {
+  background: var(--panel-2); color: var(--fg);
+  border-color: var(--border);
+}
+#shore-tabs { gap: 5px; }
+#shores-row { height: 36px; padding: 0 var(--workspace-padding); }
+#shores-row #shore-tabs { border-radius: 11px; background: color-mix(in srgb, var(--panel) 55%, var(--panel-2)); }

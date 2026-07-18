@@ -1,0 +1,10 @@
+
+#foot { display: none; }
+#main { flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.tbtn {
+  display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px;
+  border-radius: 7px; cursor: pointer; color: var(--muted); font-size: 12px;
+}
+.tbtn:hover { background: var(--panel-2); color: var(--fg); }
+.tbtn svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.6; }
+#grid { position: relative; flex: 1; min-height: 0; display: flex; padding: var(--workspace-padding); }

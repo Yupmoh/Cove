@@ -1,0 +1,22 @@
+
+#onboarding { position: fixed; inset: 0; display: none; background: rgba(17, 17, 27, 0.6); align-items: center; justify-content: center; z-index: 60; }
+#onboarding.open { display: flex; }
+.ob-box { width: 440px; max-width: 90vw; background: var(--panel); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; box-shadow: 0 24px 60px rgba(0,0,0,0.5); }
+.ob-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border); color: var(--fg); font-size: 15px; font-weight: 600; }
+.ob-head .x { cursor: pointer; color: var(--muted); font-weight: 400; font-size: 12px; }
+.ob-progress { height: 3px; background: var(--border); }
+.ob-progress-bar { height: 100%; background: var(--accent); transition: width 0.2s; }
+.ob-body { padding: 20px; color: var(--fg); font-size: 13px; line-height: 1.6; min-height: 100px; }
+.ob-body h3 { margin: 0 0 8px; font-size: 15px; }
+.ob-body p { margin: 0 0 8px; color: var(--muted); }
+.ob-adapter-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.ob-adapter { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; color: var(--fg); font-size: 13px; }
+.ob-adapter.selected { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--panel-2)); }
+.ob-adapter .ob-adapter-name { flex: 1; }
+.ob-telemetry-toggle { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+.ob-telemetry-toggle input { width: 16px; height: 16px; }
+.ob-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--border); }
+.ob-actions button { padding: 6px 16px; border-radius: 6px; font-size: 12px; cursor: pointer; }
+.ob-prev { background: transparent; border: 1px solid var(--border); color: var(--muted); }
+.ob-next { background: var(--accent); border: none; color: #000; font-weight: 600; }
+.ob-prev:disabled { opacity: 0.4; cursor: default; }

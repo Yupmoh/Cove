@@ -1,0 +1,61 @@
+
+.dual-sidebar { display: flex; flex-shrink: 0; background: var(--panel); user-select: none; -webkit-user-select: none; }
+#shores-row, #titlebar { user-select: none; -webkit-user-select: none; }
+.rtab.nook-drop-target { box-shadow: inset 0 0 0 2px var(--accent); }
+.dual-sidebar.side-left { overflow: hidden; border: 1px solid color-mix(in srgb, var(--border) 68%, transparent); border-radius: 10px; background: var(--bg); box-shadow: none; }
+.dual-sidebar.side-right { border-left: 1px solid var(--border); }
+.dual-sidebar.side-right.collapsed { border-left: none; }
+.sb-rail {
+  width: 44px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center;
+  gap: 3px; padding: 8px 0; background: var(--panel);
+}
+.side-left .sb-rail { border-right: 1px solid color-mix(in srgb, var(--border) 52%, transparent); order: 0; background: color-mix(in srgb, var(--panel) 94%, var(--bg)); }
+.side-right .sb-rail { border-left: 1px solid var(--border); order: 2; }
+.sb-mode {
+  width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+  border-radius: 8px; cursor: pointer; color: var(--muted); font-size: 15px;
+}
+.sb-mode svg { width: 17px; height: 17px; display: block; }
+.sb-act svg { width: 14px; height: 14px; display: block; }
+.sb-mode:hover { color: var(--fg); background: var(--panel-2); }
+.sb-mode.active { color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.sb-mode.stub { opacity: 0.55; }
+.sb-content { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; order: 1; }
+.side-left .sb-content { background: radial-gradient(ellipse 130% 58% at 52% 12%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 72%), var(--bg); }
+.dual-sidebar.collapsed .sb-content, .dual-sidebar.collapsed .sb-resize { display: none; }
+.sb-reopen { display: none; }
+.dual-sidebar.side-right.collapsed .sb-reopen {
+  display: flex; align-items: flex-start; justify-content: center; padding-top: 12px;
+  width: 26px; cursor: pointer; color: var(--muted);
+}
+.sb-reopen:hover { color: var(--fg); background: var(--panel-2); }
+.sb-reopen svg { width: 15px; height: 15px; }
+.sb-resize { width: 5px; flex-shrink: 0; cursor: col-resize; position: relative; }
+.side-left .sb-resize { order: 3; }
+.side-right .sb-resize { order: 0; }
+.sb-resize::before { content: ""; position: absolute; inset: 0; margin: auto; width: 1px; background: transparent; }
+.sb-resize:hover::before, .sb-resize.dragging::before { background: var(--accent-dim); width: 2px; }
+.sb-head {
+  display: flex; align-items: center; justify-content: space-between;
+  height: 42px; min-height: 42px; padding: 0 12px; margin: 0 0 4px; color: var(--muted);
+  font-size: 10.5px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+}
+.sb-head .sb-head-actions { display: flex; gap: 2px; }
+.sb-head .sb-act { cursor: pointer; font-size: 14px; color: var(--muted); padding: 0 5px; border-radius: 5px; }
+.sb-head .sb-act:hover { color: var(--fg); background: var(--panel-2); }
+.sb-list { overflow-y: auto; flex: 1; padding: 0 9px 10px; }
+.sb-empty { padding: 28px 18px; text-align: center; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.tree-row {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 8px; margin: 1px 0; border-radius: 7px; cursor: pointer; color: var(--muted);
+  font-size: 12px; white-space: nowrap;
+}
+.tree-row:hover { background: linear-gradient(90deg, color-mix(in srgb, var(--panel-2) 72%, transparent), transparent); color: var(--fg); }
+.tree-row.active { color: var(--fg); }
+.tree-row.kind-bay { font-weight: 650; color: var(--fg); text-transform: none; }
+.tree-row .tw-chevron { width: 12px; flex-shrink: 0; font-size: 9px; text-align: center; transition: transform 0.15s; }
+.tree-row.collapsed .tw-chevron { transform: rotate(-90deg); }
+.tree-row .tw-spacer { flex-shrink: 0; }
+.tree-row .tw-dot { width: 6px; height: 6px; border-radius: 50%; background: #45475a; flex-shrink: 0; }
+.tree-row .tw-label { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+.tree-row .tw-count { font-size: 10px; color: var(--muted); }

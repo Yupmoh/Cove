@@ -1,4 +1,5 @@
 import { invoke } from "./invoke";
+import { FrontendCommand } from "./app/frontend-command";
 
 interface SearchMatch {
   filePath: string;
@@ -94,7 +95,7 @@ export async function renderSearchNook(bayId: string): Promise<HTMLElement> {
     resultsEl.innerHTML = `<div style="padding:20px;color:#6e7681;text-align:center;font-size:13px;">Searching...</div>`;
 
     try {
-      const result = await invoke<SearchResult>("cove://commands/search.query", {
+      const result = await invoke<SearchResult>(FrontendCommand.SearchQuery, {
         query,
         path: bayId,
         regex: regexToggle.value,
@@ -114,7 +115,7 @@ export async function renderSearchNook(bayId: string): Promise<HTMLElement> {
     const replacement = replaceInput.value;
     if (!query) return;
     try {
-      const searchResult = await invoke<SearchResult>("cove://commands/search.query", {
+      const searchResult = await invoke<SearchResult>(FrontendCommand.SearchQuery, {
         query,
         path: bayId,
         regex: regexToggle.value,
@@ -128,7 +129,7 @@ export async function renderSearchNook(bayId: string): Promise<HTMLElement> {
         resultsEl.innerHTML = `<div style="padding:20px;color:#6e7681;font-size:13px;">No matches to replace.</div>`;
         return;
       }
-      const replaceResult = await invoke<{ results: { filePath: string; replacements: number; saved: boolean }[] }>("cove://commands/search.replace", {
+      const replaceResult = await invoke<{ results: { filePath: string; replacements: number; saved: boolean }[] }>(FrontendCommand.SearchReplace, {
         search: query,
         replacement,
         files,

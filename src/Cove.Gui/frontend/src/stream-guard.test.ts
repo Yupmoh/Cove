@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createStreamGenerations, processExitAction, replayViewportAction, shouldDisposeNook, shouldResetReplay, streamVisibilityAction } from "./stream-guard";
+import { createStreamGenerations, processExitAction, replayViewportAction, shouldDisposeNook, shouldResetReplay, streamReconciliationActions, streamVisibilityAction } from "./stream-guard";
 
 describe("processExitAction", () => {
   it("closes a nook on its first process exit", () => {
@@ -70,6 +70,24 @@ describe("streamVisibilityAction", () => {
   it("does nothing when visibility and connection already agree", () => {
     expect(streamVisibilityAction({ visible: true, connected: true })).toBe("none");
     expect(streamVisibilityAction({ visible: false, connected: false })).toBe("none");
+  });
+
+  it("disconnects then disposes a live stream removed from the canonical layout", () => {
+    expect(streamReconciliationActions({
+      inLayout: false,
+      visible: false,
+      connected: true,
+      socketClosed: false,
+    })).toEqual(["disconnect", "dispose"]);
+  });
+
+  it("disconnects but retains a hidden stream that remains in another shore", () => {
+    expect(streamReconciliationActions({
+      inLayout: true,
+      visible: false,
+      connected: true,
+      socketClosed: false,
+    })).toEqual(["disconnect"]);
   });
 });
 

@@ -1,4 +1,5 @@
 import { invoke } from "./invoke";
+import { FrontendCommand } from "./app/frontend-command";
 import {
   initialCursor,
   nextFile,
@@ -129,7 +130,7 @@ export async function renderSourceControlNook(repoRoot: string, openFile?: (path
     const target = rows[index];
     if (!target || target.hunkCount > 0) return;
     try {
-      const diff = await invoke<ScmDiffResult>("cove://commands/scm.diff", { repoRoot, filePath: target.file.filePath, ref: "HEAD" });
+      const diff = await invoke<ScmDiffResult>(FrontendCommand.ScmDiff, { repoRoot, filePath: target.file.filePath, ref: "HEAD" });
       target.hunkCount = hunkCount(diff.newContent);
     } catch {
       target.hunkCount = 0;
@@ -142,7 +143,7 @@ export async function renderSourceControlNook(repoRoot: string, openFile?: (path
       return;
     }
     try {
-      const log = await invoke<ScmLogResult>("cove://commands/scm.log", { repoRoot });
+      const log = await invoke<ScmLogResult>(FrontendCommand.ScmLog, { repoRoot });
       renderSyncSection(syncBox, log.unpushed ?? [], log.unpulled ?? []);
     } catch (err) {
       console.warn("scm log failed", repoRoot, err);
@@ -153,7 +154,7 @@ export async function renderSourceControlNook(repoRoot: string, openFile?: (path
   const refresh = async () => {
     void refreshSync();
     try {
-      const result = await invoke<ScmStatusResult>("cove://commands/scm.status", { repoRoot });
+      const result = await invoke<ScmStatusResult>(FrontendCommand.ScmStatus, { repoRoot });
       rows = renderFileList(result.staged, result.unstaged, fileList, repoRoot, (idx) => {
         cursor = { fileIndex: idx, hunkIndex: 0 };
         void ensureHunks(idx).then(paintFocus);
@@ -257,7 +258,7 @@ function buildFileRow(file: ScmFileStatus, repoRoot: string, isStaged: boolean, 
   stageBtn.style.cssText = "padding:2px 6px;background:var(--panel-2);border:1px solid var(--border);color:var(--fg);border-radius:5px;font-size:11px;cursor:pointer;";
   stageBtn.addEventListener("click", (e) => {
     e.stopPropagation();
-    invoke("cove://commands/scm.stage", { repoRoot, filePath: file.filePath, unstage: isStaged })
+    invoke(FrontendCommand.ScmStage, { repoRoot, filePath: file.filePath, unstage: isStaged })
       .then(() => { if (onChanged) onChanged(); })
       .catch((err) => console.warn("scm stage failed", file.filePath, err));
   });
@@ -265,7 +266,7 @@ function buildFileRow(file: ScmFileStatus, repoRoot: string, isStaged: boolean, 
 
   row.addEventListener("click", () => {
     onFocus();
-    invoke<ScmDiffResult>("cove://commands/scm.diff", { repoRoot, filePath: file.filePath, ref: "HEAD" }).catch(() => {});
+    invoke<ScmDiffResult>(FrontendCommand.ScmDiff, { repoRoot, filePath: file.filePath, ref: "HEAD" }).catch(() => {});
   });
 
   return row;
@@ -343,7 +344,7 @@ function buildCommitRow(commit: SyncCommit): HTMLElement {
 async function doCommit(message: string, amend: boolean, repoRoot: string, onDone: () => void): Promise<void> {
   if (!message.trim() && !amend) { console.warn("commit skipped: empty message"); return; }
   try {
-    const result = await invoke<ScmCommitResult>("cove://commands/scm.commit", { repoRoot, message, amend, sign: false });
+    const result = await invoke<ScmCommitResult>(FrontendCommand.ScmCommit, { repoRoot, message, amend, sign: false });
     if (result.success) onDone();
     else console.warn("scm commit reported failure", result.message);
   } catch (err) {

@@ -1,5 +1,6 @@
 import type * as Monaco from "monaco-editor";
 import { invoke } from "./invoke";
+import { FrontendCommand } from "./app/frontend-command";
 import { MonacoLoader, defineCoveMonacoTheme } from "./monaco-loader";
 
 interface Note {
@@ -56,7 +57,7 @@ async function buildSidebar(bayId: string): Promise<HTMLElement> {
   list.style.cssText = "flex:1;overflow-y:auto;";
 
   try {
-    const result = await invoke<NoteListResult>("cove://commands/note.list", { bayId });
+    const result = await invoke<NoteListResult>(FrontendCommand.NoteList, { bayId });
     for (const note of result.notes || []) {
       list.appendChild(buildNoteRow(note, bayId));
     }
@@ -128,14 +129,14 @@ export async function openNote(bayId: string, noteId: string): Promise<void> {
   if (!editor) { console.warn("open note without a notepad editor host", noteId); return; }
 
   try {
-    const note = await invoke<{ id: string; title: string; content: string; kind: string }>("cove://commands/note.read", { bayId, id: noteId });
+    const note = await invoke<{ id: string; title: string; content: string; kind: string }>(FrontendCommand.NoteRead, { bayId, id: noteId });
 
     if (note.kind === "markdown" && (note.content.startsWith("http://") || note.content.startsWith("https://"))) {
       openUrlInBrowserSubtab(note.content);
       return;
     }
 
-    const stateResult = await invoke<NoteGetStateResult>("cove://commands/note.get-state", { bayId, id: noteId }).catch(() => ({ state: null }));
+    const stateResult = await invoke<NoteGetStateResult>(FrontendCommand.NoteGetState, { bayId, id: noteId }).catch(() => ({ state: null }));
     if (stateResult.state) {
       try { viewport = JSON.parse(stateResult.state); } catch { viewport = { scrollX: 0, scrollY: 0, zoom: 1 }; }
     }
@@ -205,13 +206,13 @@ export async function openNote(bayId: string, noteId: string): Promise<void> {
 async function saveCurrentNote(title: string, content: string): Promise<void> {
   if (!currentBayId || !currentNoteId) { console.warn("save skipped: no open note"); return; }
   try {
-    await invoke("cove://commands/note.write", {
+    await invoke(FrontendCommand.NoteWrite, {
       bayId: currentBayId,
       id: currentNoteId,
       title,
       content,
     });
-    await invoke("cove://commands/note.save-state", {
+    await invoke(FrontendCommand.NoteSaveState, {
       bayId: currentBayId,
       id: currentNoteId,
       stateJson: JSON.stringify(viewport),
@@ -223,7 +224,7 @@ async function saveCurrentNote(title: string, content: string): Promise<void> {
 
 async function createNote(bayId: string): Promise<void> {
   try {
-    const result = await invoke<{ id: string }>("cove://commands/note.create", {
+    const result = await invoke<{ id: string }>(FrontendCommand.NoteCreate, {
       title: "Untitled",
       bayId,
       source: "notepad",
@@ -242,7 +243,7 @@ async function createNote(bayId: string): Promise<void> {
 }
 
 function openUrlInBrowserSubtab(url: string): void {
-  invoke("cove://commands/browser.open", { url }).catch(e => {
+  invoke(FrontendCommand.BrowserOpen, { url }).catch(e => {
     console.error("Browser open failed:", e);
   });
 }

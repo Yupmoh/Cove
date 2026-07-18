@@ -1,0 +1,19 @@
+
+#ws-create { position: fixed; inset: 0; display: none; background: color-mix(in srgb, var(--base) 70%, transparent); backdrop-filter: blur(8px); align-items: flex-start; justify-content: center; z-index: 55; }
+#ws-create.open { display: flex; }
+.wsc-box { margin-top: 8vh; width: 520px; border-radius: 16px; background: color-mix(in srgb, var(--panel) 94%, transparent); box-shadow: 0 26px 80px rgba(0,0,0,.52), inset 0 1px rgba(255,255,255,.025); }
+.wsc-head-copy { display: flex; flex-direction: column; gap: 2px; }
+.wsc-kicker { color: var(--muted); font-size: 10.5px; font-weight: 450; }
+.wsc-field { display: flex; flex-direction: column; gap: 7px; padding: 9px 0; }
+.wsc-field label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+.wsc-field input[type=text] { background: color-mix(in srgb, var(--panel-2) 72%, transparent); border: 1px solid color-mix(in srgb, var(--border) 82%, transparent); color: var(--fg); border-radius: 9px; padding: 10px 11px; width: 100%; outline: none; font-size: 13px; box-sizing: border-box; }
+.wsc-field input[type=text]:focus { border-color: color-mix(in srgb, var(--accent) 72%, var(--border)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 10%, transparent); }
+.wsc-path-row { display: flex; gap: 8px; align-items: center; }
+.wsc-path-row input { flex: 1; min-width: 0; }
+.wsc-path-row button, .wsc-actions button { background: color-mix(in srgb, var(--panel-2) 72%, transparent); border: 1px solid var(--border); color: var(--fg); border-radius: 9px; padding: 9px 13px; font-size: 12px; cursor: pointer; white-space: nowrap; }
+.wsc-path-row button:hover, .wsc-actions button:hover { border-color: var(--accent); }
+.wsc-hint { color: var(--muted); font-size: 10px; }
+.wsc-error { color: var(--danger, #f38ba8); font-size: 11px; min-height: 14px; padding: 2px 0; }
+.wsc-actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 6px; }
+.wsc-actions button.primary { background: var(--accent); border-color: var(--accent); color: var(--base, #11111b); font-weight: 650; min-width: 92px; }
+.wsc-actions button.secondary { color: var(--muted); }

@@ -1,0 +1,18 @@
+:root {
+  --bg: #1e1e2e;
+  --panel: #181825;
+  --panel-2: #313244;
+  --border: #45475a;
+  --fg: #cdd6f4;
+  --muted: #a6adc8;
+  --accent: #cba6f7;
+  --accent-dim: #6c5b8e;
+  --cove-bg-opacity: 1;
+  --workspace-padding: 8px;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100vh; overflow: hidden; }
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--muted) 32%, transparent); border-radius: 5px; border: 2px solid transparent; background-clip: padding-box; min-height: 32px; }
+::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--muted) 55%, transparent); background-clip: padding-box; }
+::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }

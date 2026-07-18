@@ -1,4 +1,5 @@
 import { invoke } from "./invoke";
+import { FrontendCommand } from "./app/frontend-command";
 
 interface NoteReadResult {
   id: string;
@@ -29,7 +30,7 @@ export async function renderSketchNote(bayId: string, noteId: string): Promise<H
   currentBayId = bayId;
 
   try {
-    const result = await invoke<NoteReadResult>("cove://commands/note.read", {
+    const result = await invoke<NoteReadResult>(FrontendCommand.NoteRead, {
       bayId,
       id: noteId,
     });
@@ -203,7 +204,7 @@ function adjustZoom(delta: number): void {
 async function saveViewportState(state: SketchState): Promise<void> {
   if (!currentBayId || !currentNoteId) return;
   try {
-    await invoke("cove://commands/note.write", {
+    await invoke(FrontendCommand.NoteWrite, {
       bayId: currentBayId,
       id: currentNoteId,
       content: JSON.stringify(state),
@@ -220,7 +221,7 @@ async function saveSketch(): Promise<void> {
   const stateStr = canvas.getAttribute("data-state");
   if (!stateStr) return;
   try {
-    await invoke("cove://commands/note.write", {
+    await invoke(FrontendCommand.NoteWrite, {
       bayId: currentBayId,
       id: currentNoteId,
       content: stateStr,
@@ -233,7 +234,7 @@ async function saveSketch(): Promise<void> {
 async function exportFormat(format: string): Promise<void> {
   if (!currentBayId || !currentNoteId) return;
   try {
-    const result = await invoke<NoteReadResult>("cove://commands/note.read", {
+    const result = await invoke<NoteReadResult>(FrontendCommand.NoteRead, {
       bayId: currentBayId,
       id: currentNoteId,
       format,

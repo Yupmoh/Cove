@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { BrowserNavState, normalizeUrl, nativeWebviewBounds, themeBackgroundColor } from "./browser-nook";
+import { describe, it, expect, vi } from "vitest";
+import { BrowserNavState, BrowserSession, normalizeUrl, nativeWebviewBounds, themeBackgroundColor } from "./browser-nook";
 
 describe("normalizeUrl", () => {
   it("prepends https:// for bare domains", () => {
@@ -150,5 +150,187 @@ describe("themeBackgroundColor", () => {
     expect(themeBackgroundColor("var(--bg)")).toBeNull();
     expect(themeBackgroundColor("#12345")).toBeNull();
     expect(themeBackgroundColor("navy")).toBeNull();
+  });
+});
+
+describe("BrowserSession", () => {
+  it("serializes overlapping panel open, navigation, reload, and crash recovery", async () => {
+    let completeOpen!: (value: unknown) => void;
+    const openResult = new Promise<unknown>((resolve) => {
+      completeOpen = resolve;
+    });
+    const invoke = vi.fn((command: string) => command === "webviewPane.open" ? openResult : Promise.resolve({}));
+    const session = new BrowserSession(
+      "browser-1",
+      { isConnected: true } as HTMLElement,
+      "https://example.com",
+      {
+        invoke,
+        observe: vi.fn(() => vi.fn()),
+        warn: vi.fn(),
+      },
+    );
+
+    const initialOpen = session.openPanel({ url: "https://example.com" });
+    const navigationOpen = session.openPanel({ url: "https://example.com/next" });
+    const navigation = session.invokePanel("webviewPane.navigate", { url: "https://example.com/next" });
+    const reload = session.invokePanel("webviewPane.reload", {});
+    const crashRecovery = session.invokePanel("webviewPane.reloadFromCrash", {});
+    await Promise.resolve();
+
+    expect(invoke).toHaveBeenCalledTimes(1);
+    expect(invoke).toHaveBeenCalledWith("webviewPane.open", {
+      options: { url: "https://example.com" },
+    });
+
+    completeOpen({ id: 42 });
+    await Promise.all([initialOpen, navigationOpen, navigation, reload, crashRecovery]);
+
+    expect(invoke.mock.calls.filter(([command]) => command === "webviewPane.open")).toHaveLength(1);
+    expect(invoke).toHaveBeenCalledWith("webviewPane.navigate", {
+      id: 42,
+      url: "https://example.com/next",
+    });
+    expect(invoke).toHaveBeenCalledWith("webviewPane.reload", { id: 42 });
+    expect(invoke).toHaveBeenCalledWith("webviewPane.reloadFromCrash", { id: 42 });
+    expect(session.webviewId).toBe(42);
+  });
+
+  it("closes an in-flight panel open exactly once when disposal wins the race", async () => {
+    let completeOpen!: (value: unknown) => void;
+    const openResult = new Promise<unknown>((resolve) => {
+      completeOpen = resolve;
+    });
+    const invoke = vi.fn((command: string) => command === "webviewPane.open" ? openResult : Promise.resolve({}));
+    const session = new BrowserSession(
+      "browser-1",
+      { isConnected: true } as HTMLElement,
+      "https://example.com",
+      {
+        invoke,
+        observe: vi.fn(() => vi.fn()),
+        warn: vi.fn(),
+      },
+    );
+
+    const opening = session.openPanel({ url: "https://example.com" });
+    await Promise.resolve();
+    const firstDisposal = session.dispose();
+    const secondDisposal = session.dispose();
+    completeOpen({ id: 42 });
+
+    await Promise.all([opening, firstDisposal, secondDisposal]);
+
+    expect(invoke.mock.calls.filter(([command]) => command === "webviewPane.open")).toHaveLength(1);
+    expect(invoke.mock.calls.filter(([command]) => command === "webviewPane.close")).toEqual([
+      ["webviewPane.close", { id: 42 }],
+    ]);
+    expect(session.webviewId).toBeNull();
+  });
+
+  it("owns navigation, prompts, downloads, and permission timers", async () => {
+    vi.useFakeTimers();
+    const expired = vi.fn();
+    const session = new BrowserSession(
+      "browser-1",
+      { isConnected: true } as HTMLElement,
+      "https://example.com",
+      {
+        invoke: vi.fn(async () => ({})),
+        observe: vi.fn(() => vi.fn()),
+        warn: vi.fn(),
+      },
+    );
+    session.permissions.add({ requestId: "request-1", kinds: ["camera"], url: "https://example.com" });
+    session.downloads.requested("download-1", "https://example.com/file", "file");
+    session.schedulePermissionTimeout("request-1", expired, 100);
+
+    await session.dispose();
+    vi.advanceTimersByTime(100);
+
+    expect(session.nav.currentUrl).toBe("https://example.com");
+    expect(session.permissions.active?.requestId).toBe("request-1");
+    expect(session.downloads.prompts[0]?.downloadId).toBe("download-1");
+    expect(expired).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  it("owns the native handle, subscriptions, observers, and disposal", async () => {
+    const invoke = vi.fn(async (command: string) => command === "webviewPane.open" ? { id: 42 } : {});
+    const unsubscribe = vi.fn();
+    const observe = vi.fn(() => unsubscribe);
+    const observer = { disconnect: vi.fn() };
+    const session = new BrowserSession(
+      "browser-1",
+      { isConnected: true } as HTMLElement,
+      "about:blank",
+      {
+        invoke,
+        observe,
+        warn: vi.fn(),
+      },
+    );
+    await session.openPanel({ url: "about:blank" });
+    session.ownObserver(observer as unknown as ResizeObserver);
+    session.observe("webviewPane.navigated", vi.fn());
+
+    await session.dispose();
+    await session.dispose();
+
+    expect(unsubscribe).toHaveBeenCalledOnce();
+    expect(observer.disconnect).toHaveBeenCalledOnce();
+    expect(invoke).toHaveBeenCalledWith("webviewPane.close", { id: 42 });
+    expect(session.webviewId).toBeNull();
+  });
+
+  it("distinguishes a live panel returning null from a missing panel", async () => {
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "webviewPane.open") return { id: 42 };
+      return null;
+    });
+    const session = new BrowserSession(
+      "browser-1",
+      { isConnected: true } as HTMLElement,
+      "about:blank",
+      {
+        invoke,
+        observe: vi.fn(() => vi.fn()),
+        warn: vi.fn(),
+      },
+    );
+    await session.openPanel({ url: "about:blank" });
+
+    await expect(session.invokeOwnedPanel("webviewPane.eval", {
+      code: "null",
+    })).resolves.toEqual({ found: true, value: null });
+  });
+
+  it("reconciles visible and detached native bounds through one owner", async () => {
+    const invoke = vi.fn(async (command: string) => command === "webviewPane.open" ? { id: 7 } : {});
+    const sync = vi.fn();
+    const session = new BrowserSession(
+      "browser-1",
+      { isConnected: false } as HTMLElement,
+      "about:blank",
+      {
+        invoke,
+        observe: vi.fn(() => vi.fn()),
+        warn: vi.fn(),
+      },
+    );
+    await session.openPanel({ url: "about:blank" });
+    session.setBoundsSync(sync);
+
+    session.reconcileBounds();
+    await Promise.resolve();
+
+    expect(sync).not.toHaveBeenCalled();
+    expect(invoke).toHaveBeenCalledWith("webviewPane.setBounds", {
+      id: 7,
+      x: -20000,
+      y: 0,
+      width: 2,
+      height: 2,
+    });
   });
 });

@@ -1,4 +1,5 @@
 import { invoke } from "./invoke";
+import { FrontendCommand } from "./app/frontend-command";
 import { diffRowSets, isTaskLikeKey, type RowDiff } from "./snapshot-row-diff";
 
 interface SnapshotListItem {
@@ -47,7 +48,7 @@ export async function renderSnapshotInspector(bayId: string): Promise<HTMLElemen
 
   const refresh = async () => {
     try {
-      const result = await invoke<SnapshotListResult>("cove://commands/snapshot.list", {});
+      const result = await invoke<SnapshotListResult>(FrontendCommand.SnapshotList, {});
       listEl.innerHTML = "";
       diffEl.innerHTML = "";
       if (result.snapshots.length === 0) {
@@ -102,7 +103,7 @@ function buildSnapshotRow(snap: SnapshotListItem, diffEl: HTMLElement): HTMLElem
   restoreBtn.style.cssText = "padding:4px 10px;background:#2b3d52;border:1px solid #4a9eff;color:#4a9eff;border-radius:3px;font-size:11px;cursor:pointer;";
   restoreBtn.addEventListener("click", (ev) => {
     ev.stopPropagation();
-    invoke<SnapshotRestoreResult>("cove://commands/snapshot.restore", { id: snap.id })
+    invoke<SnapshotRestoreResult>(FrontendCommand.SnapshotRestore, { id: snap.id })
       .then(r => {
         const undoEl = document.createElement("div");
         undoEl.style.cssText = "padding:8px 12px;background:#1a2e1a;color:#4ade80;font-size:12px;";
@@ -120,7 +121,7 @@ function buildSnapshotRow(snap: SnapshotListItem, diffEl: HTMLElement): HTMLElem
   row.appendChild(restoreBtn);
 
   row.addEventListener("click", () => {
-    invoke<SnapshotInspectResult>("cove://commands/snapshot.inspect", { id: snap.id })
+    invoke<SnapshotInspectResult>(FrontendCommand.SnapshotInspect, { id: snap.id })
       .then(r => renderDiffs(r.diffs, diffEl, snap.id))
       .catch(e => {
         diffEl.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed: ${(e as Error).message}</div>`;

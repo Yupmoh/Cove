@@ -1,4 +1,5 @@
 import { invoke } from "./invoke";
+import { FrontendCommand } from "./app/frontend-command";
 
 interface NoteReadResult {
   id: string;
@@ -80,7 +81,7 @@ export async function renderCanvasNote(bayId: string, noteId: string): Promise<H
   currentBayId = bayId;
 
   try {
-    const result = await invoke<NoteReadResult>("cove://commands/note.read", { bayId, id: noteId });
+    const result = await invoke<NoteReadResult>(FrontendCommand.NoteRead, { bayId, id: noteId });
     try {
       canvasState = JSON.parse(result.content) as CanvasState;
     } catch {
@@ -396,7 +397,7 @@ async function dispatchAction(el: CanvasElement): Promise<void> {
   if (action.startsWith("send_to_agent:")) {
     const target = action.substring("send_to_agent:".length);
     try {
-      await invoke("cove://commands/canvas.action", {
+      await invoke(FrontendCommand.CanvasAction, {
         action: "send_to_agent",
         targetNook: target,
         actionId,
@@ -409,7 +410,7 @@ async function dispatchAction(el: CanvasElement): Promise<void> {
   } else if (action.startsWith("cove_command:")) {
     const uri = action.substring("cove_command:".length);
     try {
-      await invoke("cove://commands/canvas.action", {
+      await invoke(FrontendCommand.CanvasAction, {
         action: "cove_command",
         uri: resolveFraming(uri, canvasState.state, actionId),
         actionId,
@@ -485,7 +486,7 @@ function rerender(): void {
 async function saveCanvas(): Promise<void> {
   if (!currentBayId || !currentNoteId) return;
   try {
-    await invoke("cove://commands/note.write", {
+    await invoke(FrontendCommand.NoteWrite, {
       bayId: currentBayId,
       id: currentNoteId,
       content: JSON.stringify(canvasState, null, 2),

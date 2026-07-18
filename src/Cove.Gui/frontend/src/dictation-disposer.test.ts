@@ -3,17 +3,6 @@ import { setupDictation } from "./dictation";
 
 class FakeWindow {
   readonly listeners = new Map<string, Set<EventListenerOrEventListenerObject>>();
-  readonly bridgeListeners = new Map<string, Set<(data: unknown) => void>>();
-  readonly __ryn = {
-    on: (event: string, callback: (data: unknown) => void): void => {
-      const callbacks = this.bridgeListeners.get(event) ?? new Set<(data: unknown) => void>();
-      callbacks.add(callback);
-      this.bridgeListeners.set(event, callbacks);
-    },
-    off: (event: string, callback: (data: unknown) => void): void => {
-      this.bridgeListeners.get(event)?.delete(callback);
-    },
-  };
 
   addEventListener(type: string, listener: EventListenerOrEventListenerObject): void {
     const listeners = this.listeners.get(type) ?? new Set<EventListenerOrEventListenerObject>();
@@ -29,20 +18,26 @@ class FakeWindow {
     return this.listeners.get(type)?.size ?? 0;
   }
 
-  bridgeListenerCount(event: string): number {
-    return this.bridgeListeners.get(event)?.size ?? 0;
-  }
 }
 
 afterEach(() => vi.unstubAllGlobals());
 
 describe("setupDictation", () => {
-  it("returns a disposer that removes its window and bridge listeners", () => {
+  it("returns a handle that removes its window and typed engine listeners", async () => {
     const fakeWindow = new FakeWindow();
     vi.stubGlobal("window", fakeWindow);
+    const engineListeners = new Map<string, Set<(data: unknown) => void>>();
 
-    const dispose = setupDictation({
+    const feature = setupDictation({
       invoke: async () => undefined,
+      events: {
+        register: (channel, handler) => {
+          const listeners = engineListeners.get(channel) ?? new Set<(data: unknown) => void>();
+          listeners.add(handler as (data: unknown) => void);
+          engineListeners.set(channel, listeners);
+          return { dispose: () => { listeners.delete(handler as (data: unknown) => void); } };
+        },
+      },
       getFocusedNookId: () => null,
       writeNook: async () => undefined,
     });
@@ -50,13 +45,13 @@ describe("setupDictation", () => {
     expect(fakeWindow.listenerCount("keydown")).toBe(1);
     expect(fakeWindow.listenerCount("keyup")).toBe(1);
     expect(fakeWindow.listenerCount("blur")).toBe(1);
-    expect(fakeWindow.bridgeListenerCount("engine.event")).toBe(1);
+    expect([...engineListeners.values()].map((listeners) => listeners.size)).toEqual([1, 1, 1]);
 
-    dispose();
+    await feature.dispose();
 
     expect(fakeWindow.listenerCount("keydown")).toBe(0);
     expect(fakeWindow.listenerCount("keyup")).toBe(0);
     expect(fakeWindow.listenerCount("blur")).toBe(0);
-    expect(fakeWindow.bridgeListenerCount("engine.event")).toBe(0);
+    expect([...engineListeners.values()].map((listeners) => listeners.size)).toEqual([0, 0, 0]);
   });
 });
