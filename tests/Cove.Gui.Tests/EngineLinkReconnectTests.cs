@@ -60,14 +60,19 @@ public sealed class EngineLinkReconnectTests
 
             var secondServe = ServeOneConnectionAsync(listener, ct);
             ControlResponse? secondPing = null;
+            Exception? lastError = null;
             for (var attempt = 0; attempt < 100 && secondPing is null; attempt++)
             {
                 try { secondPing = await link.RequestAsync("cove://sys/ping", null, ct); }
-                catch { await Task.Delay(50, ct); }
+                catch (Exception ex) when (ex is IOException or InvalidOperationException or OperationCanceledException)
+                {
+                    lastError = ex;
+                    await Task.Delay(50, ct);
+                }
             }
             await secondServe;
 
-            Assert.NotNull(secondPing);
+            Assert.True(secondPing is not null, $"reconnect ping never succeeded; last transient error: {lastError}");
             Assert.True(secondPing!.Ok);
             Assert.Equal(1, events.Count(c => c == "engine.reconnected"));
         }
