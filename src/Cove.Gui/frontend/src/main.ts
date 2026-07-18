@@ -33,6 +33,7 @@ import { renderDiffViewerNook } from "./diff-viewer-nook";
 import { renderMarkdownNook, applyMarkdownSettings, resolveMarkdownSettings } from "./markdown-nook";
 import { renderPdfNook } from "./pdf-nook";
 import { renderVideoNook } from "./video-nook";
+import { mediaUrl } from "./media-url";
 import { partitionPinned, reorderShore, glyphForNookType, visibleShoreIds, buildWingModel, filterShoresByWing } from "./shore-tabs";
 import { groupByBay, moveSelection, selectedNote, kindIcon, kindColor, type NoteListItem, type NavState } from "./notepad-sidebar";
 import { initialSidebarModel, selectLeftMode, toggleSide, setCollapsed, setWidth, collapsedOf, widthOf, SIDEBAR_MODES, SIDEBAR_RAIL_MODES, SIDEBAR_MODE_META, type SidebarModel, type SidebarSide, type SidebarMode } from "./sidebar-model";
@@ -1204,7 +1205,13 @@ function renderImageNook(nookId: string): HTMLElement {
   el.style.cssText = "display:flex;align-items:center;justify-content:center;height:100%;background:#0d1117;overflow:hidden;position:relative;";
   const img = document.createElement("img");
   img.style.cssText = "max-width:100%;max-height:100%;object-fit:contain;transition:transform 0.1s;";
-  img.alt = nookId;
+  const imagePath = nookFilePaths.get(nookId) ?? nookId;
+  img.alt = imagePath.split("/").pop() || imagePath;
+  mediaUrl(imagePath).then((url) => {
+    img.src = url;
+  }).catch((err) => {
+    console.warn("image media lease failed", imagePath, err);
+  });
   const controls = document.createElement("div");
   controls.style.cssText = "position:absolute;bottom:8px;right:8px;display:flex;gap:4px;background:#21262d;padding:4px;border-radius:4px;";
   const fitBtn = document.createElement("button");
