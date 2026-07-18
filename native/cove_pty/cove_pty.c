@@ -113,12 +113,15 @@ int cove_pty_kill(int pid, int sig) {
 
 int cove_pty_reap(int pid) {
     int status = 0;
-    pid_t r = waitpid((pid_t)pid, &status, WNOHANG);
-    if (r == 0) {
-        return -1;
+    pid_t r;
+    for (;;) {
+        r = waitpid((pid_t)pid, &status, 0);
+        if (r >= 0 || errno != EINTR) {
+            break;
+        }
     }
     if (r < 0) {
-        return -2;
+        return -errno;
     }
     if (WIFEXITED(status)) {
         return WEXITSTATUS(status);
@@ -126,7 +129,7 @@ int cove_pty_reap(int pid) {
     if (WIFSIGNALED(status)) {
         return 128 + WTERMSIG(status);
     }
-    return -2;
+    return -EIO;
 }
 
 void cove_pty_close(int fd) {
@@ -219,7 +222,13 @@ int cove_pty_poll_readable(int fd, int timeout_ms) {
     for (;;) {
         int rc = poll(&p, 1, timeout_ms);
         if (rc > 0) {
-            return 1;
+            if ((p.revents & POLLNVAL) != 0) {
+                return -EBADF;
+            }
+            if ((p.revents & (POLLIN | POLLHUP | POLLERR)) != 0) {
+                return 1;
+            }
+            return 0;
         }
         if (rc == 0) {
             return 0;

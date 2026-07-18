@@ -17,6 +17,7 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Cove.Adapters.Tests/Cove.Adapters.Tests.csproj" />
+    <Project Path="tests/Cove.Architecture.Tests/Cove.Architecture.Tests.csproj" />
     <Project Path="tests/Cove.Cli.Tests/Cove.Cli.Tests.csproj" />
     <Project Path="tests/Cove.Engine.Tests/Cove.Engine.Tests.csproj" />
     <Project Path="tests/Cove.Dictation.Tests/Cove.Dictation.Tests.csproj" />

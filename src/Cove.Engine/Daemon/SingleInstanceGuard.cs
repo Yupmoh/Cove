@@ -1,14 +1,20 @@
 using System.Globalization;
 using System.Text;
+using Cove.Platform.Ipc;
 
 namespace Cove.Engine.Daemon;
 
 public sealed class SingleInstanceGuard : IDisposable
 {
     private readonly FileStream _pidStream;
+    private readonly FileLock? _fileLock;
     private int _disposed;
 
-    private SingleInstanceGuard(FileStream pidStream) => _pidStream = pidStream;
+    private SingleInstanceGuard(FileStream pidStream, FileLock? fileLock)
+    {
+        _pidStream = pidStream;
+        _fileLock = fileLock;
+    }
 
     public static SingleInstanceGuard? TryAcquire(string pidFilePath)
     {
@@ -17,7 +23,7 @@ public sealed class SingleInstanceGuard : IDisposable
             try
             {
                 FileStream win = new FileStream(pidFilePath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.Read);
-                return new SingleInstanceGuard(win);
+                return new SingleInstanceGuard(win, null);
             }
             catch (IOException)
             {
@@ -27,14 +33,13 @@ public sealed class SingleInstanceGuard : IDisposable
         FileStream fs = new FileStream(pidFilePath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite);
         try { File.SetUnixFileMode(pidFilePath, UnixFileMode.UserRead | UnixFileMode.UserWrite); }
         catch { }
-        int fd = (int)fs.SafeFileHandle.DangerousGetHandle();
-        int rc = NativeFlock.Flock(fd, NativeFlock.LockEx | NativeFlock.LockNb);
-        if (rc != 0)
+        FileLock? fileLock = FileLock.TryAcquire(fs);
+        if (fileLock is null)
         {
             fs.Dispose();
             return null;
         }
-        return new SingleInstanceGuard(fs);
+        return new SingleInstanceGuard(fs, fileLock);
     }
 
     public void WritePid(int pid)
@@ -50,6 +55,7 @@ public sealed class SingleInstanceGuard : IDisposable
     {
         if (Interlocked.Exchange(ref _disposed, 1) != 0)
             return;
+        _fileLock?.Dispose();
         _pidStream.Dispose();
     }
 }

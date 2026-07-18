@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using Microsoft.Extensions.Logging;
+using ZLogger;
 
 namespace Cove.Platform.Pty.Unix;
 
@@ -9,14 +10,14 @@ public sealed class UnixPtySession : IPtySession
     private readonly ILogger _logger;
     private readonly int _masterFd;
     private readonly int _pid;
+    private readonly object _exitGate = new();
+    private readonly bool _adopted;
+    private readonly Task<int>? _exitWatch;
     private int _killed;
-    private int _hasExited;
+    private int _exitState;
     private int _exitCode = -1;
     private int _disposed;
     private int _firstReadLogged;
-
-    private readonly bool _adopted;
-    private readonly Task<int>? _exitWatch;
 
     internal UnixPtySession(long sessionId, int masterFd, int pid, ILogger logger, bool adopted = false)
     {
@@ -42,7 +43,7 @@ public sealed class UnixPtySession : IPtySession
     internal int Pid => _pid;
 
     public long SessionId { get; }
-    public bool HasExited => Volatile.Read(ref _hasExited) != 0;
+    public bool HasExited => Volatile.Read(ref _exitState) == (int)ExitObservationState.Exited;
     public int ExitCode => HasExited ? _exitCode : -1;
 
     public int Read(Span<byte> buffer)
@@ -62,10 +63,16 @@ public sealed class UnixPtySession : IPtySession
 
     public bool WaitReadable(int timeoutMs)
     {
+        if (Volatile.Read(ref _disposed) != 0)
+            throw new ObjectDisposedException(nameof(UnixPtySession));
         var rc = CovePtyNative.PollReadable(_masterFd, timeoutMs);
-        if (rc < 0)
-            return true;
-        return rc == 1;
+        if (rc >= 0)
+            return rc == 1;
+        if (Volatile.Read(ref _disposed) != 0)
+            throw new ObjectDisposedException(nameof(UnixPtySession));
+        var errno = -rc;
+        _logger.UnixPollFailed(SessionId, _masterFd, errno);
+        throw new PtyIoException($"pty poll failed (session {SessionId}, fd {_masterFd}, errno {errno}).", errno);
     }
 
     public void Write(ReadOnlySpan<byte> data)
@@ -121,41 +128,54 @@ public sealed class UnixPtySession : IPtySession
     {
         if (HasExited)
             return _exitCode;
-        if (_adopted)
+        lock (_exitGate)
         {
-            _exitCode = -1;
-            try
-            {
-                var wait = _exitWatch ?? ProcessExitWatch.WaitForExitAsync(_pid);
-                if (wait.Wait(TimeSpan.FromSeconds(2)))
-                    _exitCode = ProcessExitWatch.DecodeWaitStatus(wait.Result);
-                else
-                    _logger.UnixAdoptedExitUnobservable(SessionId, _pid);
-            }
-            catch (AggregateException)
-            {
-                _logger.UnixAdoptedExitUnobservable(SessionId, _pid);
-            }
-            Volatile.Write(ref _hasExited, 1);
-            _logger.SessionExited(SessionId, _exitCode);
-            return _exitCode;
+            if (HasExited)
+                return _exitCode;
+            _logger.UnixWaitBegin(SessionId);
+            return _adopted ? WaitForAdoptedExit() : WaitForOwnedExit();
         }
-        _logger.UnixWaitBegin(SessionId);
-        for (int i = 0; i < 2000; i++)
+    }
+
+    private int WaitForAdoptedExit()
+    {
+        try
         {
-            int rc = CovePtyNative.Reap(_pid);
-            if (rc == -1) { Thread.Sleep(1); continue; }
-            _exitCode = rc < -1 ? -1 : rc;
-            Volatile.Write(ref _hasExited, 1);
-            _logger.UnixReaped(SessionId, _exitCode);
-            _logger.SessionExited(SessionId, _exitCode);
-            return _exitCode;
+            var observation = _exitWatch ?? ProcessExitWatch.WaitForExitAsync(_pid);
+            if (ProcessExitWatch.TryObserveExit(observation, TimeSpan.FromSeconds(2), out var exitCode))
+                return PublishExit(exitCode, false);
         }
-        _exitCode = -1;
-        Volatile.Write(ref _hasExited, 1);
-        _logger.UnixReapTimeout(SessionId, _pid);
-        _logger.SessionExited(SessionId, _exitCode);
+        catch (AggregateException)
+        {
+        }
+        catch (PtyIoException)
+        {
+        }
+        Volatile.Write(ref _exitState, (int)ExitObservationState.ObservationUnknown);
+        _logger.UnixAdoptedExitUnobservable(SessionId, _pid);
         return -1;
+    }
+
+    private int WaitForOwnedExit()
+    {
+        var exitCode = CovePtyNative.Reap(_pid);
+        if (exitCode < 0)
+        {
+            Volatile.Write(ref _exitState, (int)ExitObservationState.ObservationUnknown);
+            _logger.UnixReapFailed(SessionId, _pid, -exitCode);
+            return -1;
+        }
+        return PublishExit(exitCode, true);
+    }
+
+    private int PublishExit(int exitCode, bool reaped)
+    {
+        _exitCode = exitCode;
+        Volatile.Write(ref _exitState, (int)ExitObservationState.Exited);
+        if (reaped)
+            _logger.UnixReaped(SessionId, exitCode);
+        _logger.SessionExited(SessionId, exitCode);
+        return exitCode;
     }
 
     public void Dispose()
@@ -165,4 +185,19 @@ public sealed class UnixPtySession : IPtySession
         _logger.UnixDisposeClose(SessionId);
         CovePtyNative.Close(_masterFd);
     }
+    private enum ExitObservationState
+    {
+        Running,
+        Exited,
+        ObservationUnknown,
+    }
+}
+
+internal static partial class UnixPtySessionLog
+{
+    [ZLoggerMessage(LogLevel.Error, "pty poll failed session={sessionId} fd={fd} errno={errno}", EventId = 1096)]
+    public static partial void UnixPollFailed(this ILogger logger, long sessionId, int fd, int errno);
+
+    [ZLoggerMessage(LogLevel.Error, "pty reap failed session={sessionId} pid={pid} errno={errno}", EventId = 1097)]
+    public static partial void UnixReapFailed(this ILogger logger, long sessionId, int pid, int errno);
 }

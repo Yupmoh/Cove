@@ -9,6 +9,17 @@ public static class ProcessExitWatch
     public static Task<int> WaitForExitAsync(int pid, CancellationToken cancellationToken = default)
         => Shared.Value.Register(pid, cancellationToken);
 
+    internal static bool TryObserveExit(Task<int> observation, TimeSpan timeout, out int exitCode)
+    {
+        if (!observation.Wait(timeout))
+        {
+            exitCode = -1;
+            return false;
+        }
+        exitCode = DecodeWaitStatus(observation.Result);
+        return true;
+    }
+
     public static int DecodeWaitStatus(int status)
     {
         if (status < 0)
