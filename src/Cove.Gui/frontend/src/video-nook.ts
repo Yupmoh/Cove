@@ -13,12 +13,18 @@ export function renderVideoNook(filePath: string): HTMLElement {
   const stage = document.createElement("div");
   stage.style.cssText = "flex:1;min-height:0;display:flex;align-items:center;justify-content:center;overflow:hidden;";
   const video = document.createElement("video");
-  video.src = mediaUrl(filePath);
   video.controls = true;
   video.preload = "metadata";
   video.style.cssText = "max-width:100%;max-height:100%;outline:none;";
   stage.appendChild(video);
   el.appendChild(stage);
+
+  mediaUrl(filePath).then((url) => {
+    video.src = url;
+  }).catch((err) => {
+    console.warn("video media lease failed", filePath, err);
+    header.textContent = `Failed to open ${filePath.split("/").pop() || filePath}`;
+  });
 
   return el;
 }

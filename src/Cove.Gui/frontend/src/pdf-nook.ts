@@ -12,9 +12,15 @@ export function renderPdfNook(filePath: string): HTMLElement {
 
   const frame = document.createElement("iframe");
   frame.title = filePath;
-  frame.src = mediaUrl(filePath);
   frame.style.cssText = "flex:1;min-height:0;border:none;width:100%;background:#525659;";
   el.appendChild(frame);
+
+  mediaUrl(filePath).then((url) => {
+    frame.src = url;
+  }).catch((err) => {
+    console.warn("pdf media lease failed", filePath, err);
+    header.textContent = `Failed to open ${filePath.split("/").pop() || filePath}`;
+  });
 
   return el;
 }

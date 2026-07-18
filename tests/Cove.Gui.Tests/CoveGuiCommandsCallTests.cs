@@ -84,7 +84,7 @@ public sealed class CoveGuiCommandsCallTests
             },
             "0.4.0",
             "dev");
-        var commands = new CoveGuiCommands(link, NullLogger<CoveGuiCommands>.Instance, null!);
+        var commands = new CoveGuiCommands(link, NullLogger<CoveGuiCommands>.Instance, null!, new MediaLeaseRegistry());
 
         try
         {

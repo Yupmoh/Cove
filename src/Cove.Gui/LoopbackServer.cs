@@ -20,6 +20,7 @@ public sealed class LoopbackServer : IAsyncDisposable
     private readonly string _clientVersion;
     private readonly string _channel;
     private readonly string? _capability;
+    private readonly MediaLeaseRegistry? _mediaLeases;
     private readonly TcpListener _listener;
     private readonly ILogger _logger;
     private readonly CancellationTokenSource _cts = new();
@@ -31,7 +32,7 @@ public sealed class LoopbackServer : IAsyncDisposable
     public LoopbackServer(string webRoot, Func<CancellationToken, Task<Stream>> dial, string clientVersion, string channel, int port = DefaultPort)
         : this(webRoot, dial, clientVersion, channel, NullLogger.Instance, port) { }
 
-    public LoopbackServer(string webRoot, Func<CancellationToken, Task<Stream>> dial, string clientVersion, string channel, ILogger logger, int port = DefaultPort, string? capability = null)
+    public LoopbackServer(string webRoot, Func<CancellationToken, Task<Stream>> dial, string clientVersion, string channel, ILogger logger, int port = DefaultPort, string? capability = null, MediaLeaseRegistry? mediaLeases = null)
     {
         _webRoot = webRoot;
         _dial = dial;
@@ -39,6 +40,7 @@ public sealed class LoopbackServer : IAsyncDisposable
         _channel = channel;
         _logger = logger;
         _capability = capability;
+        _mediaLeases = mediaLeases;
         _listener = new TcpListener(IPAddress.Loopback, port);
         Port = port;
     }
@@ -239,8 +241,14 @@ public sealed class LoopbackServer : IAsyncDisposable
 
     private async Task ServeMediaAsync(Stream stream, string target, Dictionary<string, string> headers, CancellationToken ct)
     {
-        var filePath = ParseMediaPath(target);
-        if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
+        var leaseId = QueryValue(target, "lease");
+        if (_mediaLeases is null || string.IsNullOrEmpty(leaseId) || !_mediaLeases.TryResolve(leaseId, out var filePath))
+        {
+            _logger.LoopbackMediaLeaseRejected(leaseId is { Length: > 8 } ? leaseId[..8] : leaseId ?? "");
+            await stream.WriteAsync(Encoding.ASCII.GetBytes("HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"), ct);
+            return;
+        }
+        if (!File.Exists(filePath))
         {
             _logger.LoopbackMediaNotFound(filePath);
             await stream.WriteAsync(Encoding.ASCII.GetBytes("HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"), ct);
@@ -283,17 +291,6 @@ public sealed class LoopbackServer : IAsyncDisposable
         }
     }
 
-    private static string ParseMediaPath(string target)
-    {
-        var q = target.Contains('?') ? target[(target.IndexOf('?') + 1)..] : "";
-        foreach (var kv in q.Split('&', StringSplitOptions.RemoveEmptyEntries))
-        {
-            var eq = kv.Split('=', 2);
-            if (eq.Length == 2 && eq[0] == "path")
-                return Uri.UnescapeDataString(eq[1]);
-        }
-        return "";
-    }
 
     private static (string nook, ulong since) ParsePtyQuery(string target)
     {

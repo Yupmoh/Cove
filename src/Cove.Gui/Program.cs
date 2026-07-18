@@ -31,7 +31,8 @@ internal static class Program
         Func<CancellationToken, Task<Stream>> dial = ct => GuiEngineLauncher.ConnectOrSpawnAsync(channel, ct);
         var webRoot = Path.Combine(AppContext.BaseDirectory, "wwwroot");
         var capability = System.Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
-        var server = new LoopbackServer(webRoot, dial, version, channel, startupLog, capability: capability);
+        var mediaLeases = new MediaLeaseRegistry();
+        var server = new LoopbackServer(webRoot, dial, version, channel, startupLog, capability: capability, mediaLeases: mediaLeases);
         server.Start();
         var capSeparator = url.Contains('?') ? "&" : "?";
         var authorizedUrl = $"{url}{capSeparator}__cap={capability}";
@@ -57,6 +58,7 @@ internal static class Program
             {
                 s.AddSingleton<ILoggerFactory>(loggerFactory);
                 s.AddSingleton(link);
+                s.AddSingleton(mediaLeases);
                 s.AddSingleton<EngineEventForwarder>();
                 s.AddSingleton<DictationHost>();
                 s.AddSingleton<CoveGuiCommands>();

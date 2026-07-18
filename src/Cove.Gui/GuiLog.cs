@@ -17,6 +17,12 @@ internal static partial class GuiLog
     [ZLoggerMessage(LogLevel.Warning, "loopback media not found path={path}")]
     public static partial void LoopbackMediaNotFound(this ILogger logger, string path);
 
+    [ZLoggerMessage(LogLevel.Warning, "loopback media lease rejected lease={lease}")]
+    public static partial void LoopbackMediaLeaseRejected(this ILogger logger, string lease);
+
+    [ZLoggerMessage(LogLevel.Warning, "media lease issue rejected path={path} error={error}")]
+    public static partial void MediaLeaseIssueRejected(this ILogger logger, string path, string error);
+
     [ZLoggerMessage(LogLevel.Warning, "loopback request rejected path={path}")]
     public static partial void LoopbackRequestRejected(this ILogger logger, string path);
 

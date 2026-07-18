@@ -11,11 +11,36 @@ public sealed class CoveGuiCommands
     private readonly EngineLink _link;
     private readonly ILogger<CoveGuiCommands> _log;
     private readonly DictationHost _dictation;
-    public CoveGuiCommands(EngineLink link, ILogger<CoveGuiCommands> log, DictationHost dictation)
+    private readonly MediaLeaseRegistry _mediaLeases;
+    public CoveGuiCommands(EngineLink link, ILogger<CoveGuiCommands> log, DictationHost dictation, MediaLeaseRegistry mediaLeases)
     {
         _link = link;
         _log = log;
         _dictation = dictation;
+        _mediaLeases = mediaLeases;
+    }
+
+    [RynCommand("app.mediaLease")]
+    public string MediaLease(string filePath)
+    {
+        string lease;
+        try
+        {
+            lease = _mediaLeases.Issue(filePath);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _log.MediaLeaseIssueRejected(filePath, ex.Message);
+            throw;
+        }
+        using var ms = new MemoryStream();
+        using (var w = new Utf8JsonWriter(ms))
+        {
+            w.WriteStartObject();
+            w.WriteString("url", "/media?lease=" + lease);
+            w.WriteEndObject();
+        }
+        return System.Text.Encoding.UTF8.GetString(ms.ToArray());
     }
 
     [RynCommand("app.dictationStatus")]
