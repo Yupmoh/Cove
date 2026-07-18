@@ -27,8 +27,9 @@ Read `docs/architecture.md` for the subsystem map, and `AGENTS.md` for executor 
 
 ## Commit conventions
 
-- Title-only, type-prefixed: `feat:`, `fix:`, `chore:`, `docs:`, `test:`, `refactor:`, `style:`.
-- No body, no scope, no trailer.
+- Use a type-prefixed title: `feat:`, `fix:`, `chore:`, `docs:`, `test:`, `refactor:`, `style:`.
+- After the title and one blank line, include one or more `- ` bullets explaining specific changes or why they were made.
+- No scope, prose paragraphs, or trailers.
 - No AI attribution in commit messages or committed files.
 
 ## Pull requests
