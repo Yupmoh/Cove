@@ -24,7 +24,7 @@ public sealed record ConfigChangedEvent(string Key);
 
 public sealed record ControlErrorFrame(string Code, string Message, ulong? StreamId = null);
 
-public sealed record HelloParams(int ProtocolVersion, string ClientKind, string ClientVersion, string Channel);
+public sealed record HelloParams(int ProtocolVersion, string ClientKind, string ClientVersion, string Channel, string? NookId = null, string? NookToken = null, string? ControlToken = null);
 public sealed record HelloResult(int ProtocolVersion, string EngineVersion, int EnginePid, string Channel);
 
 public sealed record DaemonStatusResult(int Pid, string Channel, string EngineVersion, int Connections, int Sessions, long UptimeSeconds);
@@ -171,7 +171,8 @@ public sealed record HandoffNookRecord(
     int RingLength,
     string? SessionId,
     string? HookStatus,
-    HandoffCheckpointDto? Checkpoint);
+    HandoffCheckpointDto? Checkpoint,
+    string? NookToken = null);
 public sealed record HandoffBeginResult(int NookCount, string SocketPath);
 
 public sealed record ToolsRetentionDto(bool Present, bool Editable, bool Hidden, string? Value, string? Recommended);

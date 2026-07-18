@@ -40,6 +40,26 @@ public sealed class EngineLink : IAsyncDisposable
         return await SendRequestAsync(s, uri, paramsEl, ct);
     }
 
+    private string? ReadControlToken()
+    {
+        try
+        {
+            var dd = Cove.Platform.CoveDataDir.Resolve(GuiLogging.ParseChannel(_channel));
+            var path = System.IO.Path.Combine(dd.IpcDir, _channel + ".control-token");
+            if (!System.IO.File.Exists(path))
+            {
+                _log.ControlTokenMissing(path);
+                return null;
+            }
+            return System.IO.File.ReadAllText(path).Trim();
+        }
+        catch (Exception ex)
+        {
+            _log.ControlTokenReadFailed(ex.Message);
+            return null;
+        }
+    }
+
     private async Task<Stream> EnsureConnectedAsync(CancellationToken ct)
     {
         if (_stream is not null) return _stream;
@@ -62,7 +82,7 @@ public sealed class EngineLink : IAsyncDisposable
             try
             {
                 var helloEl = JsonSerializer.SerializeToElement(
-                    new HelloParams(ProtocolConstants.SemanticProtocolVersion, "gui", _clientVersion, _channel),
+                    new HelloParams(ProtocolConstants.SemanticProtocolVersion, "gui", _clientVersion, _channel, ControlToken: ReadControlToken()),
                     CoveJsonContext.Default.HelloParams);
                 var hello = await SendRequestAsync(s, "cove://sys/hello", helloEl, ct);
                 if (!hello.Ok)

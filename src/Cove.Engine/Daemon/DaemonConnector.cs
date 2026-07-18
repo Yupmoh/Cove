@@ -63,8 +63,16 @@ public sealed class DaemonConnector
         var conn = new FrameConnection(stream);
         try
         {
+            var nookId = Environment.GetEnvironmentVariable("COVE_NOOK_ID");
+            var nookToken = Environment.GetEnvironmentVariable("COVE_NOOK_TOKEN");
             JsonElement hp = JsonSerializer.SerializeToElement(
-                new HelloParams(ProtocolConstants.SemanticProtocolVersion, clientKind, CoveBuild.InformationalVersion, _paths.Channel),
+                new HelloParams(
+                    ProtocolConstants.SemanticProtocolVersion,
+                    clientKind,
+                    CoveBuild.InformationalVersion,
+                    _paths.Channel,
+                    string.IsNullOrEmpty(nookId) ? null : nookId,
+                    string.IsNullOrEmpty(nookToken) ? null : nookToken),
                 CoveJsonContext.Default.HelloParams);
             await conn.WriteFrameAsync(FrameType.Request, 0,
                 ControlCodec.Encode(new ControlRequest("1", "cove://sys/hello", hp)), cancellationToken).ConfigureAwait(false);

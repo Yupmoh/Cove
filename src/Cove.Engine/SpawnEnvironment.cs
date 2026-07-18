@@ -48,7 +48,7 @@ public sealed class SpawnEnvironment
         env["TERM_PROGRAM"] = "Cove";
     }
 
-    public Dictionary<string, string> Build(string nookId, IReadOnlyDictionary<string, string>? callerEnv)
+    public Dictionary<string, string> Build(string nookId, IReadOnlyDictionary<string, string>? callerEnv, string? nookToken = null)
     {
         var env = new Dictionary<string, string>(System.StringComparer.Ordinal);
         foreach (System.Collections.DictionaryEntry e in System.Environment.GetEnvironmentVariables())
@@ -67,6 +67,7 @@ public sealed class SpawnEnvironment
         env["COVE_CLI_PATH"] = _cliPath;
         env["COVE_DATA_DIR"] = _dataDir;
         env["COVE_NOOK_ID"] = nookId;
+        env["COVE_NOOK_TOKEN"] = nookToken ?? "";
         env["COVE_BAY_ID"] = _bayId;
         env["COVE_SHORE_ID"] = "";
         env["COVE_TASK_ID"] = "";

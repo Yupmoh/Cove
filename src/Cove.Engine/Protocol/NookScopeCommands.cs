@@ -21,6 +21,8 @@ public static class NookScopeCommands
     [CoveCommand("cove://commands/nook.scope.set")]
     public static Task<ControlResponse> SetScope(EngineDispatchContext ctx)
     {
+        if (!string.IsNullOrEmpty(ctx.Request.CallerNookId))
+            return Task.FromResult(ctx.Fail("access_denied", "nook-attributed callers cannot modify scopes"));
         if (ctx.NookScopes is not { } store)
             return Task.FromResult(ctx.Fail("not_ready", "nook scope store not available"));
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.NookScopeSetParams) is not { } p)

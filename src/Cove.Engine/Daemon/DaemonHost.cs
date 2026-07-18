@@ -34,6 +34,7 @@ public sealed class DaemonHost
     private Cove.Engine.Restart.RestorationSummaryEvent? _restorationSummary;
 
     private ILogger? _logger;
+    private string? _controlToken;
     private IPtyHost? _ptyHost;
     private NookRegistry? _nooks;
     private Cove.Engine.Layout.LayoutService? _layout;
@@ -512,6 +513,29 @@ public sealed class DaemonHost
             catch (Exception ex) { DaemonLog.Write(_paths, "stale unlink failed: " + ex.Message); }
         }
 
+        _controlToken = System.Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+        try
+        {
+            var tokenTemp = _paths.ControlTokenPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            var tokenOptions = new FileStreamOptions
+            {
+                Mode = FileMode.CreateNew,
+                Access = FileAccess.Write,
+                Share = FileShare.None,
+            };
+            if (!OperatingSystem.IsWindows())
+                tokenOptions.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+            using (var tokenStream = new FileStream(tokenTemp, tokenOptions))
+                tokenStream.Write(Encoding.ASCII.GetBytes(_controlToken));
+            File.Move(tokenTemp, _paths.ControlTokenPath, overwrite: true);
+        }
+        catch (Exception ex)
+        {
+            logger.ControlTokenWriteFailed(_paths.ControlTokenPath, ex.Message);
+            guard.Dispose();
+            dataDirLock.Dispose();
+            return 1;
+        }
 
         IControlListener listener;
         try
@@ -669,6 +693,33 @@ public sealed class DaemonHost
             MarkActive(-1);
         }
     }
+    private bool ControlTokenMatches(string? candidate)
+    {
+        if (_controlToken is null || string.IsNullOrEmpty(candidate))
+            return false;
+        return System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
+            Encoding.ASCII.GetBytes(_controlToken),
+            Encoding.ASCII.GetBytes(candidate));
+    }
+
+    private ControlRequest SanitizeCallerIdentity(ConnState state, ControlRequest req)
+    {
+        if (state.PrincipalNookId is { } principal)
+        {
+            if (string.Equals(req.CallerNookId, principal, StringComparison.Ordinal))
+                return req;
+            if (!string.IsNullOrEmpty(req.CallerNookId))
+                _logger?.CallerClaimOverridden(req.CallerNookId!, principal, req.Uri);
+            return req with { CallerNookId = principal };
+        }
+        if (!state.IsGui && !string.IsNullOrEmpty(req.CallerNookId))
+        {
+            _logger?.CallerClaimStripped(req.CallerNookId!, req.Uri);
+            return req with { CallerNookId = null };
+        }
+        return req;
+    }
+
 
     private async Task<bool> DispatchAsync(FrameConnection conn, Stream stream, ConnState state, ControlRequest req, CancellationToken cancellationToken)
     {
@@ -689,6 +740,32 @@ public sealed class DaemonHost
             {
                 await WriteErrorFrameAsync(conn, "version_mismatch", $"protocol {hp.ProtocolVersion} unsupported", null, cancellationToken).ConfigureAwait(false);
                 return true;
+            }
+            if (hp.ClientKind == "gui" && !ControlTokenMatches(hp.ControlToken))
+            {
+                _logger?.GuiControlAuthRejected(hp.ClientKind);
+                await WriteResponseAsync(conn, Fail(req.Id, "control_auth_failed", "gui client requires the daemon control token"), cancellationToken).ConfigureAwait(false);
+                return true;
+            }
+            if (!string.IsNullOrEmpty(hp.NookId))
+            {
+                var auth = _nooks?.Authenticate(hp.NookId!, hp.NookToken) ?? NookAuthResult.Unknown;
+                if (auth == NookAuthResult.Rejected)
+                {
+                    _logger?.NookAuthRejected(hp.NookId!);
+                    await WriteResponseAsync(conn, Fail(req.Id, "nook_auth_failed", $"nook credential rejected for {hp.NookId}"), cancellationToken).ConfigureAwait(false);
+                    return true;
+                }
+                if (auth is NookAuthResult.Bound or NookAuthResult.LegacyBound)
+                {
+                    state.PrincipalNookId = hp.NookId;
+                    if (auth == NookAuthResult.LegacyBound)
+                        _logger?.NookAuthLegacyBound(hp.NookId!);
+                }
+                else
+                {
+                    _logger?.NookAuthUnknown(hp.NookId!);
+                }
             }
             state.HelloDone = true;
             if (hp.ClientKind == "gui")
@@ -716,6 +793,13 @@ public sealed class DaemonHost
         if (!state.HelloDone)
         {
             await WriteResponseAsync(conn, Fail(req.Id, "not_ready", "sys/hello required before commands"), cancellationToken).ConfigureAwait(false);
+            return false;
+        }
+        req = SanitizeCallerIdentity(state, req);
+        if (req.Uri == "cove://commands/nook.scope.set" && !state.IsGui)
+        {
+            _logger?.ScopeMutationDenied(state.PrincipalNookId ?? "");
+            await WriteResponseAsync(conn, Fail(req.Id, "access_denied", "scope mutation requires the gui client"), cancellationToken).ConfigureAwait(false);
             return false;
         }
         long dispatchStart = System.Diagnostics.Stopwatch.GetTimestamp();
@@ -1274,6 +1358,7 @@ public sealed class DaemonHost
     {
         public bool HelloDone;
         public bool IsGui;
+        public string? PrincipalNookId;
     }
 
     private sealed class RestoreSpawner : Cove.Engine.Restart.IRestoreSpawner

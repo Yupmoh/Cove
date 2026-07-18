@@ -57,12 +57,21 @@ public sealed class DaemonTestHarness : IAsyncDisposable
         throw new TimeoutException("daemon did not become connectable");
     }
 
+    public string ControlTokenPath => _paths.ControlTokenPath;
+
+    public string? ReadControlToken()
+    {
+        try { return File.Exists(ControlTokenPath) ? File.ReadAllText(ControlTokenPath).Trim() : null; }
+        catch (IOException) { return null; }
+    }
+
     public async Task<FrameConnection> ConnectAsync(string clientKind)
     {
         Stream s = await Endpoint.ConnectAsync(5000, CancellationToken.None);
         var conn = new FrameConnection(s);
+        var controlToken = clientKind == "gui" ? ReadControlToken() : null;
         JsonElement hp = JsonSerializer.SerializeToElement(
-            new HelloParams(1, clientKind, "0.1.0", "dev"), CoveJsonContext.Default.HelloParams);
+            new HelloParams(1, clientKind, "0.1.0", "dev", ControlToken: controlToken), CoveJsonContext.Default.HelloParams);
         await conn.WriteFrameAsync(FrameType.Request, 0,
             ControlCodec.Encode(new ControlRequest("1", "cove://sys/hello", hp)), CancellationToken.None);
         Frame resp = (await conn.ReadFrameAsync(CancellationToken.None))!.Value;

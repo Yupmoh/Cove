@@ -23,6 +23,12 @@ internal static partial class GuiLog
     [ZLoggerMessage(LogLevel.Warning, "media lease issue rejected path={path} error={error}")]
     public static partial void MediaLeaseIssueRejected(this ILogger logger, string path, string error);
 
+    [ZLoggerMessage(LogLevel.Warning, "daemon control token missing path={path}")]
+    public static partial void ControlTokenMissing(this ILogger logger, string path);
+
+    [ZLoggerMessage(LogLevel.Warning, "daemon control token read failed error={error}")]
+    public static partial void ControlTokenReadFailed(this ILogger logger, string error);
+
     [ZLoggerMessage(LogLevel.Warning, "loopback request rejected path={path}")]
     public static partial void LoopbackRequestRejected(this ILogger logger, string path);
 

@@ -11,6 +11,8 @@ internal sealed record TerminalCheckpoint(byte[] Data, long Offset, int Cols, in
 
 public sealed record HandoffExportItem(HandoffNookRecord Record, int MasterFd, byte[] RingTail);
 
+public enum NookAuthResult { Bound, LegacyBound, Unknown, Rejected }
+
 internal sealed class NookSession
 {
     public required string NookId { get; init; }
@@ -29,6 +31,7 @@ internal sealed class NookSession
     public required PtySessionReader Reader { get; init; }
     public TerminalCheckpoint? Checkpoint { get; set; }
     public bool PendingRepaint { get; set; }
+    public string? Token { get; set; }
 
     public NookInfo ToInfo() => new(NookId, Command, Cols, Rows, !Reader.HasCompleted, Cwd, Title);
 }
@@ -107,7 +110,10 @@ public sealed class NookRegistry : IDisposable, Cove.Engine.Agents.INookWriter
 
     private NookInfo SpawnCore(string nookId, string command, string[] args, string cwd, int cols, int rows, System.Collections.Generic.IReadOnlyDictionary<string, string>? callerEnv, byte[]? priorScrollback = null)
     {
-        var envDict = _spawnEnv is { } se ? se.Build(nookId, callerEnv) : callerEnv;
+        string? token = _spawnEnv is not null
+            ? System.Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32))
+            : null;
+        var envDict = _spawnEnv is { } se ? se.Build(nookId, callerEnv, token) : callerEnv;
         if (envDict is Dictionary<string, string> ed && _shellDir is { } sd)
             args = (string[])System.Linq.Enumerable.ToArray(ShellIntegration.Apply(command, sd, args, ed));
         var request = new PtySpawnRequest
@@ -138,6 +144,7 @@ public sealed class NookRegistry : IDisposable, Cove.Engine.Agents.INookWriter
             Ring = ring,
             Signal = signal,
             Reader = reader,
+            Token = token,
         };
         reader.OnCwd = c => nook.Cwd = c;
         reader.Start();
@@ -164,6 +171,26 @@ public sealed class NookRegistry : IDisposable, Cove.Engine.Agents.INookWriter
     {
         lock (_sync)
             return _nooks.TryGetValue(nookId, out nook!);
+    }
+
+    public NookAuthResult Authenticate(string nookId, string? token)
+    {
+        string? stored;
+        lock (_sync)
+        {
+            if (!_nooks.TryGetValue(nookId, out var nook))
+                return NookAuthResult.Unknown;
+            stored = nook.Token;
+        }
+        if (stored is null)
+            return NookAuthResult.LegacyBound;
+        if (string.IsNullOrEmpty(token))
+            return NookAuthResult.Rejected;
+        var storedBytes = System.Text.Encoding.ASCII.GetBytes(stored);
+        var candidateBytes = System.Text.Encoding.ASCII.GetBytes(token);
+        return System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(storedBytes, candidateBytes)
+            ? NookAuthResult.Bound
+            : NookAuthResult.Rejected;
     }
 
     public Cove.Engine.Protocol.PrefixResolveResult ResolveId(string idOrPrefix)
@@ -306,7 +333,7 @@ public sealed class NookRegistry : IDisposable, Cove.Engine.Agents.INookWriter
                 : null;
             var record = new HandoffNookRecord(
                 nook.NookId, pid, nook.Command, nook.Args, nook.SpawnCwd, nook.Cwd, nook.Cols, nook.Rows,
-                nook.Title, nook.Adapter, nook.AgentName, nook.Ring.Head, tail.Length, null, null, checkpoint);
+                nook.Title, nook.Adapter, nook.AgentName, nook.Ring.Head, tail.Length, null, null, checkpoint, nook.Token);
             _logger.HandoffExported(nook.NookId, pid, tail.Length);
             items.Add(new HandoffExportItem(record, transferFd, tail));
             lock (_sync)
@@ -362,6 +389,7 @@ public sealed class NookRegistry : IDisposable, Cove.Engine.Agents.INookWriter
             Ring = ring,
             Signal = signal,
             Reader = reader,
+            Token = record.NookToken,
         };
         nook.Cwd = record.Cwd;
         nook.PendingRepaint = true;

@@ -11,6 +11,7 @@ public sealed class DaemonPaths
     public string DaemonLockPath { get; }
     public string SpawnLockPath { get; }
     public string DaemonLogPath { get; }
+    public string ControlTokenPath { get; }
 
     public DaemonPaths(CoveDataDir dataDir)
     {
@@ -20,5 +21,6 @@ public sealed class DaemonPaths
         DaemonLockPath = Path.Combine(dataDir.IpcDir, "daemon.lock");
         SpawnLockPath = Path.Combine(dataDir.IpcDir, Channel + ".spawn.lock");
         DaemonLogPath = Path.Combine(dataDir.LogsDir, Channel + "-daemon.log");
+        ControlTokenPath = Path.Combine(dataDir.IpcDir, Channel + ".control-token");
     }
 }
