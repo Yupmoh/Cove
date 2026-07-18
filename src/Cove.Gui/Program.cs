@@ -30,8 +30,11 @@ internal static class Program
 
         Func<CancellationToken, Task<Stream>> dial = ct => GuiEngineLauncher.ConnectOrSpawnAsync(channel, ct);
         var webRoot = Path.Combine(AppContext.BaseDirectory, "wwwroot");
-        var server = new LoopbackServer(webRoot, dial, version, channel, startupLog);
+        var capability = System.Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+        var server = new LoopbackServer(webRoot, dial, version, channel, startupLog, capability: capability);
         server.Start();
+        var capSeparator = url.Contains('?') ? "&" : "?";
+        var authorizedUrl = $"{url}{capSeparator}__cap={capability}";
 
         var link = new EngineLink(dial, version, channel);
         link.SetLogger(loggerFactory.CreateLogger<EngineLink>());
@@ -39,7 +42,7 @@ internal static class Program
         var app = RynApplication.CreateBuilder()
             .ConfigureOptions(o =>
             {
-                o.Url = new Uri($"http://localhost:{LoopbackServer.DefaultPort}{startPath}");
+                o.Url = new Uri(authorizedUrl);
                 o.Title = "Cove";
                 o.Width = 1440;
                 o.Height = 880;

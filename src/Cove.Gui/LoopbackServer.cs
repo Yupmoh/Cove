@@ -18,6 +18,7 @@ public sealed class LoopbackServer : IAsyncDisposable
     private readonly Func<CancellationToken, Task<Stream>> _dial;
     private readonly string _clientVersion;
     private readonly string _channel;
+    private readonly string? _capability;
     private readonly TcpListener _listener;
     private readonly ILogger _logger;
     private readonly CancellationTokenSource _cts = new();
@@ -26,13 +27,14 @@ public sealed class LoopbackServer : IAsyncDisposable
     public LoopbackServer(string webRoot, Func<CancellationToken, Task<Stream>> dial, string clientVersion, string channel, int port = DefaultPort)
         : this(webRoot, dial, clientVersion, channel, NullLogger.Instance, port) { }
 
-    public LoopbackServer(string webRoot, Func<CancellationToken, Task<Stream>> dial, string clientVersion, string channel, ILogger logger, int port = DefaultPort)
+    public LoopbackServer(string webRoot, Func<CancellationToken, Task<Stream>> dial, string clientVersion, string channel, ILogger logger, int port = DefaultPort, string? capability = null)
     {
         _webRoot = webRoot;
         _dial = dial;
         _clientVersion = clientVersion;
         _channel = channel;
         _logger = logger;
+        _capability = capability;
         _listener = new TcpListener(IPAddress.Loopback, port);
         Port = port;
     }
@@ -60,6 +62,75 @@ public sealed class LoopbackServer : IAsyncDisposable
     public static string ComputeAcceptKey(string secWebSocketKey)
         => Convert.ToBase64String(SHA1.HashData(Encoding.ASCII.GetBytes(secWebSocketKey + WsGuid)));
 
+    private bool IsRequestAuthorized(string target, Dictionary<string, string> headers)
+    {
+        if (!HostAllowed(headers) || !OriginAllowed(headers))
+            return false;
+        if (string.IsNullOrEmpty(_capability))
+            return true;
+        if (GrantsCapabilityCookie(target))
+            return true;
+        return headers.TryGetValue("cookie", out var cookie)
+            && CookieValue(cookie, "cove_cap") is { } value
+            && string.Equals(value, _capability, StringComparison.Ordinal);
+    }
+
+    private bool GrantsCapabilityCookie(string target)
+        => !string.IsNullOrEmpty(_capability)
+            && QueryValue(target, "__cap") is { } cap
+            && string.Equals(cap, _capability, StringComparison.Ordinal);
+
+    private bool HostAllowed(Dictionary<string, string> headers)
+    {
+        if (!headers.TryGetValue("host", out var host) || string.IsNullOrEmpty(host))
+            return false;
+        return host.Equals($"localhost:{Port}", StringComparison.OrdinalIgnoreCase)
+            || host.Equals($"127.0.0.1:{Port}", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool OriginAllowed(Dictionary<string, string> headers)
+    {
+        if (!headers.TryGetValue("origin", out var origin) || string.IsNullOrEmpty(origin))
+            return true;
+        return origin.Equals($"http://localhost:{Port}", StringComparison.OrdinalIgnoreCase)
+            || origin.Equals($"http://127.0.0.1:{Port}", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string? QueryValue(string target, string key)
+    {
+        var q = target.Contains('?') ? target[(target.IndexOf('?') + 1)..] : "";
+        foreach (var kv in q.Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var eq = kv.Split('=', 2);
+            if (eq.Length == 2 && eq[0] == key)
+                return Uri.UnescapeDataString(eq[1]);
+        }
+        return null;
+    }
+
+    private static string? CookieValue(string cookieHeader, string key)
+    {
+        foreach (var pair in cookieHeader.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var eq = pair.Split('=', 2);
+            if (eq.Length == 2 && eq[0] == key)
+                return eq[1];
+        }
+        return null;
+    }
+
+    private static string StripCapability(string target)
+    {
+        var split = target.Split('?', 2);
+        if (split.Length < 2)
+            return target;
+        var kept = split[1]
+            .Split('&', StringSplitOptions.RemoveEmptyEntries)
+            .Where(kv => kv.Split('=', 2)[0] != "__cap");
+        var query = string.Join('&', kept);
+        return query.Length == 0 ? split[0] : split[0] + "?" + query;
+    }
+
     private async Task HandleAsync(TcpClient client)
     {
         using (client)
@@ -71,6 +142,13 @@ public sealed class LoopbackServer : IAsyncDisposable
                 if (req is null) return;
                 var (target, headers) = req.Value;
                 var path = target.Split('?', 2)[0];
+
+                if (!IsRequestAuthorized(target, headers))
+                {
+                    _logger.LoopbackRequestRejected(path);
+                    await stream.WriteAsync(Encoding.ASCII.GetBytes("HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"), _cts.Token);
+                    return;
+                }
 
                 if (headers.TryGetValue("upgrade", out var up) && up.Equals("websocket", StringComparison.OrdinalIgnoreCase) && path == "/pty")
                 {
@@ -86,6 +164,14 @@ public sealed class LoopbackServer : IAsyncDisposable
                 if (path == "/media")
                 {
                     await ServeMediaAsync(stream, target, headers, _cts.Token);
+                    return;
+                }
+
+                if (GrantsCapabilityCookie(target))
+                {
+                    var location = StripCapability(target);
+                    var redirect = $"HTTP/1.1 303 See Other\r\nLocation: {location}\r\nSet-Cookie: cove_cap={_capability}; Path=/; HttpOnly; SameSite=Strict\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+                    await stream.WriteAsync(Encoding.ASCII.GetBytes(redirect), _cts.Token);
                     return;
                 }
 

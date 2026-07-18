@@ -17,6 +17,9 @@ internal static partial class GuiLog
     [ZLoggerMessage(LogLevel.Warning, "loopback media not found path={path}")]
     public static partial void LoopbackMediaNotFound(this ILogger logger, string path);
 
+    [ZLoggerMessage(LogLevel.Warning, "loopback request rejected path={path}")]
+    public static partial void LoopbackRequestRejected(this ILogger logger, string path);
+
     [ZLoggerMessage(LogLevel.Error, "pty websocket relay failed nookId={nookId} error={error}")]
     public static partial void PtyWebSocketRelayFailed(this ILogger logger, string nookId, string error);
 

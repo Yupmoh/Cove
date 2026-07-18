@@ -144,7 +144,13 @@ public sealed class CoveGuiCommands
     public async ValueTask<string> ConfigGet(string key, CancellationToken ct)
     {
         var p = JsonSerializer.SerializeToElement(new ConfigGetParams(key), CoveJsonContext.Default.ConfigGetParams);
-        return await Call("cove://commands/config.get", p, ct);
+        var r = await _link.RequestAsync("cove://commands/config.get", p, ct);
+        if (r.Ok)
+            return r.Data is { } d ? d.GetRawText() : "{}";
+        if (string.Equals(r.Error?.Code, "not_found", StringComparison.Ordinal))
+            return "{}";
+        _log.CommandEngineFailed("cove://commands/config.get", r.Error?.Message ?? r.Error?.Code ?? "engine_error");
+        throw new InvalidOperationException(r.Error?.Message ?? r.Error?.Code ?? "engine_error");
     }
 
     [RynCommand("app.configSet")]
