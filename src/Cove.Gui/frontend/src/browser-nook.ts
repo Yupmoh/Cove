@@ -297,6 +297,10 @@ export async function renderBrowserNook(nookId: string, initialUrl: string, user
     window.__ryn.on(event, callback);
     instance.bridgeDisposers.push(() => window.__ryn.off(event, callback));
   };
+  instance.bridgeDisposers.push(() => {
+    for (const timer of permTimers.values()) clearTimeout(timer);
+    permTimers.clear();
+  });
 
   const openWebView = async (url: string) => {
     const storagePath = `/tmp/cove-webview-${nookId}`;
