@@ -36,7 +36,7 @@ public sealed class PtyStreamClient : IAsyncDisposable
         try
         {
             await Request(s, "cove://sys/hello",
-                JsonSerializer.SerializeToElement(new HelloParams(ProtocolConstants.SemanticProtocolVersion, "gui", clientVersion, channel), CoveJsonContext.Default.HelloParams), 1, ct);
+                JsonSerializer.SerializeToElement(new HelloParams(ProtocolConstants.SemanticProtocolVersion, "gui-stream", clientVersion, channel), CoveJsonContext.Default.HelloParams), 1, ct);
             var sub = await Request(s, "cove://commands/nook.subscribe",
                 JsonSerializer.SerializeToElement(new SubscribeParams(nookId, since), CoveJsonContext.Default.SubscribeParams), 2, ct);
             if (!sub.Ok || sub.Data is null) throw new InvalidOperationException($"subscribe failed: {sub.Error?.Code}");
