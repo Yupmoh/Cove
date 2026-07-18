@@ -15,10 +15,6 @@ public class AbsentMemberDefaultTests
         var m = JsonSerializer.Deserialize(json, BaysJsonContext.Default.BayModel)!;
         Assert.Equal(1, m.SchemaVersion);
         Assert.Equal("default", m.CollectionId);
-        Assert.NotNull(m.Wings);
-        Assert.Empty(m.Wings);
-        Assert.NotNull(m.Shores);
-        Assert.Empty(m.Shores);
         Assert.NotNull(m.Nooks);
         Assert.Empty(m.Nooks);
     }
@@ -36,11 +32,12 @@ public class AbsentMemberDefaultTests
     }
 
     [Fact]
-    public void Shore_AbsentWingId_KeepsMain()
+    public void ShoreSnapshot_AbsentWingId_KeepsMain()
     {
         var json = "{\"id\":\"r\",\"name\":\"n\",\"layoutTree\":{\"kind\":\"leaf\",\"nookId\":\"p1\"}}";
-        var r = JsonSerializer.Deserialize(json, BaysJsonContext.Default.Shore)!;
-        Assert.Equal(BayModel.MainWingId, r.WingId);
+        var r = JsonSerializer.Deserialize(json, Cove.Persistence.CoveJsonContext.Default.ShoreSnapshot)!;
+        Assert.Equal("main", r.WingId);
+        Assert.False(r.Pinned);
     }
 
     [Fact]

@@ -11,6 +11,8 @@ namespace Cove.Persistence;
 [JsonSerializable(typeof(DataDirMeta))]
 [JsonSerializable(typeof(BaySnapshot))]
 [JsonSerializable(typeof(ShoreSnapshot))]
+[JsonSerializable(typeof(WingSnapshot))]
+[JsonSerializable(typeof(IReadOnlyList<WingSnapshot>))]
 [JsonSerializable(typeof(MosaicNode))]
 [JsonSerializable(typeof(SplitNode))]
 [JsonSerializable(typeof(NookLeaf))]

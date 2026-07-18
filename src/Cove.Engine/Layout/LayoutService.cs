@@ -8,6 +8,18 @@ namespace Cove.Engine.Layout;
 public sealed class LayoutService
 {
     public const string DefaultBayId = "default";
+    public const string MainWingId = "main";
+
+    public readonly record struct ShoreView(string Id, string Name, string WingId, bool Pinned, bool Active);
+    public readonly record struct WingView(string Id, string Name, string? IconKind, string? IconValue);
+
+    private sealed class WingState
+    {
+        public required string Id { get; set; }
+        public required string Name { get; set; }
+        public string? IconKind { get; set; }
+        public string? IconValue { get; set; }
+    }
 
     private sealed class ShoreState
     {
@@ -15,6 +27,8 @@ public sealed class LayoutService
         public required MosaicNode Root { get; set; }
         public string? ActiveNookId { get; set; }
         public string? ZoomedNookId { get; set; }
+        public string WingId { get; set; } = MainWingId;
+        public bool Pinned { get; set; }
     }
 
     private sealed class Bucket
@@ -22,6 +36,9 @@ public sealed class LayoutService
         public readonly Dictionary<string, ShoreState> Shores = new(StringComparer.Ordinal);
         public readonly List<string> Order = new();
         public string? ActiveShoreId;
+        public readonly List<WingState> Wings = new() { new WingState { Id = MainWingId, Name = "main" } };
+        public string? ActiveWingId = MainWingId;
+        public string? FocusedNookId;
     }
 
     private readonly Dictionary<string, Bucket> _buckets = new(StringComparer.Ordinal);
@@ -29,6 +46,7 @@ public sealed class LayoutService
     private string _activeBayId = DefaultBayId;
     private readonly object _sync = new();
     public Action? OnChanged { get; set; }
+    public Action<string>? OnBayChanged { get; set; }
 
     public LayoutService()
     {
@@ -98,6 +116,7 @@ public sealed class LayoutService
                 Root = firstLeaf,
                 ActiveNookId = firstLeaf.NookId,
                 ZoomedNookId = null,
+                WingId = bucket.ActiveWingId ?? MainWingId,
             };
             bucket.Order.Add(shoreId);
             bucket.ActiveShoreId = shoreId;
@@ -337,10 +356,12 @@ public sealed class LayoutService
     public IReadOnlyList<string> CloseShore(string shoreId)
     {
         var nookIds = new List<string>();
+        string? ownerBay = null;
         lock (_sync)
         {
             if (!_shoreToBay.TryGetValue(shoreId, out var wsId) || !_buckets.TryGetValue(wsId, out var bucket))
                 return nookIds;
+            ownerBay = wsId;
             if (bucket.Shores.TryGetValue(shoreId, out var rs))
                 foreach (var leaf in MosaicOps.Leaves(rs.Root))
                     if (!IsEmptyLeaf(leaf))
@@ -351,19 +372,28 @@ public sealed class LayoutService
             if (bucket.ActiveShoreId == shoreId)
                 bucket.ActiveShoreId = bucket.Order.Count > 0 ? bucket.Order[0] : null;
         }
-        OnChanged?.Invoke();
+        if (ownerBay is not null)
+            OnBayChanged?.Invoke(ownerBay);
+        else
+            OnChanged?.Invoke();
         return nookIds;
     }
 
     public void FocusNook(string shoreId, string nookId)
     {
+        string? ownerBay;
         lock (_sync)
         {
             var (bucket, shore) = GetShoreOrThrow(shoreId);
             shore.ActiveNookId = nookId;
             bucket.ActiveShoreId = shoreId;
+            bucket.FocusedNookId = nookId;
+            ownerBay = _shoreToBay.TryGetValue(shoreId, out var wsId) ? wsId : null;
         }
-        OnChanged?.Invoke();
+        if (ownerBay is not null)
+            OnBayChanged?.Invoke(ownerBay);
+        else
+            OnChanged?.Invoke();
     }
 
     public void CycleFocus(string shoreId, int dir)
@@ -392,12 +422,17 @@ public sealed class LayoutService
 
     public void RenameShore(string shoreId, string name)
     {
+        string? ownerBay;
         lock (_sync)
         {
             var (_, shore) = GetShoreOrThrow(shoreId);
             shore.Name = name;
+            ownerBay = _shoreToBay.TryGetValue(shoreId, out var wsId) ? wsId : null;
         }
-        OnChanged?.Invoke();
+        if (ownerBay is not null)
+            OnBayChanged?.Invoke(ownerBay);
+        else
+            OnChanged?.Invoke();
     }
 
     public void ReorderShores(IReadOnlyList<string> orderedShoreIds)
@@ -423,6 +458,260 @@ public sealed class LayoutService
         OnChanged?.Invoke();
     }
 
+    private Bucket? BucketFor(string bayId) => _buckets.TryGetValue(bayId, out var b) ? b : null;
+
+    public string CreateWing(string bayId, string name)
+    {
+        var wingId = Guid.NewGuid().ToString("N");
+        lock (_sync)
+            EnsureBucket(bayId).Wings.Add(new WingState { Id = wingId, Name = name });
+        OnBayChanged?.Invoke(bayId);
+        return wingId;
+    }
+
+    public void RemoveWing(string bayId, string wingId)
+    {
+        if (wingId == MainWingId)
+            return;
+        lock (_sync)
+        {
+            if (BucketFor(bayId) is not { } bucket || bucket.Wings.RemoveAll(w => w.Id == wingId) == 0)
+                return;
+            foreach (var shore in bucket.Shores.Values)
+                if (shore.WingId == wingId)
+                    shore.WingId = MainWingId;
+            if (bucket.ActiveWingId == wingId)
+                bucket.ActiveWingId = MainWingId;
+        }
+        OnBayChanged?.Invoke(bayId);
+    }
+
+    public void RenameWing(string bayId, string wingId, string name)
+    {
+        lock (_sync)
+        {
+            if (BucketFor(bayId) is not { } bucket || bucket.Wings.FirstOrDefault(w => w.Id == wingId) is not { } wing)
+                return;
+            wing.Name = name;
+        }
+        OnBayChanged?.Invoke(bayId);
+    }
+
+    public void ReorderWings(string bayId, IReadOnlyList<string> orderedWingIds)
+    {
+        lock (_sync)
+        {
+            if (BucketFor(bayId) is not { } bucket)
+                return;
+            var known = bucket.Wings.ToDictionary(w => w.Id, StringComparer.Ordinal);
+            var next = new List<WingState>(bucket.Wings.Count);
+            foreach (var id in orderedWingIds)
+                if (known.Remove(id, out var w))
+                    next.Add(w);
+            foreach (var w in bucket.Wings)
+                if (known.ContainsKey(w.Id))
+                    next.Add(w);
+            bucket.Wings.Clear();
+            bucket.Wings.AddRange(next);
+        }
+        OnBayChanged?.Invoke(bayId);
+    }
+
+    public void SetWingIcon(string bayId, string wingId, string? iconKind, string? iconValue)
+    {
+        lock (_sync)
+        {
+            if (BucketFor(bayId) is not { } bucket || bucket.Wings.FirstOrDefault(w => w.Id == wingId) is not { } wing)
+                return;
+            wing.IconKind = iconKind;
+            wing.IconValue = iconValue;
+        }
+        OnBayChanged?.Invoke(bayId);
+    }
+
+    public void SwitchWing(string bayId, string wingId)
+    {
+        lock (_sync)
+        {
+            if (BucketFor(bayId) is not { } bucket || !bucket.Wings.Any(w => w.Id == wingId))
+                return;
+            bucket.ActiveWingId = wingId;
+        }
+        OnBayChanged?.Invoke(bayId);
+    }
+
+    public void SetShorePinned(string bayId, string shoreId, bool pinned)
+    {
+        lock (_sync)
+        {
+            if (BucketFor(bayId) is not { } bucket || !bucket.Shores.TryGetValue(shoreId, out var shore))
+                return;
+            shore.Pinned = pinned;
+        }
+        OnBayChanged?.Invoke(bayId);
+    }
+
+    public void MoveShoreToWing(string bayId, string shoreId, string wingId)
+    {
+        lock (_sync)
+        {
+            if (BucketFor(bayId) is not { } bucket || !bucket.Wings.Any(w => w.Id == wingId) || !bucket.Shores.TryGetValue(shoreId, out var shore))
+                return;
+            shore.WingId = wingId;
+        }
+        OnBayChanged?.Invoke(bayId);
+    }
+
+    public void SwitchShore(string bayId, string shoreId)
+    {
+        lock (_sync)
+        {
+            if (BucketFor(bayId) is not { } bucket || !bucket.Shores.ContainsKey(shoreId))
+                return;
+            bucket.ActiveShoreId = shoreId;
+        }
+        OnBayChanged?.Invoke(bayId);
+    }
+
+    public void RenameShore(string bayId, string shoreId, string name)
+    {
+        lock (_sync)
+        {
+            if (BucketFor(bayId) is not { } bucket || !bucket.Shores.TryGetValue(shoreId, out var shore))
+                return;
+            shore.Name = name;
+        }
+        OnBayChanged?.Invoke(bayId);
+    }
+
+    public IReadOnlyList<string> CloseShore(string bayId, string shoreId)
+    {
+        var nookIds = new List<string>();
+        lock (_sync)
+        {
+            if (BucketFor(bayId) is not { } bucket || !bucket.Shores.TryGetValue(shoreId, out var rs))
+                return nookIds;
+            foreach (var leaf in MosaicOps.Leaves(rs.Root))
+                if (!IsEmptyLeaf(leaf))
+                    nookIds.Add(leaf.NookId);
+            bucket.Shores.Remove(shoreId);
+            bucket.Order.Remove(shoreId);
+            _shoreToBay.Remove(shoreId);
+            if (bucket.ActiveShoreId == shoreId)
+                bucket.ActiveShoreId = bucket.Order.Count > 0 ? bucket.Order[0] : null;
+        }
+        OnBayChanged?.Invoke(bayId);
+        return nookIds;
+    }
+
+    public void SetFocusedNook(string bayId, string? nookId)
+    {
+        lock (_sync)
+        {
+            if (BucketFor(bayId) is not { } bucket)
+                return;
+            bucket.FocusedNookId = nookId;
+        }
+        OnBayChanged?.Invoke(bayId);
+    }
+
+    public string CreateShoreInWing(string bayId, string wingId, string name, NookLeaf firstLeaf)
+    {
+        string shoreId;
+        lock (_sync)
+        {
+            var bucket = EnsureBucket(bayId);
+            shoreId = Guid.NewGuid().ToString("N");
+            bucket.Shores[shoreId] = new ShoreState
+            {
+                Name = name,
+                Root = firstLeaf,
+                ActiveNookId = firstLeaf.NookId,
+                ZoomedNookId = null,
+                WingId = bucket.Wings.Any(w => w.Id == wingId) ? wingId : MainWingId,
+            };
+            bucket.Order.Add(shoreId);
+            bucket.ActiveShoreId = shoreId;
+            _shoreToBay[shoreId] = bayId;
+        }
+        OnBayChanged?.Invoke(bayId);
+        return shoreId;
+    }
+
+    public IReadOnlyList<ShoreView> ShoresFor(string bayId)
+    {
+        lock (_sync)
+        {
+            if (BucketFor(bayId) is not { } bucket)
+                return System.Array.Empty<ShoreView>();
+            var list = new List<ShoreView>(bucket.Order.Count);
+            foreach (var shoreId in bucket.Order)
+                if (bucket.Shores.TryGetValue(shoreId, out var shore))
+                    list.Add(new ShoreView(shoreId, shore.Name, shore.WingId, shore.Pinned, shoreId == bucket.ActiveShoreId));
+            return list;
+        }
+    }
+
+    public IReadOnlyList<WingView> WingsFor(string bayId)
+    {
+        lock (_sync)
+        {
+            if (BucketFor(bayId) is not { } bucket)
+                return new[] { new WingView(MainWingId, "main", null, null) };
+            return bucket.Wings.Select(w => new WingView(w.Id, w.Name, w.IconKind, w.IconValue)).ToList();
+        }
+    }
+
+    public string? FocusedNookFor(string bayId)
+    {
+        lock (_sync)
+            return BucketFor(bayId)?.FocusedNookId;
+    }
+
+    public string? ActiveShoreFor(string bayId)
+    {
+        lock (_sync)
+            return BucketFor(bayId)?.ActiveShoreId;
+    }
+
+    public (string? BayId, string? ShoreId) ResolveNookLocation(string? nookId)
+    {
+        if (nookId is null)
+            return (null, null);
+        lock (_sync)
+        {
+            foreach (var (bayId, bucket) in _buckets)
+                foreach (var (shoreId, shore) in bucket.Shores)
+                    foreach (var leaf in MosaicOps.Leaves(shore.Root))
+                        if (leaf.NookId == nookId)
+                            return (bayId, shoreId);
+        }
+        return (null, null);
+    }
+
+    public bool MoveShoreToBay(string fromBayId, string shoreId, string toBayId)
+    {
+        lock (_sync)
+        {
+            if (BucketFor(fromBayId) is not { } from || BucketFor(toBayId) is not { } to)
+                return false;
+            if (!from.Shores.TryGetValue(shoreId, out var shore))
+                return false;
+            from.Shores.Remove(shoreId);
+            from.Order.Remove(shoreId);
+            if (from.ActiveShoreId == shoreId)
+                from.ActiveShoreId = from.Order.Count > 0 ? from.Order[0] : null;
+            shore.WingId = MainWingId;
+            to.Shores[shoreId] = shore;
+            to.Order.Add(shoreId);
+            to.ActiveShoreId = shoreId;
+            _shoreToBay[shoreId] = toBayId;
+        }
+        OnBayChanged?.Invoke(fromBayId);
+        OnBayChanged?.Invoke(toBayId);
+        return true;
+    }
+
     public BaySnapshot ToSnapshot(string id, string name, string projectDir)
     {
         lock (_sync)
@@ -439,8 +728,17 @@ public sealed class LayoutService
                     Name = rs.Name,
                     LayoutTree = rs.Root,
                     ZoomedNookId = rs.ZoomedNookId,
+                    WingId = rs.WingId,
+                    Pinned = rs.Pinned,
                 });
             }
+            var wings = bucket.Wings.Select(w => new WingSnapshot
+            {
+                Id = w.Id,
+                Name = w.Name,
+                IconKind = w.IconKind,
+                IconValue = w.IconValue,
+            }).ToList();
 
             return new BaySnapshot
             {
@@ -449,6 +747,9 @@ public sealed class LayoutService
                 ProjectDir = projectDir,
                 ActiveShoreId = bucket.ActiveShoreId ?? (shores.Count > 0 ? shores[0].Id : null),
                 Shores = shores,
+                Wings = wings,
+                ActiveWingId = bucket.ActiveWingId,
+                FocusedNookId = bucket.FocusedNookId,
             };
         }
     }
@@ -458,6 +759,11 @@ public sealed class LayoutService
         lock (_sync)
         {
             var bucket = new Bucket();
+            bucket.Wings.Clear();
+            foreach (var w in ws.Wings)
+                bucket.Wings.Add(new WingState { Id = w.Id, Name = w.Name, IconKind = w.IconKind, IconValue = w.IconValue });
+            if (!bucket.Wings.Any(w => w.Id == MainWingId))
+                bucket.Wings.Insert(0, new WingState { Id = MainWingId, Name = "main" });
             foreach (var rs in ws.Shores)
             {
                 var leaves = MosaicOps.Leaves(rs.LayoutTree);
@@ -467,11 +773,15 @@ public sealed class LayoutService
                     Root = rs.LayoutTree,
                     ActiveNookId = leaves.Count > 0 ? leaves[0].NookId : null,
                     ZoomedNookId = rs.ZoomedNookId,
+                    WingId = bucket.Wings.Any(w => w.Id == rs.WingId) ? rs.WingId : MainWingId,
+                    Pinned = rs.Pinned,
                 };
                 bucket.Order.Add(rs.Id);
                 _shoreToBay[rs.Id] = ws.Id;
             }
             bucket.ActiveShoreId = ws.ActiveShoreId ?? (bucket.Order.Count > 0 ? bucket.Order[0] : null);
+            bucket.ActiveWingId = ws.ActiveWingId is { } aw && bucket.Wings.Any(w => w.Id == aw) ? aw : MainWingId;
+            bucket.FocusedNookId = ws.FocusedNookId;
             _buckets[ws.Id] = bucket;
             _activeBayId = ws.Id;
         }

@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
 using Cove.Engine;
 using Cove.Engine.Bays;
+using Cove.Engine.Layout;
 using Cove.Protocol;
 using Xunit;
 
@@ -11,6 +12,9 @@ public sealed class BayExtraCommandsTests
 {
     private static Task<ControlResponse?> Route(BayManager m, string uri, JsonElement? prm) =>
         EngineCommandRouter.RouteAsync(new ControlRequest("1", uri, prm), null, null, m);
+
+    private static Task<ControlResponse?> RouteL(BayManager m, LayoutService layout, string uri, JsonElement? prm) =>
+        EngineCommandRouter.RouteAsync(new ControlRequest("1", uri, prm), null, layout, m);
 
     private static JsonElement El<T>(T v, JsonTypeInfo<T> ti) => JsonSerializer.SerializeToElement(v, ti);
 
@@ -69,15 +73,23 @@ public sealed class BayExtraCommandsTests
         await using var m = new BayManager(newId: () => $"id-{++n}");
         var a = await m.CreateBayAsync("a", "/a");
         var b = await m.CreateBayAsync("b", "/b");
+        var layout = new LayoutService();
+        layout.EnsureBay(a.Id);
+        layout.EnsureBay(b.Id);
 
-        var created = await Route(m, "cove://commands/shore.create",
+        var created = await RouteL(m, layout, "cove://commands/shore.create",
             El(new ShoreCreateParams(a.Id, null, "extra"), ShoreWingJsonContext.Default.ShoreCreateParams));
         var shoreId = created!.Data!.Value.GetProperty("shoreId").GetString()!;
 
-        var moved = await Route(m, "cove://commands/bay.move-shore",
+        var moved = await RouteL(m, layout, "cove://commands/bay.move-shore",
             El(new BayMoveShoreParams(a.Id, shoreId, b.Id), BayExtraJsonContext.Default.BayMoveShoreParams));
         Assert.True(moved!.Ok);
-        Assert.DoesNotContain(m.Get(a.Id)!.State.Shores, r => r.Id == shoreId);
-        Assert.Contains(m.Get(b.Id)!.State.Shores, r => r.Id == shoreId);
+
+        var aShores = (await RouteL(m, layout, "cove://commands/shore.list",
+            El(new BayRef(a.Id), ShoreWingJsonContext.Default.BayRef)))!.Data!.Value.GetProperty("shores");
+        var bShores = (await RouteL(m, layout, "cove://commands/shore.list",
+            El(new BayRef(b.Id), ShoreWingJsonContext.Default.BayRef)))!.Data!.Value.GetProperty("shores");
+        Assert.DoesNotContain(aShores.EnumerateArray(), e => e.GetProperty("id").GetString() == shoreId);
+        Assert.Contains(bShores.EnumerateArray(), e => e.GetProperty("id").GetString() == shoreId);
     }
 }

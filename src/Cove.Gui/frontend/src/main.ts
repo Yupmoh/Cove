@@ -190,6 +190,15 @@ interface ShoreSnapshot {
   name: string;
   layoutTree: MosaicNode;
   zoomedNookId: string | null;
+  wingId?: string;
+  pinned?: boolean;
+}
+
+interface WingSnapshot {
+  id: string;
+  name: string;
+  iconKind?: string | null;
+  iconValue?: string | null;
 }
 
 interface BaySnapshot {
@@ -199,6 +208,9 @@ interface BaySnapshot {
   projectDir: string;
   activeShoreId: string | null;
   shores: ShoreSnapshot[];
+  wings?: WingSnapshot[];
+  activeWingId?: string | null;
+  focusedNookId?: string | null;
 }
 
 interface NookView {
@@ -1537,9 +1549,14 @@ function applyLayoutSnapshot(snapshot: BaySnapshot): void {
   if (!activeShoreId || !layout.shores.some((shore) => shore.id === activeShoreId)) {
     activeShoreId = layout.activeShoreId ?? layout.shores[0]?.id ?? null;
   }
+  if (layout.activeWingId) {
+    activeWingId = layout.activeWingId;
+  }
   const leaves = activeLeafIds();
   if (!focusedNookId || !leaves.includes(focusedNookId)) {
-    focusedNookId = leaves[0] ?? null;
+    focusedNookId = (layout.focusedNookId && leaves.includes(layout.focusedNookId))
+      ? layout.focusedNookId
+      : leaves[0] ?? null;
   }
   renderShore();
   renderShoreTabs();
@@ -7285,10 +7302,11 @@ async function createNote(): Promise<void> {
     else if (payload?.ready) dictationModelError = null;
   });
   void setupBackdrop();
-  void loadWings();
   void loadBayBoxes();
   void loadLauncherAdapters();
   await reload();
+  await loadWings();
+  renderShoreTabs();
   startAgentPolling();
   void maybeShowRestoreToast();
   void maybeShowOnboarding();

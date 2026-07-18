@@ -85,7 +85,7 @@ internal static class ScopeEnforcement
         if (string.IsNullOrEmpty(callerNookId))
             return null;
         var callerScope = scopeStore.GetScope(callerNookId!);
-        var resolver = new ScopeResolver(bays);
+        var resolver = new ScopeResolver(layout);
         var (callerWs, callerShore) = resolver.ResolveNookLocation(callerNookId);
         var (targetWs, targetShore) = resolver.ResolveNookLocation(targetNookId);
         var gate = new ScopeGate();

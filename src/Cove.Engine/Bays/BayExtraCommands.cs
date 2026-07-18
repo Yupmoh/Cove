@@ -76,16 +76,20 @@ public static class BayExtraCommands
     }
 
     [CoveCommand("cove://commands/bay.move-shore")]
-    public static async Task<ControlResponse> BayMoveShore(EngineDispatchContext ctx)
+    public static Task<ControlResponse> BayMoveShore(EngineDispatchContext ctx)
     {
         if (ctx.Bays is not { } manager)
-            return ctx.Fail("no_bays", "bay manager unavailable");
+            return Task.FromResult(ctx.Fail("no_bays", "bay manager unavailable"));
+        if (ctx.Layout is not { } layout)
+            return Task.FromResult(ctx.Fail("not_ready", "layout service unavailable"));
         if (ctx.Request.Params is not JsonElement el
             || el.Deserialize(BayExtraJsonContext.Default.BayMoveShoreParams) is not { } p)
-            return ctx.Fail("bad_params", "fromBayId, shoreId and toBayId are required");
-        return await manager.MoveShoreAsync(p.FromBayId, p.ShoreId, p.ToBayId).ConfigureAwait(false)
+            return Task.FromResult(ctx.Fail("bad_params", "fromBayId, shoreId and toBayId are required"));
+        if (manager.Get(p.FromBayId) is null || manager.Get(p.ToBayId) is null)
+            return Task.FromResult(ctx.Fail("not_found", "bay or shore not found"));
+        return Task.FromResult(layout.MoveShoreToBay(p.FromBayId, p.ShoreId, p.ToBayId)
             ? ctx.Ok()
-            : ctx.Fail("not_found", "bay or shore not found");
+            : ctx.Fail("not_found", "bay or shore not found"));
     }
 }
 

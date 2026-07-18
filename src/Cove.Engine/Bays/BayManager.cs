@@ -114,11 +114,7 @@ public sealed class BayManager : IAsyncDisposable
             Name = name,
             ProjectDir = projectDir,
             CollectionId = collectionId ?? BayModel.DefaultCollectionId,
-            Wings = [new Wing { Id = BayModel.MainWingId, Name = "main" }],
-            Shores = [],
             Nooks = new Dictionary<string, NookRecord>(),
-            ActiveShoreId = null,
-            FocusedNookId = null,
         };
 
         lock (_mapGate)
@@ -142,11 +138,7 @@ public sealed class BayManager : IAsyncDisposable
             Name = name,
             ProjectDir = projectDir,
             CollectionId = collectionId ?? BayModel.DefaultCollectionId,
-            Wings = [new Wing { Id = BayModel.MainWingId, Name = "main" }],
-            Shores = [],
             Nooks = new Dictionary<string, NookRecord>(),
-            ActiveShoreId = null,
-            FocusedNookId = null,
             Icon = icon,
         };
         lock (_mapGate)
@@ -333,33 +325,6 @@ public sealed class BayManager : IAsyncDisposable
         }).ConfigureAwait(false);
         _persistOrder?.Invoke(_registry.State.OpenBays);
     }
-
-    public async Task<bool> MoveShoreAsync(string fromBayId, string shoreId, string toBayId)
-    {
-        if (Get(fromBayId) is not { } from || Get(toBayId) is not { } to)
-            return false;
-        var moved = from.State.Shores.FirstOrDefault(r => r.Id == shoreId);
-        if (moved is null)
-            return false;
-
-        var movedNooks = new Dictionary<string, NookRecord>();
-        foreach (var nookId in BayInvariants.CollectNookIds(moved.LayoutTree))
-            if (from.State.Nooks.TryGetValue(nookId, out var record))
-                movedNooks[nookId] = record;
-
-        await from.Mutate(m => BayInvariants.CloseShore(m, shoreId, NewId)).ConfigureAwait(false);
-        await to.Mutate(m =>
-        {
-            var shores = new List<Shore>(m.Shores) { moved with { WingId = BayModel.MainWingId } };
-            var nooks = new Dictionary<string, NookRecord>(m.Nooks);
-            foreach (var kv in movedNooks)
-                nooks[kv.Key] = kv.Value;
-            return m with { Shores = shores, Nooks = nooks, ActiveShoreId = moved.Id };
-        }).ConfigureAwait(false);
-        _emit?.Invoke(new BayChange(BayChangeKind.Updated, toBayId));
-        return true;
-    }
-
     public async Task<string?> DockResidentAsync(string bayId, string? nookId, string scope, int slot)
     {
         if (Get(bayId) is not { } actor)
@@ -454,11 +419,7 @@ public sealed class BayManager : IAsyncDisposable
             IsWorktree = true,
             ParentBayId = parentId,
             WorktreeBranch = branch,
-            Wings = [new Wing { Id = BayModel.MainWingId, Name = "main" }],
-            Shores = [],
             Nooks = new Dictionary<string, NookRecord>(),
-            ActiveShoreId = null,
-            FocusedNookId = null,
         };
         lock (_mapGate)
             _bays[id] = new Actor<BayModel>(model);
@@ -500,11 +461,7 @@ public sealed class BayManager : IAsyncDisposable
             IsWorktree = true,
             ParentBayId = parentId,
             WorktreeBranch = branch,
-            Wings = [new Wing { Id = BayModel.MainWingId, Name = "main" }],
-            Shores = [],
             Nooks = new Dictionary<string, NookRecord>(),
-            ActiveShoreId = null,
-            FocusedNookId = null,
         };
         lock (_mapGate)
             _bays[id] = new Actor<BayModel>(model);

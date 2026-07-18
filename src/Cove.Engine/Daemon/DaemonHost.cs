@@ -432,6 +432,7 @@ public sealed class DaemonHost
         _restoration.MarkLaunching();
         _restoration.EmitProgress("default", "load_bay", Cove.Engine.Restart.RestorePhase.Started, wasClean ? "clean" : "unclean");
         _layout!.OnChanged = () => PersistActiveBay(baysRoot, logger);
+        _layout!.OnBayChanged = bayId => PersistBay(bayId, baysRoot, logger);
         _nooks!.OnResized = nookId => MarkNookBayDirty(nookId);
         _hookRouter.SessionStarted += (nookId, adapter, sessionId) =>
         {

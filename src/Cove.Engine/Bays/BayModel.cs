@@ -16,25 +16,6 @@ public sealed record NookRecord
     public int ResidentHeight { get; init; }
 }
 
-public sealed record Wing
-{
-    public required string Id { get; init; }
-    public required string Name { get; init; }
-    public BayIcon? Icon { get; init; }
-}
-
-public sealed record Shore
-{
-    public required string Id { get; init; }
-    public required string Name { get; init; }
-    private readonly string? _wingId;
-    public string WingId { get => _wingId ?? BayModel.MainWingId; init => _wingId = value; }
-    public string? ActiveNookId { get; init; }
-    public required MosaicNode LayoutTree { get; init; }
-    public string? ZoomedNookId { get; init; }
-    public bool Pinned { get; init; }
-}
-
 public sealed record BayModel
 {
     public const string MainWingId = "main";
@@ -50,12 +31,6 @@ public sealed record BayModel
     public bool IsWorktree { get; init; }
     public string? ParentBayId { get; init; }
     public string? WorktreeBranch { get; init; }
-    public string? FocusedNookId { get; init; }
-    public string? ActiveShoreId { get; init; }
-    private readonly IReadOnlyList<Wing>? _wings;
-    public IReadOnlyList<Wing> Wings { get => _wings ?? []; init => _wings = value; }
-    private readonly IReadOnlyList<Shore>? _shores;
-    public IReadOnlyList<Shore> Shores { get => _shores ?? []; init => _shores = value; }
     private readonly IReadOnlyDictionary<string, NookRecord>? _nooks;
     public IReadOnlyDictionary<string, NookRecord> Nooks { get => _nooks ?? new Dictionary<string, NookRecord>(); init => _nooks = value; }
     public bool Hidden { get; init; }
@@ -100,9 +75,7 @@ public sealed record BayListResult(IReadOnlyList<BaySummary> Bays);
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
 [JsonSerializable(typeof(BayModel))]
 [JsonSerializable(typeof(RegistryModel))]
-[JsonSerializable(typeof(Shore))]
 [JsonSerializable(typeof(BayIcon))]
-[JsonSerializable(typeof(Wing))]
 [JsonSerializable(typeof(NookRecord))]
 [JsonSerializable(typeof(Collection))]
 [JsonSerializable(typeof(MosaicNode))]

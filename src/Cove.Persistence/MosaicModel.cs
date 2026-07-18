@@ -57,6 +57,17 @@ public sealed record ShoreSnapshot
     public required string Name { get; init; }
     public required MosaicNode LayoutTree { get; init; }
     public string? ZoomedNookId { get; init; }
+    private readonly string? _wingId;
+    public string WingId { get => _wingId ?? "main"; init => _wingId = value; }
+    public bool Pinned { get; init; }
+}
+
+public sealed record WingSnapshot
+{
+    public required string Id { get; init; }
+    public required string Name { get; init; }
+    public string? IconKind { get; init; }
+    public string? IconValue { get; init; }
 }
 
 public sealed record BaySnapshot
@@ -71,6 +82,10 @@ public sealed record BaySnapshot
     public string? IconValue { get; init; }
     private readonly IReadOnlyList<ShoreSnapshot>? _shores;
     public IReadOnlyList<ShoreSnapshot> Shores { get => _shores ?? System.Array.Empty<ShoreSnapshot>(); init => _shores = value; }
+    private readonly IReadOnlyList<WingSnapshot>? _wings;
+    public IReadOnlyList<WingSnapshot> Wings { get => _wings ?? System.Array.Empty<WingSnapshot>(); init => _wings = value; }
+    public string? ActiveWingId { get; init; }
+    public string? FocusedNookId { get; init; }
 }
 
 public sealed class NookTypeConverter : JsonConverter<NookType>
