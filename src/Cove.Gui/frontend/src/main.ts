@@ -2818,25 +2818,36 @@ function setAgentChimesEnabled(enabled: boolean): void {
   localStorage.setItem(AGENT_CHIMES_STORAGE_KEY, chimePrefValue(enabled));
 }
 
+let agentRefreshInFlight = false;
+let agentRefreshQueued = false;
 async function refreshAgents(): Promise<void> {
-  const previousCards = agentCards;
-  let nextCards: AgentCard[];
+  if (agentRefreshInFlight) { agentRefreshQueued = true; return; }
+  agentRefreshInFlight = true;
   try {
-    const res = await invoke<{ cards: AgentCard[] }>("cove://commands/activity.list", {});
-    nextCards = res.cards ?? [];
-  } catch { nextCards = []; }
-  const cardsChanged = !agentCardsEqual(previousCards, nextCards);
-  agentCards = nextCards;
-  const nextStates = new Map(agentCards.map((c) => [c.nookId, mapAgentState(c.status)]));
-  for (const nookId of acknowledgedDoneNooks) {
-    if (nextStates.get(nookId) !== "done") acknowledgedDoneNooks.delete(nookId);
+    const previousCards = agentCards;
+    let nextCards: AgentCard[];
+    try {
+      const res = await invoke<{ cards: AgentCard[] }>("cove://commands/activity.list", {});
+      nextCards = res.cards ?? [];
+    } catch {
+      return;
+    }
+    const cardsChanged = !agentCardsEqual(previousCards, nextCards);
+    agentCards = nextCards;
+    const nextStates = new Map(agentCards.map((c) => [c.nookId, mapAgentState(c.status)]));
+    for (const nookId of acknowledgedDoneNooks) {
+      if (nextStates.get(nookId) !== "done") acknowledgedDoneNooks.delete(nookId);
+    }
+    if (agentChimesEnabled()) {
+      for (const kind of detectChimes(prevAgentStates, nextStates)) playChime(kind);
+    }
+    prevAgentStates = nextStates;
+    syncAgentNookStateClasses();
+    if (cardsChanged && agentsVisible()) renderSidebarContent("left");
+  } finally {
+    agentRefreshInFlight = false;
+    if (agentRefreshQueued) { agentRefreshQueued = false; void refreshAgents(); }
   }
-  if (agentChimesEnabled()) {
-    for (const kind of detectChimes(prevAgentStates, nextStates)) playChime(kind);
-  }
-  prevAgentStates = nextStates;
-  syncAgentNookStateClasses();
-  if (cardsChanged && agentsVisible()) renderSidebarContent("left");
 }
 
 function agentsVisible(): boolean {
@@ -6915,6 +6926,7 @@ function setupBadge(): void {
   });
   engineEventHandlers.set("dock.badge.clear", () => { needsInputNooks.clear(); onNeedsInputChanged(); });
   engineEventHandlers.set("state.changed", () => { if (agentsVisible()) void refreshAgents(); });
+  engineEventHandlers.set("agent.changed", () => { if (agentsVisible()) void refreshAgents(); });
   engineEventHandlers.set("restore.summary", (payload) => {
     const p = payload as { restored?: number; fresh?: number; skipped?: number; bootedAt?: string };
     presentRestoreToast(p.restored ?? 0, p.fresh ?? 0, p.skipped ?? 0, p.bootedAt ?? "");

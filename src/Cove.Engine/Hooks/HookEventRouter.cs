@@ -52,6 +52,8 @@ public sealed class HookEventRouter
 
     public event Action<string, string, string>? SessionStarted;
 
+    public event Action<string>? StateChanged;
+
     public void Seed(string nookId, string adapter, string? sessionId = null, string? status = null)
     {
         if (string.IsNullOrEmpty(nookId))
@@ -73,6 +75,7 @@ public sealed class HookEventRouter
             {
                 if (_logger is { } log)
                     log.HookStateTransition(nookId, existing.Adapter, "acknowledge", "idle");
+                StateChanged?.Invoke(nookId);
                 return true;
             }
         }
@@ -96,6 +99,7 @@ public sealed class HookEventRouter
         else if (wasInput && !isInput)
             NeedsInputTransition?.Invoke(nookId, false);
         _logger?.ScreenStateTransition(nookId, adapter, status);
+        StateChanged?.Invoke(nookId);
     }
 
     public void Route(HookEvent ev)
@@ -119,6 +123,9 @@ public sealed class HookEventRouter
             _logger?.HookEventUntrackedNook(ev.Adapter, ev.Event, ev.NookId);
             return;
         }
+        var before = _nookStates.TryGetValue(ev.NookId, out var priorState)
+            ? (priorState.Status, priorState.ActiveSubagents)
+            : ((string, int)?)null;
 
         switch (ev.Event)
         {
@@ -167,8 +174,13 @@ public sealed class HookEventRouter
                 break;
         }
 
-        if (_logger is { } log && _nookStates.TryGetValue(ev.NookId, out var updated))
-            log.HookStateTransition(ev.NookId, ev.Adapter, ev.Event, updated.Status);
+        if (_nookStates.TryGetValue(ev.NookId, out var updated))
+        {
+            _logger?.HookStateTransition(ev.NookId, ev.Adapter, ev.Event, updated.Status);
+            var after = (updated.Status, updated.ActiveSubagents);
+            if (before is null || before.Value != after)
+                StateChanged?.Invoke(ev.NookId);
+        }
     }
 
     private static string? ExtractSessionId(JsonElement? payload)

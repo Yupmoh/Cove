@@ -439,6 +439,8 @@ public sealed class DaemonHost
             _sessions?.SetSessionId(nookId, adapter, sessionId);
             PersistActiveBay(baysRoot, logger);
         };
+        _hookRouter.StateChanged += nookId =>
+            BroadcastEvent("agent.changed", new Cove.Protocol.AgentChangedEvent(nookId), Cove.Protocol.CoveJsonContext.Default.AgentChangedEvent);
         var loadedBays = Cove.Engine.Layout.BayStartup.Enumerate(baysRoot, logger);
         var fallbackProjectDir = System.Environment.CurrentDirectory;
         var restoreEnabled = _config?.GetSessionRestoreOnLaunch() ?? true;

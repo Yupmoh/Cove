@@ -291,4 +291,61 @@ public sealed class HookEventRouterTests
         var router = new HookEventRouter();
         Assert.False(router.Acknowledge("missing"));
     }
+
+    [Fact]
+    public void StateChanged_FiresOnlyOnRealStatusChange()
+    {
+        var router = new HookEventRouter();
+        var fired = new List<string>();
+        router.StateChanged += fired.Add;
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "session-start", NookId = "p1" });
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "user-prompt-submit", NookId = "p1" });
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "post-tool-use", NookId = "p1" });
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "pre-tool-use", NookId = "p1" });
+        Assert.Equal(new[] { "p1", "p1", "p1" }, fired);
+    }
+
+    [Fact]
+    public void StateChanged_FiresOnSubagentCountChange()
+    {
+        var router = new HookEventRouter();
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "session-start", NookId = "p1" });
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "user-prompt-submit", NookId = "p1" });
+        var fired = new List<string>();
+        router.StateChanged += fired.Add;
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "subagent-start", NookId = "p1" });
+        Assert.Single(fired);
+    }
+
+    [Fact]
+    public void StateChanged_NotFired_ForDroppedUntrackedEvent()
+    {
+        var router = new HookEventRouter();
+        var fired = false;
+        router.StateChanged += _ => fired = true;
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "pre-tool-use", NookId = "ghost" });
+        Assert.False(fired);
+    }
+
+    [Fact]
+    public void StateChanged_FiresOnScreenTransition()
+    {
+        var router = new HookEventRouter();
+        var fired = new List<string>();
+        router.StateChanged += fired.Add;
+        router.ScreenTransition("p1", "codex", "active");
+        Assert.Contains("p1", fired);
+    }
+
+    [Fact]
+    public void StateChanged_FiresOnAcknowledge()
+    {
+        var router = new HookEventRouter();
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "session-start", NookId = "p1" });
+        router.Route(new HookEvent { Adapter = "claude-code", Event = "stop", NookId = "p1" });
+        var fired = new List<string>();
+        router.StateChanged += fired.Add;
+        Assert.True(router.Acknowledge("p1"));
+        Assert.Contains("p1", fired);
+    }
 }
