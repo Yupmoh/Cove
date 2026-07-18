@@ -492,7 +492,7 @@ export function setupDictation(deps: DictationDeps): () => void {
   window.addEventListener("keyup", onKeyUp, true);
   window.addEventListener("blur", onBlur);
 
-  window.__ryn.on("engine.event", (data: unknown) => {
+  const onEngineEvent = (data: unknown): void => {
     const evt = data as { channel?: string; payload?: unknown };
     if (evt?.channel === "dictation.partial") {
       const text = (evt.payload as { text?: string } | undefined)?.text ?? "";
@@ -513,10 +513,12 @@ export function setupDictation(deps: DictationDeps): () => void {
         setTimeout(hidePill, 5000);
       }
     }
-  });
+  };
+  window.__ryn.on("engine.event", onEngineEvent);
   return () => {
     window.removeEventListener("keydown", onKeyDown, true);
     window.removeEventListener("keyup", onKeyUp, true);
     window.removeEventListener("blur", onBlur);
+    window.__ryn.off("engine.event", onEngineEvent);
   };
 }

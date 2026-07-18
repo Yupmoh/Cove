@@ -11,6 +11,7 @@ interface BrowserNookInstance {
   sync: () => void;
   resizeObserver: ResizeObserver | null;
   resizeListener: () => void;
+  bridgeDisposers: Array<() => void>;
   closed: boolean;
 }
 
@@ -142,6 +143,7 @@ export async function closeBrowserWebview(nookId: string): Promise<void> {
     instance.resizeObserver?.disconnect();
     instance.resizeObserver = null;
     window.removeEventListener("resize", instance.resizeListener);
+    for (const dispose of instance.bridgeDisposers.splice(0)) dispose();
   }
   const id = browserWebviewRegistry.get(nookId);
   if (id === undefined) return;
@@ -287,7 +289,13 @@ export async function renderBrowserNook(nookId: string, initialUrl: string, user
     sync: syncBounds,
     resizeObserver: null,
     resizeListener: syncBounds,
+    bridgeDisposers: [],
     closed: false,
+  };
+
+  const onBridge = (event: string, callback: (data: unknown) => void): void => {
+    window.__ryn.on(event, callback);
+    instance.bridgeDisposers.push(() => window.__ryn.off(event, callback));
   };
 
   const openWebView = async (url: string) => {
@@ -572,8 +580,9 @@ export async function renderBrowserNook(nookId: string, initialUrl: string, user
     }
   }, { threshold: 0 });
   visObserver.observe(el);
+  instance.bridgeDisposers.push(() => visObserver.disconnect());
 
-  window.__ryn.on("webviewPane.navigated", (data: unknown) => {
+  onBridge("webviewPane.navigated", (data: unknown) => {
     const evt = data as { id: number; url: string };
     if (evt.id !== webviewId) return;
     const persistNavigation = nav.webviewNavigated(evt.url, expectedNavigationUrl);
@@ -586,20 +595,20 @@ export async function renderBrowserNook(nookId: string, initialUrl: string, user
     }
   });
 
-  window.__ryn.on("webviewPane.titleChanged", (data: unknown) => {
+  onBridge("webviewPane.titleChanged", (data: unknown) => {
     const evt = data as { id: number; title: string };
     if (evt.id !== webviewId) return;
     if (crashState.isCrashed) return;
     titleBar.textContent = evt.title;
   });
 
-  window.__ryn.on("webviewPane.loadStateChanged", (data: unknown) => {
+  onBridge("webviewPane.loadStateChanged", (data: unknown) => {
     const evt = data as { id: number; state: string };
     if (evt.id !== webviewId) return;
     setLoading(evt.state === "started");
   });
 
-  window.__ryn.on("webviewPane.faviconChanged", (data: unknown) => {
+  onBridge("webviewPane.faviconChanged", (data: unknown) => {
     const evt = data as { id: number; dataUrl: string };
     if (evt.id !== webviewId) return;
     if (evt.dataUrl) {
@@ -611,7 +620,7 @@ export async function renderBrowserNook(nookId: string, initialUrl: string, user
     }
   });
 
-  window.__ryn.on("webviewPane.closed", (data: unknown) => {
+  onBridge("webviewPane.closed", (data: unknown) => {
     const evt = data as { id: number };
     if (evt.id !== webviewId) return;
     webviewId = null;
@@ -619,13 +628,13 @@ export async function renderBrowserNook(nookId: string, initialUrl: string, user
     titleBar.textContent = "Closed";
   });
 
-  window.__ryn.on("webviewPane.processTerminated", (data: unknown) => {
+  onBridge("webviewPane.processTerminated", (data: unknown) => {
     const evt = data as { id: number; reason?: string };
     if (evt.id !== webviewId) return;
     enterCrash(evt.reason ?? null);
   });
 
-  window.__ryn.on("webviewPane.permissionRequested", (data: unknown) => {
+  onBridge("webviewPane.permissionRequested", (data: unknown) => {
     const evt = data as { id: number; requestId: string; kinds: string[]; url: string };
     if (evt.id !== webviewId) return;
     const req: PermissionRequest = { requestId: evt.requestId, kinds: evt.kinds ?? [], url: evt.url ?? nav.currentUrl };
@@ -634,28 +643,28 @@ export async function renderBrowserNook(nookId: string, initialUrl: string, user
     renderPermission();
   });
 
-  window.__ryn.on("webviewPane.downloadRequested", (data: unknown) => {
+  onBridge("webviewPane.downloadRequested", (data: unknown) => {
     const evt = data as { id: number; downloadId: string; url: string; suggestedName: string };
     if (evt.id !== webviewId) return;
     downloads.requested(evt.downloadId, evt.url, evt.suggestedName || "download");
     renderDownloadPrompt();
   });
 
-  window.__ryn.on("webviewPane.downloadProgress", (data: unknown) => {
+  onBridge("webviewPane.downloadProgress", (data: unknown) => {
     const evt = data as { id: number; downloadId: string; receivedBytes: number; totalBytes: number };
     if (evt.id !== webviewId) return;
     downloads.progress(evt.downloadId, evt.receivedBytes ?? 0, evt.totalBytes ?? 0);
     renderDownloadShelf();
   });
 
-  window.__ryn.on("webviewPane.downloadCompleted", (data: unknown) => {
+  onBridge("webviewPane.downloadCompleted", (data: unknown) => {
     const evt = data as { id: number; downloadId: string; path?: string };
     if (evt.id !== webviewId) return;
     downloads.completed(evt.downloadId, evt.path);
     renderDownloadShelf();
   });
 
-  window.__ryn.on("webviewPane.downloadFailed", (data: unknown) => {
+  onBridge("webviewPane.downloadFailed", (data: unknown) => {
     const evt = data as { id: number; downloadId: string; reason?: string };
     if (evt.id !== webviewId) return;
     downloads.failed(evt.downloadId, evt.reason ?? "download failed");
