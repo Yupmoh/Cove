@@ -46,7 +46,23 @@ public sealed class CommandContext
     public async Task<int> RouteCoreAsync(string uri)
         => await RouteCoreWithParamsAsync(uri, null, noAutostart: Args.Contains("--no-autostart"));
 
-    public async Task<int> RouteCoreWithParamsAsync(string uri, string? paramsJson, bool noAutostart = false)
+    public Task<int> RouteCoreWithParamsAsync(string uri, string? paramsJson, bool noAutostart = false)
+        => RouteCoreWithParamsCoreAsync(uri, paramsJson, renderSuccess: null, successfulErrorCode: null, noAutostart);
+
+    internal Task<int> RouteCoreWithParamsAsync(
+        string uri,
+        string? paramsJson,
+        Func<JsonElement?, int> renderSuccess,
+        string? successfulErrorCode = null,
+        bool noAutostart = false)
+        => RouteCoreWithParamsCoreAsync(uri, paramsJson, renderSuccess, successfulErrorCode, noAutostart);
+
+    private async Task<int> RouteCoreWithParamsCoreAsync(
+        string uri,
+        string? paramsJson,
+        Func<JsonElement?, int>? renderSuccess,
+        string? successfulErrorCode,
+        bool noAutostart)
     {
         System.Text.Json.JsonElement? parsedParams = null;
         if (paramsJson is not null)
@@ -73,17 +89,22 @@ public sealed class CommandContext
             }
             await using (probeConn)
             {
-                return await DispatchAsync(probeConn, uri, parsedParams);
+                return await DispatchAsync(probeConn, uri, parsedParams, renderSuccess, successfulErrorCode);
             }
         }
         FrameConnection conn = await connector.ConnectOrSpawnAsync("cli", System.Threading.CancellationToken.None);
         await using (conn)
         {
-            return await DispatchAsync(conn, uri, parsedParams);
+            return await DispatchAsync(conn, uri, parsedParams, renderSuccess, successfulErrorCode);
         }
     }
 
-    private async Task<int> DispatchAsync(FrameConnection conn, string uri, System.Text.Json.JsonElement? parsedParams)
+    private async Task<int> DispatchAsync(
+        FrameConnection conn,
+        string uri,
+        System.Text.Json.JsonElement? parsedParams,
+        Func<JsonElement?, int>? renderSuccess,
+        string? successfulErrorCode)
     {
         await conn.WriteFrameAsync(FrameType.Request, 0,
             ControlCodec.Encode(new ControlRequest("1", uri, Params: parsedParams, Source: Source, CallerNookId: ResolveCallerNookId())), System.Threading.CancellationToken.None);
@@ -96,9 +117,14 @@ public sealed class CommandContext
         ControlResponse r = ControlCodec.DecodeResponse(f.Payload);
         if (!r.Ok)
         {
+            if (successfulErrorCode is not null &&
+                string.Equals(r.Error?.Code, successfulErrorCode, StringComparison.Ordinal))
+                return 0;
             Stderr.WriteLine($"error: {r.Error?.Code ?? "unknown"}");
             return 1;
         }
+        if (renderSuccess is not null)
+            return renderSuccess(r.Data);
         if (r.Data is { } d)
             Render(d);
         else

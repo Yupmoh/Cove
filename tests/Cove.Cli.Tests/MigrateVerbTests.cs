@@ -4,6 +4,7 @@ using Xunit;
 
 namespace Cove.Cli.Tests;
 
+[Collection(CliCollectionFixture.Name)]
 public sealed class MigrateVerbTests
 {
     [Fact]

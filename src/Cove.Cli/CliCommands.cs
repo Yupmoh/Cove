@@ -332,42 +332,31 @@ internal static class CliCommands
             return Task.FromResult(1);
         }
         var key = args[0];
-        var configPath = System.IO.Path.Combine(ctx.Paths.DataDir.Root, "config.json");
-        if (!System.IO.File.Exists(configPath))
-        {
-            ctx.Stderr.WriteLine($"error: config key '{key}' not found");
-            return Task.FromResult(1);
-        }
-        var json = System.IO.File.ReadAllText(configPath);
-        using var doc = System.Text.Json.JsonDocument.Parse(json);
-        if (TryGetConfigValue(doc.RootElement, key, out var val))
-        {
-            ctx.Stdout.WriteLine(val);
-            return Task.FromResult(0);
-        }
-        ctx.Stderr.WriteLine($"error: config key '{key}' not found");
-        return Task.FromResult(1);
+        var paramsJson = System.Text.Json.JsonSerializer.Serialize(
+            new ConfigGetParams(key),
+            CoveJsonContext.Default.ConfigGetParams);
+        return ctx.RouteCoreWithParamsAsync(
+            "cove://commands/config.get",
+            paramsJson,
+            data =>
+            {
+                if (data is not { } result ||
+                    result.ValueKind != System.Text.Json.JsonValueKind.Object ||
+                    !result.TryGetProperty("value", out var value))
+                {
+                    ctx.Stderr.WriteLine("error: invalid_response");
+                    return 1;
+                }
+                if (ctx.IsJson)
+                    ctx.Render(result);
+                else
+                    ctx.Stdout.WriteLine(value.ValueKind == System.Text.Json.JsonValueKind.String ? value.GetString() : value.GetRawText());
+                return 0;
+            },
+            successfulErrorCode: "not_found",
+            noAutostart: args.Contains("--no-autostart"));
     }
 
-    private static bool TryGetConfigValue(System.Text.Json.JsonElement root, string key, out string value)
-    {
-        value = "";
-        if (root.ValueKind == System.Text.Json.JsonValueKind.Object && root.TryGetProperty(key, out var flat))
-        {
-            value = flat.ValueKind == System.Text.Json.JsonValueKind.String ? flat.GetString() ?? "" : flat.GetRawText();
-            return true;
-        }
-        var parts = key.Split('.');
-        var current = root;
-        foreach (var part in parts)
-        {
-            if (current.ValueKind != System.Text.Json.JsonValueKind.Object || !current.TryGetProperty(part, out var next))
-                return false;
-            current = next;
-        }
-        value = current.ValueKind == System.Text.Json.JsonValueKind.String ? current.GetString() ?? "" : current.GetRawText();
-        return true;
-    }
     [CoveCommand("config set")]
     public static Task<int> ConfigSet(CommandContext ctx)
     {
@@ -379,35 +368,28 @@ internal static class CliCommands
         }
         var key = args[0];
         var value = args[1];
-        var configPath = System.IO.Path.Combine(ctx.Paths.DataDir.Root, "config.json");
-        var config = new System.Collections.Generic.Dictionary<string, System.Text.Json.JsonElement>();
-        if (System.IO.File.Exists(configPath))
-        {
-            try
+        var paramsJson = System.Text.Json.JsonSerializer.Serialize(
+            new ConfigSetParams(key, value),
+            CoveJsonContext.Default.ConfigSetParams);
+        return ctx.RouteCoreWithParamsAsync(
+            "cove://commands/config.set",
+            paramsJson,
+            data =>
             {
-                using var doc = System.Text.Json.JsonDocument.Parse(System.IO.File.ReadAllText(configPath));
-                foreach (var prop in doc.RootElement.EnumerateObject())
-                    config[prop.Name] = prop.Value.Clone();
-            }
-            catch (System.Text.Json.JsonException) { ctx.Stderr.WriteLine("warning: config.json corrupt, overwriting"); }
-        }
-        config.Remove(key);
-        using var setBuf = new System.IO.MemoryStream();
-        using (var setWriter = new System.Text.Json.Utf8JsonWriter(setBuf, new System.Text.Json.JsonWriterOptions { Indented = true }))
-        {
-            setWriter.WriteStartObject();
-            foreach (var kv in config)
-            {
-                setWriter.WritePropertyName(kv.Key);
-                kv.Value.WriteTo(setWriter);
-            }
-            setWriter.WriteString(key, value);
-            setWriter.WriteEndObject();
-            setWriter.Flush();
-        }
-        System.IO.File.WriteAllText(configPath, System.Text.Encoding.UTF8.GetString(setBuf.ToArray()));
-        ctx.Stdout.WriteLine($"set {key} = {value}");
-        return Task.FromResult(0);
+                if (ctx.IsJson)
+                {
+                    if (data is { } result)
+                        ctx.Render(result);
+                    else
+                        ctx.Stdout.WriteLine("{}");
+                }
+                else
+                {
+                    ctx.Stdout.WriteLine($"set {key} = {value}");
+                }
+                return 0;
+            },
+            noAutostart: args.Contains("--no-autostart"));
     }
 
     [CoveCommand("commands")]
@@ -473,39 +455,34 @@ internal static class CliCommands
 
     [CoveCommand("extension list")]
     public static Task<int> ExtensionList(CommandContext ctx)
-    {
-        var dataDir = Cove.Platform.CoveDataDir.Resolve(ctx.Channel);
-        var manifests = new Cove.Adapters.AdapterManifestStore(System.IO.Path.Combine(dataDir.Root, "adapters"), null);
-        var extensions = new Cove.Engine.Protocol.ExtensionRegistry(manifests);
-        var commands = extensions.List();
-        if (ctx.IsJson)
-        {
-            using var buffer = new System.IO.MemoryStream();
-            using (var writer = new System.Text.Json.Utf8JsonWriter(buffer))
+        => ctx.RouteCoreWithParamsAsync(
+            "cove://commands/extension.list",
+            null,
+            data =>
             {
-                writer.WriteStartArray();
-                foreach (var ext in commands)
+                if (data is not { } commands || commands.ValueKind != System.Text.Json.JsonValueKind.Array)
                 {
-                    writer.WriteStartObject();
-                    writer.WriteString("command", ext.Command);
-                    writer.WriteString("source", ext.Source);
-                    writer.WriteString("adapter", ext.Adapter);
-                    writer.WriteString("method", ext.Method);
-                    writer.WriteEndObject();
+                    ctx.Stderr.WriteLine("error: invalid_response");
+                    return 1;
                 }
-                writer.WriteEndArray();
-                writer.Flush();
-            }
-            ctx.Stdout.WriteLine(System.Text.Encoding.UTF8.GetString(buffer.ToArray()));
-        }
-        else
-        {
-            foreach (var ext in commands.OrderBy(e => e.Adapter).ThenBy(e => e.Method))
-                ctx.Stdout.WriteLine($"{ext.Command}  (adapter: {ext.Adapter}, method: {ext.Method})");
-            ctx.Stdout.WriteLine($"Total: {commands.Count}");
-        }
-        return Task.FromResult(0);
-    }
+                if (ctx.IsJson)
+                {
+                    ctx.Render(commands);
+                }
+                else
+                {
+                    foreach (var ext in commands.EnumerateArray()
+                                 .OrderBy(e => e.GetProperty("adapter").GetString() ?? "", System.StringComparer.Ordinal)
+                                 .ThenBy(e => e.GetProperty("method").GetString() ?? "", System.StringComparer.Ordinal))
+                    {
+                        ctx.Stdout.WriteLine(
+                            $"{ext.GetProperty("command").GetString()}  (adapter: {ext.GetProperty("adapter").GetString()}, method: {ext.GetProperty("method").GetString()})");
+                    }
+                    ctx.Stdout.WriteLine($"Total: {commands.GetArrayLength()}");
+                }
+                return 0;
+            },
+            noAutostart: ctx.Args.Contains("--no-autostart"));
 
     [CoveCommand("extension run")]
     public static Task<int> ExtensionRun(CommandContext ctx)
@@ -1050,7 +1027,7 @@ internal static class CliCommands
         var audio = args.Contains("--audio");
         var mic = args.Contains("--mic");
         var cursor = args.Contains("--cursor");
-        return ctx.RouteCoreWithParamsAsync("cove://commands/capture.start", $$"""{"bayId":"{{bayId}}","region":"{{region}}","audio":{{audio.ToString().ToLowerInvariant()}},"mic":{{mic.ToString().ToLowerInvariant()}},"cursor":{{cursor.ToString().ToLowerInvariant()}}}""");
+        return ctx.RouteCoreWithParamsAsync("cove://commands/capture.start", BuildCaptureStartParams(bayId, region, audio, mic, cursor));
     }
 
     [CoveCommand("capture stop")]
@@ -1058,7 +1035,7 @@ internal static class CliCommands
     {
         var args = ctx.Args;
         var id = ArgValue(args, "--id") ?? (args.Length > 0 ? args[0] : "");
-        return ctx.RouteCoreWithParamsAsync("cove://commands/capture.stop", $$"""{"id":"{{id}}"}""");
+        return ctx.RouteCoreWithParamsAsync("cove://commands/capture.stop", BuildStringParams("id", id));
     }
 
     [CoveCommand("capture list")]
@@ -1070,7 +1047,7 @@ internal static class CliCommands
     {
         var args = ctx.Args;
         var id = ArgValue(args, "--id") ?? (args.Length > 0 ? args[0] : "");
-        return ctx.RouteCoreWithParamsAsync("cove://commands/capture.delete", $$"""{"id":"{{id}}"}""");
+        return ctx.RouteCoreWithParamsAsync("cove://commands/capture.delete", BuildStringParams("id", id));
     }
 
     [CoveCommand("capture flag")]
@@ -1079,7 +1056,7 @@ internal static class CliCommands
         var args = ctx.Args;
         var id = ArgValue(args, "--id") ?? (args.Length > 0 ? args[0] : "");
         var label = ArgValue(args, "--label") ?? "";
-        return ctx.RouteCoreWithParamsAsync("cove://commands/capture.flag", $$"""{"id":"{{id}}","label":"{{label}}"}""");
+        return ctx.RouteCoreWithParamsAsync("cove://commands/capture.flag", BuildStringPairParams("id", id, "label", label));
     }
 
     [CoveCommand("capture show")]
@@ -1087,7 +1064,7 @@ internal static class CliCommands
     {
         var args = ctx.Args;
         var id = ArgValue(args, "--id") ?? (args.Length > 0 ? args[0] : "");
-        return ctx.RouteCoreWithParamsAsync("cove://commands/capture.show", $$"""{"id":"{{id}}"}""");
+        return ctx.RouteCoreWithParamsAsync("cove://commands/capture.show", BuildStringParams("id", id));
     }
 
     [CoveCommand("capture attach")]
@@ -1096,7 +1073,7 @@ internal static class CliCommands
         var args = ctx.Args;
         var captureId = ArgValue(args, "--capture") ?? "";
         var taskId = ArgValue(args, "--task") ?? "";
-        return ctx.RouteCoreWithParamsAsync("cove://commands/capture.attach", $$"""{"captureId":"{{captureId}}","taskId":"{{taskId}}"}""");
+        return ctx.RouteCoreWithParamsAsync("cove://commands/capture.attach", BuildStringPairParams("captureId", captureId, "taskId", taskId));
     }
 
     [CoveCommand("diagnostics status")]
@@ -1107,10 +1084,17 @@ internal static class CliCommands
     public static Task<int> DiagnosticsSnapshot(CommandContext ctx)
     {
         var args = ctx.Args;
-        var activeNooks = ArgValue(args, "--nooks") ?? "0";
-        var activeBays = ArgValue(args, "--bays") ?? "0";
-        var activeAgents = ArgValue(args, "--agents") ?? "0";
-        return ctx.RouteCoreWithParamsAsync("cove://commands/diagnostics.snapshot.take", $$"""{"activeNooks":{{activeNooks}},"activeBays":{{activeBays}},"activeAgents":{{activeAgents}}}""");
+        if (!TryParseIntArg(args, "--nooks", out var activeNooks) ||
+            !TryParseIntArg(args, "--bays", out var activeBays) ||
+            !TryParseIntArg(args, "--agents", out var activeAgents))
+        {
+            ctx.Stderr.WriteLine("error: invalid_params");
+            ctx.Stderr.WriteLine("usage: cove diagnostics snapshot [--nooks <number>] [--bays <number>] [--agents <number>]");
+            return Task.FromResult(1);
+        }
+        return ctx.RouteCoreWithParamsAsync(
+            "cove://commands/diagnostics.snapshot.take",
+            BuildDiagnosticsSnapshotParams(activeNooks, activeBays, activeAgents));
     }
 
     [CoveCommand("diagnostics snapshots")]
@@ -1122,7 +1106,7 @@ internal static class CliCommands
     {
         var args = ctx.Args;
         var path = ArgValue(args, "--path") ?? (args.Length > 0 ? args[0] : "");
-        return ctx.RouteCoreWithParamsAsync("cove://commands/diagnostics.export", $$"""{"path":"{{path}}"}""");
+        return ctx.RouteCoreWithParamsAsync("cove://commands/diagnostics.export", BuildStringParams("path", path));
     }
 
     [CoveCommand("perf bundle create")]
@@ -1130,7 +1114,7 @@ internal static class CliCommands
     {
         var args = ctx.Args;
         var tracePath = ArgValue(args, "--trace") ?? "";
-        return ctx.RouteCoreWithParamsAsync("cove://commands/perf.bundle.create", $$"""{"tracePath":"{{tracePath}}"}""");
+        return ctx.RouteCoreWithParamsAsync("cove://commands/perf.bundle.create", BuildStringParams("tracePath", tracePath));
     }
 
     [CoveCommand("perf bundle list")]
@@ -1142,6 +1126,72 @@ internal static class CliCommands
     {
         var args = ctx.Args;
         var bundlePath = ArgValue(args, "--path") ?? (args.Length > 0 ? args[0] : "");
-        return ctx.RouteCoreWithParamsAsync("cove://commands/perf.bundle.delete", $$"""{"bundlePath":"{{bundlePath}}"}""");
+        return ctx.RouteCoreWithParamsAsync("cove://commands/perf.bundle.delete", BuildStringParams("bundlePath", bundlePath));
+    }
+
+    private static bool TryParseIntArg(string[] args, string flag, out int value)
+        => int.TryParse(
+            ArgValue(args, flag) ?? "0",
+            System.Globalization.NumberStyles.Integer,
+            System.Globalization.CultureInfo.InvariantCulture,
+            out value);
+
+    private static string BuildStringParams(string propertyName, string value)
+    {
+        var buffer = new System.Buffers.ArrayBufferWriter<byte>();
+        using (var writer = new System.Text.Json.Utf8JsonWriter(buffer))
+        {
+            writer.WriteStartObject();
+            writer.WriteString(propertyName, value);
+            writer.WriteEndObject();
+        }
+        return System.Text.Encoding.UTF8.GetString(buffer.WrittenSpan);
+    }
+
+    private static string BuildStringPairParams(
+        string firstPropertyName,
+        string firstValue,
+        string secondPropertyName,
+        string secondValue)
+    {
+        var buffer = new System.Buffers.ArrayBufferWriter<byte>();
+        using (var writer = new System.Text.Json.Utf8JsonWriter(buffer))
+        {
+            writer.WriteStartObject();
+            writer.WriteString(firstPropertyName, firstValue);
+            writer.WriteString(secondPropertyName, secondValue);
+            writer.WriteEndObject();
+        }
+        return System.Text.Encoding.UTF8.GetString(buffer.WrittenSpan);
+    }
+
+    private static string BuildCaptureStartParams(string bayId, string region, bool audio, bool mic, bool cursor)
+    {
+        var buffer = new System.Buffers.ArrayBufferWriter<byte>();
+        using (var writer = new System.Text.Json.Utf8JsonWriter(buffer))
+        {
+            writer.WriteStartObject();
+            writer.WriteString("bayId", bayId);
+            writer.WriteString("region", region);
+            writer.WriteBoolean("audio", audio);
+            writer.WriteBoolean("mic", mic);
+            writer.WriteBoolean("cursor", cursor);
+            writer.WriteEndObject();
+        }
+        return System.Text.Encoding.UTF8.GetString(buffer.WrittenSpan);
+    }
+
+    private static string BuildDiagnosticsSnapshotParams(int activeNooks, int activeBays, int activeAgents)
+    {
+        var buffer = new System.Buffers.ArrayBufferWriter<byte>();
+        using (var writer = new System.Text.Json.Utf8JsonWriter(buffer))
+        {
+            writer.WriteStartObject();
+            writer.WriteNumber("activeNooks", activeNooks);
+            writer.WriteNumber("activeBays", activeBays);
+            writer.WriteNumber("activeAgents", activeAgents);
+            writer.WriteEndObject();
+        }
+        return System.Text.Encoding.UTF8.GetString(buffer.WrittenSpan);
     }
 }

@@ -4,6 +4,7 @@ using Xunit;
 
 namespace Cove.Cli.Tests;
 
+[Collection(CliCollectionFixture.Name)]
 public sealed class TaskFilterPlumbingTests
 {
     private static (CommandContext ctx, System.IO.StringWriter stdout) NewCtx(params string[] args)
