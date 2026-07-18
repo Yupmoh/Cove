@@ -34,6 +34,7 @@ import { renderMarkdownNook, applyMarkdownSettings, resolveMarkdownSettings } fr
 import { renderPdfNook } from "./pdf-nook";
 import { renderVideoNook } from "./video-nook";
 import { mediaUrl } from "./media-url";
+import { createCoalescer } from "./refresh-coalescer";
 import { partitionPinned, reorderShore, glyphForNookType, visibleShoreIds, buildWingModel, filterShoresByWing } from "./shore-tabs";
 import { groupByBay, moveSelection, selectedNote, kindIcon, kindColor, type NoteListItem, type NavState } from "./notepad-sidebar";
 import { initialSidebarModel, selectLeftMode, toggleSide, setCollapsed, setWidth, collapsedOf, widthOf, SIDEBAR_MODES, SIDEBAR_RAIL_MODES, SIDEBAR_MODE_META, type SidebarModel, type SidebarSide, type SidebarMode } from "./sidebar-model";
@@ -2818,37 +2819,29 @@ function setAgentChimesEnabled(enabled: boolean): void {
   localStorage.setItem(AGENT_CHIMES_STORAGE_KEY, chimePrefValue(enabled));
 }
 
-let agentRefreshInFlight = false;
-let agentRefreshQueued = false;
-async function refreshAgents(): Promise<void> {
-  if (agentRefreshInFlight) { agentRefreshQueued = true; return; }
-  agentRefreshInFlight = true;
+async function refreshAgentsImpl(): Promise<void> {
+  const previousCards = agentCards;
+  let nextCards: AgentCard[];
   try {
-    const previousCards = agentCards;
-    let nextCards: AgentCard[];
-    try {
-      const res = await invoke<{ cards: AgentCard[] }>("cove://commands/activity.list", {});
-      nextCards = res.cards ?? [];
-    } catch {
-      return;
-    }
-    const cardsChanged = !agentCardsEqual(previousCards, nextCards);
-    agentCards = nextCards;
-    const nextStates = new Map(agentCards.map((c) => [c.nookId, mapAgentState(c.status)]));
-    for (const nookId of acknowledgedDoneNooks) {
-      if (nextStates.get(nookId) !== "done") acknowledgedDoneNooks.delete(nookId);
-    }
-    if (agentChimesEnabled()) {
-      for (const kind of detectChimes(prevAgentStates, nextStates)) playChime(kind);
-    }
-    prevAgentStates = nextStates;
-    syncAgentNookStateClasses();
-    if (cardsChanged && agentsVisible()) renderSidebarContent("left");
-  } finally {
-    agentRefreshInFlight = false;
-    if (agentRefreshQueued) { agentRefreshQueued = false; void refreshAgents(); }
+    const res = await invoke<{ cards: AgentCard[] }>("cove://commands/activity.list", {});
+    nextCards = res.cards ?? [];
+  } catch {
+    return;
   }
+  const cardsChanged = !agentCardsEqual(previousCards, nextCards);
+  agentCards = nextCards;
+  const nextStates = new Map(agentCards.map((c) => [c.nookId, mapAgentState(c.status)]));
+  for (const nookId of acknowledgedDoneNooks) {
+    if (nextStates.get(nookId) !== "done") acknowledgedDoneNooks.delete(nookId);
+  }
+  if (agentChimesEnabled()) {
+    for (const kind of detectChimes(prevAgentStates, nextStates)) playChime(kind);
+  }
+  prevAgentStates = nextStates;
+  syncAgentNookStateClasses();
+  if (cardsChanged && agentsVisible()) renderSidebarContent("left");
 }
+const refreshAgents = createCoalescer(refreshAgentsImpl);
 
 function agentsVisible(): boolean {
   return !collapsedOf(sidebarModel, "left") && sidebarModel.leftMode === "bays";
