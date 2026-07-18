@@ -22,7 +22,7 @@ internal static class Program
         var page = Environment.GetEnvironmentVariable("COVE_GUI_PAGE");
         var startPath = string.IsNullOrEmpty(page) ? "" : "/" + page;
 
-        var loggerFactory = GuiLogging.CreateFactory();
+        using var loggerFactory = GuiLogging.CreateFactory();
         GuiEngineLauncher.Logger = loggerFactory.CreateLogger("Cove.Gui.GuiEngineLauncher");
         var startupLog = loggerFactory.CreateLogger("Cove.Gui.Program");
         var url = $"http://localhost:{LoopbackServer.DefaultPort}{startPath}";
@@ -61,7 +61,6 @@ internal static class Program
                 s.AddSingleton<DictationHost>();
                 s.AddSingleton<CoveGuiCommands>();
                 s.AddRynCommands();
-                s.AddAppCommands();
                 s.AddCoveGuiCommands();
                 s.AddRynMenuBar();
                 s.AddRynBadge();
@@ -81,6 +80,20 @@ internal static class Program
             .Build();
 
         _ = app.Services.GetRequiredService<EngineEventForwarder>();
-        app.Run();
+        try
+        {
+            app.Run();
+        }
+        finally
+        {
+            try
+            {
+                link.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            }
+            finally
+            {
+                server.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            }
+        }
     }
 }

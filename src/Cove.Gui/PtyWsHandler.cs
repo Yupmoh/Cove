@@ -20,24 +20,21 @@ public static class PtyWsHandler
             ulong browserAcked = client.BaseOffset;
             await SendText(ws, $"{{\"t\":\"base\",\"off\":{client.BaseOffset},\"head\":{client.ReplayUntilOffset},\"modes\":\"{client.TerminalModePreambleBase64}\",\"checkpoint\":\"{client.TerminalCheckpointBase64}\",\"checkpointCols\":{client.CheckpointCols},\"checkpointRows\":{client.CheckpointRows}}}", ct);
 
-            var ackTask = Task.Run(async () =>
-            {
-                var buf = new byte[512];
-                while (ws.State == WebSocketState.Open)
-                {
-                    var r = await ws.ReceiveAsync(buf, ct);
-                    if (r.MessageType == WebSocketMessageType.Close) break;
-                    var text = Encoding.UTF8.GetString(buf, 0, r.Count);
-                    var off = ParseAck(text);
-                    if (off > browserAcked) { browserAcked = off; await client!.AckAsync(off, ct); }
-                }
-            }, ct);
-
-            await client.PumpAsync(
+            using var relayCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            var ackTask = ReceiveAcksAsync(ws, client, browserAcked, relayCts.Token);
+            var pumpTask = client.PumpAsync(
                 onData: async (offset, raw, c) => await SendData(ws, offset, raw, c),
                 onResync: async (newBase, modes, checkpoint, cols, rows, c) => await SendText(ws, $"{{\"t\":\"resync\",\"base\":{newBase},\"modes\":\"{modes}\",\"checkpoint\":\"{checkpoint}\",\"checkpointCols\":{cols},\"checkpointRows\":{rows}}}", c),
                 onEnd: async (final, code, c) => await SendText(ws, $"{{\"t\":\"end\",\"code\":{code}}}", c),
-                ct);
+                relayCts.Token);
+            var first = await Task.WhenAny(ackTask, pumpTask);
+            await relayCts.CancelAsync();
+            try
+            {
+                await Task.WhenAll(ackTask, pumpTask);
+            }
+            catch (OperationCanceledException) when (first.IsCompletedSuccessfully) { }
+            await first;
         }
         catch (Exception ex) { logger.PtyWebSocketRelayFailed(nookId, ex.Message); }
         finally
@@ -45,6 +42,25 @@ public static class PtyWsHandler
             if (client is not null) await client.DisposeAsync();
             if (ws.State == WebSocketState.Open)
                 await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "", CancellationToken.None);
+        }
+    }
+
+    private static async Task ReceiveAcksAsync(
+        WebSocket ws, PtyStreamClient client, ulong browserAcked, CancellationToken ct)
+    {
+        var buffer = new byte[512];
+        while (ws.State == WebSocketState.Open)
+        {
+            var result = await ws.ReceiveAsync(buffer, ct);
+            if (result.MessageType == WebSocketMessageType.Close)
+                return;
+            var text = Encoding.UTF8.GetString(buffer, 0, result.Count);
+            var offset = ParseAck(text);
+            if (offset > browserAcked)
+            {
+                browserAcked = offset;
+                await client.AckAsync(offset, ct);
+            }
         }
     }
 

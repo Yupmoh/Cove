@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
 using System.Net.WebSockets;
@@ -22,6 +23,9 @@ public sealed class LoopbackServer : IAsyncDisposable
     private readonly TcpListener _listener;
     private readonly ILogger _logger;
     private readonly CancellationTokenSource _cts = new();
+    private readonly ConcurrentDictionary<long, Task> _handlers = new();
+    private Task _acceptLoop = Task.CompletedTask;
+    private long _handlerId;
     public int Port { get; private set; }
 
     public LoopbackServer(string webRoot, Func<CancellationToken, Task<Stream>> dial, string clientVersion, string channel, int port = DefaultPort)
@@ -44,7 +48,7 @@ public sealed class LoopbackServer : IAsyncDisposable
         try { _listener.Start(); }
         catch (SocketException ex) { throw new InvalidOperationException($"loopback port {Port} unavailable", ex); }
         Port = ((IPEndPoint)_listener.LocalEndpoint!).Port;
-        _ = Task.Run(AcceptLoopAsync);
+        _acceptLoop = Task.Run(AcceptLoopAsync);
         _logger.LoopbackServerStarted(Port);
     }
 
@@ -55,8 +59,22 @@ public sealed class LoopbackServer : IAsyncDisposable
             TcpClient client;
             try { client = await _listener.AcceptTcpClientAsync(_cts.Token); }
             catch (OperationCanceledException) { break; }
-            _ = Task.Run(() => HandleAsync(client));
+            catch (ObjectDisposedException) when (_cts.IsCancellationRequested) { break; }
+            catch (SocketException) when (_cts.IsCancellationRequested) { break; }
+            TrackHandler(client);
         }
+    }
+
+    private void TrackHandler(TcpClient client)
+    {
+        var id = Interlocked.Increment(ref _handlerId);
+        var task = Task.Run(() => HandleAsync(client));
+        _handlers[id] = task;
+        _ = task.ContinueWith(
+            completed => _handlers.TryRemove(id, out _),
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
     }
 
     public static string ComputeAcceptKey(string secWebSocketKey)
@@ -320,5 +338,7 @@ public sealed class LoopbackServer : IAsyncDisposable
     {
         await _cts.CancelAsync();
         _listener.Stop();
+        await _acceptLoop.WaitAsync(TimeSpan.FromSeconds(5));
+        await Task.WhenAll(_handlers.Values).WaitAsync(TimeSpan.FromSeconds(5));
     }
 }

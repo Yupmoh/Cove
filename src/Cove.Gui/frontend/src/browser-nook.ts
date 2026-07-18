@@ -6,7 +6,13 @@ import { DownloadShelfState, downloadPercent, formatBytes, joinPath, type Downlo
 
 export const browserWebviewRegistry = new Map<string, number>();
 
-interface BrowserNookInstance { el: HTMLElement; sync: () => void; }
+interface BrowserNookInstance {
+  el: HTMLElement;
+  sync: () => void;
+  resizeObserver: ResizeObserver | null;
+  resizeListener: () => void;
+  closed: boolean;
+}
 
 interface BrowserNookDto {
   currentUrl: string;
@@ -129,8 +135,15 @@ export function extractWebviewId(openResult: unknown): number | null {
 }
 
 export async function closeBrowserWebview(nookId: string): Promise<void> {
-  const id = browserWebviewRegistry.get(nookId);
+  const instance = browserNookInstances.get(nookId);
   browserNookInstances.delete(nookId);
+  if (instance) {
+    instance.closed = true;
+    instance.resizeObserver?.disconnect();
+    instance.resizeObserver = null;
+    window.removeEventListener("resize", instance.resizeListener);
+  }
+  const id = browserWebviewRegistry.get(nookId);
   if (id === undefined) return;
   browserWebviewRegistry.delete(nookId);
   await invoke("webviewPane.close", { id }).catch((err) => console.warn("webviewPane.close failed", nookId, err));
@@ -269,6 +282,13 @@ export async function renderBrowserNook(nookId: string, initialUrl: string, user
     const bounds = nativeWebviewBounds(rect);
     void invoke("webviewPane.setBounds", { id: webviewId, x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height }).catch(() => void 0);
   };
+  const instance: BrowserNookInstance = {
+    el,
+    sync: syncBounds,
+    resizeObserver: null,
+    resizeListener: syncBounds,
+    closed: false,
+  };
 
   const openWebView = async (url: string) => {
     const storagePath = `/tmp/cove-webview-${nookId}`;
@@ -290,11 +310,16 @@ export async function renderBrowserNook(nookId: string, initialUrl: string, user
       return;
     }
     webviewId = id;
+    if (instance.closed) {
+      webviewId = null;
+      await invoke("webviewPane.close", { id }).catch((err) => console.warn("webviewPane.close failed", nookId, err));
+      return;
+    }
     browserWebviewRegistry.set(nookId, id);
     syncBounds();
-    const ro = new ResizeObserver(() => syncBounds());
-    ro.observe(contentArea);
-    window.addEventListener("resize", syncBounds);
+    instance.resizeObserver = new ResizeObserver(() => syncBounds());
+    instance.resizeObserver.observe(contentArea);
+    window.addEventListener("resize", instance.resizeListener);
   };
 
   const doNavigate = async (url: string) => {
@@ -651,7 +676,7 @@ export async function renderBrowserNook(nookId: string, initialUrl: string, user
   updateChrome();
   renderFind();
 
-  browserNookInstances.set(nookId, { el, sync: syncBounds });
+  browserNookInstances.set(nookId, instance);
   return el;
 }
 

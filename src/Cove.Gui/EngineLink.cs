@@ -19,6 +19,8 @@ public sealed class EngineLink : IAsyncDisposable
     private ILogger _log = NullLogger.Instance;
     private System.Action<string, JsonElement>? _onEngineEvent;
     private Stream? _stream;
+    private CancellationTokenSource? _readPumpCts;
+    private Task? _readPump;
     private bool _everConnected;
     private uint _seq;
     private int _idCounter;
@@ -45,24 +47,57 @@ public sealed class EngineLink : IAsyncDisposable
         try
         {
             if (_stream is not null) return _stream;
+            var previousPump = _readPump;
+            var previousPumpCts = _readPumpCts;
+            if (previousPump is not null)
+                await previousPump;
+            previousPumpCts?.Dispose();
+            _readPumpCts = null;
+            _readPump = null;
             if (_everConnected) _log.EngineReconnecting(_channel, _endpoint);
             else _log.EngineConnecting(_channel, _endpoint);
             var s = await _dial(ct);
-            _ = Task.Run(() => ReadPumpAsync(s));
-            var helloEl = JsonSerializer.SerializeToElement(
-                new HelloParams(ProtocolConstants.SemanticProtocolVersion, "gui", _clientVersion, _channel),
-                CoveJsonContext.Default.HelloParams);
-            var hello = await SendRequestAsync(s, "cove://sys/hello", helloEl, ct);
-            if (!hello.Ok)
+            var pumpCts = new CancellationTokenSource();
+            var readPump = Task.Run(() => ReadPumpAsync(s, pumpCts.Token));
+            try
             {
-                _log.EngineHelloRejected(_channel, _endpoint, hello.Error?.Code ?? "unknown");
-                throw new InvalidOperationException($"hello failed: {hello.Error?.Code}");
+                var helloEl = JsonSerializer.SerializeToElement(
+                    new HelloParams(ProtocolConstants.SemanticProtocolVersion, "gui", _clientVersion, _channel),
+                    CoveJsonContext.Default.HelloParams);
+                var hello = await SendRequestAsync(s, "cove://sys/hello", helloEl, ct);
+                if (!hello.Ok)
+                {
+                    _log.EngineHelloRejected(_channel, _endpoint, hello.Error?.Code ?? "unknown");
+                    throw new InvalidOperationException($"hello failed: {hello.Error?.Code}");
+                }
+                if (readPump.IsCompleted)
+                    throw new IOException("control connection closed during hello");
+                _readPumpCts = pumpCts;
+                _readPump = readPump;
+                Volatile.Write(ref _stream, s);
+                if (readPump.IsCompleted)
+                {
+                    Interlocked.CompareExchange(ref _stream, null, s);
+                    throw new IOException("control connection closed during hello");
+                }
+                _everConnected = true;
+                var engineVersion = hello.Data is { } hd && hd.TryGetProperty("engineVersion", out var ev) ? ev.GetString() ?? "" : "";
+                _log.EngineConnected(_channel, _endpoint, engineVersion);
+                return s;
             }
-            _stream = s;
-            _everConnected = true;
-            var engineVersion = hello.Data is { } hd && hd.TryGetProperty("engineVersion", out var ev) ? ev.GetString() ?? "" : "";
-            _log.EngineConnected(_channel, _endpoint, engineVersion);
-            return s;
+            catch
+            {
+                await pumpCts.CancelAsync();
+                await s.DisposeAsync();
+                await readPump;
+                if (ReferenceEquals(_readPump, readPump))
+                {
+                    _readPump = null;
+                    _readPumpCts = null;
+                }
+                pumpCts.Dispose();
+                throw;
+            }
         }
         finally { _connectGate.Release(); }
     }
@@ -96,13 +131,13 @@ public sealed class EngineLink : IAsyncDisposable
         }
     }
 
-    private async Task ReadPumpAsync(Stream s)
+    private async Task ReadPumpAsync(Stream s, CancellationToken ct)
     {
         try
         {
             while (true)
             {
-                var f = await FrameIo.ReadAsync(s, CancellationToken.None);
+                var f = await FrameIo.ReadAsync(s, ct);
                 if (f.Type == FrameType.Response)
                 {
                     var r = JsonSerializer.Deserialize(f.Payload, CoveJsonContext.Default.ControlResponse)!;
@@ -125,14 +160,38 @@ public sealed class EngineLink : IAsyncDisposable
                 }
             }
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
         catch (Exception ex) { _log.EngineReadPumpEnded(ex.Message); }
         foreach (var kv in _pending) kv.Value.TrySetException(new IOException("control connection closed"));
         _pending.Clear();
-        _stream = null;
+        Interlocked.CompareExchange(ref _stream, null, s);
+        await s.DisposeAsync();
     }
 
     public async ValueTask DisposeAsync()
     {
-        if (_stream is not null) { await _stream.DisposeAsync(); _stream = null; }
+        await _connectGate.WaitAsync();
+        try
+        {
+            var pumpCts = _readPumpCts;
+            var pump = _readPump;
+            var stream = Interlocked.Exchange(ref _stream, null);
+            if (pumpCts is not null)
+                await pumpCts.CancelAsync();
+            if (stream is not null)
+                await stream.DisposeAsync();
+            if (pump is not null)
+                await pump;
+            if (ReferenceEquals(_readPump, pump))
+            {
+                _readPump = null;
+                _readPumpCts = null;
+            }
+            pumpCts?.Dispose();
+        }
+        finally
+        {
+            _connectGate.Release();
+        }
     }
 }

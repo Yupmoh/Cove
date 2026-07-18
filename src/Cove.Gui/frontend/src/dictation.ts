@@ -255,7 +255,7 @@ export function createNookTypist(write: (payload: string) => Promise<void>): Noo
 
 type PillState = "recording" | "transcribing" | "downloading" | "error";
 
-export function setupDictation(deps: DictationDeps): void {
+export function setupDictation(deps: DictationDeps): () => void {
   const holdKey = deps.holdKey ?? "F9";
   let held = false;
   let pill: HTMLElement | null = null;
@@ -467,26 +467,30 @@ export function setupDictation(deps: DictationDeps): void {
     unschedule: (id) => clearTimeout(id),
   });
 
-  window.addEventListener("keydown", (e) => {
+  const onKeyDown = (e: KeyboardEvent): void => {
     spaceHold.keydown(e);
     if (e.code === "Space") return;
     if (e.key !== holdKey || e.repeat || held) return;
     e.preventDefault();
     beginHold();
-  }, true);
+  };
 
-  window.addEventListener("keyup", (e) => {
+  const onKeyUp = (e: KeyboardEvent): void => {
     spaceHold.keyup(e);
     if (e.code === "Space") return;
     if (e.key !== holdKey) return;
     e.preventDefault();
     release();
-  }, true);
+  };
 
-  window.addEventListener("blur", () => {
+  const onBlur = (): void => {
     spaceHold.blur();
     release();
-  });
+  };
+
+  window.addEventListener("keydown", onKeyDown, true);
+  window.addEventListener("keyup", onKeyUp, true);
+  window.addEventListener("blur", onBlur);
 
   window.__ryn.on("engine.event", (data: unknown) => {
     const evt = data as { channel?: string; payload?: unknown };
@@ -510,4 +514,9 @@ export function setupDictation(deps: DictationDeps): void {
       }
     }
   });
+  return () => {
+    window.removeEventListener("keydown", onKeyDown, true);
+    window.removeEventListener("keyup", onKeyUp, true);
+    window.removeEventListener("blur", onBlur);
+  };
 }

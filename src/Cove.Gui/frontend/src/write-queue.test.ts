@@ -20,17 +20,20 @@ describe("enqueueNookWrite", () => {
     expect(order).toEqual(["a", "b", "c"]);
   });
 
-  it("keeps ordering after a failed write instead of stalling the queue", async () => {
+  it("rejects a failed write while keeping later same-nook writes moving", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => void 0);
     const order: string[] = [];
+    const error = new Error("x");
     const write = (_p: string, d: string) => {
       order.push(d);
-      return d === "boom" ? Promise.reject(new Error("x")) : Promise.resolve();
+      return d === "boom" ? Promise.reject(error) : Promise.resolve();
     };
 
-    await enqueueNookWrite("p1", "boom", write);
-    await enqueueNookWrite("p1", "after", write);
+    const failed = enqueueNookWrite("p1", "boom", write);
+    const after = enqueueNookWrite("p1", "after", write);
 
+    await expect(failed).rejects.toBe(error);
+    await expect(after).resolves.toBeUndefined();
     expect(order).toEqual(["boom", "after"]);
     expect(warn).toHaveBeenCalledTimes(1);
     warn.mockRestore();
