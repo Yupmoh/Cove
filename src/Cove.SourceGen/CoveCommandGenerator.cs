@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Linq;
 using System.Text;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Cove.SourceGen;
@@ -10,28 +11,57 @@ namespace Cove.SourceGen;
 public sealed class CoveCommandGenerator : IIncrementalGenerator
 {
     private const string AttributeFullName = "Cove.Protocol.CoveCommandAttribute";
+    private static readonly DiagnosticDescriptor StaticMethodRequired = new(
+        "COVE001",
+        "Command method must be static",
+        "Command method '{0}' must be static",
+        "Cove.SourceGen",
+        DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+    private static readonly DiagnosticDescriptor SingleParameterRequired = new(
+        "COVE002",
+        "Command method must have one parameter",
+        "Command method '{0}' must have exactly one parameter",
+        "Cove.SourceGen",
+        DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+    private static readonly DiagnosticDescriptor CommandKeyRequired = new(
+        "COVE003",
+        "Command key must not be empty",
+        "Command method '{0}' must declare a non-empty command key",
+        "Cove.SourceGen",
+        DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
-        var commands = context.SyntaxProvider.ForAttributeWithMetadataName(
-                AttributeFullName,
-                predicate: static (node, _) => node is MethodDeclarationSyntax,
-                transform: static (ctx, _) => Extract(ctx))
-            .Where(static c => c.Key != null);
+        var candidates = context.SyntaxProvider.ForAttributeWithMetadataName(
+            AttributeFullName,
+            predicate: static (node, _) => node is MethodDeclarationSyntax,
+            transform: static (ctx, _) => Extract(ctx));
 
-        var collected = commands.Collect();
-        context.RegisterSourceOutput(collected, static (spc, items) => Emit(spc, items));
+        context.RegisterSourceOutput(
+            candidates.Where(static c => c.Diagnostic != CommandDiagnostic.None),
+            static (spc, candidate) => ReportDiagnostic(spc, candidate));
+
+        var commands = candidates.Where(static c => c.Diagnostic == CommandDiagnostic.None && c.Key != null);
+        context.RegisterSourceOutput(commands.Collect(), static (spc, items) => Emit(spc, items));
     }
 
     private static CommandModel Extract(GeneratorAttributeSyntaxContext ctx)
     {
         if (ctx.TargetSymbol is not IMethodSymbol method) return default;
-        if (!method.IsStatic) return default;
-        if (method.Parameters.Length != 1) return default;
+        var location = ctx.TargetNode.GetLocation();
+        if (!method.IsStatic)
+            return CommandModel.Invalid(CommandDiagnostic.StaticMethodRequired, method.Name, location);
+        if (method.Parameters.Length != 1)
+            return CommandModel.Invalid(CommandDiagnostic.SingleParameterRequired, method.Name, location);
         var attr = ctx.Attributes[0];
-        if (attr.ConstructorArguments.Length < 1) return default;
+        if (attr.ConstructorArguments.Length < 1)
+            return CommandModel.Invalid(CommandDiagnostic.CommandKeyRequired, method.Name, location);
         var key = attr.ConstructorArguments[0].Value as string;
-        if (key is null || key.Length == 0) return default;
+        if (string.IsNullOrEmpty(key))
+            return CommandModel.Invalid(CommandDiagnostic.CommandKeyRequired, method.Name, location);
         var containing = method.ContainingType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
         var paramType = method.Parameters[0].Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
         var returnType = method.ReturnType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
@@ -43,8 +73,24 @@ public sealed class CoveCommandGenerator : IIncrementalGenerator
             else if (na.Key == "Source" && na.Value.Value is string s) source = s;
         }
         if (source is null)
-            source = key.StartsWith("cove://", System.StringComparison.Ordinal) ? "core" : "cli";
-        return new CommandModel(key, containing, method.Name, paramType, returnType, description, source);
+            source = key!.StartsWith("cove://", System.StringComparison.Ordinal) ? "core" : "cli";
+        return new CommandModel(key!, containing, method.Name, paramType, returnType, description, source);
+    }
+
+    private static void ReportDiagnostic(SourceProductionContext spc, CommandModel candidate)
+    {
+        var descriptor = candidate.Diagnostic switch
+        {
+            CommandDiagnostic.StaticMethodRequired => StaticMethodRequired,
+            CommandDiagnostic.SingleParameterRequired => SingleParameterRequired,
+            CommandDiagnostic.CommandKeyRequired => CommandKeyRequired,
+            _ => null
+        };
+        if (descriptor is not null)
+            spc.ReportDiagnostic(Microsoft.CodeAnalysis.Diagnostic.Create(
+                descriptor,
+                candidate.Location,
+                candidate.MethodName));
     }
 
     private static void Emit(SourceProductionContext spc, ImmutableArray<CommandModel> items)
@@ -60,20 +106,21 @@ public sealed class CoveCommandGenerator : IIncrementalGenerator
         sb.AppendLine("        new System.Collections.Generic.Dictionary<string, System.Delegate>(System.StringComparer.Ordinal)");
         sb.AppendLine("        {");
         foreach (var c in ordered)
-            sb.AppendLine($"            [\"{c.Key}\"] = (System.Func<{c.ParamType}, {c.ReturnType}>){c.ContainingType}.{c.MethodName},");
+            sb.AppendLine($"            [{Literal(c.Key)}] = (System.Func<{c.ParamType}, {c.ReturnType}>){c.ContainingType}.{c.MethodName},");
         sb.AppendLine("        };");
         sb.Append("    public static readonly System.Collections.Generic.IReadOnlyList<string> Keys = new string[] { ");
-        foreach (var c in ordered) sb.Append($"\"{c.Key}\", ");
+        foreach (var c in ordered) sb.Append($"{Literal(c.Key)}, ");
         sb.AppendLine("};");
         sb.AppendLine("    public sealed record CommandCatalogueEntry(string Command, string? Description, string Source);");
         sb.AppendLine("    public static readonly System.Collections.Generic.IReadOnlyList<CommandCatalogueEntry> Catalogue = new CommandCatalogueEntry[]");
         sb.AppendLine("    {");
         foreach (var c in ordered)
-            sb.AppendLine($"        new CommandCatalogueEntry(\"{c.Key}\", {(c.Description is null ? "null" : $"\"{c.Description}\"")}, \"{c.Source}\"),");
+            sb.AppendLine($"        new CommandCatalogueEntry({Literal(c.Key)}, {(c.Description is null ? "null" : Literal(c.Description))}, {Literal(c.Source)}),");
         sb.AppendLine("    };");
         sb.AppendLine("}");
         spc.AddSource("CoveCommandRegistry.g.cs", sb.ToString());
     }
+    private static string Literal(string value) => SyntaxFactory.Literal(value).ToFullString();
 
     private readonly struct CommandModel
     {
@@ -83,8 +130,11 @@ public sealed class CoveCommandGenerator : IIncrementalGenerator
         public readonly string ParamType;
         public readonly string ReturnType;
         public readonly string? Description;
-        public readonly string? Source;
-        public CommandModel(string key, string containingType, string methodName, string paramType, string returnType, string? description, string? source)
+        public readonly string Source;
+        public readonly CommandDiagnostic Diagnostic;
+        public readonly Location? Location;
+
+        public CommandModel(string key, string containingType, string methodName, string paramType, string returnType, string? description, string source)
         {
             Key = key;
             ContainingType = containingType;
@@ -93,6 +143,32 @@ public sealed class CoveCommandGenerator : IIncrementalGenerator
             ReturnType = returnType;
             Description = description;
             Source = source;
+            Diagnostic = CommandDiagnostic.None;
+            Location = null;
         }
+
+        private CommandModel(CommandDiagnostic diagnostic, string methodName, Location location)
+        {
+            Key = null!;
+            ContainingType = null!;
+            MethodName = methodName;
+            ParamType = null!;
+            ReturnType = null!;
+            Description = null;
+            Source = null!;
+            Diagnostic = diagnostic;
+            Location = location;
+        }
+
+        public static CommandModel Invalid(CommandDiagnostic diagnostic, string methodName, Location location) =>
+            new(diagnostic, methodName, location);
+    }
+
+    private enum CommandDiagnostic
+    {
+        None,
+        StaticMethodRequired,
+        SingleParameterRequired,
+        CommandKeyRequired
     }
 }

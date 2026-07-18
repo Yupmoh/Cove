@@ -43,13 +43,22 @@ public static class ManifestValidator
         else if (!SemverRegex.IsMatch(m.Version))
             errors.Add(new ValidationError("version", "invalid_format", "version must be semver"));
 
-        if (m.Methods is null || m.Methods.Count == 0)
-            errors.Add(new ValidationError("methods", "missing", "methods is required and non-empty"));
+        if (m.Methods is null)
+            errors.Add(new ValidationError("methods", "missing", "methods is required"));
         else
             foreach (var kv in m.Methods)
                 if ((string.IsNullOrEmpty(kv.Value.Script) && string.IsNullOrEmpty(kv.Value.Static))
                     || (!string.IsNullOrEmpty(kv.Value.Script) && !string.IsNullOrEmpty(kv.Value.Static)))
                     errors.Add(new ValidationError($"methods.{kv.Key}", "script_xor_static", "method must have script XOR static"));
+
+        if (m.HookEnvelopes is not null)
+            foreach (var (eventName, declaration) in m.HookEnvelopes)
+                if (declaration.Kind == HookEnvelopeKind.HookSpecificOutput
+                    && string.IsNullOrEmpty(declaration.HookEventName))
+                    errors.Add(new ValidationError(
+                        $"hookEnvelopes.{eventName}.hookEventName",
+                        "missing",
+                        "hookEventName is required for hookSpecificOutput"));
 
         if (m.ScreenState is { } screen)
         {

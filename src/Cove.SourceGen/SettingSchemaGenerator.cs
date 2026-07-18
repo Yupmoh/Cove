@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Linq;
 using System.Text;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Cove.SourceGen;
@@ -119,13 +120,14 @@ public sealed class SettingSchemaGenerator : IIncrementalGenerator
         {
             var optionsExpr = s.Options is null || s.Options.Length == 0
                 ? "null"
-                : "new string[] { " + string.Join(", ", s.Options.Select(o => $"\"{o}\"")) + " }";
-            sb.AppendLine($"        new SettingSchemaEntry(\"{s.Key}\", \"{s.Label}\", \"{s.Tab}\", \"{s.Control}\", {(s.Description is null ? "null" : $"\"{s.Description}\"")}, \"{s.Type}\", {optionsExpr}),");
+                : "new string[] { " + string.Join(", ", s.Options.Select(Literal)) + " }";
+            sb.AppendLine($"        new SettingSchemaEntry({Literal(s.Key)}, {Literal(s.Label)}, {Literal(s.Tab)}, {Literal(s.Control)}, {(s.Description is null ? "null" : Literal(s.Description))}, {Literal(s.Type)}, {optionsExpr}),");
         }
         sb.AppendLine("    };");
         sb.AppendLine("}");
         spc.AddSource("CoveSettingSchema.g.cs", sb.ToString());
     }
+    private static string Literal(string value) => SyntaxFactory.Literal(value).ToFullString();
 
     private readonly struct SettingModel
     {

@@ -100,11 +100,11 @@ public sealed class ManifestValidatorTests
     }
 
     [Fact]
-    public void MissingRequiredField_Methods()
+    public void EmptyMethods_IsAllowed()
     {
         var m = ValidManifest() with { Methods = new Dictionary<string, AdapterMethod>() };
         var errors = Validate(m);
-        Assert.Contains(errors, e => e.Field == "methods" && e.Code == "missing");
+        Assert.DoesNotContain(errors, e => e.Field == "methods");
     }
 
     [Fact]

@@ -1,4 +1,4 @@
-using Microsoft.Data.Sqlite;
+using Cove.Persistence;
 using Microsoft.Extensions.Logging;
 
 namespace Cove.Engine.Browser;
@@ -11,6 +11,7 @@ public sealed record BrowserAnnotation(string Id, string UrlKey, string Kind, st
 public sealed class BrowserStore
 {
     private readonly string _dbPath;
+    private readonly SqliteConnectionFactory _database;
     private readonly ILogger _logger;
 
     public BrowserStore(string dataDir, ILogger logger)
@@ -18,13 +19,13 @@ public sealed class BrowserStore
         _dbPath = System.IO.Path.Combine(dataDir, "browser", "browser.db");
         System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(_dbPath)!);
         _logger = logger;
+        _database = new SqliteConnectionFactory(_dbPath, logger);
         EnsureSchema();
     }
 
     public void RecordVisit(string url, string title)
     {
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
         using var cmd = conn.CreateCommand();
         cmd.CommandText = """
             INSERT INTO history (url, title, visit_count, last_visited)
@@ -43,8 +44,7 @@ public sealed class BrowserStore
     public System.Collections.Generic.IReadOnlyList<BrowserHistoryEntry> SearchHistory(string query, int limit = 20)
     {
         var result = new System.Collections.Generic.List<BrowserHistoryEntry>();
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
         using var cmd = conn.CreateCommand();
         cmd.CommandText = """
             SELECT url, title, visit_count, last_visited FROM history
@@ -70,8 +70,7 @@ public sealed class BrowserStore
     public System.Collections.Generic.IReadOnlyList<BrowserHistoryEntry> GetTopVisited(int limit = 10)
     {
         var result = new System.Collections.Generic.List<BrowserHistoryEntry>();
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT url, title, visit_count, last_visited FROM history ORDER BY visit_count DESC, last_visited DESC LIMIT @limit";
         cmd.Parameters.AddWithValue("@limit", limit);
@@ -94,8 +93,7 @@ public sealed class BrowserStore
         var urlKey = NormalizeUrlKey(url);
         var createdAt = System.DateTimeOffset.UtcNow;
 
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
         using var cmd = conn.CreateCommand();
         cmd.CommandText = """
             INSERT INTO annotations (id, url_key, kind, anchor_json, text, resolved, source, created_at)
@@ -116,8 +114,7 @@ public sealed class BrowserStore
     public System.Collections.Generic.IReadOnlyList<BrowserAnnotation> ListAnnotations(string? urlKey = null, bool? unresolved = null)
     {
         var result = new System.Collections.Generic.List<BrowserAnnotation>();
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
         using var cmd = conn.CreateCommand();
         var sql = "SELECT id, url_key, kind, anchor_json, text, resolved, source, created_at FROM annotations WHERE 1=1";
         if (urlKey is not null)
@@ -150,8 +147,7 @@ public sealed class BrowserStore
 
     public bool ResolveAnnotation(string id)
     {
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "UPDATE annotations SET resolved = 1 WHERE id = @id";
         cmd.Parameters.AddWithValue("@id", id);
@@ -160,8 +156,7 @@ public sealed class BrowserStore
 
     public bool DeleteAnnotation(string id)
     {
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "DELETE FROM annotations WHERE id = @id";
         cmd.Parameters.AddWithValue("@id", id);
@@ -172,8 +167,7 @@ public sealed class BrowserStore
     {
         var exportPath = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(_dbPath)!, "browser-history.json");
         var entries = new System.Collections.Generic.List<string>();
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT url, title, visit_count, last_visited FROM history ORDER BY last_visited DESC";
         using var reader = cmd.ExecuteReader();
@@ -223,8 +217,7 @@ public sealed class BrowserStore
     }
     private void EnsureSchema()
     {
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
         using var cmd = conn.CreateCommand();
         cmd.CommandText = """
             CREATE TABLE IF NOT EXISTS history (

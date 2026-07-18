@@ -38,6 +38,7 @@ public sealed record AdapterManifest
 public sealed record HookEnvelopeDeclaration
 {
     public required HookEnvelopeKind Kind { get; init; }
+    public string? HookEventName { get; init; }
     public bool IncludeSystemMessage { get; init; }
 }
 

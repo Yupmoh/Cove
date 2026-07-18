@@ -1,4 +1,6 @@
 using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.Logging;
+using ZLogger;
 
 namespace Cove.Persistence;
 
@@ -6,8 +8,11 @@ public sealed class SqliteConnectionFactory
 {
     private readonly string _connectionString;
     private readonly string _databasePath;
+    private readonly string _walPath;
+    private readonly string _sharedMemoryPath;
+    private readonly ILogger _logger;
 
-    public SqliteConnectionFactory(string databasePath)
+    public SqliteConnectionFactory(string databasePath, ILogger? logger = null)
     {
         SqliteBootstrap.EnsureInitialized();
         _connectionString = new SqliteConnectionStringBuilder
@@ -18,6 +23,9 @@ public sealed class SqliteConnectionFactory
             Pooling = true,
         }.ToString();
         _databasePath = databasePath;
+        _walPath = databasePath + "-wal";
+        _sharedMemoryPath = databasePath + "-shm";
+        _logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance;
     }
 
     public SqliteConnection Open()
@@ -35,14 +43,29 @@ public sealed class SqliteConnectionFactory
             "PRAGMA wal_autocheckpoint=1000;";
         pragma.ExecuteNonQuery();
 
-        ApplyOwnerOnlyMode();
+        ApplyOwnerOnlyMode(_databasePath);
+        ApplyOwnerOnlyMode(_walPath);
+        ApplyOwnerOnlyMode(_sharedMemoryPath);
         return connection;
     }
 
-    private void ApplyOwnerOnlyMode()
+    private void ApplyOwnerOnlyMode(string path)
     {
         if (OperatingSystem.IsWindows()) return;
-        if (!File.Exists(_databasePath)) return;
-        File.SetUnixFileMode(_databasePath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        if (!File.Exists(path)) return;
+        try
+        {
+            File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        }
+        catch (Exception ex)
+        {
+            _logger.SqliteChmodFailed(path, ex.Message);
+        }
     }
+}
+
+internal static partial class SqliteConnectionFactoryLog
+{
+    [ZLoggerMessage(LogLevel.Warning, "sqlite chmod failed path={path} error={error}")]
+    public static partial void SqliteChmodFailed(this ILogger logger, string path, string error);
 }

@@ -1,3 +1,4 @@
+using Cove.Persistence;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 
@@ -5,13 +6,27 @@ namespace Cove.Engine.Knowledge;
 
 public sealed class KnowledgePersistenceKernel
 {
-    private readonly string _dataDir;
+    private readonly string _timelinePath;
+    private readonly string _memoryPath;
+    private readonly string _ftsIndexPath;
+    private readonly string _notesIndexPath;
+    private readonly SqliteConnectionFactory _timelineDatabase;
+    private readonly SqliteConnectionFactory _memoryDatabase;
+    private readonly SqliteConnectionFactory _ftsIndexDatabase;
+    private readonly SqliteConnectionFactory _notesIndexDatabase;
     private readonly ILogger _logger;
 
     public KnowledgePersistenceKernel(string dataDir, ILogger logger)
     {
-        _dataDir = dataDir;
+        _timelinePath = System.IO.Path.Combine(dataDir, "timeline.db");
+        _memoryPath = System.IO.Path.Combine(dataDir, "memory", "memory.db");
+        _ftsIndexPath = System.IO.Path.Combine(dataDir, "fts", "index.db");
+        _notesIndexPath = System.IO.Path.Combine(dataDir, "notes", "index.db");
         _logger = logger;
+        _timelineDatabase = new SqliteConnectionFactory(_timelinePath, logger);
+        _memoryDatabase = new SqliteConnectionFactory(_memoryPath, logger);
+        _ftsIndexDatabase = new SqliteConnectionFactory(_ftsIndexPath, logger);
+        _notesIndexDatabase = new SqliteConnectionFactory(_notesIndexPath, logger);
     }
 
     public void EnsureAllSchemas()
@@ -25,12 +40,8 @@ public sealed class KnowledgePersistenceKernel
 
     private void EnsureTimelineDb()
     {
-        var path = System.IO.Path.Combine(_dataDir, "timeline.db");
-        using var conn = new SqliteConnection($"Data Source={path}");
-        conn.Open();
+        using var conn = _timelineDatabase.Open();
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = "PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;";
-        cmd.ExecuteNonQuery();
         cmd.CommandText = """
             CREATE TABLE IF NOT EXISTS timeline (
                 id TEXT PRIMARY KEY,
@@ -62,18 +73,14 @@ public sealed class KnowledgePersistenceKernel
             END;
             """;
         cmd.ExecuteNonQuery();
-        _logger.LogWarning("knowledge: timeline.db schema ensured at {path}", path);
+        _logger.LogWarning("knowledge: timeline.db schema ensured at {path}", _timelinePath);
     }
 
     private void EnsureMemoryDb()
     {
-        var path = System.IO.Path.Combine(_dataDir, "memory", "memory.db");
-        System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path)!);
-        using var conn = new SqliteConnection($"Data Source={path}");
-        conn.Open();
+        System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(_memoryPath)!);
+        using var conn = _memoryDatabase.Open();
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = "PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;";
-        cmd.ExecuteNonQuery();
         cmd.CommandText = """
             CREATE TABLE IF NOT EXISTS facts (
                 id TEXT PRIMARY KEY,
@@ -123,18 +130,14 @@ public sealed class KnowledgePersistenceKernel
             CREATE VIRTUAL TABLE IF NOT EXISTS episodes_fts USING fts5(summary_l0, content='episodes', content_rowid='rowid', tokenize='porter unicode61 remove_diacritics 1');
             """;
         cmd.ExecuteNonQuery();
-        _logger.LogWarning("knowledge: memory.db schema ensured at {path}", path);
+        _logger.LogWarning("knowledge: memory.db schema ensured at {path}", _memoryPath);
     }
 
     private void EnsureFtsIndexDb()
     {
-        var path = System.IO.Path.Combine(_dataDir, "fts", "index.db");
-        System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path)!);
-        using var conn = new SqliteConnection($"Data Source={path}");
-        conn.Open();
+        System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(_ftsIndexPath)!);
+        using var conn = _ftsIndexDatabase.Open();
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = "PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;";
-        cmd.ExecuteNonQuery();
         cmd.CommandText = """
             CREATE TABLE IF NOT EXISTS sessions (
                 id TEXT PRIMARY KEY,
@@ -160,18 +163,14 @@ public sealed class KnowledgePersistenceKernel
             CREATE VIRTUAL TABLE IF NOT EXISTS sessions_fts_trigram USING fts5(adapter, content='sessions', content_rowid='rowid', tokenize='trigram');
             """;
         cmd.ExecuteNonQuery();
-        _logger.LogWarning("knowledge: fts/index.db schema ensured at {path}", path);
+        _logger.LogWarning("knowledge: fts/index.db schema ensured at {path}", _ftsIndexPath);
     }
 
     private void EnsureNotesIndexDb()
     {
-        var path = System.IO.Path.Combine(_dataDir, "notes", "index.db");
-        System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path)!);
-        using var conn = new SqliteConnection($"Data Source={path}");
-        conn.Open();
+        System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(_notesIndexPath)!);
+        using var conn = _notesIndexDatabase.Open();
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = "PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;";
-        cmd.ExecuteNonQuery();
         cmd.CommandText = """
             CREATE TABLE IF NOT EXISTS notes_index (
                 note_id TEXT PRIMARY KEY,
@@ -197,13 +196,12 @@ public sealed class KnowledgePersistenceKernel
             END;
             """;
         cmd.ExecuteNonQuery();
-        _logger.LogWarning("knowledge: notes/index.db schema ensured at {path}", path);
+        _logger.LogWarning("knowledge: notes/index.db schema ensured at {path}", _notesIndexPath);
     }
 
     private void VerifyTokenizers()
     {
-        using var conn = new SqliteConnection($"Data Source={System.IO.Path.Combine(_dataDir, "timeline.db")}");
-        conn.Open();
+        using var conn = _timelineDatabase.Open();
         foreach (var tokenizer in new[] { "porter", "trigram", "unicode61" })
         {
             try

@@ -614,14 +614,13 @@
       "properties": {
         "quietMs": {
           "type": "integer",
-          "minimum": 250,
-          "description": "Milliseconds of ring silence before the nook is considered idle. Default 2000."
+          "minimum": 0,
+          "description": "Milliseconds of ring silence before the nook is considered idle. Default 2000. Values below the runtime floor are clamped, not rejected."
         },
         "tailBytes": {
           "type": "integer",
-          "minimum": 256,
-          "maximum": 65536,
-          "description": "How many trailing ring bytes to inspect. Default 4096."
+          "minimum": 0,
+          "description": "How many trailing ring bytes to inspect. Default 4096. Out-of-range values are clamped at runtime, not rejected."
         },
         "rules": {
           "type": "array",
