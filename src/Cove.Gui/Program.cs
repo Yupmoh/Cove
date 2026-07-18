@@ -30,7 +30,7 @@ internal static class Program
 
         Func<CancellationToken, Task<Stream>> dial = ct => GuiEngineLauncher.ConnectOrSpawnAsync(channel, ct);
         var webRoot = Path.Combine(AppContext.BaseDirectory, "wwwroot");
-        var server = new LoopbackServer(webRoot, dial, version, channel);
+        var server = new LoopbackServer(webRoot, dial, version, channel, startupLog);
         server.Start();
 
         var link = new EngineLink(dial, version, channel);

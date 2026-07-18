@@ -8,6 +8,18 @@ internal static partial class GuiLog
     [ZLoggerMessage(LogLevel.Information, "gui starting channel={channel} version={version} url={url} enginePath={enginePath}")]
     public static partial void AppStarting(this ILogger logger, string channel, string version, string url, string enginePath);
 
+    [ZLoggerMessage(LogLevel.Information, "loopback server started port={port}")]
+    public static partial void LoopbackServerStarted(this ILogger logger, int port);
+
+    [ZLoggerMessage(LogLevel.Error, "loopback connection handler failed error={error}")]
+    public static partial void LoopbackConnectionHandlerFailed(this ILogger logger, string error);
+
+    [ZLoggerMessage(LogLevel.Warning, "loopback media not found path={path}")]
+    public static partial void LoopbackMediaNotFound(this ILogger logger, string path);
+
+    [ZLoggerMessage(LogLevel.Error, "pty websocket relay failed nookId={nookId} error={error}")]
+    public static partial void PtyWebSocketRelayFailed(this ILogger logger, string nookId, string error);
+
     [ZLoggerMessage(LogLevel.Information, "gui window built channel={channel} devtools={devtools}")]
     public static partial void WindowBuilt(this ILogger logger, string channel, bool devtools);
 

@@ -1,5 +1,9 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Cove.Platform;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using ZLogger;
 
 namespace Cove.Engine.Theming;
 
@@ -21,9 +25,16 @@ public sealed class ThemeService
     private readonly List<Theme> _builtins;
     private readonly List<Theme> _custom = [];
     private readonly string _themesDir;
+    private readonly ILogger _logger;
 
     public ThemeService(string dataDir)
+        : this(dataDir, NullLogger.Instance)
     {
+    }
+
+    public ThemeService(string dataDir, ILogger? logger)
+    {
+        _logger = logger ?? NullLogger.Instance;
         _themesDir = System.IO.Path.Combine(dataDir, "themes");
         System.IO.Directory.CreateDirectory(_themesDir);
         _builtins = [
@@ -93,7 +104,8 @@ public sealed class ThemeService
     public void SaveCustom(Theme theme)
     {
         ValidateTheme(theme);
-        var path = System.IO.Path.Combine(_themesDir, $"{theme.Name}.json");
+        if (!TryResolveThemePath(theme.Name, out var path))
+            throw new System.ArgumentException("theme name must be a safe path segment", nameof(theme));
         var json = JsonSerializer.Serialize(theme, ThemeJsonContext.Default.Theme);
         System.IO.File.WriteAllText(path, json);
         if (!_custom.Any(t => t.Name == theme.Name))
@@ -109,7 +121,8 @@ public sealed class ThemeService
     {
         if (_builtins.Any(t => t.Name == name))
             return false;
-        var path = System.IO.Path.Combine(_themesDir, $"{name}.json");
+        if (!TryResolveThemePath(name, out var path))
+            return false;
         if (System.IO.File.Exists(path))
             System.IO.File.Delete(path);
         return _custom.RemoveAll(t => t.Name == name) > 0;
@@ -122,14 +135,46 @@ public sealed class ThemeService
         if (!System.IO.Directory.Exists(_themesDir)) return;
         foreach (var file in System.IO.Directory.EnumerateFiles(_themesDir, "*.json"))
         {
+            if (!PathContainment.IsContained(_themesDir, file))
+            {
+                _logger.ThemeFileOutsideRoot(file);
+                continue;
+            }
             try
             {
                 var json = System.IO.File.ReadAllText(file);
                 var theme = JsonSerializer.Deserialize(json, ThemeJsonContext.Default.Theme);
-                if (theme is not null) _custom.Add(theme);
+                if (theme is null)
+                {
+                    _logger.ThemeMissingData(file);
+                    continue;
+                }
+                if (!PathContainment.IsSafeSegment(theme.Name))
+                {
+                    _logger.ThemeUnsafeEmbeddedName(theme.Name, file);
+                    continue;
+                }
+                _custom.Add(theme);
             }
-            catch { }
+            catch (System.Exception ex)
+            {
+                _logger.ThemeLoadFailed(file, ex.Message);
+            }
         }
+    }
+
+    private bool TryResolveThemePath(string name, out string path)
+    {
+        path = string.Empty;
+        var fileName = $"{name}.json";
+        if (!PathContainment.IsSafeSegment(name)
+            || !PathContainment.TryResolveContained(_themesDir, out _, out path, fileName)
+            || !PathContainment.IsContained(_themesDir, path))
+        {
+            _logger.ThemeUnsafeCustomName(name);
+            return false;
+        }
+        return true;
     }
 
     private static void ValidateTheme(Theme theme)
@@ -212,3 +257,21 @@ public static class ContrastValidator
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase, DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
 [JsonSerializable(typeof(Theme))]
 public sealed partial class ThemeJsonContext : JsonSerializerContext { }
+
+internal static partial class ThemeServiceLog
+{
+    [ZLoggerMessage(LogLevel.Warning, "themes skipped custom theme file outside root path={path}")]
+    public static partial void ThemeFileOutsideRoot(this ILogger logger, string path);
+
+    [ZLoggerMessage(LogLevel.Warning, "themes skipped custom theme with missing data path={path}")]
+    public static partial void ThemeMissingData(this ILogger logger, string path);
+
+    [ZLoggerMessage(LogLevel.Warning, "themes skipped custom theme with unsafe embedded name name={name} path={path}")]
+    public static partial void ThemeUnsafeEmbeddedName(this ILogger logger, string name, string path);
+
+    [ZLoggerMessage(LogLevel.Warning, "themes failed to load custom theme path={path} error={error}")]
+    public static partial void ThemeLoadFailed(this ILogger logger, string path, string error);
+
+    [ZLoggerMessage(LogLevel.Warning, "themes rejected unsafe custom theme name={name}")]
+    public static partial void ThemeUnsafeCustomName(this ILogger logger, string name);
+}

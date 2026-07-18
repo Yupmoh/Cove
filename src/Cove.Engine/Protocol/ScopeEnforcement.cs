@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Cove.Engine.Agents;
 using Cove.Engine.Bays;
 using Cove.Engine.Layout;
 using Cove.Protocol;
@@ -9,19 +10,75 @@ internal static class ScopeEnforcement
 {
     public static bool IsNookTargetingVerb(string uri)
     {
-        return uri.StartsWith("cove://commands/nook.write", System.StringComparison.Ordinal)
-            || uri.StartsWith("cove://commands/nook.resize", System.StringComparison.Ordinal)
-            || uri.StartsWith("cove://commands/nook.kill", System.StringComparison.Ordinal)
-            || uri.StartsWith("cove://commands/nook.rename", System.StringComparison.Ordinal);
+        return uri switch
+        {
+            "cove://commands/nook.write" => true,
+            "cove://commands/nook.resize" => true,
+            "cove://commands/nook.kill" => true,
+            "cove://commands/nook.rename" => true,
+            "cove://commands/send_to_agent" => true,
+            "cove://commands/agent.message" => true,
+            "cove://commands/canvas.action" => true,
+            "cove://commands/browser.click" => true,
+            "cove://commands/browser.fill" => true,
+            "cove://commands/browser.type" => true,
+            "cove://commands/browser.press" => true,
+            "cove://commands/browser.eval" => true,
+            "cove://commands/browser.select" => true,
+            "cove://commands/browser.scroll" => true,
+            "cove://commands/browser.setUserAgent" => true,
+            "cove://commands/browser.clear" => true,
+            _ => false
+        };
     }
 
-    public static ControlResponse? Check(ControlRequest request, NookScopeStore scopeStore, BayManager? bays, LayoutService? layout)
+    private static string? ResolveTargetNookId(ControlRequest request, AgentMessageRouter? agentRouter)
     {
-        if (request.Params is not JsonElement el)
+        if (request.Params is not JsonElement { ValueKind: JsonValueKind.Object } el)
             return null;
-        string? targetNookId = null;
-        if (el.TryGetProperty("nookId", out var pid) && pid.ValueKind == JsonValueKind.String)
-            targetNookId = pid.GetString();
+
+        if (request.Uri == "cove://commands/canvas.action")
+        {
+            if (!TryGetString(el, "action", out var action) || action != "send_to_agent")
+                return null;
+            return TryGetString(el, "targetNook", out var canvasTarget) ? canvasTarget : null;
+        }
+
+        if (request.Uri == "cove://commands/send_to_agent")
+            return TryGetString(el, "targetNook", out var sendTarget) ? sendTarget : null;
+
+        if (request.Uri == "cove://commands/agent.message")
+        {
+            if (TryGetString(el, "nookId", out var agentNookId))
+                return agentNookId;
+            if (!TryGetString(el, "target", out var agentTarget))
+                return null;
+            return agentRouter?.ResolveTarget(agentTarget!)?.NookId ?? agentTarget;
+        }
+
+        return TryGetString(el, "nookId", out var targetNookId) ? targetNookId : null;
+    }
+
+    private static bool TryGetString(JsonElement element, string propertyName, out string? value)
+    {
+        if (element.TryGetProperty(propertyName, out var property) && property.ValueKind == JsonValueKind.String)
+        {
+            value = property.GetString();
+            return !string.IsNullOrEmpty(value);
+        }
+
+        value = null;
+        return false;
+    }
+
+    public static ControlResponse? Check(
+        ControlRequest request,
+        NookScopeStore scopeStore,
+        BayManager? bays,
+        LayoutService? layout,
+        AgentMessageRouter? agentRouter)
+    {
+        var targetNookId = ResolveTargetNookId(request, agentRouter);
         if (targetNookId is null)
             return null;
         var callerNookId = request.CallerNookId;

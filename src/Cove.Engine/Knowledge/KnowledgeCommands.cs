@@ -211,7 +211,12 @@ public static class KnowledgeCommands
                 return ctx.Fail("invalid_params", "uri required for cove_command action");
             if (ctx.Redrive is null)
                 return ctx.Fail("not_ready", "redrive unavailable");
-            var subReq = new ControlRequest(ctx.Request.Id + "-action", p.Uri, p.State);
+            var subReq = new ControlRequest(
+                ctx.Request.Id + "-action",
+                p.Uri,
+                p.State,
+                ctx.Request.Source,
+                ctx.Request.CallerNookId);
             var subResp = await ctx.Redrive(subReq);
             if (subResp is null)
                 return ctx.Fail("not_found", $"command '{p.Uri}' not found");

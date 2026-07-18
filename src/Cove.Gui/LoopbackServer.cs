@@ -3,6 +3,9 @@ using System.Net.Sockets;
 using System.Net.WebSockets;
 using System.Security.Cryptography;
 using System.Text;
+using Cove.Platform;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Cove.Gui;
 
@@ -16,11 +19,23 @@ public sealed class LoopbackServer : IAsyncDisposable
     private readonly string _clientVersion;
     private readonly string _channel;
     private readonly TcpListener _listener;
+    private readonly ILogger _logger;
     private readonly CancellationTokenSource _cts = new();
     public int Port { get; private set; }
 
     public LoopbackServer(string webRoot, Func<CancellationToken, Task<Stream>> dial, string clientVersion, string channel, int port = DefaultPort)
-    { _webRoot = webRoot; _dial = dial; _clientVersion = clientVersion; _channel = channel; _listener = new TcpListener(IPAddress.Loopback, port); Port = port; }
+        : this(webRoot, dial, clientVersion, channel, NullLogger.Instance, port) { }
+
+    public LoopbackServer(string webRoot, Func<CancellationToken, Task<Stream>> dial, string clientVersion, string channel, ILogger logger, int port = DefaultPort)
+    {
+        _webRoot = webRoot;
+        _dial = dial;
+        _clientVersion = clientVersion;
+        _channel = channel;
+        _logger = logger;
+        _listener = new TcpListener(IPAddress.Loopback, port);
+        Port = port;
+    }
 
     public void Start()
     {
@@ -28,7 +43,7 @@ public sealed class LoopbackServer : IAsyncDisposable
         catch (SocketException ex) { throw new InvalidOperationException($"loopback port {Port} unavailable", ex); }
         Port = ((IPEndPoint)_listener.LocalEndpoint!).Port;
         _ = Task.Run(AcceptLoopAsync);
-        Console.Error.WriteLine($"loopback server on http://localhost:{Port}");
+        _logger.LoopbackServerStarted(Port);
     }
 
     private async Task AcceptLoopAsync()
@@ -64,7 +79,7 @@ public sealed class LoopbackServer : IAsyncDisposable
                     await stream.WriteAsync(Encoding.ASCII.GetBytes(resp), _cts.Token);
                     var (nook, since) = ParsePtyQuery(target);
                     var ws = WebSocket.CreateFromStream(stream, isServer: true, subProtocol: null, keepAliveInterval: TimeSpan.FromSeconds(30));
-                    await PtyWsHandler.RunAsync(ws, _dial, _clientVersion, _channel, nook, since, _cts.Token);
+                    await PtyWsHandler.RunAsync(ws, _dial, _clientVersion, _channel, nook, since, _logger, _cts.Token);
                     return;
                 }
 
@@ -76,7 +91,7 @@ public sealed class LoopbackServer : IAsyncDisposable
 
                 await ServeStaticAsync(stream, path, _cts.Token);
             }
-            catch (Exception ex) { Console.Error.WriteLine($"connection handler ended: {ex.Message}"); }
+            catch (Exception ex) { _logger.LoopbackConnectionHandlerFailed(ex.Message); }
         }
     }
 
@@ -85,7 +100,7 @@ public sealed class LoopbackServer : IAsyncDisposable
         var rel = path == "/" ? "index.html" : path.TrimStart('/');
         if (!Path.HasExtension(rel)) rel = rel.TrimEnd('/') + "/index.html";
         var full = Path.GetFullPath(Path.Combine(_webRoot, rel));
-        if (!full.StartsWith(Path.GetFullPath(_webRoot), StringComparison.Ordinal) || !File.Exists(full))
+        if (!PathContainment.IsContained(_webRoot, full) || !File.Exists(full))
         {
             await stream.WriteAsync(Encoding.ASCII.GetBytes("HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"), ct);
             return;
@@ -123,7 +138,7 @@ public sealed class LoopbackServer : IAsyncDisposable
         var filePath = ParseMediaPath(target);
         if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
         {
-            Console.Error.WriteLine($"media not found: {filePath}");
+            _logger.LoopbackMediaNotFound(filePath);
             await stream.WriteAsync(Encoding.ASCII.GetBytes("HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"), ct);
             return;
         }

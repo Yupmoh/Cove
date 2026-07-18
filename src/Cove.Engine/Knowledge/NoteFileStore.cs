@@ -1,8 +1,10 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Cove.Protocol;
+using Cove.Platform;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
+using ZLogger;
 
 namespace Cove.Engine.Knowledge;
 
@@ -27,7 +29,8 @@ public sealed class NoteFileStore
         if (string.IsNullOrEmpty(note.Id))
             note = note with { Id = System.Guid.NewGuid().ToString("N") };
 
-        var noteDir = ResolveNoteDir(note.BayId, note.Id);
+        if (!TryResolveNoteDir(note.BayId, note.Id, out var noteDir))
+            throw new System.ArgumentException("bayId and noteId must be safe path segments");
         System.IO.Directory.CreateDirectory(noteDir);
 
         var meta = new NoteMeta
@@ -52,7 +55,8 @@ public sealed class NoteFileStore
 
     public Note? Get(string bayId, string id)
     {
-        var noteDir = ResolveNoteDir(bayId, id);
+        if (!TryResolveNoteDir(bayId, id, out var noteDir))
+            return null;
         var metaPath = System.IO.Path.Combine(noteDir, "meta.json");
         if (!System.IO.File.Exists(metaPath)) return null;
 
@@ -76,7 +80,8 @@ public sealed class NoteFileStore
     public System.Collections.Generic.IReadOnlyList<NoteMeta> ListByBay(string bayId)
     {
         var result = new System.Collections.Generic.List<NoteMeta>();
-        var wsDir = System.IO.Path.Combine(_notesRoot, bayId);
+        if (!TryResolveBayDir(bayId, out var wsDir))
+            return result;
         if (!System.IO.Directory.Exists(wsDir)) return result;
 
         foreach (var noteDir in System.IO.Directory.GetDirectories(wsDir))
@@ -92,6 +97,8 @@ public sealed class NoteFileStore
 
     public void Update(string bayId, string id, System.Func<Note, Note> update)
     {
+        if (!TryResolveNoteDir(bayId, id, out var noteDir))
+            return;
         var existing = Get(bayId, id);
         if (existing is null)
         {
@@ -100,7 +107,6 @@ public sealed class NoteFileStore
         }
 
         var updated = update(existing);
-        var noteDir = ResolveNoteDir(bayId, id);
         var metaPath = System.IO.Path.Combine(noteDir, "meta.json");
         var meta = JsonSerializer.Deserialize(System.IO.File.ReadAllText(metaPath), NoteFileJsonContext.Default.NoteMeta)!;
         meta = meta with { Title = updated.Title, UpdatedAt = System.DateTimeOffset.UtcNow };
@@ -113,7 +119,8 @@ public sealed class NoteFileStore
 
     public void Delete(string bayId, string id)
     {
-        var noteDir = ResolveNoteDir(bayId, id);
+        if (!TryResolveNoteDir(bayId, id, out var noteDir))
+            return;
         if (!System.IO.Directory.Exists(noteDir)) return;
         RemoveFromFtsIndex(id);
         System.IO.Directory.Delete(noteDir, true);
@@ -122,6 +129,8 @@ public sealed class NoteFileStore
 
     public System.Collections.Generic.IReadOnlyList<NoteHistoryEntry> GetHistory(string bayId, string id)
     {
+        if (!TryResolveNoteDir(bayId, id, out _))
+            return [];
         if (_snapshots is null)
         {
             _logger.LogWarning("notes: snapshot service not available, cannot get history for {id}", id);
@@ -196,7 +205,8 @@ public sealed class NoteFileStore
 
     public void SaveViewport(string bayId, string id, string viewportJson)
     {
-        var noteDir = ResolveNoteDir(bayId, id);
+        if (!TryResolveNoteDir(bayId, id, out var noteDir))
+            return;
         if (!System.IO.Directory.Exists(noteDir))
         {
             _logger.LogWarning("notes: save viewport failed — note {id} not found", id);
@@ -207,37 +217,83 @@ public sealed class NoteFileStore
 
     public string? LoadViewport(string bayId, string id)
     {
-        var path = System.IO.Path.Combine(ResolveNoteDir(bayId, id), "viewport.json");
+        if (!TryResolveNoteDir(bayId, id, out var noteDir))
+            return null;
+        var path = System.IO.Path.Combine(noteDir, "viewport.json");
         return System.IO.File.Exists(path) ? System.IO.File.ReadAllText(path) : null;
     }
 
     public void SaveState(string bayId, string id, string stateJson)
     {
-        var noteDir = ResolveNoteDir(bayId, id);
-        if (!System.IO.Directory.Exists(noteDir)) return;
+        if (!TryResolveNoteDir(bayId, id, out var noteDir))
+            return;
+        if (!System.IO.Directory.Exists(noteDir))
+        {
+            _logger.NoteSaveStateMissing(id);
+            return;
+        }
         System.IO.File.WriteAllText(System.IO.Path.Combine(noteDir, "state.json"), stateJson);
     }
 
     public string? LoadState(string bayId, string id)
     {
-        var path = System.IO.Path.Combine(ResolveNoteDir(bayId, id), "state.json");
+        if (!TryResolveNoteDir(bayId, id, out var noteDir))
+            return null;
+        var path = System.IO.Path.Combine(noteDir, "state.json");
         return System.IO.File.Exists(path) ? System.IO.File.ReadAllText(path) : null;
     }
 
     public string SaveMedia(string bayId, string id, string fileName, byte[] data)
     {
-        var noteDir = ResolveNoteDir(bayId, id);
-        var mediaDir = System.IO.Path.Combine(noteDir, "media");
-        System.IO.Directory.CreateDirectory(mediaDir);
+        if (!TryResolveNoteDir(bayId, id, out _))
+            throw new System.ArgumentException("bayId and noteId must be safe path segments");
+        if (!PathContainment.IsSafeSegment(fileName))
+        {
+            _logger.NoteMediaUnsafeFileName(fileName, id, bayId);
+            throw new System.ArgumentException("media fileName must be a safe path segment", nameof(fileName));
+        }
+
         var mediaId = $"img-{System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}-{fileName}";
-        var mediaPath = System.IO.Path.Combine(mediaDir, mediaId);
+        if (!PathContainment.TryResolveContained(_notesRoot, out _, out var mediaPath, bayId, id, "media", mediaId)
+            || !PathContainment.IsContained(_notesRoot, mediaPath))
+        {
+            _logger.NoteMediaOutsideRoot(fileName, id, bayId);
+            throw new System.ArgumentException("media path must stay within the notes root", nameof(fileName));
+        }
+
+        var mediaDir = System.IO.Path.GetDirectoryName(mediaPath)!;
+        System.IO.Directory.CreateDirectory(mediaDir);
         System.IO.File.WriteAllBytes(mediaPath, data);
         _logger.LogWarning("notes: saved media {mediaId} for note {id} in {ws}", mediaId, id, bayId);
         return System.IO.Path.Combine(bayId, id, "media", mediaId);
     }
 
-    private string ResolveNoteDir(string bayId, string noteId)
-        => System.IO.Path.Combine(_notesRoot, bayId, noteId);
+    private bool TryResolveBayDir(string bayId, out string bayDir)
+    {
+        bayDir = string.Empty;
+        if (!PathContainment.IsSafeSegment(bayId)
+            || !PathContainment.TryResolveContained(_notesRoot, out _, out bayDir, bayId)
+            || !PathContainment.IsContained(_notesRoot, bayDir))
+        {
+            _logger.NoteUnsafeBayIdentifier(bayId);
+            return false;
+        }
+        return true;
+    }
+
+    private bool TryResolveNoteDir(string bayId, string noteId, out string noteDir)
+    {
+        noteDir = string.Empty;
+        if (!PathContainment.IsSafeSegment(bayId)
+            || !PathContainment.IsSafeSegment(noteId)
+            || !PathContainment.TryResolveContained(_notesRoot, out _, out noteDir, bayId, noteId)
+            || !PathContainment.IsContained(_notesRoot, noteDir))
+        {
+            _logger.NoteUnsafeIdentifiers(noteId, bayId);
+            return false;
+        }
+        return true;
+    }
 
     private static void WriteMeta(string noteDir, NoteMeta meta)
         => System.IO.File.WriteAllText(System.IO.Path.Combine(noteDir, "meta.json"), JsonSerializer.Serialize(meta, NoteFileJsonContext.Default.NoteMeta));
@@ -324,3 +380,21 @@ public sealed record NoteMeta
 [JsonSerializable(typeof(NoteMeta))]
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase, WriteIndented = true)]
 public sealed partial class NoteFileJsonContext : JsonSerializerContext { }
+
+internal static partial class NoteFileStoreLog
+{
+    [ZLoggerMessage(LogLevel.Warning, "notes rejected unsafe bay identifier bayId={bayId}")]
+    public static partial void NoteUnsafeBayIdentifier(this ILogger logger, string bayId);
+
+    [ZLoggerMessage(LogLevel.Warning, "notes rejected unsafe identifiers noteId={noteId} bayId={bayId}")]
+    public static partial void NoteUnsafeIdentifiers(this ILogger logger, string noteId, string bayId);
+
+    [ZLoggerMessage(LogLevel.Warning, "notes media save rejected unsafe file name fileName={fileName} noteId={noteId} bayId={bayId}")]
+    public static partial void NoteMediaUnsafeFileName(this ILogger logger, string fileName, string noteId, string bayId);
+
+    [ZLoggerMessage(LogLevel.Warning, "notes media save rejected path outside root fileName={fileName} noteId={noteId} bayId={bayId}")]
+    public static partial void NoteMediaOutsideRoot(this ILogger logger, string fileName, string noteId, string bayId);
+
+    [ZLoggerMessage(LogLevel.Warning, "notes save state failed note not found noteId={noteId}")]
+    public static partial void NoteSaveStateMissing(this ILogger logger, string noteId);
+}

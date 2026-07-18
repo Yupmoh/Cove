@@ -15,7 +15,12 @@ internal static class McpBridgeCommands
             return ctx.Fail("invalid_params", "execute_command cannot redrive itself");
         if (ctx.Redrive is null)
             return ctx.Fail("not_ready", "redrive unavailable");
-        var subReq = new ControlRequest(ctx.Request.Id + "-sub", p.Command, p.Params);
+        var subReq = new ControlRequest(
+            ctx.Request.Id + "-sub",
+            p.Command,
+            p.Params,
+            ctx.Request.Source,
+            ctx.Request.CallerNookId);
         var subResp = await ctx.Redrive(subReq);
         return subResp ?? ctx.Fail("not_found", $"command '{p.Command}' not found");
     }

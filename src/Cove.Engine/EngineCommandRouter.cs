@@ -91,7 +91,7 @@ public static class EngineCommandRouter
         {
             if (nookScopes is not null && ScopeEnforcement.IsNookTargetingVerb(request.Uri))
             {
-                var denied = ScopeEnforcement.Check(request, nookScopes!, bays, layout);
+                var denied = ScopeEnforcement.Check(request, nookScopes!, bays, layout, agentRouter);
                 if (denied is not null)
                     return denied;
             }

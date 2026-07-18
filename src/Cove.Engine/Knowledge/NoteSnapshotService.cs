@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using Cove.Protocol;
+using Cove.Platform;
 using Microsoft.Extensions.Logging;
+using ZLogger;
 
 namespace Cove.Engine.Knowledge;
 
@@ -33,6 +35,8 @@ public sealed class NoteSnapshotService
 
     public void Snapshot(string bayId, string noteId, string message)
     {
+        if (!AreSafeIdentifiers(bayId, noteId))
+            return;
         EnsureRepo();
         var notePath = System.IO.Path.Combine(bayId, noteId);
         RunGit(["add", "--", notePath]);
@@ -45,6 +49,8 @@ public sealed class NoteSnapshotService
 
     public System.Collections.Generic.IReadOnlyList<NoteHistoryEntry> GetHistory(string bayId, string noteId)
     {
+        if (!AreSafeIdentifiers(bayId, noteId))
+            return [];
         EnsureRepo();
         var notePath = System.IO.Path.Combine(bayId, noteId);
         var result = RunGit(["log", "--format=%H%x1f%s%x1f%aI", "--", notePath]);
@@ -67,6 +73,14 @@ public sealed class NoteSnapshotService
             ));
         }
         return entries;
+    }
+
+    private bool AreSafeIdentifiers(string bayId, string noteId)
+    {
+        if (PathContainment.IsSafeSegment(bayId) && PathContainment.IsSafeSegment(noteId))
+            return true;
+        _logger.NoteSnapshotUnsafeIdentifiers(bayId, noteId);
+        return false;
     }
 
     private GitResult RunGit(System.Collections.Generic.IReadOnlyList<string> args)
@@ -94,4 +108,10 @@ public sealed class NoteSnapshotService
     {
         public bool Ok => ExitCode == 0;
     }
+}
+
+internal static partial class NoteSnapshotLog
+{
+    [ZLoggerMessage(LogLevel.Warning, "notes snapshot rejected unsafe identifiers bayId={bayId} noteId={noteId}")]
+    public static partial void NoteSnapshotUnsafeIdentifiers(this ILogger logger, string bayId, string noteId);
 }

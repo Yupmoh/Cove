@@ -3,6 +3,7 @@ using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
 using Cove.Protocol;
+using Microsoft.Extensions.Logging;
 
 namespace Cove.Gui;
 
@@ -10,7 +11,7 @@ public static class PtyWsHandler
 {
     public static async Task RunAsync(
         WebSocket ws, Func<CancellationToken, Task<Stream>> dial, string clientVersion, string channel,
-        string nookId, ulong since, CancellationToken ct)
+        string nookId, ulong since, ILogger logger, CancellationToken ct)
     {
         PtyStreamClient? client = null;
         try
@@ -38,7 +39,7 @@ public static class PtyWsHandler
                 onEnd: async (final, code, c) => await SendText(ws, $"{{\"t\":\"end\",\"code\":{code}}}", c),
                 ct);
         }
-        catch (Exception ex) { Console.Error.WriteLine($"pty ws relay ended for nook {nookId}: {ex.Message}"); }
+        catch (Exception ex) { logger.PtyWebSocketRelayFailed(nookId, ex.Message); }
         finally
         {
             if (client is not null) await client.DisposeAsync();
