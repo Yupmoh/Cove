@@ -4,10 +4,9 @@ namespace Cove.Gui.Tests;
 
 public sealed class MediaLeaseRegistryTests
 {
-    private static string MakeMediaFile(string extension)
+    private static string MakeMediaFile(GuiTestDirectory directory, string extension)
     {
-        var dir = Directory.CreateTempSubdirectory().FullName;
-        var path = Path.Combine(dir, "sample" + extension);
+        var path = Path.Combine(directory.Path, "sample" + extension);
         File.WriteAllBytes(path, [1, 2, 3]);
         return path;
     }
@@ -15,7 +14,8 @@ public sealed class MediaLeaseRegistryTests
     [Fact]
     public void Issue_ThenResolve_ReturnsCanonicalPath()
     {
-        var file = MakeMediaFile(".pdf");
+        using var directory = GuiTestDirectory.Create("cove-media-lease-");
+        var file = MakeMediaFile(directory, ".pdf");
         var registry = new MediaLeaseRegistry();
         var lease = registry.Issue(file);
         Assert.True(registry.TryResolve(lease, out var resolved));
@@ -25,7 +25,8 @@ public sealed class MediaLeaseRegistryTests
     [Fact]
     public void Issue_IdIsOpaqueHex()
     {
-        var file = MakeMediaFile(".mp4");
+        using var directory = GuiTestDirectory.Create("cove-media-lease-");
+        var file = MakeMediaFile(directory, ".mp4");
         var registry = new MediaLeaseRegistry();
         var lease = registry.Issue(file);
         Assert.Equal(64, lease.Length);
@@ -36,7 +37,8 @@ public sealed class MediaLeaseRegistryTests
     [Fact]
     public void Issue_TwoLeases_AreDistinct()
     {
-        var file = MakeMediaFile(".webm");
+        using var directory = GuiTestDirectory.Create("cove-media-lease-");
+        var file = MakeMediaFile(directory, ".webm");
         var registry = new MediaLeaseRegistry();
         Assert.NotEqual(registry.Issue(file), registry.Issue(file));
     }
@@ -44,8 +46,9 @@ public sealed class MediaLeaseRegistryTests
     [Fact]
     public void Issue_MissingFile_Throws()
     {
+        using var directory = GuiTestDirectory.Create("cove-media-lease-");
         var registry = new MediaLeaseRegistry();
-        var missing = Path.Combine(Directory.CreateTempSubdirectory().FullName, "gone.pdf");
+        var missing = Path.Combine(directory.Path, "gone.pdf");
         Assert.Throws<InvalidOperationException>(() => registry.Issue(missing));
     }
 
@@ -59,8 +62,8 @@ public sealed class MediaLeaseRegistryTests
     [Fact]
     public void Issue_DisallowedExtension_Throws()
     {
-        var dir = Directory.CreateTempSubdirectory().FullName;
-        var secret = Path.Combine(dir, "id_rsa");
+        using var directory = GuiTestDirectory.Create("cove-media-lease-");
+        var secret = Path.Combine(directory.Path, "id_rsa");
         File.WriteAllText(secret, "private");
         var registry = new MediaLeaseRegistry();
         Assert.Throws<InvalidOperationException>(() => registry.Issue(secret));
@@ -76,7 +79,8 @@ public sealed class MediaLeaseRegistryTests
     [Fact]
     public void Resolve_ExpiredLease_IsFalse()
     {
-        var file = MakeMediaFile(".png");
+        using var directory = GuiTestDirectory.Create("cove-media-lease-");
+        var file = MakeMediaFile(directory, ".png");
         var now = DateTimeOffset.UtcNow;
         var registry = new MediaLeaseRegistry(TimeSpan.FromMinutes(5), () => now);
         var lease = registry.Issue(file);

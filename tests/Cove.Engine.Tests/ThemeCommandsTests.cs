@@ -29,7 +29,7 @@ public sealed class ThemeCommandsTests
             Assert.Equal("catppuccin-mocha", first.GetProperty("name").GetString());
             Assert.Equal("dark", first.GetProperty("type").GetString());
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -43,7 +43,7 @@ public sealed class ThemeCommandsTests
             Assert.True(resp!.Ok);
             Assert.True(resp.Data!.Value.TryGetProperty("theme", out var themeProp) == false || themeProp.ValueKind == JsonValueKind.Null);
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -62,7 +62,7 @@ public sealed class ThemeCommandsTests
             Assert.True(getResp!.Ok);
             Assert.Equal("cove-daybreak", getResp.Data!.Value.GetProperty("theme").GetProperty("name").GetString());
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -84,7 +84,7 @@ public sealed class ThemeCommandsTests
             var reloaded = new ThemeService(dir);
             Assert.NotNull(reloaded.Get("my-theme"));
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -102,7 +102,7 @@ public sealed class ThemeCommandsTests
             Assert.True(resp!.Ok);
             Assert.Null(themes.Get("to-delete"));
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -117,7 +117,7 @@ public sealed class ThemeCommandsTests
             Assert.False(resp!.Ok);
             Assert.Equal("not_found", resp.Error!.Code);
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -132,7 +132,7 @@ public sealed class ThemeCommandsTests
             Assert.True(resp!.Ok);
             Assert.True(resp.Data!.Value.GetProperty("isBuiltin").GetBoolean());
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -150,7 +150,7 @@ public sealed class ThemeCommandsTests
             Assert.True(resp!.Ok);
             Assert.False(resp.Data!.Value.GetProperty("isBuiltin").GetBoolean());
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]

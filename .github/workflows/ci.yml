@@ -7,13 +7,14 @@ on:
     branches: [ main ]
 
 jobs:
-  build-test:
+  unit:
     strategy:
       fail-fast: false
       matrix:
         os: [ macos-latest, windows-latest, ubuntu-latest ]
         configuration: [ Debug, Release ]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
@@ -31,5 +32,309 @@ jobs:
         run: dotnet restore Cove.slnx
       - name: Build
         run: dotnet build Cove.slnx -c ${{ matrix.configuration }} --no-restore
-      - name: Test
-        run: dotnet test Cove.slnx -c ${{ matrix.configuration }} --no-build
+      - name: Test unit lane
+        run: >
+          dotnet test Cove.slnx -c ${{ matrix.configuration }} --no-build
+          --filter "Category!=Platform&Category!=Live"
+          --logger "trx;LogFilePrefix=unit"
+          --results-directory artifacts/test-results/unit
+      - name: Verify unit discovery
+        shell: pwsh
+        run: |
+          $runnerOs = if ($env:COVE_CI_RUNNER_OS) { $env:COVE_CI_RUNNER_OS } else { '${{ runner.os }}' }
+          $expectedByOs = @{
+            macOS = @(
+              "Cove.Adapters.Tests",
+              "Cove.Architecture.Tests",
+              "Cove.ClientContract.Tests",
+              "Cove.Cli.Tests",
+              "Cove.Dictation.Tests",
+              "Cove.Engine.Tests",
+              "Cove.Gui.Tests",
+              "Cove.Persistence.Tests",
+              "Cove.Platform.Tests",
+              "Cove.Protocol.Tests",
+              "Cove.Pty.Harness",
+              "Cove.SourceGen.Tests",
+              "Cove.Tasks.Tests",
+              "Cove.Tui.Tests"
+            )
+            Linux = @(
+              "Cove.Adapters.Tests",
+              "Cove.Architecture.Tests",
+              "Cove.ClientContract.Tests",
+              "Cove.Cli.Tests",
+              "Cove.Dictation.Tests",
+              "Cove.Engine.Tests",
+              "Cove.Gui.Tests",
+              "Cove.Persistence.Tests",
+              "Cove.Platform.Tests",
+              "Cove.Protocol.Tests",
+              "Cove.Pty.Harness",
+              "Cove.SourceGen.Tests",
+              "Cove.Tasks.Tests",
+              "Cove.Tui.Tests"
+            )
+            Windows = @(
+              "Cove.Adapters.Tests",
+              "Cove.Architecture.Tests",
+              "Cove.ClientContract.Tests",
+              "Cove.Cli.Tests",
+              "Cove.Dictation.Tests",
+              "Cove.Engine.Tests",
+              "Cove.Gui.Tests",
+              "Cove.Persistence.Tests",
+              "Cove.Platform.Tests",
+              "Cove.Protocol.Tests",
+              "Cove.Pty.Harness",
+              "Cove.SourceGen.Tests",
+              "Cove.Tasks.Tests",
+              "Cove.Tui.Tests"
+            )
+          }
+          $expected = $expectedByOs[$runnerOs]
+          if ($null -eq $expected) { throw "Unit lane has no assembly policy for runner OS '$runnerOs'" }
+          $results = @(Get-ChildItem artifacts/test-results/unit -Filter *.trx -Recurse)
+          if ($results.Count -eq 0) { throw "Unit lane produced no TRX files and discovered zero tests" }
+          $executedByAssembly = @{}
+          $executed = 0
+          foreach ($result in $results) {
+            [xml]$document = Get-Content $result.FullName
+            $counters = $document.SelectSingleNode("//*[local-name()='Counters']")
+            if ($null -eq $counters) { throw "Unit lane TRX '$($result.FullName)' has no Counters element" }
+            $resultExecuted = [int]$counters.executed
+            $executed += $resultExecuted
+            $assemblies = @($document.SelectNodes("//*[local-name()='TestMethod']/@codeBase") |
+              ForEach-Object { [System.IO.Path]::GetFileNameWithoutExtension($_.Value) } |
+              Where-Object { $_ } |
+              Sort-Object -Unique)
+            if ($assemblies.Count -gt 1) {
+              throw "Unit lane TRX '$($result.FullName)' contains multiple test assemblies: $($assemblies -join ', ')"
+            }
+            if ($assemblies.Count -eq 1) {
+              $assembly = $assemblies[0]
+              $executedByAssembly[$assembly] = [int]$executedByAssembly[$assembly] + $resultExecuted
+            }
+          }
+          if ($executed -eq 0) { throw "Unit lane executed zero tests" }
+          foreach ($assembly in $expected) {
+            if (-not $executedByAssembly.ContainsKey($assembly)) {
+              throw "Unit lane expected '$assembly' but it produced no identifiable TRX result"
+            }
+            if ($executedByAssembly[$assembly] -eq 0) {
+              throw "Unit lane assembly '$assembly' executed zero tests"
+            }
+          }
+
+  platform:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ macos-latest, windows-latest, ubuntu-latest ]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    env:
+      COVE_PLATFORM_TESTS: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install platform prerequisites
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y clang
+      - name: Build frontend
+        working-directory: src/Cove.Gui/frontend
+        run: npm ci && npm run build
+      - name: Restore
+        run: dotnet restore Cove.slnx
+      - name: Build
+        run: dotnet build Cove.slnx -c Release --no-restore
+      - name: Test platform lane
+        run: >
+          dotnet test Cove.slnx -c Release --no-build
+          --filter "Category=Platform"
+          --logger "trx;LogFilePrefix=platform"
+          --results-directory artifacts/test-results/platform
+      - name: Verify platform discovery
+        shell: pwsh
+        run: |
+          $runnerOs = if ($env:COVE_CI_RUNNER_OS) { $env:COVE_CI_RUNNER_OS } else { '${{ runner.os }}' }
+          $expectedByOs = @{
+            macOS = @(
+              "Cove.Adapters.Tests",
+              "Cove.Engine.Tests",
+              "Cove.Gui.Tests",
+              "Cove.Persistence.Tests",
+              "Cove.Platform.Tests",
+              "Cove.Protocol.Tests",
+              "Cove.Pty.Harness"
+            )
+            Linux = @(
+              "Cove.Adapters.Tests",
+              "Cove.Engine.Tests",
+              "Cove.Gui.Tests",
+              "Cove.Persistence.Tests",
+              "Cove.Platform.Tests",
+              "Cove.Protocol.Tests",
+              "Cove.Pty.Harness"
+            )
+            Windows = @(
+              "Cove.Architecture.Tests",
+              "Cove.Platform.Tests",
+              "Cove.Pty.Harness"
+            )
+          }
+          $expected = $expectedByOs[$runnerOs]
+          if ($null -eq $expected) { throw "Platform lane has no assembly policy for runner OS '$runnerOs'" }
+          $results = @(Get-ChildItem artifacts/test-results/platform -Filter *.trx -Recurse)
+          if ($results.Count -eq 0) { throw "Platform lane produced no TRX files and discovered zero tests" }
+          $executedByAssembly = @{}
+          $executed = 0
+          foreach ($result in $results) {
+            [xml]$document = Get-Content $result.FullName
+            $counters = $document.SelectSingleNode("//*[local-name()='Counters']")
+            if ($null -eq $counters) { throw "Platform lane TRX '$($result.FullName)' has no Counters element" }
+            $resultExecuted = [int]$counters.executed
+            $executed += $resultExecuted
+            $assemblies = @($document.SelectNodes("//*[local-name()='TestMethod']/@codeBase") |
+              ForEach-Object { [System.IO.Path]::GetFileNameWithoutExtension($_.Value) } |
+              Where-Object { $_ } |
+              Sort-Object -Unique)
+            if ($assemblies.Count -gt 1) {
+              throw "Platform lane TRX '$($result.FullName)' contains multiple test assemblies: $($assemblies -join ', ')"
+            }
+            if ($assemblies.Count -eq 1) {
+              $assembly = $assemblies[0]
+              $executedByAssembly[$assembly] = [int]$executedByAssembly[$assembly] + $resultExecuted
+            }
+          }
+          if ($executed -eq 0) { throw "Platform lane executed zero tests" }
+          foreach ($assembly in $expected) {
+            if (-not $executedByAssembly.ContainsKey($assembly)) {
+              throw "Platform lane expected '$assembly' but it produced no identifiable TRX result"
+            }
+            if ($executedByAssembly[$assembly] -eq 0) {
+              throw "Platform lane assembly '$assembly' executed zero tests"
+            }
+          }
+
+  live:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ macos-latest, windows-latest, ubuntu-latest ]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    env:
+      COVE_LIVE_TESTS: "1"
+      COVE_DICTATION_ENSURE_MODEL: "1"
+      COVE_DICTATION_MODEL_ROOT: ${{ runner.temp }}/cove-models
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Restore dictation model cache
+        if: runner.os == 'macOS'
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/cove-models
+          key: dictation-${{ runner.os }}-${{ hashFiles('src/Cove.Dictation/DictationModelManager.cs') }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install live prerequisites
+        if: runner.os == 'macOS'
+        run: |
+          brew install fish jq ripgrep sqlite
+          npm install --global typescript typescript-language-server
+      - name: Install live prerequisites
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fish jq ripgrep sqlite3 zsh
+          npm install --global typescript typescript-language-server
+      - name: Install live prerequisites
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install ripgrep -y
+          npm install --global typescript typescript-language-server
+      - name: Build frontend
+        working-directory: src/Cove.Gui/frontend
+        run: npm ci && npm run build
+      - name: Restore
+        run: dotnet restore Cove.slnx
+      - name: Build
+        run: dotnet build Cove.slnx -c Release --no-restore
+      - name: Provision dictation model
+        if: runner.os == 'macOS'
+        run: >
+          dotnet test tests/Cove.Dictation.Tests/Cove.Dictation.Tests.csproj
+          -c Release --no-build
+          --filter "FullyQualifiedName=Cove.Dictation.Tests.DictationRealModelTests.EnsureModel_DownloadsVerifiesAndExtracts"
+      - name: Test live lane
+        run: >
+          dotnet test Cove.slnx -c Release --no-build
+          --filter "Category=Live"
+          --logger "trx;LogFilePrefix=live"
+          --results-directory artifacts/test-results/live
+      - name: Verify live discovery
+        shell: pwsh
+        run: |
+          $runnerOs = if ($env:COVE_CI_RUNNER_OS) { $env:COVE_CI_RUNNER_OS } else { '${{ runner.os }}' }
+          $expectedByOs = @{
+            macOS = @(
+              "Cove.Adapters.Tests",
+              "Cove.Dictation.Tests",
+              "Cove.Engine.Tests"
+            )
+            Linux = @(
+              "Cove.Adapters.Tests",
+              "Cove.Engine.Tests"
+            )
+            Windows = @(
+              "Cove.Engine.Tests"
+            )
+          }
+          $expected = $expectedByOs[$runnerOs]
+          if ($null -eq $expected) { throw "Live lane has no assembly policy for runner OS '$runnerOs'" }
+          $results = @(Get-ChildItem artifacts/test-results/live -Filter *.trx -Recurse)
+          if ($results.Count -eq 0) { throw "Live lane produced no TRX files and discovered zero tests" }
+          $executedByAssembly = @{}
+          $executed = 0
+          foreach ($result in $results) {
+            [xml]$document = Get-Content $result.FullName
+            $counters = $document.SelectSingleNode("//*[local-name()='Counters']")
+            if ($null -eq $counters) { throw "Live lane TRX '$($result.FullName)' has no Counters element" }
+            $resultExecuted = [int]$counters.executed
+            $executed += $resultExecuted
+            $assemblies = @($document.SelectNodes("//*[local-name()='TestMethod']/@codeBase") |
+              ForEach-Object { [System.IO.Path]::GetFileNameWithoutExtension($_.Value) } |
+              Where-Object { $_ } |
+              Sort-Object -Unique)
+            if ($assemblies.Count -gt 1) {
+              throw "Live lane TRX '$($result.FullName)' contains multiple test assemblies: $($assemblies -join ', ')"
+            }
+            if ($assemblies.Count -eq 1) {
+              $assembly = $assemblies[0]
+              $executedByAssembly[$assembly] = [int]$executedByAssembly[$assembly] + $resultExecuted
+            }
+          }
+          if ($executed -eq 0) { throw "Live lane executed zero tests" }
+          foreach ($assembly in $expected) {
+            if (-not $executedByAssembly.ContainsKey($assembly)) {
+              throw "Live lane expected '$assembly' but it produced no identifiable TRX result"
+            }
+            if ($executedByAssembly[$assembly] -eq 0) {
+              throw "Live lane assembly '$assembly' executed zero tests"
+            }
+          }

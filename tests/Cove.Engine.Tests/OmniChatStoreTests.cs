@@ -23,7 +23,7 @@ public sealed class OmniChatStoreTests
             Assert.Equal("hello", history[0].Body);
             Assert.Equal("hi there", history[1].Body);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -35,7 +35,7 @@ public sealed class OmniChatStoreTests
             var store = new OmniChatStore(dir);
             Assert.Empty(store.LoadHistory("never-seen"));
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -50,7 +50,7 @@ public sealed class OmniChatStoreTests
 
             Assert.Empty(store.LoadHistory("nook-1"));
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -65,7 +65,7 @@ public sealed class OmniChatStoreTests
             Assert.Empty(store.LoadHistory("../evil"));
             Assert.False(File.Exists(Path.Combine(dir, "..", "evil.json")));
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -85,6 +85,6 @@ public sealed class OmniChatStoreTests
             Assert.Equal("first", history[0].Body);
             Assert.Equal("second", history[1].Body);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 }

@@ -42,9 +42,10 @@ public sealed class CrashReporterTests
     public void ListCrashes_ReturnsMostRecentFirst()
     {
         var dir = NewDir();
-        var reporter = new CrashReporter(dir, NullLogger.Instance);
+        var time = new ManualTimeProvider();
+        var reporter = new CrashReporter(dir, NullLogger.Instance, time);
         reporter.RecordCrash("first", "Ex1", "msg1", null);
-        System.Threading.Thread.Sleep(20);
+        time.Advance(TimeSpan.FromMilliseconds(1));
         reporter.RecordCrash("second", "Ex2", "msg2", null);
 
         var crashes = reporter.ListCrashes();
@@ -74,31 +75,153 @@ public sealed class CrashReporterTests
     public void Prune_RemovesOldDumps()
     {
         var dir = NewDir();
-        var reporter = new CrashReporter(dir, NullLogger.Instance);
-        var dump = reporter.RecordCrash("old", "Ex", "msg", null);
+        try
+        {
+            var time = new ManualTimeProvider();
+            var reporter = new CrashReporter(dir, NullLogger.Instance, time);
+            var dump = reporter.RecordCrash("old", "Ex", "msg", null);
 
-        var oldPath = dump.FilePath;
-        var oldTime = System.DateTimeOffset.UtcNow.AddDays(-10);
-        System.IO.File.SetCreationTimeUtc(oldPath, oldTime.UtcDateTime);
+            time.Advance(TimeSpan.FromDays(8));
 
-        reporter.Prune();
-        Assert.False(System.IO.File.Exists(oldPath));
+            reporter.Prune();
+            Assert.False(System.IO.File.Exists(dump.FilePath));
+        }
+        finally
+        {
+            System.IO.Directory.Delete(dir, recursive: true);
+        }
+
+        Assert.False(System.IO.Directory.Exists(dir));
+    }
+
+    [Fact]
+    public void Prune_RemovesOldCorruptDumpsUsingLastWriteTime()
+    {
+        var now = new System.DateTimeOffset(2026, 1, 20, 12, 0, 0, System.TimeSpan.Zero);
+        var dir = NewDir();
+        try
+        {
+            var time = new ManualTimeProvider(now);
+            var reporter = new CrashReporter(dir, NullLogger.Instance, time);
+            var valid = reporter.RecordCrash("valid", "Ex", "msg", null);
+            var corrupt = System.IO.Path.Combine(dir, "diagnostics", "crash-corrupt.json");
+            System.IO.File.WriteAllText(corrupt, "{not-json");
+            System.IO.File.SetLastWriteTimeUtc(valid.FilePath, now.AddDays(-30).UtcDateTime);
+            System.IO.File.SetLastWriteTimeUtc(corrupt, now.AddDays(-8).UtcDateTime);
+
+            reporter.Prune();
+
+            Assert.True(System.IO.File.Exists(valid.FilePath));
+            Assert.False(System.IO.File.Exists(corrupt));
+        }
+        finally
+        {
+            System.IO.Directory.Delete(dir, recursive: true);
+        }
+
+        Assert.False(System.IO.Directory.Exists(dir));
     }
 
     [Fact]
     public void Prune_EnforcesSizeCap()
     {
         var dir = NewDir();
-        var reporter = new CrashReporter(dir, NullLogger.Instance);
-        for (var i = 0; i < 5; i++)
+        try
         {
-            reporter.RecordCrash("proc", "Ex", new string('x', 3 * 1024 * 1024), null);
+            var reporter = new CrashReporter(dir, NullLogger.Instance);
+            for (var i = 0; i < 5; i++)
+            {
+                reporter.RecordCrash("proc", "Ex", new string('x', 3 * 1024 * 1024), null);
+            }
+
+            reporter.Prune();
+            var files = System.IO.Directory.EnumerateFiles(System.IO.Path.Combine(dir, "diagnostics"), "crash-*.json");
+            var totalSize = files.Sum(f => new System.IO.FileInfo(f).Length);
+            Assert.True(totalSize <= 10 * 1024 * 1024 + 1024);
+        }
+        finally
+        {
+            System.IO.Directory.Delete(dir, recursive: true);
         }
 
-        reporter.Prune();
-        var files = System.IO.Directory.EnumerateFiles(System.IO.Path.Combine(dir, "diagnostics"), "crash-*.json");
-        var totalSize = files.Sum(f => new System.IO.FileInfo(f).Length);
-        Assert.True(totalSize <= 10 * 1024 * 1024 + 1024);
+        Assert.False(System.IO.Directory.Exists(dir));
+    }
+
+    [Fact]
+    public void Prune_CountsCorruptBytesAndOrdersValidDumpsByPersistedTime()
+    {
+        var firstAt = new System.DateTimeOffset(2026, 1, 13, 12, 0, 0, System.TimeSpan.Zero);
+        var dir = NewDir();
+        try
+        {
+            var time = new ManualTimeProvider(firstAt);
+            var reporter = new CrashReporter(dir, NullLogger.Instance, time);
+            var olderValid = reporter.RecordCrash("older", "Ex", new string('x', 4 * 1024 * 1024), null);
+            time.Advance(System.TimeSpan.FromDays(2));
+            var newerValid = reporter.RecordCrash("newer", "Ex", new string('x', 4 * 1024 * 1024), null);
+            var corrupt = System.IO.Path.Combine(dir, "diagnostics", "crash-corrupt.json");
+            System.IO.File.WriteAllBytes(corrupt, new byte[4 * 1024 * 1024]);
+            System.IO.File.SetLastWriteTimeUtc(newerValid.FilePath, firstAt.AddDays(-10).UtcDateTime);
+            System.IO.File.SetLastWriteTimeUtc(olderValid.FilePath, firstAt.AddDays(10).UtcDateTime);
+            System.IO.File.SetLastWriteTimeUtc(corrupt, firstAt.AddDays(-1).UtcDateTime);
+
+            reporter.Prune();
+
+            Assert.True(System.IO.File.Exists(newerValid.FilePath));
+            Assert.True(System.IO.File.Exists(olderValid.FilePath));
+            Assert.False(System.IO.File.Exists(corrupt));
+            var files = System.IO.Directory.EnumerateFiles(System.IO.Path.Combine(dir, "diagnostics"), "crash-*.json");
+            Assert.True(files.Sum(file => new System.IO.FileInfo(file).Length) <= 10 * 1024 * 1024);
+        }
+        finally
+        {
+            System.IO.Directory.Delete(dir, recursive: true);
+        }
+
+        Assert.False(System.IO.Directory.Exists(dir));
+    }
+
+    [Fact]
+    public void Prune_LengthMetadataFailureTreatsFileAsOversizedAndDeletesIt()
+    {
+        var now = new System.DateTimeOffset(2026, 1, 20, 12, 0, 0, System.TimeSpan.Zero);
+        var dir = NewDir();
+        try
+        {
+            var diagnostics = System.IO.Path.Combine(dir, "diagnostics");
+            System.IO.Directory.CreateDirectory(diagnostics);
+            var lengthFailure = System.IO.Path.Combine(diagnostics, "crash-length-failure.json");
+            var record = new CrashDumpRecord("length-failure", "proc", "Ex", "msg", now.ToString("o"), "");
+            var json = System.Text.Json.JsonSerializer.Serialize(record, CrashJsonContext.Default.CrashDumpRecord);
+            System.IO.File.WriteAllText(lengthFailure, json);
+            var metadataFailureObserved = false;
+            var messages = new System.Collections.Generic.List<string>();
+            var logger = new CallbackLogger(message =>
+            {
+                messages.Add(message);
+                if (message.Contains("crash dump metadata read failed", System.StringComparison.Ordinal) &&
+                    message.Contains(lengthFailure, System.StringComparison.Ordinal))
+                    metadataFailureObserved = true;
+            });
+            var reporter = new CrashReporter(
+                dir,
+                logger,
+                new ManualTimeProvider(now),
+                file => file.FullName == lengthFailure
+                    ? throw new System.IO.IOException("injected length failure")
+                    : file.Length);
+
+            reporter.Prune();
+
+            Assert.True(metadataFailureObserved, string.Join(System.Environment.NewLine, messages));
+            Assert.False(System.IO.File.Exists(lengthFailure));
+        }
+        finally
+        {
+            System.IO.Directory.Delete(dir, recursive: true);
+        }
+
+        Assert.False(System.IO.Directory.Exists(dir));
     }
 
     [Fact]
@@ -188,4 +311,29 @@ public sealed class CrashReporterTests
         Assert.DoesNotContain("/Users/charlie", content);
         Assert.DoesNotContain("charlie", content);
     }
+
+    private sealed class CallbackLogger(System.Action<string> callback) : Microsoft.Extensions.Logging.ILogger
+    {
+        public System.IDisposable BeginScope<TState>(TState state) where TState : notnull => Scope.Instance;
+
+        public bool IsEnabled(Microsoft.Extensions.Logging.LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            Microsoft.Extensions.Logging.LogLevel logLevel,
+            Microsoft.Extensions.Logging.EventId eventId,
+            TState state,
+            System.Exception? exception,
+            System.Func<TState, System.Exception?, string> formatter) =>
+            callback(formatter(state, exception));
+
+        private sealed class Scope : System.IDisposable
+        {
+            public static readonly Scope Instance = new();
+
+            public void Dispose()
+            {
+            }
+        }
+    }
+
 }

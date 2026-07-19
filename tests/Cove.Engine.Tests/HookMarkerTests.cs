@@ -135,6 +135,6 @@ public sealed class HookConfigMergerTests
             var content = System.IO.File.ReadAllText(path);
             Assert.Contains("hooks", content);
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 }

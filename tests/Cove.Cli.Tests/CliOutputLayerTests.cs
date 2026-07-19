@@ -1,4 +1,5 @@
 using Cove.Cli;
+using Cove.Testing;
 using Xunit;
 
 namespace Cove.Cli.Tests;
@@ -9,16 +10,10 @@ public sealed class CliOutputLayerTests
     private static CommandContext NewContext(StringWriter stdout, StringWriter stderr, string[] args)
     {
         var tempRoot = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "cove-cli-test-" + System.Guid.NewGuid().ToString("N"));
-        var prev = System.Environment.GetEnvironmentVariable("COVE_DATA_DIR");
-        System.Environment.SetEnvironmentVariable("COVE_DATA_DIR", tempRoot);
-        try
-        {
-            var dataDir = Cove.Platform.CoveDataDir.Resolve(Cove.Platform.CoveChannel.Stable);
-            var paths = new Cove.Engine.Daemon.DaemonPaths(dataDir);
-            var endpoint = Cove.Platform.Ipc.ControlEndpointFactory.FromSocketPath(System.IO.Path.Combine(tempRoot, "test.sock"));
-            return new CommandContext(paths, endpoint, stdout, stderr, args);
-        }
-        finally { System.Environment.SetEnvironmentVariable("COVE_DATA_DIR", prev); }
+        var dataDir = Cove.Platform.CoveDataDir.ForRoot(Cove.Platform.CoveChannel.Stable, tempRoot);
+        var paths = new Cove.Engine.Daemon.DaemonPaths(dataDir);
+        var endpoint = Cove.Platform.Ipc.ControlEndpointFactory.FromSocketPath(System.IO.Path.Combine(tempRoot, "test.sock"));
+        return new CommandContext(paths, endpoint, stdout, stderr, args);
     }
 
     [Fact]
@@ -103,8 +98,7 @@ public sealed class CliOutputLayerTests
     [Fact]
     public async Task ConfigSet_RoutesToDaemonWithoutWritingConfigFile()
     {
-        var root = System.IO.Path.Combine("/tmp", "cr-" + System.Guid.NewGuid().ToString("N").Substring(0, 8));
-        System.IO.Directory.CreateDirectory(root);
+        var root = TestDirectory.Create("cr-");
         try
         {
             var result = await InvokeAgainstDaemonAsync(
@@ -122,15 +116,14 @@ public sealed class CliOutputLayerTests
         }
         finally
         {
-            try { System.IO.Directory.Delete(root, true); } catch { }
+            TestDirectory.Delete(root);
         }
     }
 
     [Fact]
     public async Task ConfigGet_NotFoundIsSuccessfulAndPrintsNothing()
     {
-        var root = System.IO.Path.Combine("/tmp", "cr-" + System.Guid.NewGuid().ToString("N").Substring(0, 8));
-        System.IO.Directory.CreateDirectory(root);
+        var root = TestDirectory.Create("cr-");
         try
         {
             var result = await InvokeAgainstDaemonAsync(
@@ -150,15 +143,14 @@ public sealed class CliOutputLayerTests
         }
         finally
         {
-            try { System.IO.Directory.Delete(root, true); } catch { }
+            TestDirectory.Delete(root);
         }
     }
 
     [Fact]
     public async Task ExtensionList_RoutesToDaemonAndFormatsResponse()
     {
-        var root = System.IO.Path.Combine("/tmp", "cr-" + System.Guid.NewGuid().ToString("N").Substring(0, 8));
-        System.IO.Directory.CreateDirectory(root);
+        var root = TestDirectory.Create("cr-");
         try
         {
             var result = await InvokeAgainstDaemonAsync(
@@ -180,15 +172,14 @@ public sealed class CliOutputLayerTests
         }
         finally
         {
-            try { System.IO.Directory.Delete(root, true); } catch { }
+            TestDirectory.Delete(root);
         }
     }
 
     [Fact]
     public async Task CaptureStop_QuotedIdProducesValidJsonPayload()
     {
-        var root = System.IO.Path.Combine("/tmp", "cr-" + System.Guid.NewGuid().ToString("N").Substring(0, 8));
-        System.IO.Directory.CreateDirectory(root);
+        var root = TestDirectory.Create("cr-");
         try
         {
             const string id = "capture-\"quoted\\path";
@@ -201,15 +192,14 @@ public sealed class CliOutputLayerTests
         }
         finally
         {
-            try { System.IO.Directory.Delete(root, true); } catch { }
+            TestDirectory.Delete(root);
         }
     }
 
     [Fact]
     public async Task DiagnosticsSnapshot_NumericOptionsProduceNumberProperties()
     {
-        var root = System.IO.Path.Combine("/tmp", "cr-" + System.Guid.NewGuid().ToString("N").Substring(0, 8));
-        System.IO.Directory.CreateDirectory(root);
+        var root = TestDirectory.Create("cr-");
         try
         {
             var result = await InvokeAgainstDaemonAsync(
@@ -228,7 +218,7 @@ public sealed class CliOutputLayerTests
         }
         finally
         {
-            try { System.IO.Directory.Delete(root, true); } catch { }
+            TestDirectory.Delete(root);
         }
     }
 

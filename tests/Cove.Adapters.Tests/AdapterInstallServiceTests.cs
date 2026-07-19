@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Cove.Adapters;
+using Cove.Testing;
 using Xunit;
 
 namespace Cove.Adapters.Tests;
@@ -38,10 +39,10 @@ public sealed class AdapterInstallServiceTests
         return path;
     }
 
-    [Fact]
+    [ExternalFact(TestOperatingSystem.Unix, "bash")]
+    [System.Runtime.Versioning.UnsupportedOSPlatform("windows")]
     public async Task Install_FetchesFiles_SetsExecutableMode_AtomicRename_RunsHook()
     {
-        if (OperatingSystem.IsWindows()) return;
         var src = NewDir();
         var dest = NewDir();
         try
@@ -72,13 +73,13 @@ public sealed class AdapterInstallServiceTests
             Assert.True((mode & System.IO.UnixFileMode.UserExecute) != 0);
             Assert.Equal("test-adapter", installed.Name);
         }
-        finally { try { Directory.Delete(src, true); } catch { } try { Directory.Delete(dest, true); } catch { } }
+        finally { TestDirectory.Delete(src); TestDirectory.Delete(dest); }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
+    [Trait(TestTraits.Category, TestTraits.Platform)]
     public async Task Install_InvalidManifest_RollsBackTempDir()
     {
-        if (OperatingSystem.IsWindows()) return;
         var src = NewDir();
         var dest = NewDir();
         try
@@ -93,13 +94,12 @@ public sealed class AdapterInstallServiceTests
             Assert.False(Directory.Exists(Path.Combine(dest, "bad")));
             Assert.False(Directory.Exists(Path.Combine(dest, ".installing-bad")));
         }
-        finally { try { Directory.Delete(src, true); } catch { } try { Directory.Delete(dest, true); } catch { } }
+        finally { TestDirectory.Delete(src); TestDirectory.Delete(dest); }
     }
 
-    [Fact]
+    [ExternalFact(TestOperatingSystem.Unix, "bash")]
     public async Task Uninstall_RunsHook_ThenDeletesDir()
     {
-        if (OperatingSystem.IsWindows()) return;
         var dest = NewDir();
         try
         {
@@ -115,13 +115,12 @@ public sealed class AdapterInstallServiceTests
 
             Assert.False(Directory.Exists(adapterDir));
         }
-        finally { try { Directory.Delete(dest, true); } catch { } }
+        finally { TestDirectory.Delete(dest); }
     }
 
-    [Fact]
+    [ExternalFact(TestOperatingSystem.Unix, "bash")]
     public async Task Uninstall_HookTimesOutAfterFiveSeconds_StillDeletesDir()
     {
-        if (OperatingSystem.IsWindows()) return;
         var dest = NewDir();
         try
         {
@@ -137,7 +136,7 @@ public sealed class AdapterInstallServiceTests
 
             Assert.False(Directory.Exists(adapterDir));
         }
-        finally { try { Directory.Delete(dest, true); } catch { } }
+        finally { TestDirectory.Delete(dest); }
     }
 }
 

@@ -34,7 +34,7 @@ public sealed class HookResolveRouteTests
             var body = await resp.Content.ReadAsStringAsync();
             Assert.Equal("my context", body);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -63,7 +63,7 @@ public sealed class HookResolveRouteTests
             Assert.Contains("additionalContext", body);
             Assert.Contains("injected text", body);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -85,6 +85,6 @@ public sealed class HookResolveRouteTests
 
             Assert.Equal(System.Net.HttpStatusCode.BadRequest, resp.StatusCode);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 }

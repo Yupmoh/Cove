@@ -5,6 +5,7 @@ using Cove.Engine;
 using Cove.Platform.Ipc;
 using Cove.Protocol;
 using Xunit;
+using Cove.Testing;
 
 namespace Cove.Engine.Tests;
 
@@ -24,10 +25,9 @@ public sealed class RunRouteTests
         }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task Run_Show_Segments_Cancel_Complete_OverSocket()
     {
-        if (System.OperatingSystem.IsWindows()) return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(60));
         CancellationToken ct = cts.Token;
 
@@ -46,10 +46,9 @@ public sealed class RunRouteTests
         Assert.Equal("invalid_transition", cancelResp.Error!.Code);
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task RunList_RequiresTaskOrBay()
     {
-        if (System.OperatingSystem.IsWindows()) return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(60));
         CancellationToken ct = cts.Token;
 

@@ -15,19 +15,30 @@ public sealed class StateStore : IDisposable
     private readonly string _journalDir;
     private readonly TimeSpan _debounce;
     private readonly int _journalKeep;
+    private readonly TimeProvider _timeProvider;
     private readonly object _gate = new();
     private readonly Dictionary<string, Registration> _registrations = new(StringComparer.Ordinal);
     private readonly HashSet<string> _dirty = new(StringComparer.Ordinal);
-    private readonly Timer _timer;
+    private readonly ITimer _timer;
     private bool _disposed;
 
-    public StateStore(string journalDir, ILogger logger, TimeSpan? debounce = null, int journalKeep = 10)
+    public StateStore(
+        string journalDir,
+        ILogger logger,
+        TimeSpan? debounce = null,
+        int journalKeep = 10,
+        TimeProvider? timeProvider = null)
     {
         _journalDir = journalDir;
         _logger = logger;
         _debounce = debounce ?? TimeSpan.FromMilliseconds(750);
         _journalKeep = journalKeep;
-        _timer = new Timer(_ => SafeFlush(), null, Timeout.Infinite, Timeout.Infinite);
+        _timeProvider = timeProvider ?? TimeProvider.System;
+        _timer = _timeProvider.CreateTimer(
+            _ => SafeFlush(),
+            null,
+            Timeout.InfiniteTimeSpan,
+            Timeout.InfiniteTimeSpan);
     }
 
     public void Register(string fileKey, string path, Func<byte[]> serialize, Func<bool> isHydrated)
@@ -134,7 +145,7 @@ public sealed class StateStore : IDisposable
     {
         Directory.CreateDirectory(_journalDir);
         var safe = Sanitize(fileKey);
-        var stamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var stamp = _timeProvider.GetUtcNow().ToUnixTimeMilliseconds();
         var path = Path.Combine(_journalDir, $"{safe}.{stamp}.json");
         File.WriteAllBytes(path, bytes);
         PruneJournal(safe);

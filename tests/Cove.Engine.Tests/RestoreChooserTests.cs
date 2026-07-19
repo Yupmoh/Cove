@@ -45,7 +45,7 @@ public sealed class RestoreChooserTests
             Assert.True(result.AutoRelaunch);
             Assert.Equal(2, result.Items.Count);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -63,7 +63,7 @@ public sealed class RestoreChooserTests
 
             Assert.True(result.AutoRelaunch);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -89,7 +89,7 @@ public sealed class RestoreChooserTests
             Assert.Contains(result.Items, i => i.NookId == "p2" && !i.WasRunning);
             Assert.Contains(result.Items, i => i.NookId == "p3" && i.Hidden);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
     [Fact]
     public void SaveLoadSettings_RoundTrips()
@@ -105,7 +105,7 @@ public sealed class RestoreChooserTests
             chooser.SaveSettings(new RestoreSettings(true));
             Assert.True(chooser.LoadSettings().AutoRestoreOnLaunch);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]

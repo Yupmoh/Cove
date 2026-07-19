@@ -2,16 +2,15 @@ using System.Text.Json;
 using Cove.Platform.Ipc;
 using Cove.Protocol;
 using Xunit;
+using Cove.Testing;
 
 namespace Cove.Engine.Tests;
 
 public sealed class ScrollbackSearchLiveTests
 {
-    [Fact]
+    [LiveFact(TestOperatingSystem.Unix)]
     public async Task Search_Finds_String_EmittedIntoRing_OverSocket()
     {
-        if (System.OperatingSystem.IsWindows())
-            return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(60));
         CancellationToken ct = cts.Token;
 
@@ -41,11 +40,9 @@ public sealed class ScrollbackSearchLiveTests
         Assert.True(found, "NEEDLE_LINE not found in ring search");
     }
 
-    [Fact]
+    [LiveFact(TestOperatingSystem.Unix)]
     public async Task Search_Works_OnNook_NotCurrentlySubscribed()
     {
-        if (System.OperatingSystem.IsWindows())
-            return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(60));
         CancellationToken ct = cts.Token;
 
@@ -54,21 +51,22 @@ public sealed class ScrollbackSearchLiveTests
 
         string nookId = await SpawnAsync(ctl, "/bin/sh", new[] { "-c", "printf 'HIDDEN_NEEDLE\\n'; sleep 30" }, ct);
 
-        await Task.Delay(1000, ct);
-
         JsonElement sp = JsonSerializer.SerializeToElement(new SearchParams(nookId, "HIDDEN_NEEDLE"), CoveJsonContext.Default.SearchParams);
-        ControlResponse r = await RequestAsync(ctl, "s", "cove://commands/nook.search", sp, ct);
-        Assert.True(r.Ok);
+        ControlResponse? r = null;
+        await AsyncTest.EventuallyAsync(async () =>
+        {
+            r = await RequestAsync(ctl, "s", "cove://commands/nook.search", sp, ct);
+            return r.Ok && r.Data!.Value.Deserialize(CoveJsonContext.Default.SearchResult)!.Matches.Any();
+        }, TimeSpan.FromSeconds(10), "hidden scrollback marker was not searchable", ct);
+        Assert.True(r!.Ok);
         var matches = r.Data!.Value.Deserialize(CoveJsonContext.Default.SearchResult)!.Matches;
         Assert.NotEmpty(matches);
         Assert.Contains(matches, m => m.Text.Contains("HIDDEN_NEEDLE"));
     }
 
-    [Fact]
+    [LiveFact(TestOperatingSystem.Unix)]
     public async Task Search_UnknownNook_ReturnsEmpty()
     {
-        if (System.OperatingSystem.IsWindows())
-            return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(30));
         CancellationToken ct = cts.Token;
 

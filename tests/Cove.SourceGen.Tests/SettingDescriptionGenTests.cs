@@ -1,12 +1,10 @@
-using System.Linq;
+using System.Collections;
 using Cove.SourceGen;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
 
 namespace Cove.SourceGen.Tests;
 
-public class SettingDescriptionGenTests
+public sealed class SettingDescriptionGenTests
 {
     private const string AttributeSource = """
         namespace Cove.Engine.Config;
@@ -37,7 +35,7 @@ public class SettingDescriptionGenTests
         """;
 
     [Fact]
-    public void EmitsConstructorSuppliedDescription()
+    public void EmitsConstructorSuppliedDescriptionInCompilableSchema()
     {
         const string source = """
             using Cove.Engine.Config;
@@ -51,15 +49,20 @@ public class SettingDescriptionGenTests
             }
             """;
 
-        var generated = RunGenerator(source);
+        var entry = GenerateSingleEntry(source, AttributeSource);
 
-        Assert.Contains(
-            "new SettingSchemaEntry(\"appearance.fontSize\", \"Font size\", \"Appearance\", \"number\", \"Size of terminal text\", \"int\", null)",
-            generated);
+        AssertSchemaEntry(
+            entry,
+            "appearance.fontSize",
+            "Font size",
+            "Appearance",
+            "number",
+            "Size of terminal text",
+            "int");
     }
 
     [Fact]
-    public void NamedDescriptionOverridesConstructorDescription()
+    public void NamedDescriptionOverridesConstructorDescriptionInCompilableSchema()
     {
         const string source = """
             using Cove.Engine.Config;
@@ -73,25 +76,53 @@ public class SettingDescriptionGenTests
             }
             """;
 
-        var generated = RunGenerator(source, SettableDescriptionAttributeSource);
+        var entry = GenerateSingleEntry(source, SettableDescriptionAttributeSource);
 
-        Assert.Contains(
-            "new SettingSchemaEntry(\"appearance.fontSize\", \"Font size\", \"Appearance\", \"number\", \"Named description\", \"int\", null)",
-            generated);
+        AssertSchemaEntry(
+            entry,
+            "appearance.fontSize",
+            "Font size",
+            "Appearance",
+            "number",
+            "Named description",
+            "int");
     }
 
-    private static string RunGenerator(string userSource, string attributeSource = AttributeSource)
+    private static object GenerateSingleEntry(string source, string attributeSource)
     {
-        var compilation = CSharpCompilation.Create(
-            "TestAsm",
-            new[] { CSharpSyntaxTree.ParseText(attributeSource), CSharpSyntaxTree.ParseText(userSource) },
-            new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var (output, diagnostics) = GeneratorTestHarness.Run(
+            new SettingSchemaGenerator(),
+            ("SettingAttribute.cs", attributeSource),
+            ("AppearanceSection.cs", source));
 
-        var driver = CSharpGeneratorDriver.Create(new SettingSchemaGenerator());
-        driver.RunGeneratorsAndUpdateCompilation(compilation, out var output, out var diagnostics);
         Assert.Empty(diagnostics);
-        var generated = output.SyntaxTrees.Single(t => t.FilePath.EndsWith("CoveSettingSchema.g.cs"));
-        return generated.ToString();
+        var generated = Assert.Single(output.SyntaxTrees, tree => tree.FilePath.EndsWith("CoveSettingSchema.g.cs"));
+        Assert.NotEmpty(generated.GetRoot().DescendantNodes());
+        var assembly = GeneratorTestHarness.EmitAndLoad(output);
+        var schema = assembly.GetType("Cove.Generated.CoveSettingSchema");
+        Assert.NotNull(schema);
+        var entries = Assert.IsAssignableFrom<IEnumerable>(schema.GetField("Entries")!.GetValue(null))
+            .Cast<object>()
+            .ToArray();
+        return Assert.Single(entries);
+    }
+
+    private static void AssertSchemaEntry(
+        object entry,
+        string key,
+        string label,
+        string tab,
+        string control,
+        string description,
+        string type)
+    {
+        var entryType = entry.GetType();
+        Assert.Equal(key, entryType.GetProperty("Key")!.GetValue(entry));
+        Assert.Equal(label, entryType.GetProperty("Label")!.GetValue(entry));
+        Assert.Equal(tab, entryType.GetProperty("Tab")!.GetValue(entry));
+        Assert.Equal(control, entryType.GetProperty("Control")!.GetValue(entry));
+        Assert.Equal(description, entryType.GetProperty("Description")!.GetValue(entry));
+        Assert.Equal(type, entryType.GetProperty("Type")!.GetValue(entry));
+        Assert.Null(entryType.GetProperty("Options")!.GetValue(entry));
     }
 }

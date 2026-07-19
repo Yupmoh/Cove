@@ -1,4 +1,5 @@
 using Cove.Adapters;
+using Cove.Testing;
 using Xunit;
 
 namespace Cove.Adapters.Tests;
@@ -31,10 +32,10 @@ public sealed class SkillIndexWatcherTests
         return condition();
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
+    [Trait(TestTraits.Category, TestTraits.Platform)]
     public async Task Watcher_RebuildsOnNewSkill()
     {
-        if (OperatingSystem.IsWindows()) return;
         var dir = NewDir();
         Directory.CreateDirectory(dir);
         try
@@ -51,13 +52,13 @@ public sealed class SkillIndexWatcherTests
             Assert.True(ok, "watcher did not pick up new skill within 5s");
             Assert.Equal("added-skill", index.List()[0].Name);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
+    [Trait(TestTraits.Category, TestTraits.Platform)]
     public async Task Watcher_RebuildsOnSkillEdit()
     {
-        if (OperatingSystem.IsWindows()) return;
         var dir = NewDir();
         Directory.CreateDirectory(dir);
         WriteSkill(dir, "edit-skill", "original");
@@ -74,13 +75,13 @@ public sealed class SkillIndexWatcherTests
             var ok = await WaitForAsync(() => index.List()[0].Description == "updated description", TimeSpan.FromSeconds(5));
             Assert.True(ok, "watcher did not pick up skill edit within 5s");
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
+    [Trait(TestTraits.Category, TestTraits.Platform)]
     public async Task Watcher_RebuildsOnSkillDelete()
     {
-        if (OperatingSystem.IsWindows()) return;
         var dir = NewDir();
         Directory.CreateDirectory(dir);
         WriteSkill(dir, "doomed-skill");
@@ -97,6 +98,6 @@ public sealed class SkillIndexWatcherTests
             var ok = await WaitForAsync(() => index.List().Count == 0, TimeSpan.FromSeconds(5));
             Assert.True(ok, "watcher did not pick up skill deletion within 5s");
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 }

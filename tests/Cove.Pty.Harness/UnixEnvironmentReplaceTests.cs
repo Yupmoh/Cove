@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text;
 using Cove.Engine.Pty;
 using Cove.Platform.Pty;
+using Cove.Testing;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -9,13 +10,10 @@ namespace Cove.Pty.Harness;
 
 public sealed class UnixEnvironmentReplaceTests
 {
-    [Fact]
-    public void ProvidedEnvironment_ReplacesHostEnvironmentEntirely()
+    [PlatformFact(TestOperatingSystem.Unix)]
+    public async Task ProvidedEnvironment_ReplacesHostEnvironmentEntirely()
     {
-        if (OperatingSystem.IsWindows())
-            return;
-        Environment.SetEnvironmentVariable("COVE_TEST_HOST_LEAK", "1");
-        try
+        await using (await ProcessEnvironmentScope.SetAsync("COVE_TEST_HOST_LEAK", "1"))
         {
             var logger = NullLogger.Instance;
             var host = PtyHostFactory.Create(logger);
@@ -57,10 +55,6 @@ public sealed class UnixEnvironmentReplaceTests
                 reader.Dispose();
                 session.Dispose();
             }
-        }
-        finally
-        {
-            Environment.SetEnvironmentVariable("COVE_TEST_HOST_LEAK", null);
         }
     }
 }

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Cove.Gui;
+using Cove.Testing;
 using Xunit;
 
 [Collection("GitSummary process")]
@@ -59,21 +60,26 @@ public class GitSummaryTests
     [Fact]
     public void RunReportsNonRepoDirectory()
     {
-        var root = Directory.CreateTempSubdirectory("cove-git-norepo").FullName;
-        var json = GitSummary.Run(root);
-        using var doc = JsonDocument.Parse(json);
-        Assert.False(doc.RootElement.GetProperty("ok").GetBoolean());
-        Assert.Equal("not_a_repo", doc.RootElement.GetProperty("error").GetString());
-        Directory.Delete(root, true);
+        var root = TestDirectory.Create("cove-git-norepo-");
+        try
+        {
+            var json = GitSummary.Run(root);
+            using var doc = JsonDocument.Parse(json);
+            Assert.False(doc.RootElement.GetProperty("ok").GetBoolean());
+            Assert.Equal("not_a_repo", doc.RootElement.GetProperty("error").GetString());
+        }
+        finally
+        {
+            TestDirectory.Delete(root);
+        }
     }
 
-    [Fact]
-    public void RunTimesOutWhenGitKeepsRedirectedStreamsOpen()
+    [PlatformFact(TestOperatingSystem.Unix)]
+    [System.Runtime.Versioning.UnsupportedOSPlatform("windows")]
+    public async Task RunTimesOutWhenGitKeepsRedirectedStreamsOpen()
     {
-        if (OperatingSystem.IsWindows()) return;
-
-        var toolRoot = Directory.CreateTempSubdirectory("cove-fake-git").FullName;
-        var repositoryRoot = Directory.CreateTempSubdirectory("cove-git-timeout").FullName;
+        var toolRoot = TestDirectory.Create("cove-fake-git-");
+        var repositoryRoot = TestDirectory.Create("cove-git-timeout-");
         var gitPath = Path.Combine(toolRoot, "git");
         var originalPath = Environment.GetEnvironmentVariable("PATH");
         File.WriteAllText(gitPath, "#!/bin/sh\n(sleep 7; kill -TERM $$) &\ni=0\nwhile [ \"$i\" -lt 8192 ]\ndo\nprintf 'blocked stderr output' >&2\ni=$((i + 1))\ndone\nsleep 30\n");
@@ -81,21 +87,24 @@ public class GitSummaryTests
 
         try
         {
-            Environment.SetEnvironmentVariable("PATH", $"{toolRoot}{Path.PathSeparator}{originalPath}");
-            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-            var json = GitSummary.Run(repositoryRoot);
-            stopwatch.Stop();
-            using var doc = JsonDocument.Parse(json);
+            await using (await ProcessEnvironmentScope.SetAsync(
+                "PATH",
+                $"{toolRoot}{Path.PathSeparator}{originalPath}"))
+            {
+                var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+                var json = GitSummary.Run(repositoryRoot);
+                stopwatch.Stop();
+                using var doc = JsonDocument.Parse(json);
 
-            Assert.False(doc.RootElement.GetProperty("ok").GetBoolean());
-            Assert.Equal("timeout", doc.RootElement.GetProperty("error").GetString());
-            Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(8), $"Timeout took {stopwatch.Elapsed}.");
+                Assert.False(doc.RootElement.GetProperty("ok").GetBoolean());
+                Assert.Equal("timeout", doc.RootElement.GetProperty("error").GetString());
+                Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(8), $"Timeout took {stopwatch.Elapsed}.");
+            }
         }
         finally
         {
-            Environment.SetEnvironmentVariable("PATH", originalPath);
-            Directory.Delete(repositoryRoot, true);
-            Directory.Delete(toolRoot, true);
+            TestDirectory.Delete(repositoryRoot);
+            TestDirectory.Delete(toolRoot);
         }
     }
 }

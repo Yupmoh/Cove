@@ -2,16 +2,15 @@ using System.Text.Json;
 using Cove.Platform.Ipc;
 using Cove.Protocol;
 using Xunit;
+using Cove.Testing;
 
 namespace Cove.Engine.Tests;
 
 public sealed class DeepScrollbackSearchLiveTests
 {
-    [Fact]
+    [LiveFact(TestOperatingSystem.Unix)]
     public async Task Search_FindsMarker_ThousandsOfLinesBack()
     {
-        if (System.OperatingSystem.IsWindows())
-            return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(90));
         CancellationToken ct = cts.Token;
 

@@ -1,6 +1,7 @@
 using System.Text;
 using Cove.Persistence;
 using Microsoft.Extensions.Logging.Abstractions;
+using Cove.Testing;
 using Xunit;
 
 namespace Cove.Persistence.Tests;
@@ -13,6 +14,7 @@ public sealed class StateStoreTests : IDisposable
     private byte[] _content = Encoding.UTF8.GetBytes("value-0");
     private bool _hydrated = true;
     private int _serializeCount;
+    private readonly ManualTimeProvider _timeProvider = new();
 
     public StateStoreTests()
     {
@@ -29,7 +31,7 @@ public sealed class StateStoreTests : IDisposable
 
     private StateStore NewStore(TimeSpan? debounce = null, int keep = 10)
     {
-        var store = new StateStore(_journalDir, NullLogger.Instance, debounce, keep);
+        var store = new StateStore(_journalDir, NullLogger.Instance, debounce, keep, _timeProvider);
         store.Register("state", _path, () => { Interlocked.Increment(ref _serializeCount); return _content; }, () => _hydrated);
         return store;
     }
@@ -68,12 +70,9 @@ public sealed class StateStoreTests : IDisposable
         for (int i = 0; i < 5; i++)
             store.MarkDirty("state");
 
-        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
-        while (Volatile.Read(ref _serializeCount) < 1 && DateTime.UtcNow < deadline)
-            Thread.Sleep(25);
-
+        _timeProvider.Advance(TimeSpan.FromMilliseconds(100));
         Assert.Equal(1, Volatile.Read(ref _serializeCount));
-        Thread.Sleep(400);
+        _timeProvider.Advance(TimeSpan.FromMilliseconds(400));
         Assert.Equal(1, Volatile.Read(ref _serializeCount));
     }
 
@@ -106,11 +105,79 @@ public sealed class StateStoreTests : IDisposable
             _content = Encoding.UTF8.GetBytes("value-" + i);
             store.MarkDirty("state");
             store.Flush();
-            Thread.Sleep(3);
+            _timeProvider.Advance(TimeSpan.FromMilliseconds(1));
         }
 
         var journals = Directory.GetFiles(_journalDir, "state.*.json");
         Assert.True(journals.Length <= 3, $"expected <= 3 journal entries, found {journals.Length}");
+    }
+
+    private sealed class ManualTimeProvider : TimeProvider
+    {
+        private DateTimeOffset _utcNow = DateTimeOffset.UnixEpoch;
+        private readonly List<ManualTimer> _timers = new();
+
+        public override DateTimeOffset GetUtcNow() => _utcNow;
+
+        public override ITimer CreateTimer(
+            TimerCallback callback,
+            object? state,
+            TimeSpan dueTime,
+            TimeSpan period)
+        {
+            var timer = new ManualTimer(this, callback, state);
+            _timers.Add(timer);
+            timer.Change(dueTime, period);
+            return timer;
+        }
+
+        public void Advance(TimeSpan duration)
+        {
+            _utcNow += duration;
+            foreach (var timer in _timers.ToArray())
+                timer.FireIfDue(_utcNow);
+        }
+
+        private sealed class ManualTimer : ITimer
+        {
+            private readonly ManualTimeProvider _owner;
+            private readonly TimerCallback _callback;
+            private readonly object? _state;
+            private DateTimeOffset? _dueAt;
+            private TimeSpan _period;
+            private bool _disposed;
+
+            public ManualTimer(ManualTimeProvider owner, TimerCallback callback, object? state)
+            {
+                _owner = owner;
+                _callback = callback;
+                _state = state;
+            }
+
+            public bool Change(TimeSpan dueTime, TimeSpan period)
+            {
+                if (_disposed)
+                    return false;
+                _dueAt = dueTime == Timeout.InfiniteTimeSpan ? null : _owner.GetUtcNow() + dueTime;
+                _period = period;
+                return true;
+            }
+
+            public void FireIfDue(DateTimeOffset now)
+            {
+                if (_disposed || _dueAt is null || now < _dueAt)
+                    return;
+                _dueAt = _period == Timeout.InfiniteTimeSpan ? null : now + _period;
+                _callback(_state);
+            }
+
+            public void Dispose() => _disposed = true;
+            public ValueTask DisposeAsync()
+            {
+                Dispose();
+                return ValueTask.CompletedTask;
+            }
+        }
     }
 
     [Fact]

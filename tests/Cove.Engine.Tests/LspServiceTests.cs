@@ -2,6 +2,7 @@ using System.Text.Json;
 using Cove.Engine;
 using Cove.Engine.Lsp;
 using Cove.Protocol;
+using Cove.Testing;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -40,14 +41,15 @@ public sealed class LspServiceTests
         return null;
     }
 
-    [Fact]
+    [ExternalFact(TestOperatingSystem.Any, "typescript-language-server")]
     public async Task Diagnostics_TypeScriptTypeError_ReportsError()
     {
-        if (FindOnPath("typescript-language-server") is null) return;
-        if (FindBayTypeScriptLib() is not { } tsLib) return;
-        var dir = Path.Combine(Path.GetTempPath(), "cove-lspsvc-" + Guid.NewGuid().ToString("N"));
+        Assert.NotNull(FindOnPath("typescript-language-server"));
+        var tsLib = FindBayTypeScriptLib();
+        Assert.NotNull(tsLib);
+        var dir = TestDirectory.Create("cove-lspsvc");
         Directory.CreateDirectory(Path.Combine(dir, "node_modules"));
-        File.CreateSymbolicLink(Path.Combine(dir, "node_modules", "typescript"), tsLib);
+        File.CreateSymbolicLink(Path.Combine(dir, "node_modules", "typescript"), tsLib!);
         try
         {
             var content = "const x: number = \"not a number\";\n";
@@ -69,7 +71,7 @@ public sealed class LspServiceTests
                 if (d.GetProperty("severity").GetString() == "error") hasError = true;
             Assert.True(hasError);
         }
-        finally { try { Directory.Delete(dir, true); } catch (IOException) { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
     [Fact]

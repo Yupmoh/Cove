@@ -27,7 +27,7 @@ public sealed class NoteStoreTests
             Assert.False(string.IsNullOrEmpty(note.Id));
             Assert.Equal("Test", note.Title);
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -41,7 +41,7 @@ public sealed class NoteStoreTests
             Assert.NotNull(fetched);
             Assert.Equal("hello", fetched!.Content);
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -55,7 +55,7 @@ public sealed class NoteStoreTests
             store.Create(new Note { Title = "n3", BayId = "ws2", Content = "", Source = "u" });
             Assert.Equal(2, store.ListByBay("ws1").Count);
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -68,7 +68,7 @@ public sealed class NoteStoreTests
             store.Update("ws1", note.Id, n => n with { Content = "new" });
             Assert.Equal("new", store.Get("ws1", note.Id)!.Content);
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -81,6 +81,6 @@ public sealed class NoteStoreTests
             store.Delete("ws1", note.Id);
             Assert.Null(store.Get("ws1", note.Id));
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 }

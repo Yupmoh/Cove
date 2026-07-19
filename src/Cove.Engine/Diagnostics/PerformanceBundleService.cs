@@ -16,19 +16,21 @@ public sealed class PerformanceBundleService
     private readonly ILogger _logger;
     private readonly DiagnosticsHub _hub;
     private readonly string _outputDir;
+    private readonly TimeProvider _timeProvider;
 
-    public PerformanceBundleService(DiagnosticsHub hub, string outputDir, ILogger? logger = null)
+    public PerformanceBundleService(DiagnosticsHub hub, string outputDir, ILogger? logger = null, TimeProvider? timeProvider = null)
     {
         _hub = hub;
         _outputDir = outputDir;
         _logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance;
+        _timeProvider = timeProvider ?? TimeProvider.System;
         Directory.CreateDirectory(_outputDir);
     }
 
     public PerformanceBundle CreateBundle(string? tracePath = null)
     {
         var id = System.Guid.NewGuid().ToString("N");
-        var createdAt = System.DateTimeOffset.UtcNow;
+        var createdAt = _timeProvider.GetUtcNow();
         var bundleName = $"perf-bundle-{createdAt:yyyyMMdd-HHmmss}-{id[..8]}";
         var bundlePath = Path.Combine(_outputDir, $"{bundleName}.zip");
 
@@ -80,7 +82,7 @@ public sealed class PerformanceBundleService
                 var snapshotCount = doc.RootElement.TryGetProperty("snapshotCount", out var scEl) ? scEl.GetInt32() : 0;
                 var containsTrace = doc.RootElement.TryGetProperty("containsTrace", out var ctEl) && ctEl.GetBoolean();
 
-                var createdAt = System.DateTimeOffset.TryParse(createdAtStr, out var ca) ? ca : System.DateTimeOffset.UtcNow;
+                var createdAt = System.DateTimeOffset.TryParse(createdAtStr, out var ca) ? ca : _timeProvider.GetUtcNow();
                 var sizeBytes = new FileInfo(file).Length;
 
                 result.Add(new PerformanceBundle(id, file, createdAt, sizeBytes, snapshotCount, containsTrace));

@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using Cove.Persistence;
 using Microsoft.Extensions.Logging.Abstractions;
+using Cove.Testing;
 using Xunit;
 
 namespace Cove.Persistence.Tests;
@@ -20,7 +21,7 @@ public sealed class AtomicJsonStoreTests : IDisposable
 
     public void Dispose()
     {
-        try { if (Directory.Exists(_dir)) Directory.Delete(_dir, recursive: true); } catch { }
+        TestDirectory.Delete(_dir);
     }
 
     private static CoveState SampleA() => new CoveState
@@ -70,11 +71,11 @@ public sealed class AtomicJsonStoreTests : IDisposable
         Assert.Equal("0192f0a0-7b2c-7e10-9a3b-2b7c4d5e6f70", read!.FocusedBay);
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
+    [Trait(TestTraits.Category, TestTraits.Platform)]
+    [System.Runtime.Versioning.UnsupportedOSPlatform("windows")]
     public void Write_OnPosix_FileIsOwnerOnly()
     {
-        if (OperatingSystem.IsWindows())
-            return;
         AtomicJsonStore.Write(_path, SampleA(), CoveJsonContext.Default.CoveState);
         Assert.Equal(
             UnixFileMode.UserRead | UnixFileMode.UserWrite,

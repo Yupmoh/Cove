@@ -2,6 +2,7 @@ using Cove.Engine.Daemon;
 using Cove.Platform;
 using Cove.Platform.Ipc;
 using Xunit;
+using Cove.Testing;
 
 namespace Cove.Engine.Tests;
 
@@ -11,8 +12,7 @@ public sealed class DaemonSingletonOrderTests
     public async Task SecondInstance_ExitsWithoutTouchingHookPort()
     {
         var parent = Path.Combine(Path.GetTempPath(), "cove-singleton-" + Guid.NewGuid().ToString("N").Substring(0, 8));
-        var prev = Environment.GetEnvironmentVariable("COVE_DATA_DIR");
-        Environment.SetEnvironmentVariable("COVE_DATA_DIR", parent);
+        await using var environment = await ProcessEnvironmentScope.SetAsync("COVE_DATA_DIR", parent);
         try
         {
             var dd = CoveDataDir.Resolve(CoveChannel.Dev);
@@ -33,19 +33,20 @@ public sealed class DaemonSingletonOrderTests
         }
         finally
         {
-            Environment.SetEnvironmentVariable("COVE_DATA_DIR", prev);
-            try { Directory.Delete(parent, true); } catch { }
+            Cove.Testing.TestDirectory.Delete(parent);
         }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task OwnedEndpoint_WithFreeGuard_DoesNotOverwriteHookPort()
     {
-        if (OperatingSystem.IsWindows())
-            return;
         var parent = Path.Combine(Path.GetTempPath(), "cove-singleton-" + Guid.NewGuid().ToString("N").Substring(0, 8));
-        var prev = Environment.GetEnvironmentVariable("COVE_DATA_DIR");
-        Environment.SetEnvironmentVariable("COVE_DATA_DIR", parent);
+        await using var environment = await ProcessEnvironmentScope.SetAsync(
+            new Dictionary<string, string?>
+            {
+                ["COVE_DATA_DIR"] = parent,
+                ["COVE_HANDOFF"] = "0",
+            });
         IControlListener? owner = null;
         try
         {
@@ -69,8 +70,7 @@ public sealed class DaemonSingletonOrderTests
         {
             if (owner is not null)
                 await owner.DisposeAsync();
-            Environment.SetEnvironmentVariable("COVE_DATA_DIR", prev);
-            try { Directory.Delete(parent, true); } catch { }
+            Cove.Testing.TestDirectory.Delete(parent);
         }
     }
 }

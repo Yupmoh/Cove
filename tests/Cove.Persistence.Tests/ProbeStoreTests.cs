@@ -1,4 +1,5 @@
 using Cove.Persistence;
+using Cove.Testing;
 using Xunit;
 
 namespace Cove.Persistence.Tests;
@@ -18,7 +19,7 @@ public sealed class ProbeStoreTests : IDisposable
     public void Dispose()
     {
         foreach (var suffix in new[] { "", "-wal", "-shm" })
-            try { File.Delete(_dbPath + suffix); } catch { }
+            TestFile.Delete(_dbPath + suffix);
     }
 
     private static ProbeRow[] SampleRows() => new[]

@@ -2,16 +2,15 @@ using System.Text.Json;
 using Cove.Platform.Ipc;
 using Cove.Protocol;
 using Xunit;
+using Cove.Testing;
 
 namespace Cove.Engine.Tests;
 
 public sealed class HeadlessSmokeTests
 {
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task Create_Split_Focus_Close_OverSocket_NoGui()
     {
-        if (System.OperatingSystem.IsWindows())
-            return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(60));
         CancellationToken ct = cts.Token;
 

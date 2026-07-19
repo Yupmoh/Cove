@@ -1,4 +1,5 @@
 using Cove.Platform.Terminal;
+using Cove.Testing;
 using Xunit;
 
 namespace Cove.Platform.Tests;
@@ -29,7 +30,8 @@ public sealed class RawModeScopeTests
         Assert.Equal(1, restoreCount);
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
+    [Trait(TestTraits.Category, TestTraits.Platform)]
     public void TryEnter_InvalidFileDescriptor_ReturnsNull()
     {
         var scope = RawModeScope.TryEnter(-1);

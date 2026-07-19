@@ -31,8 +31,8 @@ public sealed class CliBinLinkTests
         }
         finally
         {
-            try { Directory.Delete(dataDir, true); } catch { }
-            try { Directory.Delete(srcDir, true); } catch { }
+            Cove.Testing.TestDirectory.Delete(dataDir);
+            Cove.Testing.TestDirectory.Delete(srcDir);
         }
     }
 
@@ -58,8 +58,8 @@ public sealed class CliBinLinkTests
         }
         finally
         {
-            try { Directory.Delete(dataDir, true); } catch { }
-            try { Directory.Delete(srcDir, true); } catch { }
+            Cove.Testing.TestDirectory.Delete(dataDir);
+            Cove.Testing.TestDirectory.Delete(srcDir);
         }
     }
 
@@ -72,6 +72,6 @@ public sealed class CliBinLinkTests
             var linkPath = CliBinLink.Ensure(dataDir, Path.Combine(dataDir, "nope"), NullLogger.Instance);
             Assert.Equal(ExpectedLink(dataDir), linkPath);
         }
-        finally { try { Directory.Delete(dataDir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dataDir); }
     }
 }

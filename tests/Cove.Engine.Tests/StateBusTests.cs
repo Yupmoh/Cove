@@ -21,7 +21,7 @@ public sealed class StateBusTests
             Assert.True(exists);
             Assert.Equal("dark", value);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -36,7 +36,7 @@ public sealed class StateBusTests
             var (exists, _) = bus.Read("app", "ui", "theme");
             Assert.False(exists);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -49,7 +49,7 @@ public sealed class StateBusTests
             var (exists, _) = bus.Read("app", "ui", "never");
             Assert.False(exists);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -65,7 +65,7 @@ public sealed class StateBusTests
             Assert.True(exists);
             Assert.Equal("dark", value);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -84,7 +84,7 @@ public sealed class StateBusTests
                 Assert.Equal("val", value);
             }
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -110,7 +110,7 @@ public sealed class StateBusTests
             Assert.True(exists);
             Assert.Equal(tricky, value);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -125,6 +125,6 @@ public sealed class StateBusTests
             bus.Write("app", "ui", "theme", "dark");
             Assert.Equal("app/ui/theme", firedKey);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 }

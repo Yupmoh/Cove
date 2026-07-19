@@ -3,6 +3,7 @@ using System.Net.Sockets;
 using System.Net.WebSockets;
 using System.Text.Json;
 using Cove.Gui;
+using Cove.Gui.Tests;
 using Cove.Protocol;
 using Xunit;
 
@@ -30,32 +31,42 @@ public sealed class PtyRelayLifecycleTests
         await using var engine = new FakeEngine();
         var streamDisposed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var releaseEngine = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var tmp = Directory.CreateTempSubdirectory().FullName;
-        await File.WriteAllTextAsync(Path.Combine(tmp, "index.html"), "<html>ok</html>");
+        using var temp = GuiTestDirectory.Create("cove-relay-lifecycle-");
+        await File.WriteAllTextAsync(Path.Combine(temp.Path, "index.html"), "<html>ok</html>");
 
         async Task<Stream> Dial(CancellationToken ct)
             => new DisposeTrackingStream(await engine.Dial(ct), streamDisposed);
 
-        await using var server = new LoopbackServer(tmp, Dial, "0.1.0", "dev", port: 0);
+        await using var server = new LoopbackServer(temp.Path, Dial, "0.1.0", "dev", port: 0);
         server.Start();
-        var serve = engine.ServeOnceAsync(0, 0, _ => releaseEngine.Task);
+        var serve = engine.ServeOnceAsync(0, 0, _ => releaseEngine.Task, allowPeerEof: true);
         using var ws = new ClientWebSocket();
-        await ws.ConnectAsync(new Uri($"ws://127.0.0.1:{server.Port}/pty?nook=p1&since=0"), CancellationToken.None);
-        _ = await ReceiveTextAsync(ws);
+        try
+        {
+            await ws.ConnectAsync(new Uri($"ws://127.0.0.1:{server.Port}/pty?nook=p1&since=0"), CancellationToken.None);
+            _ = await ReceiveTextAsync(ws);
 
-        ws.Abort();
+            ws.Abort();
 
-        await streamDisposed.Task.WaitAsync(TimeSpan.FromSeconds(2));
-        releaseEngine.TrySetResult();
-        await serve;
+            await streamDisposed.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        }
+        finally
+        {
+            ws.Abort();
+            releaseEngine.TrySetResult();
+            if (ws.State == WebSocketState.None)
+                engine.CancelPendingConnections();
+            await serve.WaitAsync(TimeSpan.FromSeconds(5));
+        }
     }
 
     private static async Task<string> ReceiveTextAsync(ClientWebSocket ws)
     {
         var buffer = new byte[4096];
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         while (true)
         {
-            var result = await ws.ReceiveAsync(buffer, CancellationToken.None);
+            var result = await ws.ReceiveAsync(buffer, cancellation.Token);
             if (result.MessageType == WebSocketMessageType.Text)
                 return System.Text.Encoding.UTF8.GetString(buffer, 0, result.Count);
         }

@@ -71,7 +71,7 @@ public sealed class CommentRepository
     private static void SyncCardCommentIds(SqliteConnection conn, string cardId)
     {
         var ids = conn.Query<string>(
-            "SELECT id FROM comments WHERE card_id = @CardId ORDER BY created_at",
+            "SELECT id FROM comments WHERE card_id = @CardId ORDER BY created_at, rowid",
             new { CardId = cardId }).AsList();
         var json = BuildJsonArray(ids);
         conn.Execute(
@@ -97,7 +97,7 @@ public sealed class CommentRepository
     {
         using var conn = _factory.Open();
         return conn.Query<CommentRow>(
-            $"SELECT {SelectColumns} FROM comments WHERE card_id = @CardId ORDER BY created_at",
+            $"SELECT {SelectColumns} FROM comments WHERE card_id = @CardId ORDER BY created_at, rowid",
             new { CardId = cardId }).AsList();
     }
 

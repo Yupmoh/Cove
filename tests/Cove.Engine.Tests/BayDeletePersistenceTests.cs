@@ -50,7 +50,7 @@ public sealed class BayDeletePersistenceTests
         }
         finally
         {
-            try { Directory.Delete(root, true); } catch { }
+            Cove.Testing.TestDirectory.Delete(root);
         }
     }
 
@@ -71,7 +71,7 @@ public sealed class BayDeletePersistenceTests
         }
         finally
         {
-            try { Directory.Delete(parent, true); } catch { }
+            Cove.Testing.TestDirectory.Delete(parent);
         }
     }
 }

@@ -6,11 +6,11 @@ namespace Cove.Engine.Tests;
 
 public sealed class AttributionIndexTests
 {
-    private static AttributionIndex NewIndex()
+    private static AttributionIndex NewIndex(TimeProvider? timeProvider = null)
     {
         var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"cove-attr-{System.Guid.NewGuid():N}");
         System.IO.Directory.CreateDirectory(dir);
-        return new AttributionIndex(dir, NullLogger.Instance);
+        return new AttributionIndex(dir, NullLogger.Instance, timeProvider);
     }
 
     [Fact]
@@ -77,9 +77,10 @@ public sealed class AttributionIndexTests
     [Fact]
     public void FindByLine_MultipleEntries_ReturnsMostRecent()
     {
-        var idx = NewIndex();
+        var time = new ManualTimeProvider();
+        var idx = NewIndex(time);
         idx.Record("session-1", "tool-old", "file.cs", 10, 20);
-        System.Threading.Thread.Sleep(10);
+        time.Advance(TimeSpan.FromMilliseconds(1));
         idx.Record("session-2", "tool-new", "file.cs", 10, 20);
 
         var entry = idx.FindByLine("file.cs", 15);

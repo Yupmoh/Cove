@@ -37,7 +37,7 @@ public sealed class BayStartupTests
             Assert.Contains(loaded, l => l.Snapshot.Id == "wsA");
             Assert.Contains(loaded, l => l.Snapshot.Id == "wsB");
         }
-        finally { try { Directory.Delete(root, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(root); }
     }
 
     [Fact]
@@ -60,7 +60,7 @@ public sealed class BayStartupTests
             var loaded = BayStartup.Enumerate(root, NullLogger.Instance);
             Assert.Equal(new[] { "wsC", "wsA", "wsB" }, loaded.Select(l => l.Snapshot.Id).ToArray());
         }
-        finally { try { Directory.Delete(root, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(root); }
     }
 
     [Fact]
@@ -75,7 +75,7 @@ public sealed class BayStartupTests
             var loaded = BayStartup.Enumerate(root, NullLogger.Instance);
             Assert.Equal(new[] { "wsB", "wsA" }, loaded.Select(l => l.Snapshot.Id).ToArray());
         }
-        finally { try { Directory.Delete(root, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(root); }
     }
 
     [Fact]
@@ -89,7 +89,7 @@ public sealed class BayStartupTests
             var loaded = BayStartup.Enumerate(root, NullLogger.Instance);
             Assert.Equal(new[] { "wsA", "wsB" }, loaded.Select(l => l.Snapshot.Id).ToArray());
         }
-        finally { try { Directory.Delete(root, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(root); }
     }
 
     [Fact]
@@ -124,6 +124,6 @@ public sealed class BayStartupTests
             var snap = layout.ToSnapshot("default", "default", "/x");
             Assert.Single(snap.Shores);
         }
-        finally { try { Directory.Delete(root, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(root); }
     }
 }

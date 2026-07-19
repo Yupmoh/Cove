@@ -5,6 +5,7 @@ using Cove.Engine.Pty;
 using Cove.Platform.Pty;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
+using Cove.Testing;
 
 namespace Cove.Engine.Tests;
 
@@ -79,11 +80,9 @@ public sealed class ScrollbackRestoreTests
         Assert.Null(BayPersistence.LoadScrollback("nope", Path.Combine(Path.GetTempPath(), System.Guid.NewGuid().ToString("N"))));
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public void RespawnAs_PreseedsPriorScrollback()
     {
-        if (System.OperatingSystem.IsWindows())
-            return;
 
         var host = PtyHostFactory.Create(NullLogger.Instance);
         var reg = new NookRegistry(host, NullLogger.Instance);
@@ -91,7 +90,6 @@ public sealed class ScrollbackRestoreTests
         {
             var prior = Encoding.UTF8.GetBytes("PRIOR_OUTPUT\n");
             reg.RespawnAs("nook-x", "/bin/sh", new[] { "-c", "sleep 1" }, "/tmp", 80, 24, prior);
-            System.Threading.Thread.Sleep(150);
             var snap = reg.SnapshotRing("nook-x");
             Assert.Contains("PRIOR_OUTPUT", Encoding.UTF8.GetString(snap));
         }
@@ -100,11 +98,9 @@ public sealed class ScrollbackRestoreTests
             reg.Dispose();
         }
     }
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public void SnapshotRing_PreservesEntireRetainedRing()
     {
-        if (System.OperatingSystem.IsWindows())
-            return;
 
         var host = PtyHostFactory.Create(NullLogger.Instance);
         var reg = new NookRegistry(host, NullLogger.Instance);
@@ -115,7 +111,6 @@ public sealed class ScrollbackRestoreTests
                 prior[index] = (byte)(index % 251);
 
             reg.RespawnAs("nook-full", "/bin/sh", new[] { "-c", "sleep 1" }, "/tmp", 80, 24, prior);
-            System.Threading.Thread.Sleep(150);
 
             Assert.Equal(prior, reg.SnapshotRing("nook-full"));
         }
@@ -125,11 +120,9 @@ public sealed class ScrollbackRestoreTests
         }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public void CaptureTerminalRestoreState_KeepsCheckpointAndRawTailSeparate()
     {
-        if (System.OperatingSystem.IsWindows())
-            return;
 
         var host = PtyHostFactory.Create(NullLogger.Instance);
         var reg = new NookRegistry(host, NullLogger.Instance);
@@ -137,7 +130,6 @@ public sealed class ScrollbackRestoreTests
         {
             var prior = Encoding.UTF8.GetBytes("abcdefghij");
             reg.RespawnAs("nook-checkpoint", "/bin/sh", new[] { "-c", "sleep 1" }, "/tmp", 80, 24, prior);
-            System.Threading.Thread.Sleep(150);
 
             Assert.True(reg.StoreTerminalCheckpoint("nook-checkpoint", Encoding.UTF8.GetBytes("STATE"), 4, 80, 24, 10000));
             var state = Assert.IsType<TerminalRestoreState>(reg.CaptureTerminalRestoreState("nook-checkpoint"));
@@ -155,18 +147,15 @@ public sealed class ScrollbackRestoreTests
         }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public void RespawnAs_TerminalRestoreState_NormalizesCheckpointToRestoredTail()
     {
-        if (System.OperatingSystem.IsWindows())
-            return;
         var host = PtyHostFactory.Create(NullLogger.Instance);
         var reg = new NookRegistry(host, NullLogger.Instance);
         try
         {
             var restored = new TerminalRestoreState(Encoding.UTF8.GetBytes("STATE"), Encoding.UTF8.GetBytes("TAIL"), 9000, 132, 40, 10000, "\x1b[?1006h");
             reg.RespawnAs("nook-restored-checkpoint", "/bin/sh", new[] { "-c", "sleep 1" }, "/tmp", 80, 24, restored);
-            System.Threading.Thread.Sleep(150);
 
             var captured = Assert.IsType<TerminalRestoreState>(reg.CaptureTerminalRestoreState("nook-restored-checkpoint"));
             Assert.Equal("STATE", Encoding.UTF8.GetString(captured.Checkpoint));
@@ -182,11 +171,9 @@ public sealed class ScrollbackRestoreTests
         }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public void StoreTerminalCheckpoint_RejectsOffsetOutsideRetainedRange()
     {
-        if (System.OperatingSystem.IsWindows())
-            return;
 
         var host = PtyHostFactory.Create(NullLogger.Instance);
         var reg = new NookRegistry(host, NullLogger.Instance);
@@ -194,7 +181,6 @@ public sealed class ScrollbackRestoreTests
         {
             var prior = Encoding.UTF8.GetBytes("abcdefghij");
             reg.RespawnAs("nook-invalid-checkpoint", "/bin/sh", new[] { "-c", "sleep 1" }, "/tmp", 80, 24, prior);
-            System.Threading.Thread.Sleep(150);
 
             Assert.False(reg.StoreTerminalCheckpoint("nook-invalid-checkpoint", Encoding.UTF8.GetBytes("STATE"), 11, 80, 24, 10000));
             Assert.Equal(prior, reg.SnapshotRing("nook-invalid-checkpoint"));

@@ -8,11 +8,10 @@ public sealed class LoopbackCapabilityTests
 {
     private const string Cap = "TESTCAP0123456789";
 
-    private static string MakeWebRoot()
+    private static GuiTestDirectory MakeWebRoot()
     {
-        var root = Path.Combine(Path.GetTempPath(), "cove-loopcap-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(root);
-        File.WriteAllText(Path.Combine(root, "index.html"), "<!doctype html><title>cove</title>");
+        var root = GuiTestDirectory.Create("cove-loopcap-");
+        root.WriteFile("index.html", "<!doctype html><title>cove</title>");
         return root;
     }
 
@@ -20,7 +19,6 @@ public sealed class LoopbackCapabilityTests
     {
         static Task<Stream> Dial(CancellationToken ct) => Task.FromResult<Stream>(new MemoryStream());
         var server = new LoopbackServer(webRoot, Dial, "0.0.0", "test", Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance, port: 0, capability: Cap);
-        server.Start();
         return server;
     }
 
@@ -38,25 +36,37 @@ public sealed class LoopbackCapabilityTests
         await stream.WriteAsync(bytes);
         using var ms = new MemoryStream();
         var buf = new byte[4096];
-        stream.ReadTimeout = 2000;
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(2));
         try
         {
             int n;
-            while ((n = await stream.ReadAsync(buf)) > 0)
+            while ((n = await stream.ReadAsync(buf, cancellation.Token)) > 0)
             {
                 ms.Write(buf, 0, n);
                 if (ms.Length > 65536) break;
             }
         }
-        catch (IOException) { }
+        catch (IOException exception) when (
+            exception.InnerException is SocketException
+            {
+                SocketErrorCode: SocketError.ConnectionReset or
+                    SocketError.ConnectionAborted or
+                    SocketError.Shutdown
+            })
+        {
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+        }
         return Encoding.ASCII.GetString(ms.ToArray());
     }
 
     [Fact]
     public async Task Request_WithoutCapability_IsForbidden()
     {
-        var root = MakeWebRoot();
-        await using var server = StartServer(root);
+        using var root = MakeWebRoot();
+        await using var server = StartServer(root.Path);
+        server.Start();
         var resp = await RawRequestAsync(server.Port, "GET / HTTP/1.1", $"Host: localhost:{server.Port}");
         Assert.Contains("403 Forbidden", resp);
     }
@@ -64,8 +74,9 @@ public sealed class LoopbackCapabilityTests
     [Fact]
     public async Task Request_WithCapabilityQuery_RedirectsAndSetsCookieWithoutLeakingToken()
     {
-        var root = MakeWebRoot();
-        await using var server = StartServer(root);
+        using var root = MakeWebRoot();
+        await using var server = StartServer(root.Path);
+        server.Start();
         var resp = await RawRequestAsync(server.Port, $"GET /?__cap={Cap} HTTP/1.1", $"Host: localhost:{server.Port}");
         Assert.Contains("303 See Other", resp);
         Assert.Contains($"Set-Cookie: cove_cap={Cap}", resp);
@@ -77,8 +88,9 @@ public sealed class LoopbackCapabilityTests
     [Fact]
     public async Task Request_ExtensionlessPageWithCapability_RedirectsPreservingOtherQuery()
     {
-        var root = MakeWebRoot();
-        await using var server = StartServer(root);
+        using var root = MakeWebRoot();
+        await using var server = StartServer(root.Path);
+        server.Start();
         var resp = await RawRequestAsync(server.Port, $"GET /perf?tab=cpu&__cap={Cap} HTTP/1.1", $"Host: localhost:{server.Port}");
         Assert.Contains("303 See Other", resp);
         var locationLine = resp.Split("\r\n").First(l => l.StartsWith("Location:", StringComparison.OrdinalIgnoreCase));
@@ -89,8 +101,9 @@ public sealed class LoopbackCapabilityTests
     [Fact]
     public async Task Request_WithCapabilityCookie_Serves()
     {
-        var root = MakeWebRoot();
-        await using var server = StartServer(root);
+        using var root = MakeWebRoot();
+        await using var server = StartServer(root.Path);
+        server.Start();
         var resp = await RawRequestAsync(server.Port, "GET / HTTP/1.1", $"Host: localhost:{server.Port}", $"Cookie: cove_cap={Cap}");
         Assert.Contains("200 OK", resp);
     }
@@ -98,8 +111,9 @@ public sealed class LoopbackCapabilityTests
     [Fact]
     public async Task Request_WithoutHostHeader_IsForbidden()
     {
-        var root = MakeWebRoot();
-        await using var server = StartServer(root);
+        using var root = MakeWebRoot();
+        await using var server = StartServer(root.Path);
+        server.Start();
         var resp = await RawRequestAsync(server.Port, "GET / HTTP/1.1", $"Cookie: cove_cap={Cap}");
         Assert.Contains("403 Forbidden", resp);
     }
@@ -107,8 +121,9 @@ public sealed class LoopbackCapabilityTests
     [Fact]
     public async Task Request_WithWrongHost_IsForbidden()
     {
-        var root = MakeWebRoot();
-        await using var server = StartServer(root);
+        using var root = MakeWebRoot();
+        await using var server = StartServer(root.Path);
+        server.Start();
         var resp = await RawRequestAsync(server.Port, "GET / HTTP/1.1", "Host: evil.example.com", $"Cookie: cove_cap={Cap}");
         Assert.Contains("403 Forbidden", resp);
     }
@@ -116,8 +131,9 @@ public sealed class LoopbackCapabilityTests
     [Fact]
     public async Task Request_WithForeignOrigin_IsForbidden()
     {
-        var root = MakeWebRoot();
-        await using var server = StartServer(root);
+        using var root = MakeWebRoot();
+        await using var server = StartServer(root.Path);
+        server.Start();
         var resp = await RawRequestAsync(server.Port, "GET / HTTP/1.1", $"Host: localhost:{server.Port}", "Origin: https://evil.example.com", $"Cookie: cove_cap={Cap}");
         Assert.Contains("403 Forbidden", resp);
     }
@@ -125,8 +141,9 @@ public sealed class LoopbackCapabilityTests
     [Fact]
     public async Task PtyUpgrade_WithoutCapability_IsForbidden()
     {
-        var root = MakeWebRoot();
-        await using var server = StartServer(root);
+        using var root = MakeWebRoot();
+        await using var server = StartServer(root.Path);
+        server.Start();
         var resp = await RawRequestAsync(server.Port, "GET /pty?nook=abc HTTP/1.1", $"Host: localhost:{server.Port}", "Upgrade: websocket", "Connection: Upgrade", "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==");
         Assert.Contains("403 Forbidden", resp);
         Assert.DoesNotContain("101 Switching", resp);

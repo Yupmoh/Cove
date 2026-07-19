@@ -2,16 +2,15 @@ using System.Text.Json;
 using Cove.Platform.Ipc;
 using Cove.Protocol;
 using Xunit;
+using Cove.Testing;
 
 namespace Cove.Engine.Tests;
 
 public sealed class TerminalSettingsLiveTests
 {
-    [Fact]
+    [LiveFact(TestOperatingSystem.Unix)]
     public async Task ConfigSet_PersistsTerminalFontFamily_AndConfigGet_RetrievesIt()
     {
-        if (System.OperatingSystem.IsWindows())
-            return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(60));
         CancellationToken ct = cts.Token;
 
@@ -29,11 +28,9 @@ public sealed class TerminalSettingsLiveTests
         Assert.Equal("JetBrains Mono", result.Value);
     }
 
-    [Fact]
+    [LiveFact(TestOperatingSystem.Unix)]
     public async Task ConfigGet_MissingKey_ReturnsNotFound()
     {
-        if (System.OperatingSystem.IsWindows())
-            return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(30));
         CancellationToken ct = cts.Token;
 
@@ -46,11 +43,9 @@ public sealed class TerminalSettingsLiveTests
         Assert.Equal("not_found", getResp.Error?.Code);
     }
 
-    [Fact]
+    [LiveFact(TestOperatingSystem.Unix)]
     public async Task ConfigSet_PersistsAcrossDaemonRestart()
     {
-        if (System.OperatingSystem.IsWindows())
-            return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(60));
         CancellationToken ct = cts.Token;
 

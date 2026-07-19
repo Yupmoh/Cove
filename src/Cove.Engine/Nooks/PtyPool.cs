@@ -18,13 +18,15 @@ public sealed class PtyPool
     private readonly object _lock = new();
     private readonly int _maxPoolSize;
     private readonly TimeSpan _maxWarmAge;
+    private readonly TimeProvider _timeProvider;
 
-    public PtyPool(IPtyHost host, ILogger? logger = null, int maxPoolSize = 3, TimeSpan? maxWarmAge = null)
+    public PtyPool(IPtyHost host, ILogger? logger = null, int maxPoolSize = 3, TimeSpan? maxWarmAge = null, TimeProvider? timeProvider = null)
     {
         _host = host;
         _logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance;
         _maxPoolSize = maxPoolSize;
         _maxWarmAge = maxWarmAge ?? TimeSpan.FromSeconds(30);
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     public int PoolSize(string poolKey)
@@ -66,7 +68,7 @@ public sealed class PtyPool
             try
             {
                 var session = _host.Spawn(request);
-                var entry = new PtyPoolEntry(session, System.DateTimeOffset.UtcNow);
+                var entry = new PtyPoolEntry(session, _timeProvider.GetUtcNow());
                 queue.Enqueue(entry);
                 _logger.LogInformation("pty-pool: pre-warmed session for pool {key} (size now {size})", poolKey, available + 1);
             }
@@ -101,9 +103,9 @@ public sealed class PtyPool
                     entry.Session.Dispose();
                     continue;
                 }
-                if (System.DateTimeOffset.UtcNow - entry.WarmedAt > _maxWarmAge)
+                if (_timeProvider.GetUtcNow() - entry.WarmedAt > _maxWarmAge)
                 {
-                    _logger.LogWarning("pty-pool: discarding stale pre-warmed session in pool {key} (age {age}s)", poolKey, (System.DateTimeOffset.UtcNow - entry.WarmedAt).TotalSeconds);
+                    _logger.LogWarning("pty-pool: discarding stale pre-warmed session in pool {key} (age {age}s)", poolKey, (_timeProvider.GetUtcNow() - entry.WarmedAt).TotalSeconds);
                     entry.Session.Dispose();
                     continue;
                 }

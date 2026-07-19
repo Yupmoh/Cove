@@ -15,14 +15,16 @@ public sealed class SnapshotService
     private readonly string _snapshotsDir;
     private readonly IGitRunner _git;
     private readonly ILogger _logger;
+    private readonly TimeProvider _timeProvider;
     private string? _lastHash;
 
-    public SnapshotService(string coveDir, string snapshotsDir, IGitRunner git, ILogger logger)
+    public SnapshotService(string coveDir, string snapshotsDir, IGitRunner git, ILogger logger, TimeProvider? timeProvider = null)
     {
         _coveDir = coveDir;
         _snapshotsDir = snapshotsDir;
         _git = git;
         _logger = logger;
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     public async Task<Snapshot?> TakeAsync(IReadOnlyDictionary<string, string> content, SnapshotTrigger trigger)
@@ -37,7 +39,7 @@ public sealed class SnapshotService
             return null;
 
         var label = trigger.ToString().ToLowerInvariant();
-        var id = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString("X");
+        var id = _timeProvider.GetUtcNow().ToUnixTimeMilliseconds().ToString("X");
 
         foreach (var kv in filtered)
         {
@@ -60,7 +62,7 @@ public sealed class SnapshotService
         var commitId = revResult.Ok ? revResult.Stdout.Trim() : hash;
 
         _lastHash = hash;
-        return new Snapshot(id, commitId, trigger, DateTimeOffset.UtcNow, false);
+        return new Snapshot(id, commitId, trigger, _timeProvider.GetUtcNow(), false);
     }
 
     private static IReadOnlyDictionary<string, string> FilterSecrets(IReadOnlyDictionary<string, string> content)
@@ -221,7 +223,7 @@ public sealed class SnapshotService
 
     private async Task<HashSet<string>> ComputeRetainedIdsAsync(IReadOnlyList<Snapshot> all)
     {
-        var now = DateTimeOffset.UtcNow;
+        var now = _timeProvider.GetUtcNow();
         var keep = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (var s in all.Where(x => x.TakenAtUtc > now.AddHours(-24)).Take(24))

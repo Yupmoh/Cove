@@ -29,7 +29,7 @@ public class HookHttpServerTests
 
             Assert.Equal("51525", File.ReadAllText(portFile));
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -49,7 +49,7 @@ public class HookHttpServerTests
             Assert.True(port > 0);
             Assert.Equal(port, server.Port);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -74,7 +74,7 @@ public class HookHttpServerTests
             Assert.Equal("claude-code", received!.Adapter);
             Assert.Equal("session-start", received.Event);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -100,7 +100,7 @@ public class HookHttpServerTests
             Assert.NotNull(received);
             Assert.Equal("nook-42", received!.NookId);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -124,7 +124,7 @@ public class HookHttpServerTests
             var body = await resp.Content.ReadAsStringAsync();
             Assert.Contains("coveContext", body);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -146,6 +146,6 @@ public class HookHttpServerTests
             Assert.Equal(server.Port, data.GetProperty("port").GetInt32());
             Assert.True(data.GetProperty("running").GetBoolean());
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 }

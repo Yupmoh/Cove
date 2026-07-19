@@ -25,16 +25,23 @@ public sealed class SessionService
     private readonly TimeSpan _cacheTtl;
     private readonly TimeSpan _listTimeout;
     private readonly ILogger? _logger;
+    private readonly Action? _backgroundRefreshCompleted;
     private readonly System.Collections.Concurrent.ConcurrentDictionary<(string adapter, string cwd), (List<RecentSession> sessions, DateTimeOffset at)> _cache = new();
     private readonly System.Collections.Concurrent.ConcurrentDictionary<(string adapter, string cwd), bool> _refreshing = new();
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, int> _schemaVersions = new();
 
-    public SessionService(MethodRunner runner, TimeSpan? cacheTtl = null, TimeSpan? listTimeout = null, ILogger? logger = null)
+    public SessionService(
+        MethodRunner runner,
+        TimeSpan? cacheTtl = null,
+        TimeSpan? listTimeout = null,
+        ILogger? logger = null,
+        Action? backgroundRefreshCompleted = null)
     {
         _runner = runner;
         _cacheTtl = cacheTtl ?? TimeSpan.FromSeconds(2);
         _listTimeout = listTimeout ?? TimeSpan.FromSeconds(3);
         _logger = logger;
+        _backgroundRefreshCompleted = backgroundRefreshCompleted;
     }
 
     private static string AdapterNameOf(string adapterDir)
@@ -77,6 +84,7 @@ public sealed class SessionService
             finally
             {
                 _refreshing.TryRemove(key, out _);
+                _backgroundRefreshCompleted?.Invoke();
             }
         });
     }

@@ -55,10 +55,11 @@ public sealed class CaptureBundleTests
     public void StopCapture_SetsDurationAndStatus()
     {
         var dir = NewDir();
-        var store = new CaptureStore(dir, NullLogger.Instance);
+        var time = new ManualTimeProvider();
+        var store = new CaptureStore(dir, NullLogger.Instance, time);
         var cap = store.StartCapture("ws-1", "fullscreen", false, false, false);
 
-        System.Threading.Thread.Sleep(50);
+        time.Advance(TimeSpan.FromMilliseconds(50));
         var stopped = store.StopCapture(cap.Id);
 
         Assert.Equal("stopped", stopped!.Status);
@@ -147,9 +148,10 @@ public sealed class CaptureBundleTests
     public void FlagCapture_MarksChapter()
     {
         var dir = NewDir();
-        var store = new CaptureStore(dir, NullLogger.Instance);
+        var time = new ManualTimeProvider();
+        var store = new CaptureStore(dir, NullLogger.Instance, time);
         var cap = store.StartCapture("ws-1", "fullscreen", false, false, false);
-        System.Threading.Thread.Sleep(20);
+        time.Advance(TimeSpan.FromMilliseconds(20));
         store.FlagCapture(cap.Id, "important moment");
 
         var chaptersPath = System.IO.Path.Combine(cap.BundleDir, "chapters.json");

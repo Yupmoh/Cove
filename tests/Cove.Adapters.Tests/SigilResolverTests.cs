@@ -1,4 +1,5 @@
 using Cove.Adapters;
+using Cove.Testing;
 using Xunit;
 
 namespace Cove.Adapters.Tests;
@@ -40,7 +41,7 @@ public sealed class SigilResolverTests
             var parent = Directory.GetParent(root);
             if (parent is not null)
             {
-                try { Directory.Delete(parent.FullName, true); } catch { }
+                TestDirectory.Delete(parent.FullName);
             }
         }
     }

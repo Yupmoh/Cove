@@ -153,7 +153,7 @@ public sealed class RunCommandTests
             Assert.Equal(Cove.Engine.Bays.RunCommandLifecycle.Running, status!.Lifecycle);
             await svc2.DisposeAsync();
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 }
 

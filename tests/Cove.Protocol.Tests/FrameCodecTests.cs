@@ -17,106 +17,103 @@ public sealed class FrameCodecTests
     public void Header_RoundTrips(FrameType type, ulong streamId)
     {
         var header = new FrameHeader(type, streamId, 42, 100);
-        Span<byte> dst = stackalloc byte[ProtocolConstants.HeaderSize];
-        FrameHeader.Write(dst, header);
-        Assert.True(FrameHeader.TryRead(dst, out FrameHeader read, out string? err));
-        Assert.Null(err);
+        Span<byte> destination = stackalloc byte[ProtocolConstants.HeaderSize];
+        FrameHeader.Write(destination, header);
+        Assert.True(FrameHeader.TryRead(destination, out FrameHeader read, out string? error));
+        Assert.Null(error);
         Assert.Equal(header, read);
     }
 
     [Fact]
-    public void ExampleA_Request_Decodes()
+    public void NookListRequestFrame_EncodesAndDecodesCanonicalVector()
     {
-        byte[] frame = HexUtil.Bytes(
-            "43 4f 56 45 01 01 00 00 00 00 00 00 00 00 00 00 01 00 00 00 2c 00 00 00" +
-            "7b 22 69 64 22 3a 22 31 22 2c 22 75 72 69 22 3a 22 63 6f 76 65 3a 2f 2f" +
-            "63 6f 6d 6d 61 6e 64 73 2f 6e 6f 6f 6b 2e 6c 69 73 74 22 7d");
-        Assert.True(FrameHeader.TryRead(frame, out FrameHeader h, out _));
-        Assert.Equal(FrameType.Request, h.Type);
-        Assert.Equal(0UL, h.StreamId);
-        Assert.Equal(1u, h.Seq);
-        Assert.Equal(44u, h.Length);
-        ControlRequest req = ControlCodec.DecodeRequest(frame.AsSpan(ProtocolConstants.HeaderSize));
-        Assert.Equal("1", req.Id);
-        Assert.Equal("cove://commands/nook.list", req.Uri);
-        Assert.Null(req.Params);
+        ReadOnlySpan<byte> frame = ProtocolVectors.NookListRequestFrame;
+        FrameHeader header = ReadHeader(frame);
+        Assert.Equal(new FrameHeader(FrameType.Request, 0, 1, 44), header);
+        AssertHeaderEncodes(frame, header);
+
+        ControlRequest request = ControlCodec.DecodeRequest(frame[ProtocolConstants.HeaderSize..]);
+        Assert.Equal("1", request.Id);
+        Assert.Equal("cove://commands/nook.list", request.Uri);
+        Assert.Null(request.Params);
+        Assert.True(frame[ProtocolConstants.HeaderSize..].SequenceEqual(ControlCodec.Encode(request)));
     }
 
     [Fact]
-    public void ExampleA_Response_Decodes()
+    public void NookListResponseFrame_EncodesAndDecodesCanonicalVector()
     {
-        byte[] frame = HexUtil.Bytes(
-            "43 4f 56 45 01 02 00 00 00 00 00 00 00 00 00 00 01 00 00 00 28 00 00 00" +
-            "7b 22 69 64 22 3a 22 31 22 2c 22 6f 6b 22 3a 74 72 75 65 2c 22 64 61 74" +
-            "61 22 3a 7b 22 6e 6f 6f 6b 73 22 3a 5b 5d 7d 7d");
-        Assert.True(FrameHeader.TryRead(frame, out FrameHeader h, out _));
-        Assert.Equal(FrameType.Response, h.Type);
-        Assert.Equal(40u, h.Length);
-        ControlResponse resp = ControlCodec.DecodeResponse(frame.AsSpan(ProtocolConstants.HeaderSize));
-        Assert.Equal("1", resp.Id);
-        Assert.True(resp.Ok);
-        Assert.Null(resp.Error);
+        ReadOnlySpan<byte> frame = ProtocolVectors.NookListResponseFrame;
+        FrameHeader header = ReadHeader(frame);
+        Assert.Equal(new FrameHeader(FrameType.Response, 0, 1, 40), header);
+        AssertHeaderEncodes(frame, header);
+
+        ControlResponse response = ControlCodec.DecodeResponse(frame[ProtocolConstants.HeaderSize..]);
+        Assert.Equal("1", response.Id);
+        Assert.True(response.Ok);
+        Assert.Equal(0, response.Data!.Value.GetProperty("nooks").GetArrayLength());
+        Assert.Null(response.Error);
+        Assert.True(frame[ProtocolConstants.HeaderSize..].SequenceEqual(ControlCodec.Encode(response)));
     }
 
     [Fact]
-    public void ExampleB_StreamData_DecodesOffsetAndRaw()
+    public void StreamDataFrame_EncodesAndDecodesCanonicalVector()
     {
-        byte[] f3 = HexUtil.Bytes(
-            "43 4f 56 45 01 05 00 00 01 00 00 00 00 00 00 00 0c 00 00 00 0d 00 00 00" +
-            "04 00 00 00 00 00 00 00 62 79 65 0d 0a");
-        Assert.True(FrameHeader.TryRead(f3, out FrameHeader h, out _));
-        Assert.Equal(FrameType.StreamData, h.Type);
-        Assert.Equal(1UL, h.StreamId);
-        Assert.Equal(13u, h.Length);
-        var payload = f3.AsSpan(ProtocolConstants.HeaderSize);
+        ReadOnlySpan<byte> frame = ProtocolVectors.StreamDataFrame;
+        FrameHeader header = ReadHeader(frame);
+        Assert.Equal(new FrameHeader(FrameType.StreamData, 1, 12, 13), header);
+        AssertHeaderEncodes(frame, header);
+
+        ReadOnlySpan<byte> payload = frame[ProtocolConstants.HeaderSize..];
         Assert.Equal(4UL, StreamPayload.ReadStreamDataOffset(payload));
         Assert.Equal("bye\r\n", Encoding.ASCII.GetString(StreamPayload.ReadStreamDataRaw(payload)));
+
+        Span<byte> encoded = stackalloc byte[13];
+        Assert.Equal(13, StreamPayload.WriteStreamData(encoded, 4, "bye\r\n"u8));
+        Assert.True(payload.SequenceEqual(encoded));
     }
 
     [Fact]
-    public void ExampleC_Credit_Resync_StreamEnd_Decode()
+    public void CreditAndResyncFrames_EncodeAndDecodeCanonicalVectors()
     {
-        byte[] credit = HexUtil.Bytes(
-            "43 4f 56 45 01 06 00 00 01 00 00 00 00 00 00 00 14 00 00 00 08 00 00 00" +
-            "00 00 02 00 00 00 00 00");
-        Assert.True(FrameHeader.TryRead(credit, out FrameHeader ch, out _));
-        Assert.Equal(FrameType.Credit, ch.Type);
-        Assert.Equal(131072UL, StreamPayload.ReadOffset(credit.AsSpan(ProtocolConstants.HeaderSize)));
+        AssertOffsetFrame(ProtocolVectors.CreditFrame, FrameType.Credit, 20, 131072);
+        AssertOffsetFrame(ProtocolVectors.ResyncFrame, FrameType.Resync, 400, 9437184);
+    }
 
-        byte[] resync = HexUtil.Bytes(
-            "43 4f 56 45 01 07 00 00 01 00 00 00 00 00 00 00 90 01 00 00 08 00 00 00" +
-            "00 00 90 00 00 00 00 00");
-        Assert.True(FrameHeader.TryRead(resync, out FrameHeader rh, out _));
-        Assert.Equal(FrameType.Resync, rh.Type);
-        Assert.Equal(9437184UL, StreamPayload.ReadOffset(resync.AsSpan(ProtocolConstants.HeaderSize)));
+    [Fact]
+    public void StreamEndFrame_EncodesAndDecodesCanonicalVector()
+    {
+        ReadOnlySpan<byte> frame = ProtocolVectors.StreamEndFrame;
+        FrameHeader header = ReadHeader(frame);
+        Assert.Equal(new FrameHeader(FrameType.StreamEnd, 1, 401, 12), header);
+        AssertHeaderEncodes(frame, header);
 
-        byte[] end = HexUtil.Bytes(
-            "43 4f 56 45 01 08 00 00 01 00 00 00 00 00 00 00 91 01 00 00 0c 00 00 00" +
-            "04 02 90 00 00 00 00 00 00 00 00 00");
-        Assert.True(FrameHeader.TryRead(end, out FrameHeader eh, out _));
-        Assert.Equal(FrameType.StreamEnd, eh.Type);
-        var (finalOffset, exitCode) = StreamPayload.ReadStreamEnd(end.AsSpan(ProtocolConstants.HeaderSize));
+        ReadOnlySpan<byte> payload = frame[ProtocolConstants.HeaderSize..];
+        var (finalOffset, exitCode) = StreamPayload.ReadStreamEnd(payload);
         Assert.Equal(9437700UL, finalOffset);
         Assert.Equal(0, exitCode);
+
+        Span<byte> encoded = stackalloc byte[12];
+        Assert.Equal(12, StreamPayload.WriteStreamEnd(encoded, finalOffset, exitCode));
+        Assert.True(payload.SequenceEqual(encoded));
     }
 
     [Fact]
     public void Reject_BadMagic()
     {
-        byte[] b = new byte[ProtocolConstants.HeaderSize];
-        b[0] = (byte)'X';
-        Assert.False(FrameHeader.TryRead(b, out _, out string? err));
-        Assert.Equal("malformed_frame", err);
+        byte[] bytes = new byte[ProtocolConstants.HeaderSize];
+        bytes[0] = (byte)'X';
+        Assert.False(FrameHeader.TryRead(bytes, out _, out string? error));
+        Assert.Equal("malformed_frame", error);
     }
 
     [Fact]
     public void Reject_BadWireVersion()
     {
-        Span<byte> b = stackalloc byte[ProtocolConstants.HeaderSize];
-        FrameHeader.Write(b, new FrameHeader(FrameType.Request, 0, 1, 0));
-        b[4] = 2;
-        Assert.False(FrameHeader.TryRead(b, out _, out string? err));
-        Assert.Equal("unsupported_version", err);
+        Span<byte> bytes = stackalloc byte[ProtocolConstants.HeaderSize];
+        FrameHeader.Write(bytes, new FrameHeader(FrameType.Request, 0, 1, 0));
+        bytes[4] = 2;
+        Assert.False(FrameHeader.TryRead(bytes, out _, out string? error));
+        Assert.Equal("unsupported_version", error);
     }
 
     [Fact]
@@ -125,56 +122,87 @@ public sealed class FrameCodecTests
         Span<byte> zero = stackalloc byte[ProtocolConstants.HeaderSize];
         FrameHeader.Write(zero, new FrameHeader(FrameType.Request, 0, 1, 0));
         zero[5] = 0;
-        Assert.False(FrameHeader.TryRead(zero, out _, out string? e0));
-        Assert.Equal("unknown_frame_type", e0);
+        Assert.False(FrameHeader.TryRead(zero, out _, out string? zeroError));
+        Assert.Equal("unknown_frame_type", zeroError);
 
-        Span<byte> unk = stackalloc byte[ProtocolConstants.HeaderSize];
-        FrameHeader.Write(unk, new FrameHeader(FrameType.Request, 0, 1, 0));
-        unk[5] = 9;
-        Assert.False(FrameHeader.TryRead(unk, out _, out string? e9));
-        Assert.Equal("unknown_frame_type", e9);
+        Span<byte> unknown = stackalloc byte[ProtocolConstants.HeaderSize];
+        FrameHeader.Write(unknown, new FrameHeader(FrameType.Request, 0, 1, 0));
+        unknown[5] = 9;
+        Assert.False(FrameHeader.TryRead(unknown, out _, out string? unknownError));
+        Assert.Equal("unknown_frame_type", unknownError);
     }
 
     [Fact]
     public void Reject_NonZeroFlagsOrReserved()
     {
-        Span<byte> flags = stackalloc byte[ProtocolConstants.HeaderSize];
-        FrameHeader.Write(flags, new FrameHeader(FrameType.Request, 0, 1, 0));
-        flags[6] = 1;
-        Assert.False(FrameHeader.TryRead(flags, out _, out string? ef));
-        Assert.Equal("malformed_frame", ef);
+        Span<byte> bytes = stackalloc byte[ProtocolConstants.HeaderSize];
+        FrameHeader.Write(bytes, new FrameHeader(FrameType.Request, 0, 1, 0));
+        bytes[6] = 1;
+        Assert.False(FrameHeader.TryRead(bytes, out _, out string? error));
+        Assert.Equal("malformed_frame", error);
     }
 
     [Fact]
     public void Reject_StreamIdRuleViolations()
     {
-        Span<byte> ctrl = stackalloc byte[ProtocolConstants.HeaderSize];
-        FrameHeader.Write(ctrl, new FrameHeader(FrameType.Request, 0, 1, 0));
-        ctrl[8] = 5;
-        Assert.False(FrameHeader.TryRead(ctrl, out _, out string? ec));
-        Assert.Equal("malformed_frame", ec);
+        Span<byte> control = stackalloc byte[ProtocolConstants.HeaderSize];
+        FrameHeader.Write(control, new FrameHeader(FrameType.Request, 0, 1, 0));
+        control[8] = 5;
+        Assert.False(FrameHeader.TryRead(control, out _, out string? controlError));
+        Assert.Equal("malformed_frame", controlError);
 
         Span<byte> data = stackalloc byte[ProtocolConstants.HeaderSize];
         FrameHeader.Write(data, new FrameHeader(FrameType.StreamData, 1, 1, 0));
-        for (int i = 8; i < 16; i++) data[i] = 0;
-        Assert.False(FrameHeader.TryRead(data, out _, out string? ed));
-        Assert.Equal("malformed_frame", ed);
+        data[8..16].Clear();
+        Assert.False(FrameHeader.TryRead(data, out _, out string? dataError));
+        Assert.Equal("malformed_frame", dataError);
     }
 
     [Fact]
     public void Reject_OversizeLength()
     {
-        Span<byte> b = stackalloc byte[ProtocolConstants.HeaderSize];
-        FrameHeader.Write(b, new FrameHeader(FrameType.Request, 0, 1, (uint)ProtocolConstants.MaxFramePayload + 1));
-        Assert.False(FrameHeader.TryRead(b, out _, out string? err));
-        Assert.Equal("frame_too_large", err);
+        Span<byte> bytes = stackalloc byte[ProtocolConstants.HeaderSize];
+        FrameHeader.Write(bytes, new FrameHeader(FrameType.Request, 0, 1, (uint)ProtocolConstants.MaxFramePayload + 1));
+        Assert.False(FrameHeader.TryRead(bytes, out _, out string? error));
+        Assert.Equal("frame_too_large", error);
     }
 
     [Fact]
     public void ShortHeader_NeedsMoreBytes()
     {
-        byte[] b = new byte[10];
-        Assert.False(FrameHeader.TryRead(b, out _, out string? err));
-        Assert.Equal("short_header", err);
+        byte[] bytes = new byte[10];
+        Assert.False(FrameHeader.TryRead(bytes, out _, out string? error));
+        Assert.Equal("short_header", error);
+    }
+
+    private static FrameHeader ReadHeader(ReadOnlySpan<byte> frame)
+    {
+        Assert.True(FrameHeader.TryRead(frame, out FrameHeader header, out string? error));
+        Assert.Null(error);
+        return header;
+    }
+
+    private static void AssertHeaderEncodes(ReadOnlySpan<byte> frame, FrameHeader header)
+    {
+        Span<byte> encoded = stackalloc byte[ProtocolConstants.HeaderSize];
+        FrameHeader.Write(encoded, header);
+        Assert.True(frame[..ProtocolConstants.HeaderSize].SequenceEqual(encoded));
+    }
+
+    private static void AssertOffsetFrame(
+        ReadOnlySpan<byte> frame,
+        FrameType type,
+        uint sequence,
+        ulong expectedOffset)
+    {
+        FrameHeader header = ReadHeader(frame);
+        Assert.Equal(new FrameHeader(type, 1, sequence, 8), header);
+        AssertHeaderEncodes(frame, header);
+
+        ReadOnlySpan<byte> payload = frame[ProtocolConstants.HeaderSize..];
+        Assert.Equal(expectedOffset, StreamPayload.ReadOffset(payload));
+        Span<byte> encoded = stackalloc byte[8];
+        StreamPayload.WriteOffset(encoded, expectedOffset);
+        Assert.True(payload.SequenceEqual(encoded));
     }
 }

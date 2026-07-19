@@ -21,9 +21,15 @@ public sealed class AttachSessionTests
         using (var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5)))
         {
             var serverTask = CompleteSubscriptionAsync(serverConnection, timeout.Token);
-            var session = new AttachSession(clientConnection, "nook-1");
+            var session = new AttachSession(
+                clientConnection,
+                "nook-1",
+                "tui",
+                "0.1.0",
+                "dev",
+                "user:tui");
 
-            var result = await session.SubscribeAsync("tui", timeout.Token);
+            var result = await session.SubscribeAsync(timeout.Token);
             var requests = await serverTask;
 
             Assert.Equal("h", requests.Hello.Id);
@@ -45,13 +51,20 @@ public sealed class AttachSessionTests
         using (var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5)))
         {
             var serverTask = CompleteSubscriptionAsync(serverConnection, timeout.Token);
-            var session = new AttachSession(clientConnection, "nook-1");
-            await session.SubscribeAsync("tui", timeout.Token);
+            var session = new AttachSession(
+                clientConnection,
+                "nook-1",
+                "tui",
+                "0.1.0",
+                "dev",
+                "user:tui");
+            await session.SubscribeAsync(timeout.Token);
             await serverTask;
 
             var pumpTask = session.PumpAsync(
                 (_, _) => Task.CompletedTask,
-                (_, _, _) => Task.CompletedTask,
+                (_, _) => Task.CompletedTask,
+                (_, _) => Task.CompletedTask,
                 timeout.Token);
 
             await serverConnection.WriteFrameAsync(

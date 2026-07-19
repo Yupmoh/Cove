@@ -9,6 +9,7 @@ using Cove.Platform.Pty;
 using Cove.Protocol;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
+using Cove.Testing;
 
 namespace Cove.Engine.Tests;
 
@@ -17,10 +18,9 @@ public sealed class BayCwdSpawnTests
     private static Task<ControlResponse?> Route(NookRegistry nooks, BayManager ws, JsonElement prm) =>
         EngineCommandRouter.RouteAsync(new ControlRequest("1", "cove://commands/nook.spawn", prm), nooks, null, ws);
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task Spawn_NoExplicitCwd_DefaultsToActiveBayDir()
     {
-        if (OperatingSystem.IsWindows()) return;
         var dir = Path.Combine(Path.GetTempPath(), "cove-ws-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
@@ -36,13 +36,12 @@ public sealed class BayCwdSpawnTests
             var desc = reg.Descriptors().First(d => d.NookId == nookId);
             Assert.Equal(dir, desc.Cwd);
         }
-        finally { try { Directory.Delete(dir, true); } catch { /* best effort */ } }
+        finally { TestDirectory.Delete(dir); }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task Spawn_ExplicitCwd_OverridesBayDir()
     {
-        if (OperatingSystem.IsWindows()) return;
         var dir = Path.Combine(Path.GetTempPath(), "cove-ws-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
@@ -58,7 +57,7 @@ public sealed class BayCwdSpawnTests
             var desc = reg.Descriptors().First(d => d.NookId == nookId);
             Assert.Equal("/tmp", desc.Cwd);
         }
-        finally { try { Directory.Delete(dir, true); } catch { /* best effort */ } }
+        finally { TestDirectory.Delete(dir); }
     }
 
     [Fact]

@@ -152,7 +152,7 @@ while True:
     {
         await Task.Run(() =>
         {
-            try { if (System.IO.File.Exists(_mockServerPath)) System.IO.File.Delete(_mockServerPath); } catch { }
+            Cove.Testing.TestFile.Delete(_mockServerPath);
         });
     }
 }

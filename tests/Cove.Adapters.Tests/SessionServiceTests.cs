@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Cove.Adapters;
+using Cove.Testing;
 using Xunit;
 
 namespace Cove.Adapters.Tests;
@@ -18,10 +19,9 @@ public sealed class SessionServiceTests
         return path;
     }
 
-    [Fact]
+    [ExternalFact(TestOperatingSystem.Unix, "bash")]
     public async Task ListRecentSessions_ParsesJsonAndSortsByLastActiveDesc()
     {
-        if (OperatingSystem.IsWindows()) return;
         var dir = NewDir();
         try
         {
@@ -46,13 +46,12 @@ public sealed class SessionServiceTests
             Assert.Equal("s3", sessions[1].Id);
             Assert.Equal("s1", sessions[2].Id);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
-    [Fact]
+    [ExternalFact(TestOperatingSystem.Unix, "bash")]
     public async Task ListRecentSessions_CachesPerAdapterCwd_WithinTtl()
     {
-        if (OperatingSystem.IsWindows()) return;
         var dir = NewDir();
         try
         {
@@ -70,12 +69,11 @@ public sealed class SessionServiceTests
             Assert.True(File.Exists(marker));
             Assert.Equal("x\n", await File.ReadAllTextAsync(marker));
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
-    [Fact]
+    [ExternalFact(TestOperatingSystem.Unix, "bash")]
     public async Task ListRecentSessions_GracefulFailure_ReturnsEmpty()
     {
-        if (OperatingSystem.IsWindows()) return;
         var dir = NewDir();
         try
         {
@@ -86,20 +84,23 @@ public sealed class SessionServiceTests
 
             Assert.Empty(sessions);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
-    [Fact]
+    [ExternalFact(TestOperatingSystem.Unix, "bash")]
     public async Task ListRecentSessions_ServesStaleImmediately_ThenRefreshesInBackground()
     {
-        if (OperatingSystem.IsWindows()) return;
         var dir = NewDir();
         try
         {
             WriteScript(dir, "list_recent_sessions.sh", """
             echo '{"sessions":[{"id":"v1","cwd":"/repo","lastActive":"2024-01-01T00:00:00Z"}]}'
             """);
-            var svc = new SessionService(new MethodRunner(), cacheTtl: TimeSpan.Zero);
+            var refreshed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var svc = new SessionService(
+                new MethodRunner(),
+                cacheTtl: TimeSpan.Zero,
+                backgroundRefreshCompleted: () => refreshed.TrySetResult());
 
             var first = await svc.ListRecentSessionsAsync(dir, "/repo");
             Assert.Equal("v1", Assert.Single(first).Id);
@@ -111,55 +112,53 @@ public sealed class SessionServiceTests
             var stale = await svc.ListRecentSessionsAsync(dir, "/repo");
             Assert.Equal("v1", Assert.Single(stale).Id);
 
-            var deadline = DateTimeOffset.UtcNow.AddSeconds(10);
-            while (DateTimeOffset.UtcNow < deadline)
-            {
-                var latest = await svc.ListRecentSessionsAsync(dir, "/repo");
-                if (latest.Count == 1 && latest[0].Id == "v2") return;
-                await Task.Delay(50);
-            }
-            Assert.Fail("background refresh never replaced the stale cache entry");
+            await AsyncTest.CompletesWithinAsync(refreshed.Task, TimeSpan.FromSeconds(10), "background refresh never completed");
+            Assert.Equal("v2", Assert.Single(await svc.ListRecentSessionsAsync(dir, "/repo")).Id);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
-    [Fact]
+    [ExternalFact(TestOperatingSystem.Unix, "bash")]
     public async Task ListRecentSessions_FailedBackgroundRefresh_KeepsStaleAndRecovers()
     {
-        if (OperatingSystem.IsWindows()) return;
         var dir = NewDir();
         try
         {
             WriteScript(dir, "list_recent_sessions.sh", """
             echo '{"sessions":[{"id":"v1","cwd":"/repo","lastActive":"2024-01-01T00:00:00Z"}]}'
             """);
-            var svc = new SessionService(new MethodRunner(), cacheTtl: TimeSpan.Zero);
+            var refreshCount = 0;
+            var failedRefresh = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var recoveredRefresh = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var svc = new SessionService(
+                new MethodRunner(),
+                cacheTtl: TimeSpan.Zero,
+                backgroundRefreshCompleted: () =>
+                {
+                    if (Interlocked.Increment(ref refreshCount) == 1)
+                        failedRefresh.TrySetResult();
+                    else
+                        recoveredRefresh.TrySetResult();
+                });
             Assert.Equal("v1", Assert.Single(await svc.ListRecentSessionsAsync(dir, "/repo")).Id);
 
             WriteScript(dir, "list_recent_sessions.sh", "exit 1");
             Assert.Equal("v1", Assert.Single(await svc.ListRecentSessionsAsync(dir, "/repo")).Id);
-            await Task.Delay(300);
-            Assert.Single(await svc.ListRecentSessionsAsync(dir, "/repo"));
+            await AsyncTest.CompletesWithinAsync(failedRefresh.Task, TimeSpan.FromSeconds(10), "failed background refresh never completed");
 
             WriteScript(dir, "list_recent_sessions.sh", """
             echo '{"sessions":[{"id":"v3","cwd":"/repo","lastActive":"2024-03-01T00:00:00Z"}]}'
             """);
-            var deadline = DateTimeOffset.UtcNow.AddSeconds(10);
-            while (DateTimeOffset.UtcNow < deadline)
-            {
-                var latest = await svc.ListRecentSessionsAsync(dir, "/repo");
-                if (latest.Count == 1 && latest[0].Id == "v3") return;
-                await Task.Delay(50);
-            }
-            Assert.Fail("refresh flag wedged: recovery script result never landed");
+            Assert.Equal("v1", Assert.Single(await svc.ListRecentSessionsAsync(dir, "/repo")).Id);
+            await AsyncTest.CompletesWithinAsync(recoveredRefresh.Task, TimeSpan.FromSeconds(10), "recovery refresh never completed");
+            Assert.Equal("v3", Assert.Single(await svc.ListRecentSessionsAsync(dir, "/repo")).Id);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
-    [Fact]
+    [ExternalFact(TestOperatingSystem.Unix, "bash")]
     public async Task ExtractSession_ParsesCanonicalEventJsonL()
     {
-        if (OperatingSystem.IsWindows()) return;
         var dir = NewDir();
         try
         {
@@ -177,13 +176,12 @@ public sealed class SessionServiceTests
             Assert.Equal("prose", events[1].Type);
             Assert.Equal("session_end", events[2].Type);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
-    [Fact]
+    [ExternalFact(TestOperatingSystem.Unix, "bash")]
     public async Task ExtractSession_SkipsInvalidJsonLines()
     {
-        if (OperatingSystem.IsWindows()) return;
         var dir = NewDir();
         try
         {
@@ -198,13 +196,13 @@ public sealed class SessionServiceTests
 
             Assert.Equal(2, events.Count);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
+    [Trait(TestTraits.Category, TestTraits.Platform)]
     public async Task ExtractSession_SchemaVersionBump_FlagsReindex()
     {
-        if (OperatingSystem.IsWindows()) return;
         var dir = NewDir();
         try
         {
@@ -216,7 +214,7 @@ public sealed class SessionServiceTests
 
             Assert.True(needsReindex);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
     [Fact]

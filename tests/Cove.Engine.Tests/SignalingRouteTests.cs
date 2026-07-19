@@ -3,6 +3,7 @@ using Cove.Engine;
 using Cove.Platform.Ipc;
 using Cove.Protocol;
 using Xunit;
+using Cove.Testing;
 
 namespace Cove.Engine.Tests;
 
@@ -45,10 +46,9 @@ public sealed class SignalingRouteTests
         return claimResp.Data!.Value.GetProperty("runId").GetString()!;
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task SetInReview_MovesCardToRunReviewStatus()
     {
-        if (System.OperatingSystem.IsWindows()) return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(60));
         CancellationToken ct = cts.Token;
 
@@ -63,10 +63,9 @@ public sealed class SignalingRouteTests
         Assert.Equal("in-review", reviewResp.Data!.Value.GetProperty("statusId").GetString());
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task SetDone_MovesCardAndCompletesRun()
     {
-        if (System.OperatingSystem.IsWindows()) return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(60));
         CancellationToken ct = cts.Token;
 
@@ -84,10 +83,9 @@ public sealed class SignalingRouteTests
         Assert.Equal("completed", runResp.Data!.Value.GetProperty("state").GetString());
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task SetInReview_DefaultLaunchedRun_RejectsWithNoReviewStatus()
     {
-        if (System.OperatingSystem.IsWindows()) return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(60));
         CancellationToken ct = cts.Token;
 
@@ -102,10 +100,9 @@ public sealed class SignalingRouteTests
         Assert.Equal("no_review_status", reviewResp.Error!.Code);
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task Claim_MintsRunAndRejectsOverlap()
     {
-        if (System.OperatingSystem.IsWindows()) return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(60));
         CancellationToken ct = cts.Token;
 
@@ -123,10 +120,9 @@ public sealed class SignalingRouteTests
         Assert.Equal("conflict", claim2.Error!.Code);
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task SetInReview_PrefixRunId_ResolvesCorrectly()
     {
-        if (System.OperatingSystem.IsWindows()) return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(60));
         CancellationToken ct = cts.Token;
 
@@ -142,10 +138,9 @@ public sealed class SignalingRouteTests
         Assert.Equal("in-review", reviewResp.Data!.Value.GetProperty("statusId").GetString());
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task SetInReview_CoveN_TaskId_ResolvesActiveRun()
     {
-        if (System.OperatingSystem.IsWindows()) return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(60));
         CancellationToken ct = cts.Token;
 
@@ -163,10 +158,9 @@ public sealed class SignalingRouteTests
         Assert.Equal("in-review", reviewResp.Data!.Value.GetProperty("statusId").GetString());
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task SetInReview_CoveN_WithoutBay_RejectsWithClearError()
     {
-        if (System.OperatingSystem.IsWindows()) return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(60));
         CancellationToken ct = cts.Token;
 

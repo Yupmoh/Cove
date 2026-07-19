@@ -26,7 +26,7 @@ public sealed class LauncherOverridePersistenceTests
             Assert.Contains("--verbose", loaded.ExtraFlags);
             Assert.Equal("/tmp", loaded.WorkingDir);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -45,7 +45,7 @@ public sealed class LauncherOverridePersistenceTests
             Assert.False(retrieved!.Yolo);
             Assert.Contains("--model", retrieved.ExtraFlags);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -63,7 +63,7 @@ public sealed class LauncherOverridePersistenceTests
             var fresh = new LauncherOverrideStore(dir);
             Assert.False(fresh.TryLoad("nook-3", out _));
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -82,7 +82,7 @@ public sealed class LauncherOverridePersistenceTests
             Assert.Contains(all, kv => kv.Key == "nook-a" && kv.Value.Yolo);
             Assert.Contains(all, kv => kv.Key == "nook-b" && !kv.Value.Yolo);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -94,7 +94,7 @@ public sealed class LauncherOverridePersistenceTests
             var store = new LauncherOverrideStore(dir);
             Assert.False(store.TryLoad("never-seen", out _));
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -110,6 +110,6 @@ public sealed class LauncherOverridePersistenceTests
             var evilPath = Path.Combine(Path.GetDirectoryName(dir)!, "evil.json");
             Assert.False(File.Exists(evilPath));
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 }

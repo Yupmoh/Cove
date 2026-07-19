@@ -3,6 +3,7 @@ using Cove.Adapters;
 using Cove.Engine.Protocol;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
+using Cove.Testing;
 
 namespace Cove.Engine.Tests;
 
@@ -32,7 +33,7 @@ public sealed class ExtensionRegistryTests
             var registry = new ExtensionRegistry(manifests);
             Assert.Empty(registry.List());
         }
-        finally { try { Directory.Delete(root, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(root); }
     }
 
     [Fact]
@@ -49,7 +50,7 @@ public sealed class ExtensionRegistryTests
             Assert.Contains(commands, c => c.Command == "extension.test-adapter.check_auth");
             Assert.Contains(commands, c => c.Command == "extension.test-adapter.statusline");
         }
-        finally { try { Directory.Delete(root, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(root); }
     }
 
     [Fact]
@@ -65,7 +66,7 @@ public sealed class ExtensionRegistryTests
             foreach (var cmd in registry.List())
                 Assert.Equal("extension", cmd.Source);
         }
-        finally { try { Directory.Delete(root, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(root); }
     }
 
     [Fact]
@@ -83,7 +84,7 @@ public sealed class ExtensionRegistryTests
             Assert.Equal("claude-code", resolved!.Adapter);
             Assert.Equal("check_auth", resolved.Method);
         }
-        finally { try { Directory.Delete(root, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(root); }
     }
 
     [Fact]
@@ -97,7 +98,7 @@ public sealed class ExtensionRegistryTests
             registry.Index();
             Assert.Null(registry.Resolve("extension.bogus.method"));
         }
-        finally { try { Directory.Delete(root, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(root); }
     }
 
     [Fact]
@@ -113,7 +114,7 @@ public sealed class ExtensionRegistryTests
             registry.Index();
             Assert.Null(registry.Resolve("extension.check_auth"));
         }
-        finally { try { Directory.Delete(root, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(root); }
     }
 
     [Fact]
@@ -131,14 +132,13 @@ public sealed class ExtensionRegistryTests
             registry.Index();
             Assert.NotEmpty(registry.List());
         }
-        finally { try { Directory.Delete(root, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(root); }
     }
 
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task ExtensionRun_DispatchesThroughVerbHandlerAndReturnsOutput()
     {
-        if (System.OperatingSystem.IsWindows()) return;
         var root = NewDir();
         try
         {
@@ -153,6 +153,6 @@ public sealed class ExtensionRegistryTests
             Assert.True(response!.Ok);
             Assert.Contains("hello-from-adapter", response.Data!.Value.GetProperty("output").GetString());
         }
-        finally { try { Directory.Delete(root, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(root); }
     }
 }

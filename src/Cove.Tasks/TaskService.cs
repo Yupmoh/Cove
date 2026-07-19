@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Cove.Tasks;
 
-public sealed class TaskService
+public sealed class TaskService : IAsyncDisposable
 {
     private readonly SqliteConnectionFactory _factory;
     private readonly TasksWriteChannel _channel;
@@ -39,6 +39,8 @@ public sealed class TaskService
 
 
     public System.Threading.Tasks.Task StartAsync() => _channel.StartAsync();
+
+    public ValueTask DisposeAsync() => _channel.DisposeAsync();
 
     public void SeedDefaultStatuses(string bayId)
     {
@@ -230,6 +232,6 @@ public sealed class TaskService
     public System.Threading.Tasks.Task UpsertScheduleAsync(Schedules.ScheduleRow row) => _schedules.UpsertAsync(row);
     public System.Threading.Tasks.Task UpdateScheduleAsync(string cardId, bool? paused, bool? skipNext, string? nextFireAt, string? lastFiredAt, string? pendingIntent = null) => _schedules.UpdateAsync(cardId, paused, skipNext, nextFireAt, lastFiredAt, pendingIntent);
     public System.Threading.Tasks.Task DeleteScheduleAsync(string cardId) => _schedules.DeleteAsync(cardId);
-    public System.Collections.Generic.IReadOnlyList<Schedules.ScheduleRow> ListDueSchedules(System.DateTimeOffset now) => _schedules.ListDue(now);
+    public System.Collections.Generic.IReadOnlyList<Schedules.ScheduleRow> ListActiveSchedules() => _schedules.ListActive();
     public Cove.Persistence.SqliteConnectionFactory GetConnectionFactory() => _factory;
 }

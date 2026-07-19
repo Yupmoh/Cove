@@ -120,7 +120,11 @@ public sealed class CommandContext
             if (successfulErrorCode is not null &&
                 string.Equals(r.Error?.Code, successfulErrorCode, StringComparison.Ordinal))
                 return 0;
-            Stderr.WriteLine($"error: {r.Error?.Code ?? "unknown"}");
+            var errorCode = r.Error?.Code ?? "unknown";
+            if (string.IsNullOrEmpty(r.Error?.Message))
+                Stderr.WriteLine($"error: {errorCode}");
+            else
+                Stderr.WriteLine($"error: {errorCode}: {r.Error.Message}");
             return 1;
         }
         if (renderSuccess is not null)

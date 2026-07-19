@@ -32,7 +32,7 @@ public sealed class NookScopeCommandTests
             Assert.True(response!.Ok);
             Assert.Equal("same-bay", response.Data!.Value.GetProperty("scope").GetString());
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -52,7 +52,7 @@ public sealed class NookScopeCommandTests
             var getResp = await EngineCommandRouter.RouteAsync(getReq, nookScopes: store);
             Assert.Equal("all", getResp!.Data!.Value.GetProperty("scope").GetString());
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -69,6 +69,6 @@ public sealed class NookScopeCommandTests
             Assert.False(response!.Ok);
             Assert.Equal("invalid_params", response.Error!.Code);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 }

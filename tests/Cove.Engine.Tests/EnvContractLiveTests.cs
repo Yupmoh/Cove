@@ -3,16 +3,15 @@ using System.Text.Json;
 using Cove.Platform.Ipc;
 using Cove.Protocol;
 using Xunit;
+using Cove.Testing;
 
 namespace Cove.Engine.Tests;
 
 public sealed class EnvContractLiveTests
 {
-    [Fact]
+    [LiveFact(TestOperatingSystem.Unix)]
     public async Task SpawnedNook_EnvContains_AllCoveVars_OverSocket()
     {
-        if (System.OperatingSystem.IsWindows())
-            return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(60));
         CancellationToken ct = cts.Token;
 

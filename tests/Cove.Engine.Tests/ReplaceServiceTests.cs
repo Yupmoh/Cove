@@ -27,7 +27,7 @@ public sealed class ReplaceServiceTests
             var content = System.IO.File.ReadAllText(path);
             Assert.Equal("hi world\nhi again\n", content);
         }
-        finally { try { System.IO.File.Delete(path); } catch { } }
+        finally { Cove.Testing.TestFile.Delete(path); }
     }
 
     [Fact]
@@ -40,7 +40,7 @@ public sealed class ReplaceServiceTests
             var results = service.ReplaceInFiles("hello", "hi", new[] { path }, caseInsensitive: true);
             Assert.Equal(3, results[0].Replacements);
         }
-        finally { try { System.IO.File.Delete(path); } catch { } }
+        finally { Cove.Testing.TestFile.Delete(path); }
     }
 
     [Fact]
@@ -53,7 +53,7 @@ public sealed class ReplaceServiceTests
             var results = service.ReplaceInFiles("hello", "hi", new[] { path }, caseInsensitive: false);
             Assert.Equal(1, results[0].Replacements);
         }
-        finally { try { System.IO.File.Delete(path); } catch { } }
+        finally { Cove.Testing.TestFile.Delete(path); }
     }
 
     [Fact]
@@ -68,7 +68,7 @@ public sealed class ReplaceServiceTests
             var content = System.IO.File.ReadAllText(path);
             Assert.Equal("fooNUM barNUM bazNUM\n", content);
         }
-        finally { try { System.IO.File.Delete(path); } catch { } }
+        finally { Cove.Testing.TestFile.Delete(path); }
     }
 
     [Fact]
@@ -81,7 +81,7 @@ public sealed class ReplaceServiceTests
             var results = service.ReplaceInFiles("hello", "hi", new[] { path }, wholeWord: true);
             Assert.Equal(2, results[0].Replacements);
         }
-        finally { try { System.IO.File.Delete(path); } catch { } }
+        finally { Cove.Testing.TestFile.Delete(path); }
     }
 
     [Fact]
@@ -95,7 +95,7 @@ public sealed class ReplaceServiceTests
             Assert.Equal(0, results[0].Replacements);
             Assert.False(results[0].Saved);
         }
-        finally { try { System.IO.File.Delete(path); } catch { } }
+        finally { Cove.Testing.TestFile.Delete(path); }
     }
 
     [Fact]
@@ -110,7 +110,7 @@ public sealed class ReplaceServiceTests
             Assert.Equal(2, results.Count);
             Assert.All(results, r => Assert.Equal(1, r.Replacements));
         }
-        finally { try { System.IO.File.Delete(path1); } catch { } try { System.IO.File.Delete(path2); } catch { } }
+        finally { Cove.Testing.TestFile.Delete(path1); Cove.Testing.TestFile.Delete(path2); }
     }
 
     [Fact]
@@ -144,6 +144,6 @@ public sealed class ReplaceServiceTests
             var content = System.IO.File.ReadAllText(path);
             Assert.Contains("hello", content);
         }
-        finally { try { System.IO.File.Delete(path); } catch { } }
+        finally { Cove.Testing.TestFile.Delete(path); }
     }
 }

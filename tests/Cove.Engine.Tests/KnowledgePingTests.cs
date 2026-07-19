@@ -3,6 +3,7 @@ using Cove.Engine;
 using Cove.Platform.Ipc;
 using Cove.Protocol;
 using Xunit;
+using Cove.Testing;
 
 namespace Cove.Engine.Tests;
 
@@ -22,10 +23,9 @@ public sealed class KnowledgePingTests
         }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task KnowledgePing_RoundTripsOverSocket_FromClient()
     {
-        if (System.OperatingSystem.IsWindows()) return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(60));
         CancellationToken ct = cts.Token;
 
@@ -38,10 +38,9 @@ public sealed class KnowledgePingTests
         Assert.Equal("hello", resp.Data!.Value.GetProperty("echo").GetString());
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task KnowledgePing_NoParams_StillWorks()
     {
-        if (System.OperatingSystem.IsWindows()) return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(60));
         CancellationToken ct = cts.Token;
 

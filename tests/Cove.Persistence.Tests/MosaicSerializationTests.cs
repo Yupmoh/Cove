@@ -3,6 +3,7 @@ using System.IO;
 using System.Text.Json;
 using Cove.Persistence;
 using Microsoft.Extensions.Logging.Abstractions;
+using Cove.Testing;
 using Xunit;
 
 namespace Cove.Persistence.Tests;
@@ -21,7 +22,7 @@ public sealed class MosaicSerializationTests : IDisposable
 
     public void Dispose()
     {
-        try { if (Directory.Exists(_dir)) Directory.Delete(_dir, recursive: true); } catch { }
+        TestDirectory.Delete(_dir);
     }
 
     private static BaySnapshot Sample() => new BaySnapshot

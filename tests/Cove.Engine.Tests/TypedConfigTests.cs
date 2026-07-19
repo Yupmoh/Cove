@@ -19,7 +19,7 @@ public sealed class TypedConfigTests
             var cfg = new ConfigService(dir, NullLogger.Instance);
             Assert.Equal("catppuccin-mocha", cfg.GetTheme());
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -31,7 +31,7 @@ public sealed class TypedConfigTests
             var cfg = new ConfigService(dir, NullLogger.Instance);
             Assert.Equal("11", cfg.Get("terminal.fontSize"));
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -47,7 +47,7 @@ public sealed class TypedConfigTests
             Assert.Equal("dracula", cfg2.GetTheme());
             Assert.Equal("16", cfg2.Get("terminal.fontSize"));
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -63,7 +63,7 @@ public sealed class TypedConfigTests
             Assert.Equal("14", cfg.Get("terminal.fontSize"));
             Assert.Equal("catppuccin", cfg.GetTheme());
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -78,7 +78,7 @@ public sealed class TypedConfigTests
             var cfg = new ConfigService(dir, NullLogger.Instance);
             Assert.Equal("42", cfg.Get("futureSetting"));
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -98,7 +98,7 @@ public sealed class TypedConfigTests
             var raw = File.ReadAllText(path);
             Assert.DoesNotContain("dracula", raw);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -111,7 +111,7 @@ public sealed class TypedConfigTests
             cfg.Set("terminal.fontSize", "16");
             Assert.Equal("16", cfg.Get("terminal.fontSize"));
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -124,7 +124,7 @@ public sealed class TypedConfigTests
             cfg.Set("diagnostics.enabled", "true");
             Assert.Equal("true", cfg.Get("diagnostics.enabled"));
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -143,7 +143,7 @@ public sealed class TypedConfigTests
             Assert.True(cfg.IsWritable());
             Assert.Equal("fixed", cfg.GetTheme());
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -162,7 +162,7 @@ public sealed class TypedConfigTests
             cfg.GetLspServerEntries();
             cfg.GetSessionRestoreOnLaunch();
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -182,7 +182,7 @@ public sealed class TypedConfigTests
             Assert.Equal("16", cfg2.Get("terminal.fontSize"));
             Assert.Equal("dracula", cfg2.GetTheme());
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -198,7 +198,7 @@ public sealed class TypedConfigTests
             Assert.Equal("16", cfg.Get("terminal.fontSize"));
             Assert.Equal("false", cfg.Get("updates.checkOnLaunch"));
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -215,6 +215,6 @@ public sealed class TypedConfigTests
             Assert.Null(cfg.Get("telemetry.enabled"));
             Assert.Null(cfg.Get("pushToTalk.keyCode"));
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 }

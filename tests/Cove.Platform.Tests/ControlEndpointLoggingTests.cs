@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using Cove.Platform.Ipc;
+using Cove.Testing;
 using Microsoft.Extensions.Logging;
 using Xunit;
 
@@ -32,14 +33,11 @@ public sealed class ControlEndpointLoggingTests
         }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
+    [Trait(TestTraits.Category, TestTraits.Platform)]
     public async Task Bind_logs_socket_path_and_bound_address()
     {
-        if (OperatingSystem.IsWindows())
-            return;
-
-        string dir = Path.Combine(Path.GetTempPath(), "cove-ipc-" + Guid.NewGuid().ToString("n"));
-        Directory.CreateDirectory(dir);
+        string dir = TestDirectory.Create("cove-ipc-");
         string socketPath = Path.Combine(dir, "stable.sock");
         var logger = new CapturingLogger();
 
@@ -54,19 +52,16 @@ public sealed class ControlEndpointLoggingTests
         }
         finally
         {
-            try { File.Delete(socketPath); } catch { }
-            try { Directory.Delete(dir, true); } catch { }
+            TestFile.Delete(socketPath);
+            TestDirectory.Delete(dir);
         }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
+    [Trait(TestTraits.Category, TestTraits.Platform)]
     public void Probe_logs_socket_path_on_client_side()
     {
-        if (OperatingSystem.IsWindows())
-            return;
-
-        string dir = Path.Combine(Path.GetTempPath(), "cove-ipc-" + Guid.NewGuid().ToString("n"));
-        Directory.CreateDirectory(dir);
+        string dir = TestDirectory.Create("cove-ipc-");
         string socketPath = Path.Combine(dir, "stable.sock");
         var logger = new CapturingLogger();
 
@@ -81,7 +76,7 @@ public sealed class ControlEndpointLoggingTests
         }
         finally
         {
-            try { Directory.Delete(dir, true); } catch { }
+            TestDirectory.Delete(dir);
         }
     }
 }

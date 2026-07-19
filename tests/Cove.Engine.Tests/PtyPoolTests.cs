@@ -115,9 +115,10 @@ public sealed class PtyPoolTests
     public void TryAcquire_DiscardsStaleSession()
     {
         var host = new FakePtyHost();
-        var pool = new PtyPool(host, NullLogger.Instance, maxWarmAge: TimeSpan.FromMilliseconds(1));
+        var time = new ManualTimeProvider();
+        var pool = new PtyPool(host, NullLogger.Instance, maxWarmAge: TimeSpan.FromMilliseconds(1), timeProvider: time);
         pool.PreWarm("default", Req());
-        System.Threading.Thread.Sleep(10);
+        time.Advance(TimeSpan.FromMilliseconds(2));
         Assert.Null(pool.TryAcquire("default"));
     }
 

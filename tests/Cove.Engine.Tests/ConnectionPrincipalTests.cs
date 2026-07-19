@@ -5,6 +5,7 @@ using Cove.Platform.Pty;
 using Cove.Protocol;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
+using Cove.Testing;
 
 namespace Cove.Engine.Tests;
 
@@ -70,10 +71,9 @@ public sealed class ConnectionPrincipalTests
         return (nookId, token);
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task AuthenticatedNookConnection_CannotMutateScopes()
     {
-        if (OperatingSystem.IsWindows()) return;
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var ct = cts.Token;
         await using var harness = await DaemonTestHarness.StartAsync();
@@ -90,10 +90,9 @@ public sealed class ConnectionPrincipalTests
         Assert.Equal("access_denied", denied.Error?.Code);
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task AuthenticatedNookConnection_CannotForgeCallerIdentity()
     {
-        if (OperatingSystem.IsWindows()) return;
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var ct = cts.Token;
         await using var harness = await DaemonTestHarness.StartAsync();
@@ -110,10 +109,9 @@ public sealed class ConnectionPrincipalTests
         Assert.Equal("access_denied", forged.Error?.Code);
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task AuthenticatedSameTabNook_CannotTargetOtherNooks()
     {
-        if (OperatingSystem.IsWindows()) return;
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var ct = cts.Token;
         await using var harness = await DaemonTestHarness.StartAsync();
@@ -139,10 +137,9 @@ public sealed class ConnectionPrincipalTests
         Assert.True(allowed.Ok, allowed.Error?.Message);
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task Hello_WithWrongToken_IsRejected()
     {
-        if (OperatingSystem.IsWindows()) return;
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var ct = cts.Token;
         await using var harness = await DaemonTestHarness.StartAsync();
@@ -190,10 +187,9 @@ public sealed class ConnectionPrincipalTests
         Assert.True(allowed.Ok, allowed.Error?.Message);
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task AnonymousConnection_ClaimOfTokenedNook_IsStripped()
     {
-        if (OperatingSystem.IsWindows()) return;
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var ct = cts.Token;
         await using var harness = await DaemonTestHarness.StartAsync();
@@ -214,40 +210,41 @@ public sealed class ConnectionPrincipalTests
         Assert.True(response.Ok, response.Error?.Message);
     }
 
-    [Fact]
-    public void HandoffExportAdopt_PreservesNookToken()
+    [PlatformFact(TestOperatingSystem.Unix)]
+    public async Task HandoffExportAdopt_PreservesNookToken()
     {
-        if (OperatingSystem.IsWindows()) return;
-        var dataDir = Directory.CreateTempSubdirectory().FullName;
-        var spawnEnv = new SpawnEnvironment("/usr/bin:/bin", dataDir, "/bin/echo", "default");
-        using var source = new NookRegistry(PtyHostFactory.Create(NullLogger.Instance), NullLogger.Instance, spawnEnv);
-        using var successor = new NookRegistry(PtyHostFactory.Create(NullLogger.Instance), NullLogger.Instance, spawnEnv);
-
-        var info = source.Spawn(new SpawnParams("/bin/sh", ["-c", "printf 'TOK<%s>END' \"$COVE_NOOK_TOKEN\"; sleep 8"], null, null, 80, 24));
-        var token = "";
-        for (var i = 0; i < 100; i++)
+        var dataDir = TestDirectory.Create("cove-handoff");
+        try
         {
-            var text = Encoding.UTF8.GetString(source.Read(info.NookId, 0, 65536));
-            var start = text.IndexOf("TOK<", StringComparison.Ordinal);
-            var end = text.IndexOf(">END", StringComparison.Ordinal);
-            if (start >= 0 && end > start)
-            {
-                token = text[(start + 4)..end];
-                break;
-            }
-            Thread.Sleep(50);
-        }
-        Assert.Equal(64, token.Length);
-        Assert.Equal(NookAuthResult.Bound, source.Authenticate(info.NookId, token));
-        Assert.Equal(NookAuthResult.Rejected, source.Authenticate(info.NookId, new string('F', 64)));
-        Assert.Equal(NookAuthResult.Unknown, source.Authenticate("nook-missing", token));
+            var spawnEnv = new SpawnEnvironment("/usr/bin:/bin", dataDir, "/bin/echo", "default");
+            using var source = new NookRegistry(PtyHostFactory.Create(NullLogger.Instance), NullLogger.Instance, spawnEnv);
+            using var successor = new NookRegistry(PtyHostFactory.Create(NullLogger.Instance), NullLogger.Instance, spawnEnv);
 
-        var items = source.ExportForHandoff();
-        var item = Assert.Single(items);
-        var adopted = successor.Adopt(item.Record, item.MasterFd, item.RingTail);
-        Assert.NotNull(adopted);
-        Assert.Equal(NookAuthResult.Bound, successor.Authenticate(info.NookId, token));
-        Assert.Equal(NookAuthResult.Rejected, successor.Authenticate(info.NookId, null));
-        successor.Stop(info.NookId);
+            var info = source.Spawn(new SpawnParams("/bin/sh", ["-c", "printf 'TOK<%s>END' \"$COVE_NOOK_TOKEN\"; sleep 8"], null, null, 80, 24));
+            var token = "";
+            await AsyncTest.EventuallyAsync(() =>
+            {
+                var text = Encoding.UTF8.GetString(source.Read(info.NookId, 0, 65536));
+                var start = text.IndexOf("TOK<", StringComparison.Ordinal);
+                var end = text.IndexOf(">END", StringComparison.Ordinal);
+                if (start < 0 || end <= start)
+                    return false;
+                token = text[(start + 4)..end];
+                return true;
+            }, TimeSpan.FromSeconds(5), "spawned nook did not emit its token");
+            Assert.Equal(64, token.Length);
+            Assert.Equal(NookAuthResult.Bound, source.Authenticate(info.NookId, token));
+            Assert.Equal(NookAuthResult.Rejected, source.Authenticate(info.NookId, new string('F', 64)));
+            Assert.Equal(NookAuthResult.Unknown, source.Authenticate("nook-missing", token));
+
+            var items = source.ExportForHandoff();
+            var item = Assert.Single(items);
+            var adopted = successor.Adopt(item.Record, item.MasterFd, item.RingTail);
+            Assert.NotNull(adopted);
+            Assert.Equal(NookAuthResult.Bound, successor.Authenticate(info.NookId, token));
+            Assert.Equal(NookAuthResult.Rejected, successor.Authenticate(info.NookId, null));
+            successor.Stop(info.NookId);
+        }
+        finally { TestDirectory.Delete(dataDir); }
     }
 }

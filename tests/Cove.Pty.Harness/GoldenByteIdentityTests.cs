@@ -3,18 +3,17 @@ using System.IO;
 using System.Security.Cryptography;
 using Cove.Engine.Pty;
 using Cove.Pty.Harness;
+using Cove.Testing;
 using Xunit;
 
 namespace Cove.Pty.Harness.Tests;
 
 public sealed class GoldenByteIdentityTests
 {
-    [Fact]
-    [Trait("Category", "PtyGolden")]
+    [PlatformFact(TestOperatingSystem.Unix)]
+    [Trait("Suite", "PtyGolden")]
     public void Delivery_IsByteIdenticalToGolden()
     {
-        if (OperatingSystem.IsWindows())
-            return;
         const long total = 4L * 1024 * 1024;
         var (ring, reader, session) = PtyHarnessFixture.StartGen(8 * 1024 * 1024, total);
         try

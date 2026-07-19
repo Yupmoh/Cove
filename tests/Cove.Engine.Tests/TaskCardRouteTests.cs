@@ -5,6 +5,7 @@ using Cove.Engine;
 using Cove.Platform.Ipc;
 using Cove.Protocol;
 using Xunit;
+using Cove.Testing;
 
 namespace Cove.Engine.Tests;
 
@@ -24,10 +25,9 @@ public sealed class TaskCardRouteTests
         }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task Create_Get_List_Update_Delete_OverSocket()
     {
-        if (System.OperatingSystem.IsWindows()) return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(60));
         CancellationToken ct = cts.Token;
 
@@ -62,10 +62,9 @@ public sealed class TaskCardRouteTests
         Assert.Equal("not_found", getAfterDelete.Error!.Code);
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task Create_NumberingIsMonotonicAcrossCards()
     {
-        if (System.OperatingSystem.IsWindows()) return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(60));
         CancellationToken ct = cts.Token;
 

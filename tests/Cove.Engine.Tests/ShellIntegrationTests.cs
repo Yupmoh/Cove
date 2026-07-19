@@ -30,7 +30,7 @@ public sealed class ShellIntegrationTests
         }
         finally
         {
-            try { Directory.Delete(dir, true); } catch { }
+            Cove.Testing.TestDirectory.Delete(dir);
         }
     }
 

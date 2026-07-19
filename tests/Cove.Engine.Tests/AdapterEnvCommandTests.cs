@@ -47,7 +47,7 @@ public class AdapterEnvCommandTests
             Assert.Equal(1, entries.GetArrayLength());
             Assert.Equal("****", entries[0].GetProperty("value").GetString());
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -68,7 +68,7 @@ public class AdapterEnvCommandTests
             var loaded = store.Load("claude-code");
             Assert.Equal("real-secret", loaded[0].Value);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -86,7 +86,7 @@ public class AdapterEnvCommandTests
             Assert.False(response!.Ok);
             Assert.Equal("invalid_params", response.Error!.Code);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -109,7 +109,7 @@ public class AdapterEnvCommandTests
             var cove = vars.EnumerateArray().First(v => v.GetProperty("key").GetString() == "COVE");
             Assert.Equal("1", cove.GetProperty("value").GetString());
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]

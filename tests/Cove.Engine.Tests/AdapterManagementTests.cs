@@ -21,7 +21,7 @@ public sealed class AdapterRetentionPolicyTests
             var removed = policy.Enforce(dir);
             Assert.Empty(removed);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -38,7 +38,7 @@ public sealed class AdapterRetentionPolicyTests
             Assert.Empty(removed);
             Assert.Equal(5, Directory.GetFiles(dir).Length);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -59,7 +59,7 @@ public sealed class AdapterRetentionPolicyTests
             Assert.Equal(2, removed.Count);
             Assert.Equal(3, Directory.GetFiles(dir).Length);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -82,7 +82,7 @@ public sealed class AdapterRetentionPolicyTests
             Assert.Single(removed);
             Assert.Contains("old.json", removed[0]);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -108,7 +108,7 @@ public sealed class FirstRunWizardTests
             var wizard = new FirstRunWizard(dir);
             Assert.True(wizard.IsFirstRun());
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -122,7 +122,7 @@ public sealed class FirstRunWizardTests
             var wizard = new FirstRunWizard(dir);
             Assert.True(wizard.IsFirstRun());
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -137,7 +137,7 @@ public sealed class FirstRunWizardTests
             var wizard = new FirstRunWizard(dir);
             Assert.False(wizard.IsFirstRun());
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -152,7 +152,7 @@ public sealed class FirstRunWizardTests
             wizard.MarkComplete();
             Assert.False(wizard.IsFirstRun());
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -167,6 +167,6 @@ public sealed class FirstRunWizardTests
             Assert.NotEmpty(recommended);
             Assert.Contains(recommended, a => a.Name == "claude-code");
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 }

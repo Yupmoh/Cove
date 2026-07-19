@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Cove.Engine.Bays;
 using Cove.Protocol;
 using Xunit;
+using Cove.Testing;
 
 namespace Cove.Engine.Tests;
 
@@ -35,11 +36,9 @@ public sealed class BayDurabilityTests
         Assert.Equal("\U0001F680", value.GetString());
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task Resize_PersistsColsRows_AcrossGracefulRestart()
     {
-        if (OperatingSystem.IsWindows())
-            return;
 
         await using var h = await DaemonTestHarness.StartAsync();
 

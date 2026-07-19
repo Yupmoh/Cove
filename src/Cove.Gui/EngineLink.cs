@@ -37,7 +37,7 @@ public sealed class EngineLink : IAsyncDisposable
     public async Task<ControlResponse> RequestAsync(string uri, JsonElement? paramsEl, CancellationToken ct)
     {
         var s = await EnsureConnectedAsync(ct);
-        return await SendRequestAsync(s, uri, paramsEl, ct);
+        return await SendRequestAsync(s, uri, paramsEl, "user:gui", ct);
     }
 
     private string? ReadControlToken()
@@ -84,7 +84,7 @@ public sealed class EngineLink : IAsyncDisposable
                 var helloEl = JsonSerializer.SerializeToElement(
                     new HelloParams(ProtocolConstants.SemanticProtocolVersion, "gui", _clientVersion, _channel, ControlToken: ReadControlToken()),
                     CoveJsonContext.Default.HelloParams);
-                var hello = await SendRequestAsync(s, "cove://sys/hello", helloEl, ct);
+                var hello = await SendRequestAsync(s, "cove://sys/hello", helloEl, null, ct);
                 if (!hello.Ok)
                 {
                     _log.EngineHelloRejected(_channel, _endpoint, hello.Error?.Code ?? "unknown");
@@ -128,12 +128,17 @@ public sealed class EngineLink : IAsyncDisposable
         finally { _connectGate.Release(); }
     }
 
-    private async Task<ControlResponse> SendRequestAsync(Stream s, string uri, JsonElement? paramsEl, CancellationToken ct)
+    private async Task<ControlResponse> SendRequestAsync(
+        Stream s,
+        string uri,
+        JsonElement? paramsEl,
+        string? source,
+        CancellationToken ct)
     {
         var id = Interlocked.Increment(ref _idCounter).ToString();
         var tcs = new TaskCompletionSource<ControlResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
         _pending[id] = tcs;
-        var req = new ControlRequest(id, uri, paramsEl, "user:gui");
+        var req = new ControlRequest(id, uri, paramsEl, source);
         var bytes = JsonSerializer.SerializeToUtf8Bytes(req, CoveJsonContext.Default.ControlRequest);
         var seq = Interlocked.Increment(ref _seq);
         var sw = Stopwatch.StartNew();

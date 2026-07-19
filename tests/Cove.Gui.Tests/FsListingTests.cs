@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Cove.Gui;
+using Cove.Gui.Tests;
 using Xunit;
 
 public class FsListingTests
@@ -7,11 +8,11 @@ public class FsListingTests
     [Fact]
     public void ListsFilesAndDirectoriesWithKinds()
     {
-        var root = Directory.CreateTempSubdirectory("cove-fslist").FullName;
-        Directory.CreateDirectory(Path.Combine(root, "sub"));
-        File.WriteAllText(Path.Combine(root, "readme.md"), "hi");
+        using var temp = GuiTestDirectory.Create("cove-fslist-");
+        Directory.CreateDirectory(Path.Combine(temp.Path, "sub"));
+        File.WriteAllText(Path.Combine(temp.Path, "readme.md"), "hi");
 
-        var json = FsListing.ListDirectory(root, 100);
+        var json = FsListing.ListDirectory(temp.Path, 100);
         using var doc = JsonDocument.Parse(json);
         var entries = doc.RootElement.GetProperty("entries").EnumerateArray().ToList();
 
@@ -21,7 +22,6 @@ public class FsListingTests
         Assert.True(sub.GetProperty("isDir").GetBoolean());
         Assert.False(readme.GetProperty("isDir").GetBoolean());
         Assert.False(doc.RootElement.GetProperty("truncated").GetBoolean());
-        Directory.Delete(root, true);
     }
 
     [Fact]
@@ -36,13 +36,12 @@ public class FsListingTests
     [Fact]
     public void CapsEntryCountAndFlagsTruncation()
     {
-        var root = Directory.CreateTempSubdirectory("cove-fslist-cap").FullName;
-        for (var i = 0; i < 10; i++) File.WriteAllText(Path.Combine(root, $"f{i}.txt"), "");
+        using var temp = GuiTestDirectory.Create("cove-fslist-cap-");
+        for (var i = 0; i < 10; i++) File.WriteAllText(Path.Combine(temp.Path, $"f{i}.txt"), "");
 
-        var json = FsListing.ListDirectory(root, 4);
+        var json = FsListing.ListDirectory(temp.Path, 4);
         using var doc = JsonDocument.Parse(json);
         Assert.Equal(4, doc.RootElement.GetProperty("entries").GetArrayLength());
         Assert.True(doc.RootElement.GetProperty("truncated").GetBoolean());
-        Directory.Delete(root, true);
     }
 }

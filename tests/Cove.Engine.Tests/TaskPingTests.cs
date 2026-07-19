@@ -3,6 +3,7 @@ using Cove.Engine;
 using Cove.Platform.Ipc;
 using Cove.Protocol;
 using Xunit;
+using Cove.Testing;
 
 namespace Cove.Engine.Tests;
 
@@ -40,11 +41,9 @@ public sealed class TaskPingTests
         Assert.Contains(entries, e => e.Command == "cove://commands/task.ping");
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task Ping_RoundTripsOverSocket_FromClient()
     {
-        if (System.OperatingSystem.IsWindows())
-            return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(60));
         CancellationToken ct = cts.Token;
 

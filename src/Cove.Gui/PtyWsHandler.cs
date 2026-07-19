@@ -23,9 +23,12 @@ public static class PtyWsHandler
             using var relayCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             var ackTask = ReceiveAcksAsync(ws, client, browserAcked, relayCts.Token);
             var pumpTask = client.PumpAsync(
-                onData: async (offset, raw, c) => await SendData(ws, offset, raw, c),
-                onResync: async (newBase, modes, checkpoint, cols, rows, c) => await SendText(ws, $"{{\"t\":\"resync\",\"base\":{newBase},\"modes\":\"{modes}\",\"checkpoint\":\"{checkpoint}\",\"checkpointCols\":{cols},\"checkpointRows\":{rows}}}", c),
-                onEnd: async (final, code, c) => await SendText(ws, $"{{\"t\":\"end\",\"code\":{code}}}", c),
+                onData: async (data, c) => await SendData(ws, data.Offset, data.Data, c),
+                onResync: async (resync, c) => await SendText(
+                    ws,
+                    $"{{\"t\":\"resync\",\"base\":{resync.BaseOffset},\"modes\":\"{Convert.ToBase64String(resync.TerminalModePreamble.Span)}\",\"checkpoint\":\"{Convert.ToBase64String(resync.TerminalCheckpoint.Span)}\",\"checkpointCols\":{resync.CheckpointCols},\"checkpointRows\":{resync.CheckpointRows}}}",
+                    c),
+                onEnd: async (completed, c) => await SendText(ws, $"{{\"t\":\"end\",\"code\":{completed.ExitCode}}}", c),
                 relayCts.Token);
             var first = await Task.WhenAny(ackTask, pumpTask);
             await relayCts.CancelAsync();

@@ -2,6 +2,8 @@
 #include <sys/socket.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <pthread.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
@@ -242,77 +244,349 @@ int cove_pty_poll_readable(int fd, int timeout_ms) {
 
 #if defined(__APPLE__)
 #include <sys/event.h>
-
-int cove_pty_exitwatch_new(void) {
-    int kq = kqueue();
-    return kq < 0 ? -errno : kq;
-}
-
-int cove_pty_exitwatch_add(int wfd, int pid) {
-    struct kevent kev;
-    EV_SET(&kev, (uintptr_t)pid, EVFILT_PROC, EV_ADD | EV_ONESHOT, NOTE_EXIT | NOTE_EXITSTATUS, 0, NULL);
-    if (kevent(wfd, &kev, 1, NULL, 0, NULL) < 0) {
-        return errno == ESRCH ? 1 : -errno;
-    }
-    return 0;
-}
-
-int cove_pty_exitwatch_next(int wfd, int *out_status) {
-    for (;;) {
-        struct kevent out;
-        int n = kevent(wfd, NULL, 0, &out, 1, NULL);
-        if (n > 0) {
-            *out_status = (out.fflags & NOTE_EXITSTATUS) ? (int)out.data : -1;
-            return (int)out.ident;
-        }
-        if (n < 0 && errno == EINTR) {
-            continue;
-        }
-        *out_status = -1;
-        return -errno;
-    }
-}
 #else
 #include <sys/epoll.h>
+#include <sys/eventfd.h>
 #include <sys/syscall.h>
+#endif
 
-int cove_pty_exitwatch_new(void) {
-    int ep = epoll_create1(EPOLL_CLOEXEC);
-    return ep < 0 ? -errno : ep;
+struct cove_exitwatch_registration {
+    int pid;
+    int native_fd;
+    int64_t token;
+    struct cove_exitwatch_registration *next;
+};
+
+struct cove_exitwatch {
+    int fd;
+#if !defined(__APPLE__)
+    int wake_fd;
+#endif
+    pthread_mutex_t mutex;
+    pthread_cond_t readers_drained;
+    pthread_cond_t reader_entered;
+    struct cove_exitwatch_registration *registrations;
+    unsigned int active_readers;
+    unsigned int reader_waiters;
+    int closing;
+};
+
+static struct cove_exitwatch_registration **cove_exitwatch_find(
+    struct cove_exitwatch *watch,
+    int64_t token) {
+    struct cove_exitwatch_registration **entry = &watch->registrations;
+    while (*entry != NULL && (*entry)->token != token) {
+        entry = &(*entry)->next;
+    }
+    return entry;
 }
 
-int cove_pty_exitwatch_add(int wfd, int pid) {
-    int pfd = (int)syscall(SYS_pidfd_open, pid, 0);
-    if (pfd < 0) {
-        return errno == ESRCH ? 1 : -errno;
+intptr_t cove_pty_exitwatch_new(void) {
+#if defined(__APPLE__)
+    int fd = kqueue();
+#else
+    int fd = epoll_create1(EPOLL_CLOEXEC);
+#endif
+    if (fd < 0) {
+        return -errno;
     }
-    struct epoll_event ev;
-    ev.events = EPOLLIN;
-    ev.data.u64 = ((unsigned long long)(unsigned int)pid << 32) | (unsigned int)pfd;
-    if (epoll_ctl(wfd, EPOLL_CTL_ADD, pfd, &ev) < 0) {
+#if defined(__APPLE__)
+    struct kevent wake_event;
+    EV_SET(&wake_event, 1, EVFILT_USER, EV_ADD | EV_ENABLE, 0, 0, NULL);
+    if (kevent(fd, &wake_event, 1, NULL, 0, NULL) < 0) {
         int e = errno;
-        close(pfd);
+        close(fd);
         return -e;
     }
+#else
+    int wake_fd = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
+    if (wake_fd < 0) {
+        int e = errno;
+        close(fd);
+        return -e;
+    }
+    struct epoll_event wake_event;
+    memset(&wake_event, 0, sizeof(wake_event));
+    wake_event.events = EPOLLIN;
+    if (epoll_ctl(fd, EPOLL_CTL_ADD, wake_fd, &wake_event) < 0) {
+        int e = errno;
+        close(wake_fd);
+        close(fd);
+        return -e;
+    }
+#endif
+    struct cove_exitwatch *watch = calloc(1, sizeof(*watch));
+    if (watch == NULL) {
+        int e = errno;
+#if !defined(__APPLE__)
+        close(wake_fd);
+#endif
+        close(fd);
+        return -e;
+    }
+    int rc = pthread_mutex_init(&watch->mutex, NULL);
+    if (rc != 0) {
+#if !defined(__APPLE__)
+        close(wake_fd);
+#endif
+        close(fd);
+        free(watch);
+        return -rc;
+    }
+    rc = pthread_cond_init(&watch->readers_drained, NULL);
+    if (rc != 0) {
+        pthread_mutex_destroy(&watch->mutex);
+#if !defined(__APPLE__)
+        close(wake_fd);
+#endif
+        close(fd);
+        free(watch);
+        return -rc;
+    }
+    rc = pthread_cond_init(&watch->reader_entered, NULL);
+    if (rc != 0) {
+        pthread_cond_destroy(&watch->readers_drained);
+        pthread_mutex_destroy(&watch->mutex);
+#if !defined(__APPLE__)
+        close(wake_fd);
+#endif
+        close(fd);
+        free(watch);
+        return -rc;
+    }
+    watch->fd = fd;
+#if !defined(__APPLE__)
+    watch->wake_fd = wake_fd;
+#endif
+    return (intptr_t)watch;
+}
+
+int cove_pty_exitwatch_add(intptr_t handle, int pid, int64_t token) {
+    struct cove_exitwatch *watch = (struct cove_exitwatch *)handle;
+    struct cove_exitwatch_registration *registration = calloc(1, sizeof(*registration));
+    if (registration == NULL) {
+        return -errno;
+    }
+    registration->pid = pid;
+    registration->native_fd = -1;
+    registration->token = token;
+
+    pthread_mutex_lock(&watch->mutex);
+    if (watch->closing) {
+        pthread_mutex_unlock(&watch->mutex);
+        free(registration);
+        return -ECANCELED;
+    }
+    if (*cove_exitwatch_find(watch, token) != NULL) {
+        pthread_mutex_unlock(&watch->mutex);
+        free(registration);
+        return -EEXIST;
+    }
+#if defined(__APPLE__)
+    struct kevent event;
+    EV_SET(
+        &event,
+        (uintptr_t)pid,
+        EVFILT_PROC,
+        EV_ADD | EV_ONESHOT,
+        NOTE_EXIT | NOTE_EXITSTATUS,
+        0,
+        (void *)(intptr_t)token);
+    if (kevent(watch->fd, &event, 1, NULL, 0, NULL) < 0) {
+        int e = errno;
+        pthread_mutex_unlock(&watch->mutex);
+        free(registration);
+        return e == ESRCH ? 1 : -e;
+    }
+#else
+    int pidfd = (int)syscall(SYS_pidfd_open, pid, 0);
+    if (pidfd < 0) {
+        int e = errno;
+        pthread_mutex_unlock(&watch->mutex);
+        free(registration);
+        return e == ESRCH ? 1 : -e;
+    }
+    struct epoll_event event;
+    memset(&event, 0, sizeof(event));
+    event.events = EPOLLIN;
+    event.data.u64 = (uint64_t)token;
+    if (epoll_ctl(watch->fd, EPOLL_CTL_ADD, pidfd, &event) < 0) {
+        int e = errno;
+        close(pidfd);
+        pthread_mutex_unlock(&watch->mutex);
+        free(registration);
+        return -e;
+    }
+    registration->native_fd = pidfd;
+#endif
+    registration->next = watch->registrations;
+    watch->registrations = registration;
+    pthread_mutex_unlock(&watch->mutex);
     return 0;
 }
 
-int cove_pty_exitwatch_next(int wfd, int *out_status) {
-    for (;;) {
-        struct epoll_event out;
-        int n = epoll_wait(wfd, &out, 1, -1);
-        if (n > 0) {
-            int pid = (int)(out.data.u64 >> 32);
-            int pfd = (int)(out.data.u64 & 0xffffffffu);
-            close(pfd);
-            *out_status = -1;
-            return pid;
-        }
-        if (n < 0 && errno == EINTR) {
-            continue;
-        }
-        *out_status = -1;
-        return -errno;
+int cove_pty_exitwatch_remove(intptr_t handle, int64_t token) {
+    struct cove_exitwatch *watch = (struct cove_exitwatch *)handle;
+    pthread_mutex_lock(&watch->mutex);
+    if (watch->closing) {
+        pthread_mutex_unlock(&watch->mutex);
+        return -ECANCELED;
+    }
+    struct cove_exitwatch_registration **entry = cove_exitwatch_find(watch, token);
+    struct cove_exitwatch_registration *registration = *entry;
+    if (registration == NULL) {
+        pthread_mutex_unlock(&watch->mutex);
+        return 0;
+    }
+    *entry = registration->next;
+#if defined(__APPLE__)
+    struct kevent event;
+    EV_SET(&event, (uintptr_t)registration->pid, EVFILT_PROC, EV_DELETE, 0, 0, NULL);
+    int rc = kevent(watch->fd, &event, 1, NULL, 0, NULL);
+    int result = rc < 0 && errno != ENOENT && errno != ESRCH ? -errno : 0;
+#else
+    int rc = epoll_ctl(watch->fd, EPOLL_CTL_DEL, registration->native_fd, NULL);
+    int result = rc < 0 && errno != ENOENT ? -errno : 0;
+    close(registration->native_fd);
+#endif
+    free(registration);
+    pthread_mutex_unlock(&watch->mutex);
+    return result;
+}
+
+static void cove_exitwatch_reader_leave(struct cove_exitwatch *watch) {
+    watch->active_readers--;
+    if (watch->closing && watch->active_readers == 0 && watch->reader_waiters == 0) {
+        pthread_cond_signal(&watch->readers_drained);
     }
 }
+
+int cove_pty_exitwatch_wait_reader_entered(intptr_t handle) {
+    struct cove_exitwatch *watch = (struct cove_exitwatch *)handle;
+    pthread_mutex_lock(&watch->mutex);
+    watch->reader_waiters++;
+    while (watch->active_readers == 0 && !watch->closing) {
+        pthread_cond_wait(&watch->reader_entered, &watch->mutex);
+    }
+    int result = watch->active_readers > 0 ? 0 : -ECANCELED;
+    watch->reader_waiters--;
+    if (watch->closing && watch->active_readers == 0 && watch->reader_waiters == 0) {
+        pthread_cond_signal(&watch->readers_drained);
+    }
+    pthread_mutex_unlock(&watch->mutex);
+    return result;
+}
+
+int64_t cove_pty_exitwatch_next(intptr_t handle, int *out_status) {
+    struct cove_exitwatch *watch = (struct cove_exitwatch *)handle;
+    pthread_mutex_lock(&watch->mutex);
+    if (watch->closing) {
+        pthread_mutex_unlock(&watch->mutex);
+        *out_status = -1;
+        return -ECANCELED;
+    }
+    watch->active_readers++;
+    pthread_cond_broadcast(&watch->reader_entered);
+    pthread_mutex_unlock(&watch->mutex);
+
+    for (;;) {
+#if defined(__APPLE__)
+        struct kevent event;
+        int count = kevent(watch->fd, NULL, 0, &event, 1, NULL);
+#else
+        struct epoll_event event;
+        int count = epoll_wait(watch->fd, &event, 1, -1);
 #endif
+        int wait_error = count < 0 ? errno : 0;
+        pthread_mutex_lock(&watch->mutex);
+        if (watch->closing) {
+            cove_exitwatch_reader_leave(watch);
+            pthread_mutex_unlock(&watch->mutex);
+            *out_status = -1;
+            return -ECANCELED;
+        }
+        if (count > 0) {
+#if defined(__APPLE__)
+            int64_t token = (int64_t)(intptr_t)event.udata;
+#else
+            int64_t token = (int64_t)event.data.u64;
+#endif
+            struct cove_exitwatch_registration **entry = cove_exitwatch_find(watch, token);
+            struct cove_exitwatch_registration *registration = *entry;
+            if (registration == NULL) {
+                pthread_mutex_unlock(&watch->mutex);
+                continue;
+            }
+            *entry = registration->next;
+#if defined(__APPLE__)
+            *out_status = (event.fflags & NOTE_EXITSTATUS) ? (int)event.data : -1;
+#else
+            epoll_ctl(watch->fd, EPOLL_CTL_DEL, registration->native_fd, NULL);
+            close(registration->native_fd);
+            *out_status = -1;
+#endif
+            free(registration);
+            cove_exitwatch_reader_leave(watch);
+            pthread_mutex_unlock(&watch->mutex);
+            return token;
+        }
+        if (wait_error == EINTR) {
+            pthread_mutex_unlock(&watch->mutex);
+            continue;
+        }
+        cove_exitwatch_reader_leave(watch);
+        pthread_mutex_unlock(&watch->mutex);
+        *out_status = -1;
+        return -wait_error;
+    }
+}
+
+void cove_pty_exitwatch_free(intptr_t handle) {
+    struct cove_exitwatch *watch = (struct cove_exitwatch *)handle;
+    if (watch == NULL) {
+        return;
+    }
+
+    pthread_mutex_lock(&watch->mutex);
+    if (watch->closing) {
+        pthread_mutex_unlock(&watch->mutex);
+        return;
+    }
+    watch->closing = 1;
+    pthread_cond_broadcast(&watch->reader_entered);
+    if (watch->active_readers > 0) {
+#if defined(__APPLE__)
+        struct kevent wake_event;
+        EV_SET(&wake_event, 1, EVFILT_USER, 0, NOTE_TRIGGER, 0, NULL);
+        while (kevent(watch->fd, &wake_event, 1, NULL, 0, NULL) < 0 && errno == EINTR) {
+        }
+#else
+        uint64_t value = 1;
+        while (write(watch->wake_fd, &value, sizeof(value)) < 0 && errno == EINTR) {
+        }
+#endif
+    }
+    while (watch->active_readers > 0 || watch->reader_waiters > 0) {
+        pthread_cond_wait(&watch->readers_drained, &watch->mutex);
+    }
+
+    struct cove_exitwatch_registration *registration = watch->registrations;
+    watch->registrations = NULL;
+    while (registration != NULL) {
+        struct cove_exitwatch_registration *next = registration->next;
+#if !defined(__APPLE__)
+        close(registration->native_fd);
+#endif
+        free(registration);
+        registration = next;
+    }
+#if !defined(__APPLE__)
+    close(watch->wake_fd);
+#endif
+    close(watch->fd);
+    pthread_mutex_unlock(&watch->mutex);
+    pthread_cond_destroy(&watch->reader_entered);
+    pthread_cond_destroy(&watch->readers_drained);
+    pthread_mutex_destroy(&watch->mutex);
+    free(watch);
+}

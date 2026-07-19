@@ -13,18 +13,25 @@ public sealed class BinaryDiscoveryService
 {
     private static readonly Regex VersionRegex = new(@"(\d+\.\d+\.\d+)", RegexOptions.Compiled);
     private readonly ILogger? _logger;
+    private readonly Func<string?> _pathResolver;
+    private readonly Func<string> _homeResolver;
     private string? _cachedPath;
 
-    public BinaryDiscoveryService(ILogger? logger = null)
+    public BinaryDiscoveryService(
+        ILogger? logger = null,
+        Func<string?>? pathResolver = null,
+        Func<string>? homeResolver = null)
     {
         _logger = logger;
+        _pathResolver = pathResolver ?? (() => Environment.GetEnvironmentVariable("PATH"));
+        _homeResolver = homeResolver ?? (() => Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
     }
 
     public BinaryDiscoveryResult Discover(BinaryDiscovery config, IReadOnlyList<string>? wellKnownPaths = null, string? loginShellPath = null)
     {
         var source = loginShellPath is not null ? "login-shell" : "process-env";
-        var rawPath = loginShellPath ?? Environment.GetEnvironmentVariable("PATH") ?? "";
-        var pathDirs = ResolvePathDirs(loginShellPath);
+        var rawPath = loginShellPath ?? _pathResolver() ?? "";
+        var pathDirs = ResolvePathDirs(rawPath);
         var commands = string.Join(",", config.Commands);
         var wellKnownCount = wellKnownPaths?.Count ?? 0;
 
@@ -121,17 +128,14 @@ public sealed class BinaryDiscoveryService
         return new BinaryDiscoveryResult(state, binaryPath, version);
     }
 
-    private static IReadOnlyList<string> ResolvePathDirs(string? loginShellPath)
-    {
-        var path = loginShellPath ?? Environment.GetEnvironmentVariable("PATH") ?? "";
-        return path.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries);
-    }
+    private static IReadOnlyList<string> ResolvePathDirs(string path)
+        => path.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries);
 
-    private static string ExpandTilde(string path)
+    private string ExpandTilde(string path)
     {
         if (path.StartsWith("~", StringComparison.Ordinal))
         {
-            var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            var home = _homeResolver();
             return path.StartsWith("~/", StringComparison.Ordinal)
                 ? Path.Combine(home, path[2..])
                 : Path.Combine(home, path[1..]);

@@ -1,4 +1,5 @@
 using Cove.Adapters;
+using Cove.Testing;
 using Xunit;
 
 namespace Cove.Adapters.Tests;
@@ -15,7 +16,7 @@ public sealed class BundledAdapterSeederTests : IDisposable
 
     public void Dispose()
     {
-        try { Directory.Delete(_root, recursive: true); } catch { }
+        TestDirectory.Delete(_root);
     }
 
     private string MakeSourceAdapter(string sourceRoot, string name, string manifestBody)

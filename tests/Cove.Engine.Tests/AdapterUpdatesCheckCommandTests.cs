@@ -3,6 +3,7 @@ using Cove.Engine.Adapters;
 using Cove.Engine.Launch;
 using Cove.Protocol;
 using Xunit;
+using Cove.Testing;
 
 namespace Cove.Engine.Tests;
 
@@ -59,10 +60,9 @@ public sealed class AdapterUpdatesCheckCommandTests
             cacheTtl: TimeSpan.Zero));
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task UpdatesCheck_ReportsNewerUpstreamVersion()
     {
-        if (OperatingSystem.IsWindows()) return;
         var root = MakeRoot();
         var binDir = WriteFakeBinary(root, "cove-fake-codex", "0.0.1");
         WriteAdapter(root, "codex", "cove-fake-codex", binDir);
@@ -86,10 +86,9 @@ public sealed class AdapterUpdatesCheckCommandTests
         Assert.Equal(new[] { "@openai/codex" }, fetched);
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task UpdatesCheck_ExcludesUpToDateHarness()
     {
-        if (OperatingSystem.IsWindows()) return;
         var root = MakeRoot();
         var binDir = WriteFakeBinary(root, "cove-fake-codex", "0.0.1");
         WriteAdapter(root, "codex", "cove-fake-codex", binDir);
@@ -104,10 +103,9 @@ public sealed class AdapterUpdatesCheckCommandTests
         Assert.Equal(0, response.Data!.Value.GetProperty("updates").GetArrayLength());
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task UpdatesCheck_SkipsUnknownAndUndetectedAdapters()
     {
-        if (OperatingSystem.IsWindows()) return;
         var root = MakeRoot();
         var binDir = WriteFakeBinary(root, "cove-fake-tool", "0.0.1");
         WriteAdapter(root, "mystery-tool", "cove-fake-tool", binDir);

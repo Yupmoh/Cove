@@ -43,7 +43,7 @@ public sealed class SkillsResolveManifestTests
             Assert.False(response!.Ok);
             Assert.Equal("not_found", response.Error!.Code);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -64,6 +64,6 @@ public sealed class SkillsResolveManifestTests
             Assert.True(response!.Ok);
             Assert.Equal("my-skill", response.Data!.Value.GetProperty("name").GetString());
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 }

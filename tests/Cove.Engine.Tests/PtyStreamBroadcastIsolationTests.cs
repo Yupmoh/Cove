@@ -3,6 +3,7 @@ using System.Text.Json;
 using Cove.Engine.Bays;
 using Cove.Protocol;
 using Xunit;
+using Cove.Testing;
 
 namespace Cove.Engine.Tests;
 
@@ -22,10 +23,9 @@ public sealed class PtyStreamBroadcastIsolationTests
         }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task GuiStream_DoesNotReceiveBroadcastEventsWhileStreamingPtyData()
     {
-        if (OperatingSystem.IsWindows()) return;
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var ct = cts.Token;
         await using var harness = await DaemonTestHarness.StartAsync();

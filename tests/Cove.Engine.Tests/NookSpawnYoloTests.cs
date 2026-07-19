@@ -6,6 +6,7 @@ using Cove.Platform.Pty;
 using Cove.Protocol;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
+using Cove.Testing;
 
 namespace Cove.Engine.Tests;
 
@@ -15,10 +16,9 @@ public sealed class NookSpawnYoloTests
 
     private static string NewDir() => Path.Combine(Path.GetTempPath(), "cove-spawnyolo-" + Guid.NewGuid().ToString("N"));
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task NookSpawn_WithYolo_PersistsYoloOverride()
     {
-        if (System.OperatingSystem.IsWindows()) return;
         var dir = NewDir();
         try
         {
@@ -34,13 +34,12 @@ public sealed class NookSpawnYoloTests
             Assert.NotNull(overrides);
             Assert.True(overrides!.Yolo);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task NookSpawn_WithoutYolo_PersistsYoloFalse()
     {
-        if (System.OperatingSystem.IsWindows()) return;
         var dir = NewDir();
         try
         {
@@ -54,13 +53,12 @@ public sealed class NookSpawnYoloTests
             var nookId = response.Data!.Value.GetProperty("nookId").GetString()!;
             Assert.False(orch.GetOverrides(nookId)?.Yolo ?? false);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task NookSpawn_WithoutAdapter_DoesNotPersistOverride()
     {
-        if (System.OperatingSystem.IsWindows()) return;
         var dir = NewDir();
         try
         {
@@ -74,6 +72,6 @@ public sealed class NookSpawnYoloTests
             var nookId = response.Data!.Value.GetProperty("nookId").GetString()!;
             Assert.Null(orch.GetOverrides(nookId));
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 }

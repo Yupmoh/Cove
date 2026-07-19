@@ -90,8 +90,8 @@ public sealed class WorktreeTests
         }
         finally
         {
-            try { Directory.Delete(repo, true); } catch { }
-            try { Directory.Delete(wtPath, true); } catch { }
+            Cove.Testing.TestDirectory.Delete(repo);
+            Cove.Testing.TestDirectory.Delete(wtPath);
         }
     }
 
@@ -165,7 +165,7 @@ public sealed class WorktreeTests
                 Assert.True(removed.Ok, removed.Stderr);
 
                 var winner = await Task.WhenAny(deleted.Task, Task.Delay(TimeSpan.FromSeconds(10)));
-                Assert.True(deleted.Task.IsCompleted, "watcher did not fire Deleted within 10s");
+                Assert.Same(deleted.Task, winner);
                 Assert.Empty(m.ListWorktrees(parent.Id));
             }
             finally
@@ -175,8 +175,8 @@ public sealed class WorktreeTests
         }
         finally
         {
-            try { Directory.Delete(repo, true); } catch { }
-            try { Directory.Delete(wtPath, true); } catch { }
+            Cove.Testing.TestDirectory.Delete(repo);
+            Cove.Testing.TestDirectory.Delete(wtPath);
         }
     }
 
@@ -201,8 +201,8 @@ public sealed class WorktreeTests
         }
         finally
         {
-            try { Directory.Delete(linkParent, true); } catch { }
-            try { Directory.Delete(real, true); } catch { }
+            Cove.Testing.TestDirectory.Delete(linkParent);
+            Cove.Testing.TestDirectory.Delete(real);
         }
     }
     [Fact]
@@ -242,8 +242,8 @@ public sealed class WorktreeTests
         }
         finally
         {
-            try { Directory.Delete(repo, true); } catch { }
-            try { Directory.Delete(wtPath, true); } catch { }
+            Cove.Testing.TestDirectory.Delete(repo);
+            Cove.Testing.TestDirectory.Delete(wtPath);
         }
     }
 }

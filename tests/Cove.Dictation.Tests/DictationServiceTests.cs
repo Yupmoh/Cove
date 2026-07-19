@@ -11,6 +11,9 @@ public sealed class DictationServiceTests
         public float[] Clip = [];
         public bool Started;
         public bool ThrowOnStart;
+        public int SnapshotCalls;
+        public TaskCompletionSource SnapshotObserved { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public void Start()
         {
@@ -25,7 +28,12 @@ public sealed class DictationServiceTests
             return Clip;
         }
 
-        public AudioSnapshot Snapshot(double maxSeconds) => new(Started ? Clip : [], 0);
+        public AudioSnapshot Snapshot(double maxSeconds)
+        {
+            Interlocked.Increment(ref SnapshotCalls);
+            SnapshotObserved.TrySetResult();
+            return new(Started ? Clip : [], 0);
+        }
     }
 
     private sealed class FakeTrimmer : ISpeechTrimmer
@@ -181,12 +189,63 @@ public sealed class DictationServiceTests
             {
                 _first = false;
                 Entered.Set();
-                Release.Wait(TimeSpan.FromSeconds(5));
+                if (!Release.Wait(TimeSpan.FromSeconds(5)))
+                    throw new TimeoutException("blocking transcriber was not released");
                 Exited = true;
                 return "partial";
             }
             return "final";
         }
+    }
+
+    private sealed class ShutdownDrain : IDisposable
+    {
+        private readonly TaskCompletionSource _completion =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly Thread _thread;
+
+        public ShutdownDrain(DictationService service)
+        {
+            _thread = new Thread(() =>
+            {
+                try
+                {
+                    service.Shutdown();
+                    _completion.TrySetResult();
+                }
+                catch (Exception ex)
+                {
+                    _completion.TrySetException(ex);
+                }
+            })
+            {
+                IsBackground = true,
+            };
+            _thread.Start();
+        }
+
+        public Task Completion => _completion.Task;
+
+        public void WaitUntilEntered()
+        {
+            Assert.True(
+                SpinWait.SpinUntil(
+                    () => (_thread.ThreadState & ThreadState.WaitSleepJoin) != 0,
+                    TimeSpan.FromSeconds(2)),
+                "shutdown did not enter its drain");
+            Assert.False(Completion.IsCompleted);
+        }
+
+        public void Dispose()
+        {
+            Assert.True(_thread.Join(TimeSpan.FromSeconds(2)), "shutdown thread did not exit");
+        }
+    }
+
+    private static async Task ShutdownAsync(DictationService service)
+    {
+        using var shutdown = new ShutdownDrain(service);
+        await shutdown.Completion.WaitAsync(TimeSpan.FromSeconds(5));
     }
 
     [Fact]
@@ -200,15 +259,22 @@ public sealed class DictationServiceTests
         Assert.True(svc.Start());
         Assert.True(tr.Entered.Wait(TimeSpan.FromSeconds(5)));
         var stopTask = svc.StopAsync();
-        await Task.Delay(50);
-        Assert.False(stopTask.IsCompleted);
-        tr.Release.Set();
-        var result = await stopTask.WaitAsync(TimeSpan.FromSeconds(5));
-        Assert.Equal("final", result.Text);
+        DictationResult? result = null;
+        try
+        {
+            Assert.Equal(DictationState.Transcribing, svc.State);
+            Assert.False(stopTask.IsCompleted);
+        }
+        finally
+        {
+            tr.Release.Set();
+            result = await stopTask.WaitAsync(TimeSpan.FromSeconds(5));
+        }
+        Assert.Equal("final", result!.Text);
     }
 
     [Fact]
-    public void Shutdown_WaitsForInFlightPartialDecode()
+    public async Task Shutdown_WaitsForInFlightPartialDecode()
     {
         var rec = new FakeRecorder { Clip = Seconds(2) };
         var tr = new BlockingTranscriber();
@@ -217,12 +283,16 @@ public sealed class DictationServiceTests
 
         Assert.True(svc.Start());
         Assert.True(tr.Entered.Wait(TimeSpan.FromSeconds(5)));
-        _ = Task.Run(() =>
+        using var shutdown = new ShutdownDrain(svc);
+        try
         {
-            Thread.Sleep(100);
+            shutdown.WaitUntilEntered();
+        }
+        finally
+        {
             tr.Release.Set();
-        });
-        svc.Shutdown();
+            await shutdown.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        }
         Assert.True(tr.Exited);
     }
 
@@ -236,15 +306,20 @@ public sealed class DictationServiceTests
         Assert.True(svc.Start());
         var stopTask = svc.StopAsync();
         Assert.True(tr.Entered.Wait(TimeSpan.FromSeconds(5)));
-        _ = Task.Run(() =>
+        using var shutdown = new ShutdownDrain(svc);
+        DictationResult? result = null;
+        try
         {
-            Thread.Sleep(100);
+            shutdown.WaitUntilEntered();
+        }
+        finally
+        {
             tr.Release.Set();
-        });
-        svc.Shutdown();
+            await shutdown.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+            result = await stopTask.WaitAsync(TimeSpan.FromSeconds(5));
+        }
         Assert.True(tr.Exited);
-        var result = await stopTask.WaitAsync(TimeSpan.FromSeconds(5));
-        Assert.Equal("partial", result.Text);
+        Assert.Equal("partial", result!.Text);
     }
 
     [Fact]
@@ -258,12 +333,21 @@ public sealed class DictationServiceTests
         Assert.True(svc.Start());
         Assert.True(tr.Entered.Wait(TimeSpan.FromSeconds(5)));
         var stopTask = svc.StopAsync();
-        var shutdownTask = Task.Run(() => svc.Shutdown());
-        await Task.Delay(50);
-        tr.Release.Set();
-        await shutdownTask.WaitAsync(TimeSpan.FromSeconds(5));
-        var result = await stopTask.WaitAsync(TimeSpan.FromSeconds(5));
-        Assert.Equal("", result.Text);
+        using var shutdown = new ShutdownDrain(svc);
+        DictationResult? result = null;
+        try
+        {
+            Assert.Equal(DictationState.Transcribing, svc.State);
+            shutdown.WaitUntilEntered();
+            Assert.False(stopTask.IsCompleted);
+        }
+        finally
+        {
+            tr.Release.Set();
+            await shutdown.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+            result = await stopTask.WaitAsync(TimeSpan.FromSeconds(5));
+        }
+        Assert.Equal("", result!.Text);
     }
 
     [Fact]
@@ -272,14 +356,34 @@ public sealed class DictationServiceTests
         var rec = new FakeRecorder { Clip = Seconds(2) };
         var svc = new DictationService(rec, new FakeTrimmer(), new CountingTranscriber(), NullLogger.Instance, TimeSpan.FromMilliseconds(10));
         var emissions = 0;
-        svc.PartialTranscript = _ => Interlocked.Increment(ref emissions);
+        var firstEmission = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var stopped = 0;
+        var postStopEmission = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        svc.PartialTranscript = _ =>
+        {
+            Interlocked.Increment(ref emissions);
+            firstEmission.TrySetResult();
+            if (Volatile.Read(ref stopped) != 0)
+                postStopEmission.TrySetResult();
+        };
 
         Assert.True(svc.Start());
-        await Task.Delay(60);
-        await svc.StopAsync();
-        var settled = Volatile.Read(ref emissions);
-        await Task.Delay(80);
-        Assert.Equal(settled, Volatile.Read(ref emissions));
+        try
+        {
+            await firstEmission.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await svc.StopAsync().WaitAsync(TimeSpan.FromSeconds(5));
+            var settled = Volatile.Read(ref emissions);
+            Volatile.Write(ref stopped, 1);
+            await Assert.ThrowsAsync<TimeoutException>(
+                () => postStopEmission.Task.WaitAsync(TimeSpan.FromMilliseconds(100)));
+            Assert.Equal(settled, Volatile.Read(ref emissions));
+        }
+        finally
+        {
+            if (svc.State == DictationState.Recording)
+                await svc.StopAsync().WaitAsync(TimeSpan.FromSeconds(5));
+            await ShutdownAsync(svc);
+        }
     }
 
     [Fact]
@@ -288,14 +392,32 @@ public sealed class DictationServiceTests
         var rec = new FakeRecorder { Clip = Seconds(2) };
         var svc = new DictationService(rec, new FakeTrimmer(), new CountingTranscriber(), NullLogger.Instance, TimeSpan.FromMilliseconds(10));
         var emissions = 0;
-        svc.PartialTranscript = _ => Interlocked.Increment(ref emissions);
+        var firstEmission = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var stopped = 0;
+        var postStopEmission = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        svc.PartialTranscript = _ =>
+        {
+            Interlocked.Increment(ref emissions);
+            firstEmission.TrySetResult();
+            if (Volatile.Read(ref stopped) != 0)
+                postStopEmission.TrySetResult();
+        };
 
         Assert.True(svc.Start());
-        await Task.Delay(60);
-        svc.Shutdown();
-        var settled = Volatile.Read(ref emissions);
-        await Task.Delay(80);
-        Assert.Equal(settled, Volatile.Read(ref emissions));
+        try
+        {
+            await firstEmission.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await ShutdownAsync(svc);
+            var settled = Volatile.Read(ref emissions);
+            Volatile.Write(ref stopped, 1);
+            await Assert.ThrowsAsync<TimeoutException>(
+                () => postStopEmission.Task.WaitAsync(TimeSpan.FromMilliseconds(100)));
+            Assert.Equal(settled, Volatile.Read(ref emissions));
+        }
+        finally
+        {
+            await ShutdownAsync(svc);
+        }
     }
 
     [Fact]
@@ -308,12 +430,23 @@ public sealed class DictationServiceTests
         svc.PartialTranscript = t => partials.TrySetResult(t);
 
         Assert.True(svc.Start());
-        var partial = await partials.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        Assert.Equal("hello world", partial);
+        var stopped = false;
+        try
+        {
+            var partial = await partials.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.Equal("hello world", partial);
 
-        var result = await svc.StopAsync();
-        Assert.Equal("hello world", result.Text);
-        Assert.Equal(DictationState.Idle, svc.State);
+            var result = await svc.StopAsync();
+            stopped = true;
+            Assert.Equal("hello world", result.Text);
+            Assert.Equal(DictationState.Idle, svc.State);
+        }
+        finally
+        {
+            if (!stopped)
+                await svc.StopAsync();
+            await ShutdownAsync(svc);
+        }
     }
 
     [Fact]
@@ -324,10 +457,20 @@ public sealed class DictationServiceTests
         var svc = new DictationService(rec, new FakeTrimmer(), tr, NullLogger.Instance, TimeSpan.FromMilliseconds(15));
 
         Assert.True(svc.Start());
-        await Task.Delay(120);
-        Assert.Equal(0, tr.Calls);
-        var result = await svc.StopAsync();
+        DictationResult? result = null;
+        try
+        {
+            await Assert.ThrowsAsync<TimeoutException>(
+                () => rec.SnapshotObserved.Task.WaitAsync(TimeSpan.FromMilliseconds(150)));
+            Assert.Equal(0, rec.SnapshotCalls);
+            Assert.Equal(0, tr.Calls);
+        }
+        finally
+        {
+            result = await svc.StopAsync();
+            await ShutdownAsync(svc);
+        }
         Assert.Equal(1, tr.Calls);
-        Assert.Equal("hello world", result.Text);
+        Assert.Equal("hello world", result!.Text);
     }
 }

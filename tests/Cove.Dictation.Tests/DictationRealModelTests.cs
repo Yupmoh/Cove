@@ -1,42 +1,70 @@
 using System.Diagnostics;
 using Cove.Dictation;
+using Cove.Testing;
 using Xunit;
 
 namespace Cove.Dictation.Tests;
 
+[Collection("Dictation real model")]
 public sealed class DictationRealModelTests
 {
     private static string ModelsRoot =>
         Environment.GetEnvironmentVariable("COVE_DICTATION_MODEL_ROOT")
         ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".cove-dev", "models");
 
-    private static string? ResolveModelDir() => new DictationModelManager(ModelsRoot).TryGetModelDir();
-
-    private static float[] Speak(string text)
+    private static string RequiredModelDir()
     {
+        var modelDir = new DictationModelManager(ModelsRoot).TryGetModelDir();
+        return TestPrerequisite.RequireDirectory(
+            modelDir ?? Path.Combine(ModelsRoot, DictationModelManager.ModelDirName),
+            $"Dictation model is missing under {ModelsRoot}.");
+    }
+
+    private static async Task<float[]> SpeakAsync(string text)
+    {
+        TestPrerequisite.RequireExecutable("say");
+        TestPrerequisite.RequireExecutable("afconvert");
         var wav = Path.Combine(Path.GetTempPath(), "cove-dictate-say-" + Guid.NewGuid().ToString("N")[..8] + ".wav");
         var aiff = Path.ChangeExtension(wav, ".aiff");
         try
         {
-            Run("say", "-o", aiff, text);
-            Run("afconvert", "-f", "WAVE", "-d", "LEI16@16000", "-c", "1", aiff, wav);
+            await RunAsync("say", "-o", aiff, text);
+            await RunAsync("afconvert", "-f", "WAVE", "-d", "LEI16@16000", "-c", "1", aiff, wav);
             return ReadWavMono16(wav);
         }
         finally
         {
-            File.Delete(aiff);
-            File.Delete(wav);
+            TestFile.Delete(aiff);
+            TestFile.Delete(wav);
         }
     }
 
-    private static void Run(string command, params string[] args)
+    private static async Task RunAsync(string command, params string[] args)
     {
-        var psi = new ProcessStartInfo(command) { UseShellExecute = false };
-        foreach (var a in args)
-            psi.ArgumentList.Add(a);
-        using var p = Process.Start(psi)!;
-        p.WaitForExit(30000);
-        Assert.Equal(0, p.ExitCode);
+        var psi = new ProcessStartInfo(command)
+        {
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+        foreach (var argument in args)
+            psi.ArgumentList.Add(argument);
+        using var process = Process.Start(psi)!;
+        var stdout = process.StandardOutput.ReadToEndAsync();
+        var stderr = process.StandardError.ReadToEndAsync();
+        int exitCode;
+        string output;
+        string error;
+        try
+        {
+            exitCode = await TestProcess.WaitForExitAsync(process, TimeSpan.FromSeconds(30));
+        }
+        finally
+        {
+            output = await stdout;
+            error = await stderr;
+        }
+        Assert.True(exitCode == 0, $"{command} exited {exitCode}. stdout: {output} stderr: {error}");
     }
 
     private static float[] ReadWavMono16(string path)
@@ -62,24 +90,32 @@ public sealed class DictationRealModelTests
         return samples;
     }
 
-    [Fact]
+    [LiveFact(TestOperatingSystem.MacOS)]
     public async Task EnsureModel_DownloadsVerifiesAndExtracts()
     {
-        if (Environment.GetEnvironmentVariable("COVE_DICTATION_ENSURE_MODEL") != "1") return;
-        var mgr = new DictationModelManager(ModelsRoot);
-        var dir = await mgr.EnsureModelAsync(null, CancellationToken.None);
-        Assert.True(Directory.Exists(dir));
-        foreach (var f in DictationModelManager.RequiredFiles)
-            Assert.True(File.Exists(Path.Combine(dir, f)), f);
+        TestPrerequisite.RequireFlag("COVE_DICTATION_ENSURE_MODEL");
+        var manager = new DictationModelManager(ModelsRoot);
+        var deadline = TimeSpan.FromMinutes(10);
+        using var timeout = new CancellationTokenSource(deadline);
+        string directory;
+        try
+        {
+            directory = await manager.EnsureModelAsync(null, timeout.Token);
+        }
+        catch (OperationCanceledException exception) when (timeout.IsCancellationRequested)
+        {
+            throw new TimeoutException($"dictation model provisioning exceeded {deadline}", exception);
+        }
+        Assert.True(Directory.Exists(directory));
+        foreach (var file in DictationModelManager.RequiredFiles)
+            Assert.True(File.Exists(Path.Combine(directory, file)), file);
     }
 
-    [Fact]
-    public void RealModel_TranscribesSynthesizedSpeech()
+    [LiveFact(TestOperatingSystem.MacOS)]
+    public async Task RealModel_TranscribesSynthesizedSpeech()
     {
-        if (!OperatingSystem.IsMacOS()) return;
-        if (ResolveModelDir() is not { } modelDir) return;
-
-        var samples = Speak("hello world");
+        var modelDir = RequiredModelDir();
+        var samples = await SpeakAsync("hello world");
         using var trimmer = new SileroSpeechTrimmer(Path.Combine(ModelsRoot, DictationModelManager.VadFileName));
         using var transcriber = new SherpaTranscriber(modelDir);
         var speech = trimmer.Trim(samples);
@@ -89,14 +125,12 @@ public sealed class DictationRealModelTests
         Assert.Contains("world", text);
     }
 
-    [Fact]
-    public void RealModel_MidSentencePause_NoPhantomText()
+    [LiveFact(TestOperatingSystem.MacOS)]
+    public async Task RealModel_MidSentencePause_NoPhantomText()
     {
-        if (!OperatingSystem.IsMacOS()) return;
-        if (ResolveModelDir() is not { } modelDir) return;
-
-        var first = Speak("the quick brown fox");
-        var second = Speak("jumps over the lazy dog");
+        var modelDir = RequiredModelDir();
+        var first = await SpeakAsync("the quick brown fox");
+        var second = await SpeakAsync("jumps over the lazy dog");
         var pause = new float[DictationService.SampleRate * 3];
         var clip = new float[first.Length + pause.Length + second.Length];
         first.CopyTo(clip, 0);
@@ -110,32 +144,28 @@ public sealed class DictationRealModelTests
         Assert.Contains("lazy dog", text);
         var allowed = new HashSet<string> { "the", "quick", "brown", "fox", "jumps", "jumped", "over", "lazy", "dog" };
         var words = text.Split(' ', StringSplitOptions.RemoveEmptyEntries)
-            .Select(w => w.Trim('.', ',', '!', '?'))
-            .Where(w => w.Length > 0);
+            .Select(word => word.Trim('.', ',', '!', '?'))
+            .Where(word => word.Length > 0);
         foreach (var word in words)
             Assert.Contains(word, allowed);
     }
 
-    [Fact]
-    public void RealModel_SecondClipAfterSpeech_SilenceYieldsNothing()
+    [LiveFact(TestOperatingSystem.MacOS)]
+    public async Task RealModel_SecondClipAfterSpeech_SilenceYieldsNothing()
     {
-        if (!OperatingSystem.IsMacOS()) return;
-        if (ResolveModelDir() is not { } _) return;
-
+        _ = RequiredModelDir();
         using var trimmer = new SileroSpeechTrimmer(Path.Combine(ModelsRoot, DictationModelManager.VadFileName));
-        var speech = trimmer.Trim(Speak("testing one two three"));
+        var speech = trimmer.Trim(await SpeakAsync("testing one two three"));
         Assert.NotEmpty(speech);
         var silence = trimmer.Trim(new float[DictationService.SampleRate * 2]);
         Assert.Empty(silence);
     }
 
-    [Fact]
-    public void RealModel_PartialTracker_ProducesProgressivePreview()
+    [LiveFact(TestOperatingSystem.MacOS)]
+    public async Task RealModel_PartialTracker_ProducesProgressivePreview()
     {
-        if (!OperatingSystem.IsMacOS()) return;
-        if (ResolveModelDir() is not { } modelDir) return;
-
-        var first = Speak("hello world");
+        var modelDir = RequiredModelDir();
+        var first = await SpeakAsync("hello world");
         var pause = new float[DictationService.SampleRate];
         var firstClip = new float[first.Length + pause.Length];
         first.CopyTo(firstClip, 0);
@@ -148,7 +178,7 @@ public sealed class DictationRealModelTests
         Assert.NotNull(partial);
         Assert.Contains("hello", partial!.ToLowerInvariant());
 
-        var second = Speak("testing dictation");
+        var second = await SpeakAsync("testing dictation");
         var grown = new float[firstClip.Length + second.Length];
         firstClip.CopyTo(grown, 0);
         second.CopyTo(grown, firstClip.Length);
@@ -158,4 +188,9 @@ public sealed class DictationRealModelTests
         Assert.Contains("hello", partial2!.ToLowerInvariant());
         Assert.Contains("testing", partial2!.ToLowerInvariant());
     }
+}
+
+[CollectionDefinition("Dictation real model", DisableParallelization = true)]
+public sealed class DictationRealModelCollection
+{
 }

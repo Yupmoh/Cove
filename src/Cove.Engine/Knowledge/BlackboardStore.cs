@@ -8,15 +8,18 @@ public sealed class BlackboardStore
 {
     private readonly string _dbPath;
     private readonly ILogger _logger;
+    private readonly TimeProvider _timeProvider;
 
-    public BlackboardStore(string dataDir, ILogger logger)
+    public BlackboardStore(string dataDir, ILogger logger, TimeProvider? timeProvider = null)
     {
         _dbPath = System.IO.Path.Combine(dataDir, "memory", "memory.db");
         _logger = logger;
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     public BlackboardPost Post(string bayId, string kind, string audience, string content, string? refId = null, System.TimeSpan? ttl = null)
     {
+        var now = _timeProvider.GetUtcNow();
         var post = new BlackboardPost
         {
             Id = System.Guid.NewGuid().ToString("N"),
@@ -25,8 +28,8 @@ public sealed class BlackboardStore
             Audience = audience,
             Content = content,
             RefId = refId,
-            CreatedAt = System.DateTimeOffset.UtcNow,
-            ExpiresAt = ttl.HasValue ? System.DateTimeOffset.UtcNow.Add(ttl.Value) : null,
+            CreatedAt = now,
+            ExpiresAt = ttl.HasValue ? now.Add(ttl.Value) : null,
         };
 
         using var conn = new SqliteConnection($"Data Source={_dbPath}");
@@ -84,7 +87,7 @@ public sealed class BlackboardStore
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "DELETE FROM blackboard WHERE bay_id = @ws AND ttl_at IS NOT NULL AND ttl_at < @now";
         cmd.Parameters.AddWithValue("@ws", bayId);
-        cmd.Parameters.AddWithValue("@now", System.DateTimeOffset.UtcNow.ToString("o"));
+        cmd.Parameters.AddWithValue("@now", _timeProvider.GetUtcNow().ToString("o"));
         var deleted = cmd.ExecuteNonQuery();
         if (deleted > 0)
             _logger.LogWarning("blackboard: swept {count} expired posts for {ws}", deleted, bayId);

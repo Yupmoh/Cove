@@ -1,16 +1,15 @@
 using System.Text.Json;
 using Cove.Protocol;
 using Xunit;
+using Cove.Testing;
 
 namespace Cove.Engine.Tests;
 
 public sealed class ConfigChangedEventLiveTests
 {
-    [Fact]
+    [LiveFact(TestOperatingSystem.Unix)]
     public async Task ConfigSet_EmitsConfigChangedEvent()
     {
-        if (System.OperatingSystem.IsWindows())
-            return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(30));
         CancellationToken ct = cts.Token;
 

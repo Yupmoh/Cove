@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text.Json;
 using Cove.Adapters;
+using Cove.Testing;
 using Xunit;
 
 namespace Cove.Adapters.Tests;
@@ -52,7 +53,7 @@ public sealed class LaunchProfileTests
             Assert.True(loaded.IsDefault);
             Assert.Equal("opus", loaded.Model);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -69,7 +70,7 @@ public sealed class LaunchProfileTests
             var claudeProfiles = store.List("claude-code");
             Assert.Equal(2, claudeProfiles.Count);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -88,7 +89,7 @@ public sealed class LaunchProfileTests
             Assert.False(profiles.First(p => p.Slug == "default").IsDefault);
             Assert.True(profiles.First(p => p.Slug == "fast").IsDefault);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -107,7 +108,7 @@ public sealed class LaunchProfileTests
             Assert.Single(profiles);
             Assert.True(profiles[0].IsDefault);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -123,7 +124,7 @@ public sealed class LaunchProfileTests
 
             Assert.Empty(store.List("claude-code"));
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -140,7 +141,7 @@ public sealed class LaunchProfileTests
             Assert.NotNull(def);
             Assert.Equal("default", def!.Slug);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -155,7 +156,7 @@ public sealed class LaunchProfileTests
             Assert.True(def!.IsDefault);
             Assert.Equal("claude-code", def.Adapter);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -172,7 +173,7 @@ public sealed class LaunchProfileTests
 
             Assert.Equal("fast", store.GetProfileForNook("claude-code", "nook-1"));
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -186,7 +187,7 @@ public sealed class LaunchProfileTests
 
             Assert.Null(store.GetProfileForNook("claude-code", "never-seen"));
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -204,7 +205,7 @@ public sealed class LaunchProfileTests
 
             Assert.Equal("fast", store.GetProfileForNook("claude-code", "nook-1"));
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -223,7 +224,7 @@ public sealed class LaunchProfileTests
             store.RecordLastUsed("claude-code", "fast");
             Assert.Equal("fast", store.GetLastUsed("claude-code"));
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -235,7 +236,7 @@ public sealed class LaunchProfileTests
             var store = new LaunchProfileStore(dir);
             Assert.Null(store.GetLastUsed("claude-code"));
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -256,7 +257,7 @@ public sealed class LaunchProfileTests
             Assert.False(chip.IsDefault);
             Assert.NotNull(chip.LastUsedAt);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -274,7 +275,7 @@ public sealed class LaunchProfileTests
             Assert.Equal("default", chip!.ProfileSlug);
             Assert.True(chip.IsDefault);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -291,6 +292,6 @@ public sealed class LaunchProfileTests
             Assert.Single(profiles);
             Assert.Equal("default", profiles[0].Slug);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 }

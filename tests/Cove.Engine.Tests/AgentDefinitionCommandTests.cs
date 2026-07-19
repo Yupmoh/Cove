@@ -34,7 +34,7 @@ public class AgentDefinitionCommandTests
             var agents = response.Data!.Value.GetProperty("agents");
             Assert.Equal(2, agents.GetArrayLength());
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -57,7 +57,7 @@ public class AgentDefinitionCommandTests
             Assert.Equal("prompt body", data.GetProperty("prompt").GetString());
             Assert.Equal(1, data.GetProperty("attachedSkills").GetArrayLength());
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -75,7 +75,7 @@ public class AgentDefinitionCommandTests
             Assert.False(response!.Ok);
             Assert.Equal("not_found", response.Error!.Code);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -95,7 +95,7 @@ public class AgentDefinitionCommandTests
             Assert.True(response!.Ok);
             Assert.Null(store.Load("deletable"));
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -113,7 +113,7 @@ public class AgentDefinitionCommandTests
             Assert.False(response!.Ok);
             Assert.Equal("invalid_params", response.Error!.Code);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]

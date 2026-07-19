@@ -1,4 +1,3 @@
-using System.Buffers.Binary;
 using System.Text.Json;
 using Cove.Protocol;
 
@@ -36,9 +35,9 @@ public sealed class PtyStreamClient : IAsyncDisposable
         try
         {
             await Request(s, "cove://sys/hello",
-                JsonSerializer.SerializeToElement(new HelloParams(ProtocolConstants.SemanticProtocolVersion, "gui-stream", clientVersion, channel), CoveJsonContext.Default.HelloParams), 1, ct);
+                JsonSerializer.SerializeToElement(new HelloParams(ProtocolConstants.SemanticProtocolVersion, "gui-stream", clientVersion, channel), CoveJsonContext.Default.HelloParams), null, 1, ct);
             var sub = await Request(s, "cove://commands/nook.subscribe",
-                JsonSerializer.SerializeToElement(new SubscribeParams(nookId, since), CoveJsonContext.Default.SubscribeParams), 2, ct);
+                JsonSerializer.SerializeToElement(new SubscribeParams(nookId, since), CoveJsonContext.Default.SubscribeParams), "user:gui", 2, ct);
             if (!sub.Ok || sub.Data is null) throw new InvalidOperationException($"subscribe failed: {sub.Error?.Code}");
             var r = JsonSerializer.Deserialize(sub.Data.Value, CoveJsonContext.Default.SubscribeResult)!;
             return new PtyStreamClient(s, r);
@@ -50,10 +49,16 @@ public sealed class PtyStreamClient : IAsyncDisposable
         }
     }
 
-    private static async Task<ControlResponse> Request(Stream s, string uri, JsonElement paramsEl, uint seq, CancellationToken ct)
+    private static async Task<ControlResponse> Request(
+        Stream s,
+        string uri,
+        JsonElement paramsEl,
+        string? source,
+        uint seq,
+        CancellationToken ct)
     {
         var id = uri.EndsWith("hello") ? "h" : "s";
-        var req = new ControlRequest(id, uri, paramsEl, "user:gui");
+        var req = new ControlRequest(id, uri, paramsEl, source);
         var bytes = JsonSerializer.SerializeToUtf8Bytes(req, CoveJsonContext.Default.ControlRequest);
         var gate = new SemaphoreSlim(1, 1);
         await FrameIo.WriteAsync(s, gate, FrameType.Request, 0, seq, bytes, ct);
@@ -67,9 +72,9 @@ public sealed class PtyStreamClient : IAsyncDisposable
     }
 
     public async Task PumpAsync(
-        Func<ulong, ReadOnlyMemory<byte>, CancellationToken, Task> onData,
-        Func<ulong, string, string, int, int, CancellationToken, Task> onResync,
-        Func<ulong, int, CancellationToken, Task> onEnd,
+        Func<StreamDataMessage, CancellationToken, Task> onData,
+        Func<StreamResyncMessage, CancellationToken, Task> onResync,
+        Func<StreamEndMessage, CancellationToken, Task> onEnd,
         CancellationToken ct)
     {
         while (true)
@@ -79,35 +84,13 @@ public sealed class PtyStreamClient : IAsyncDisposable
             switch (f.Type)
             {
                 case FrameType.StreamData:
-                    if (f.Payload.Length < 8)
-                        throw new InvalidDataException($"StreamData payload is too short: expected at least 8 bytes, received {f.Payload.Length}");
-                    var offset = BinaryPrimitives.ReadUInt64LittleEndian(f.Payload);
-                    await onData(offset, f.Payload.AsMemory(8), ct);
+                    await onData(StreamPayload.ReadStreamData(f.Payload), ct);
                     break;
                 case FrameType.Resync:
-                    if (f.Payload.Length < 8)
-                        throw new InvalidDataException($"Resync payload is too short: expected at least 8 bytes, received {f.Payload.Length}");
-                    ulong newBase = BinaryPrimitives.ReadUInt64LittleEndian(f.Payload);
-                    if (f.Payload.Length < 20)
-                    {
-                        await onResync(newBase, f.Payload.Length > 8 ? Convert.ToBase64String(f.Payload.AsSpan(8)) : "", "", 0, 0, ct);
-                        break;
-                    }
-                    int cols = BinaryPrimitives.ReadInt32LittleEndian(f.Payload.AsSpan(8));
-                    int rows = BinaryPrimitives.ReadInt32LittleEndian(f.Payload.AsSpan(12));
-                    int modeLength = BinaryPrimitives.ReadInt32LittleEndian(f.Payload.AsSpan(16));
-                    if (modeLength < 0 || modeLength > f.Payload.Length - 20)
-                        throw new InvalidDataException("invalid resync mode length");
-                    string modes = modeLength == 0 ? "" : Convert.ToBase64String(f.Payload.AsSpan(20, modeLength));
-                    string checkpoint = modeLength == f.Payload.Length - 20 ? "" : Convert.ToBase64String(f.Payload.AsSpan(20 + modeLength));
-                    await onResync(newBase, modes, checkpoint, cols, rows, ct);
+                    await onResync(StreamPayload.ReadResync(f.Payload), ct);
                     break;
                 case FrameType.StreamEnd:
-                    if (f.Payload.Length < 12)
-                        throw new InvalidDataException($"StreamEnd payload is too short: expected at least 12 bytes, received {f.Payload.Length}");
-                    var final = BinaryPrimitives.ReadUInt64LittleEndian(f.Payload);
-                    var code = BinaryPrimitives.ReadInt32LittleEndian(f.Payload.AsSpan(8));
-                    await onEnd(final, code, ct);
+                    await onEnd(StreamPayload.ReadStreamEndMessage(f.Payload), ct);
                     return;
             }
         }

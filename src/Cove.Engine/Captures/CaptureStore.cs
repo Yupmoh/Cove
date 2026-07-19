@@ -22,14 +22,16 @@ public sealed class CaptureStore
     private readonly string _capturesDir;
     private readonly string _dbPath;
     private readonly ILogger _logger;
+    private readonly TimeProvider _timeProvider;
     private int _nextNumber = 1;
 
-    public CaptureStore(string dataDir, ILogger logger)
+    public CaptureStore(string dataDir, ILogger logger, TimeProvider? timeProvider = null)
     {
         _capturesDir = System.IO.Path.Combine(dataDir, "captures");
         _dbPath = System.IO.Path.Combine(dataDir, "captures.db");
         System.IO.Directory.CreateDirectory(_capturesDir);
         _logger = logger;
+        _timeProvider = timeProvider ?? TimeProvider.System;
         EnsureSchema();
         _nextNumber = GetMaxNumber() + 1;
     }
@@ -38,7 +40,7 @@ public sealed class CaptureStore
     {
         var number = System.Threading.Interlocked.Increment(ref _nextNumber) - 1;
         var id = System.Guid.NewGuid().ToString("N");
-        var createdAt = System.DateTimeOffset.UtcNow;
+        var createdAt = _timeProvider.GetUtcNow();
         var bundleDir = System.IO.Path.Combine(_capturesDir, $"CAP-{number}");
         System.IO.Directory.CreateDirectory(bundleDir);
 
@@ -72,7 +74,7 @@ public sealed class CaptureStore
         var cap = GetCapture(id);
         if (cap is null) return null;
 
-        var stoppedAt = System.DateTimeOffset.UtcNow;
+        var stoppedAt = _timeProvider.GetUtcNow();
         var duration = stoppedAt - cap.CreatedAt;
         var updated = cap with { Duration = duration, Status = "stopped" };
 
@@ -176,7 +178,7 @@ public sealed class CaptureStore
                 chapters.Add(existing.TrimStart('[').TrimEnd(']'));
         }
 
-        var offsetMs = (long)(System.DateTimeOffset.UtcNow - cap.CreatedAt).TotalMilliseconds;
+        var offsetMs = (long)(_timeProvider.GetUtcNow() - cap.CreatedAt).TotalMilliseconds;
         chapters.Add($$"""{"offsetMs": {{offsetMs}}, "label": "{{EscapeJson(label)}}"}""");
 
         var json = "[\n  " + string.Join(",\n  ", chapters) + "\n]";

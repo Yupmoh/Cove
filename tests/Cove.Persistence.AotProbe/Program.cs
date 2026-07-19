@@ -56,8 +56,22 @@ catch (Exception ex)
 }
 finally
 {
-    foreach (var suffix in new[] { "", "-wal", "-shm" })
-        try { File.Delete(dbPath + suffix); } catch { }
+    try
+    {
+        foreach (var suffix in new[] { "", "-wal", "-shm" })
+        {
+            var path = dbPath + suffix;
+            if (File.Exists(path))
+                File.Delete(path);
+            if (File.Exists(path))
+                throw new IOException($"probe artifact remains after cleanup: {path}");
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.Error.WriteLine($"PROBE CLEANUP FAIL: {ex.GetType().Name}: {ex.Message}");
+        exitCode = 1;
+    }
 }
 
 return exitCode;

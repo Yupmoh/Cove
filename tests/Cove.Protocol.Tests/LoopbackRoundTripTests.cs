@@ -1,26 +1,29 @@
 using System.Text;
 using System.Text.Json;
 using Cove.Platform.Ipc;
+using Cove.Testing;
 using Xunit;
 
 namespace Cove.Protocol.Tests;
 
 public sealed class LoopbackRoundTripTests
 {
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
+    [Trait(TestTraits.Category, TestTraits.Platform)]
     public async Task Loopback_Hello_Ping_InterleavedStreams_Credit()
     {
-        string dir = Path.Combine(Path.GetTempPath(), "cove-ipc-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(dir);
-        string socketPath = Path.Combine(dir, "dev.sock");
-        IControlEndpoint endpoint = ControlEndpointFactory.FromSocketPath(socketPath);
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-
-        ulong readCreditAck = 0;
-
-        await using IControlListener listener = endpoint.Bind();
-        Task server = Task.Run(async () =>
+        string dir = TestDirectory.Create("cove-ipc-");
+        try
         {
+            string socketPath = Path.Combine(dir, "dev.sock");
+            IControlEndpoint endpoint = ControlEndpointFactory.FromSocketPath(socketPath);
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+
+            ulong readCreditAck = 0;
+
+            await using IControlListener listener = endpoint.Bind();
+            Task server = Task.Run(async () =>
+            {
             await using Stream s = await listener.AcceptAsync(cts.Token);
             await using var conn = new FrameConnection(s);
 
@@ -47,10 +50,10 @@ public sealed class LoopbackRoundTripTests
             Assert.Equal(FrameType.Credit, credit.Header.Type);
             Assert.Equal(1UL, credit.Header.StreamId);
             readCreditAck = StreamPayload.ReadOffset(credit.Payload);
-        }, cts.Token);
+            }, cts.Token);
 
-        Task client = Task.Run(async () =>
-        {
+            Task client = Task.Run(async () =>
+            {
             await using Stream s = await endpoint.ConnectAsync(5000, cts.Token);
             await using var conn = new FrameConnection(s);
 
@@ -98,12 +101,15 @@ public sealed class LoopbackRoundTripTests
             byte[] creditPayload = new byte[8];
             StreamPayload.WriteOffset(creditPayload, next1);
             await conn.WriteFrameAsync(FrameType.Credit, 1, creditPayload, cts.Token);
-        }, cts.Token);
+            }, cts.Token);
 
-        await Task.WhenAll(server, client);
-        Assert.Equal(9UL, readCreditAck);
-
-        try { Directory.Delete(dir, recursive: true); } catch { }
+            await Task.WhenAll(server, client);
+            Assert.Equal(9UL, readCreditAck);
+        }
+        finally
+        {
+            TestDirectory.Delete(dir);
+        }
     }
 
     private static byte[] MakeStreamData(ulong offset, string text)

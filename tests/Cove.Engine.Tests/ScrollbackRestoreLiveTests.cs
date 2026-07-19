@@ -3,16 +3,15 @@ using System.Text.Json;
 using Cove.Platform.Ipc;
 using Cove.Protocol;
 using Xunit;
+using Cove.Testing;
 
 namespace Cove.Engine.Tests;
 
 public sealed class ScrollbackRestoreLiveTests
 {
-    [Fact]
+    [LiveFact(TestOperatingSystem.Unix)]
     public async Task ScrollbackSnapshot_SurvivesRestart_AndRestoresIntoRing()
     {
-        if (System.OperatingSystem.IsWindows())
-            return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(90));
         CancellationToken ct = cts.Token;
 
@@ -32,7 +31,16 @@ public sealed class ScrollbackRestoreLiveTests
             CoveJsonContext.Default.LayoutMutateParams);
         await RequestAsync(ctl, "cr", "cove://commands/layout.mutate", mp, ct);
 
-        await Task.Delay(1500, ct);
+        JsonElement readinessParams = JsonSerializer.SerializeToElement(new NookReadParams(nookId, 0, 65536), CoveJsonContext.Default.NookReadParams);
+        await AsyncTest.EventuallyAsync(async () =>
+        {
+            var response = await RequestAsync(ctl, "ready", "cove://commands/nook.read", readinessParams, ct);
+            if (!response.Ok)
+                return false;
+            var result = response.Data!.Value.Deserialize(CoveJsonContext.Default.NookReadResult)!;
+            return !string.IsNullOrEmpty(result.DataBase64)
+                && Encoding.UTF8.GetString(Convert.FromBase64String(result.DataBase64)).Contains(marker, StringComparison.Ordinal);
+        }, TimeSpan.FromSeconds(10), "scrollback marker was not captured before restart", ct);
         await h.RestartAsync();
         await using FrameConnection ctl2 = await h.ConnectAsync("cli");
 

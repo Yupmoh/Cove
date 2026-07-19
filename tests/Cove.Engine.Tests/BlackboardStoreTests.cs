@@ -9,13 +9,13 @@ public sealed class BlackboardStoreTests
 {
     private static string NewDir() => System.IO.Path.Combine(System.IO.Path.GetTempPath(), "cove-bb-" + System.Guid.NewGuid().ToString("N"));
 
-    private static (string dir, BlackboardStore store) NewStore()
+    private static (string dir, BlackboardStore store) NewStore(TimeProvider? timeProvider = null)
     {
         var dir = NewDir();
         System.IO.Directory.CreateDirectory(dir);
         var kernel = new KnowledgePersistenceKernel(dir, NullLogger.Instance);
         kernel.EnsureAllSchemas();
-        return (dir, new BlackboardStore(dir, NullLogger.Instance));
+        return (dir, new BlackboardStore(dir, NullLogger.Instance, timeProvider));
     }
 
     [Fact]
@@ -34,9 +34,10 @@ public sealed class BlackboardStoreTests
     [Fact]
     public void TtlExpiredPost_IsSweptOnShow()
     {
-        var (_, store) = NewStore();
+        var time = new ManualTimeProvider();
+        var (_, store) = NewStore(time);
         store.Post("ws1", "claim", "bay", "temporary claim", ttl: System.TimeSpan.FromMilliseconds(1));
-        System.Threading.Thread.Sleep(50);
+        time.Advance(TimeSpan.FromMilliseconds(2));
 
         var shown = store.Show("ws1");
         Assert.Empty(shown);
@@ -45,10 +46,11 @@ public sealed class BlackboardStoreTests
     [Fact]
     public void NonExpiringPost_SurvivesShow()
     {
-        var (_, store) = NewStore();
+        var time = new ManualTimeProvider();
+        var (_, store) = NewStore(time);
         store.Post("ws1", "claim", "bay", "permanent claim");
 
-        System.Threading.Thread.Sleep(50);
+        time.Advance(TimeSpan.FromDays(1));
         var shown = store.Show("ws1");
         Assert.Single(shown);
     }

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Cove.Adapters;
+using Cove.Testing;
 using Xunit;
 
 namespace Cove.Adapters.Tests;
@@ -41,10 +42,10 @@ public sealed class AdapterReloadWatcherTests
         return condition();
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
+    [Trait(TestTraits.Category, TestTraits.Platform)]
     public async Task Reload_TriggersOnManifestChange()
     {
-        if (OperatingSystem.IsWindows()) return;
         var dir = NewDir();
         Directory.CreateDirectory(dir);
         var adapterDir = Path.Combine(dir, "watched-adapter");
@@ -62,13 +63,13 @@ public sealed class AdapterReloadWatcherTests
             Assert.True(ok, "manifest change did not trigger reload within 5s");
             Assert.Equal("watched-adapter", changedName);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
+    [Trait(TestTraits.Category, TestTraits.Platform)]
     public async Task Reload_TriggersOnScriptChange()
     {
-        if (OperatingSystem.IsWindows()) return;
         var dir = NewDir();
         Directory.CreateDirectory(dir);
         var adapterDir = Path.Combine(dir, "script-adapter");
@@ -86,13 +87,13 @@ public sealed class AdapterReloadWatcherTests
             var ok = await WaitForAsync(() => triggered, TimeSpan.FromSeconds(5));
             Assert.True(ok, "script change did not trigger reload within 5s");
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
+    [Trait(TestTraits.Category, TestTraits.Platform)]
     public async Task Reload_TriggersOnAtomicRenameSwap()
     {
-        if (OperatingSystem.IsWindows()) return;
         var dir = NewDir();
         Directory.CreateDirectory(dir);
         var adapterDir = Path.Combine(dir, "rename-adapter");
@@ -114,13 +115,13 @@ public sealed class AdapterReloadWatcherTests
             Assert.True(ok, "atomic rename swap did not trigger reload within 5s");
             Assert.Equal("rename-adapter", changedName);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
+    [Trait(TestTraits.Category, TestTraits.Platform)]
     public async Task Reload_DebouncesMultipleEvents()
     {
-        if (OperatingSystem.IsWindows()) return;
         var dir = NewDir();
         Directory.CreateDirectory(dir);
         var adapterDir = Path.Combine(dir, "debounce-adapter");
@@ -128,22 +129,27 @@ public sealed class AdapterReloadWatcherTests
         try
         {
             var triggerCount = 0;
+            var firstTrigger = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var extraTrigger = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             using var watcher = new AdapterReloadWatcher(dir, debounceMs: 300);
-            watcher.AdapterChanged += (_) => Interlocked.Increment(ref triggerCount);
+            watcher.AdapterChanged += (_) =>
+            {
+                if (Interlocked.Increment(ref triggerCount) == 1)
+                    firstTrigger.TrySetResult();
+                else
+                    extraTrigger.TrySetResult();
+            };
             watcher.Start();
 
             for (int i = 0; i < 5; i++)
-            {
                 WriteManifest(adapterDir, version: $"1.0.{i}");
-                await Task.Delay(10);
-            }
 
-            Assert.True(await WaitForAsync(() => Volatile.Read(ref triggerCount) >= 1, TimeSpan.FromSeconds(5)), "debounced reload never fired");
-            await Task.Delay(700);
-            var settled = Volatile.Read(ref triggerCount);
-            Assert.True(settled <= 2, $"expected <=2 debounced events, got {settled}");
+            await AsyncTest.CompletesWithinAsync(firstTrigger.Task, TimeSpan.FromSeconds(5), "debounced reload never fired");
+            var unexpected = await Task.WhenAny(extraTrigger.Task, Task.Delay(TimeSpan.FromMilliseconds(700)));
+            Assert.NotSame(extraTrigger.Task, unexpected);
+            Assert.Equal(1, Volatile.Read(ref triggerCount));
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -155,10 +161,10 @@ public sealed class AdapterReloadWatcherTests
         Assert.False(AdapterReloadWatcher.IsWatchableDir(Path.Combine("x", ".DS_Store")));
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
+    [Trait(TestTraits.Category, TestTraits.Platform)]
     public async Task Reload_ThrowingHandler_DoesNotBreakSubsequentHandlers()
     {
-        if (OperatingSystem.IsWindows()) return;
         var dir = NewDir();
         Directory.CreateDirectory(dir);
         var adapterDir = Path.Combine(dir, "resilient-adapter");
@@ -176,13 +182,13 @@ public sealed class AdapterReloadWatcherTests
             var ok = await WaitForAsync(() => secondFired, TimeSpan.FromSeconds(5));
             Assert.True(ok, "second handler did not fire after first handler threw");
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
+    [Trait(TestTraits.Category, TestTraits.Platform)]
     public async Task Reload_FiresAdaptersChangedAfterAdapterChanged()
     {
-        if (OperatingSystem.IsWindows()) return;
         var dir = NewDir();
         Directory.CreateDirectory(dir);
         var adapterDir = Path.Combine(dir, "broadcast-adapter");
@@ -199,6 +205,6 @@ public sealed class AdapterReloadWatcherTests
             var ok = await WaitForAsync(() => adaptersChangedFired, TimeSpan.FromSeconds(5));
             Assert.True(ok, "AdaptersChanged did not fire after manifest change");
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 }

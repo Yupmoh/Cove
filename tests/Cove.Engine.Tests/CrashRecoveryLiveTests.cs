@@ -2,16 +2,15 @@ using System.Text.Json;
 using Cove.Platform.Ipc;
 using Cove.Protocol;
 using Xunit;
+using Cove.Testing;
 
 namespace Cove.Engine.Tests;
 
 public sealed class CrashRecoveryLiveTests
 {
-    [Fact]
+    [LiveFact(TestOperatingSystem.Unix)]
     public async Task PerNookCrash_LeavesSiblingAlive_AndShowsExitState()
     {
-        if (System.OperatingSystem.IsWindows())
-            return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(60));
         CancellationToken ct = cts.Token;
 
@@ -21,10 +20,16 @@ public sealed class CrashRecoveryLiveTests
         string crashNook = await SpawnAsync(ctl, "/bin/sh", new[] { "-c", "sleep 1; exit 7" }, ct);
         string siblingNook = await SpawnAsync(ctl, "/bin/sh", new[] { "-c", "sleep 30" }, ct);
 
-        await Task.Delay(2500, ct);
-
-        ControlResponse listResp = await RequestAsync(ctl, "li", "cove://commands/nook.list", null, ct);
-        Assert.True(listResp.Ok);
+        ControlResponse? listResp = null;
+        await AsyncTest.EventuallyAsync(async () =>
+        {
+            listResp = await RequestAsync(ctl, "li", "cove://commands/nook.list", null, ct);
+            if (!listResp.Ok)
+                return false;
+            var listed = listResp.Data!.Value.Deserialize(CoveJsonContext.Default.NookListResult)!.Nooks;
+            return listed.Single(p => p.NookId == crashNook).Alive == false;
+        }, TimeSpan.FromSeconds(10), "crashed nook did not transition to an exited state", ct);
+        Assert.True(listResp!.Ok);
         var nooks = listResp.Data!.Value.Deserialize(CoveJsonContext.Default.NookListResult)!.Nooks;
         var crash = nooks.Single(p => p.NookId == crashNook);
         var sibling = nooks.Single(p => p.NookId == siblingNook);
@@ -38,11 +43,9 @@ public sealed class CrashRecoveryLiveTests
         Assert.True(writeResp.Ok, "sibling nook should still accept writes after the other nook crashed");
     }
 
-    [Fact]
+    [LiveFact(TestOperatingSystem.Unix)]
     public async Task Reattach_AfterClientDisconnect_ReplaysRingByteIdentical()
     {
-        if (System.OperatingSystem.IsWindows())
-            return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(60));
         CancellationToken ct = cts.Token;
 
@@ -51,7 +54,6 @@ public sealed class CrashRecoveryLiveTests
         await using (FrameConnection ctl = await h.ConnectAsync("cli"))
         {
             nookId = await SpawnAsync(ctl, "/bin/sh", new[] { "-c", "printf 'REATtach_PROOF\n'; sleep 30" }, ct);
-            await Task.Delay(1000, ct);
         }
 
         await using FrameConnection ctl2 = await h.ConnectAsync("cli");

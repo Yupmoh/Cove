@@ -54,6 +54,6 @@ public sealed class NookDescriptorAdapterTests
             Assert.Equal("Claude Code", sessions["p1"].AgentName);
             Assert.Equal("sess-1", sessions["p1"].SessionId);
         }
-        finally { try { Directory.Delete(wsDir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(wsDir); }
     }
 }

@@ -46,7 +46,7 @@ public sealed class NookCommandsTests
             var resp = await EngineCommandRouter.RouteAsync(new ControlRequest("r1", "cove://commands/search.query", prm), searchService: search);
             Assert.True(resp!.Ok);
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
     [Fact]
     public async Task SearchReplace_ReplacesInFiles()
@@ -65,7 +65,7 @@ public sealed class NookCommandsTests
             var content = System.IO.File.ReadAllText(filePath);
             Assert.Equal("hi world\nhi again\n", content);
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]

@@ -19,5 +19,8 @@ internal sealed class RecordingSink : IPtyDeliverySink
         _data.SetLength(0);
     }
 
+    public bool Contains(ReadOnlySpan<byte> value) =>
+        _data.GetBuffer().AsSpan(0, checked((int)_data.Length)).IndexOf(value) >= 0;
+
     public byte[] Delivered => _data.ToArray();
 }

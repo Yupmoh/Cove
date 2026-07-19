@@ -7,6 +7,7 @@ using Cove.Engine;
 using Cove.Engine.Sessions;
 using Cove.Protocol;
 using Xunit;
+using Cove.Testing;
 
 namespace Cove.Engine.Tests;
 
@@ -51,10 +52,9 @@ public sealed class SessionRecentCommandTests
             Cove.Persistence.CoveJsonContext.Default.NookDescriptor);
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task Recent_ReturnsAdapterSessionIdsAndLabels_NewestFirst()
     {
-        if (OperatingSystem.IsWindows()) return;
         var root = CopyFixture("test-v2");
         try
         {
@@ -79,13 +79,12 @@ public sealed class SessionRecentCommandTests
             Assert.Equal("Fix the router", sessions[1].GetProperty("label").GetString());
             Assert.Equal("/repo/work", sessions[0].GetProperty("cwd").GetString());
         }
-        finally { try { Directory.Delete(root, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(root); }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task Recent_FailingAdapter_DegradesToEmpty_NotError()
     {
-        if (OperatingSystem.IsWindows()) return;
         var root = CopyFixture("test-v2");
         try
         {
@@ -96,13 +95,12 @@ public sealed class SessionRecentCommandTests
             Assert.True(resp!.Ok);
             Assert.Equal(0, resp.Data!.Value.GetProperty("sessions").GetArrayLength());
         }
-        finally { try { Directory.Delete(root, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(root); }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task Recent_PrefersNookTitleOverAdapterLabel()
     {
-        if (OperatingSystem.IsWindows()) return;
         var root = CopyFixture("test-v2");
         var baysDir = Path.Combine(Path.GetTempPath(), "cove-recent-bays-" + Guid.NewGuid().ToString("N"));
         try
@@ -124,13 +122,12 @@ public sealed class SessionRecentCommandTests
             Assert.Equal(1, sessions.GetArrayLength());
             Assert.Equal("cove-session", sessions[0].GetProperty("label").GetString());
         }
-        finally { try { Directory.Delete(root, true); } catch { } try { Directory.Delete(baysDir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(root); Cove.Testing.TestDirectory.Delete(baysDir); }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task Recent_KeepsDistinctSessionsWithIdenticalLabels()
     {
-        if (OperatingSystem.IsWindows()) return;
         var root = CopyFixture("test-v2");
         var baysDir = Path.Combine(Path.GetTempPath(), "cove-recent-bays-" + Guid.NewGuid().ToString("N"));
         try
@@ -157,13 +154,12 @@ public sealed class SessionRecentCommandTests
             Assert.Equal("cove-session", sessions[0].GetProperty("label").GetString());
             Assert.Equal("cove-session", sessions[1].GetProperty("label").GetString());
         }
-        finally { try { Directory.Delete(root, true); } catch { } try { Directory.Delete(baysDir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(root); Cove.Testing.TestDirectory.Delete(baysDir); }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task Recent_KeepsDistinctLabels()
     {
-        if (OperatingSystem.IsWindows()) return;
         var root = CopyFixture("test-v2");
         var baysDir = Path.Combine(Path.GetTempPath(), "cove-recent-bays-" + Guid.NewGuid().ToString("N"));
         try
@@ -187,13 +183,12 @@ public sealed class SessionRecentCommandTests
             Assert.Equal("cove-session", sessions[0].GetProperty("label").GetString());
             Assert.Equal("Fix the router", sessions[1].GetProperty("label").GetString());
         }
-        finally { try { Directory.Delete(root, true); } catch { } try { Directory.Delete(baysDir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(root); Cove.Testing.TestDirectory.Delete(baysDir); }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task Recent_ZeroLimitReturnsEveryDiscoveredSession()
     {
-        if (OperatingSystem.IsWindows()) return;
         var root = CopyFixture("test-v2");
         try
         {
@@ -206,7 +201,7 @@ public sealed class SessionRecentCommandTests
             Assert.True(resp!.Ok);
             Assert.Equal(25, resp.Data!.Value.GetProperty("sessions").GetArrayLength());
         }
-        finally { try { Directory.Delete(root, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(root); }
     }
 
     [Fact]
@@ -217,10 +212,9 @@ public sealed class SessionRecentCommandTests
         Assert.Equal("not_ready", resp.Error!.Code);
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task Recent_SkipsAdaptersThatDeclareNoSessionListing()
     {
-        if (OperatingSystem.IsWindows()) return;
         var root = CopyFixture("test-v2");
         try
         {
@@ -245,6 +239,6 @@ public sealed class SessionRecentCommandTests
             Assert.Contains("s1", ids);
             Assert.DoesNotContain("ghost", ids);
         }
-        finally { try { Directory.Delete(root, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(root); }
     }
 }

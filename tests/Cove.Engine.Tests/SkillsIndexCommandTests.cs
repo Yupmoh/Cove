@@ -45,7 +45,7 @@ public class SkillsIndexCommandTests
             Assert.Equal("test-skill", first.GetProperty("name").GetString());
             Assert.Equal("a test skill", first.GetProperty("description").GetString());
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]

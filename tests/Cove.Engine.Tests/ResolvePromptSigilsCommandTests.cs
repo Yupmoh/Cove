@@ -47,7 +47,7 @@ public class ResolvePromptSigilsCommandTests
             Assert.Equal(1, unresolved.GetArrayLength());
             Assert.Equal("missing", unresolved[0].GetString());
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -66,7 +66,7 @@ public class ResolvePromptSigilsCommandTests
             Assert.False(response!.Ok);
             Assert.Equal("invalid_params", response.Error!.Code);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -88,6 +88,6 @@ public class ResolvePromptSigilsCommandTests
             var resolved = response.Data!.Value.GetProperty("resolved");
             Assert.Equal(1, resolved.GetArrayLength());
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 }

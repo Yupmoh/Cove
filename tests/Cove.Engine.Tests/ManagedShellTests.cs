@@ -2,6 +2,7 @@ using System.IO;
 using Cove.Engine.Shell;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
+using Cove.Testing;
 
 namespace Cove.Engine.Tests;
 
@@ -22,7 +23,7 @@ public sealed class ManagedShellTests
             Assert.Contains("export COVE_CLI_PATH=", content);
             Assert.Contains("export __COVE_MANAGED_KEYS=", content);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -37,7 +38,7 @@ public sealed class ManagedShellTests
             Assert.Contains("case \":$PATH:\"", content);
             Assert.Contains("export PATH=", content);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -54,7 +55,7 @@ public sealed class ManagedShellTests
             Assert.Contains("set -x COVE_CLI_PATH", content);
             Assert.DoesNotContain("export ", content);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -70,7 +71,7 @@ public sealed class ManagedShellTests
             svc.ReinstallBinCove();
             Assert.True(File.Exists(svc.BinCovePath));
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -90,7 +91,7 @@ public sealed class ManagedShellTests
             var secondContent = File.ReadAllText(svc.BinCovePath);
             Assert.Equal(firstContent, secondContent);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -109,7 +110,7 @@ public sealed class ManagedShellTests
             Assert.Contains("first", File.ReadAllText(svc.BinCovePath));
             Assert.Equal(Cove.Platform.CoveBuild.InformationalVersion, File.ReadAllText(Path.Combine(dir, "bin", ".cove-version")).Trim());
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -122,14 +123,12 @@ public sealed class ManagedShellTests
             svc.ReinstallBinCove();
             Assert.False(File.Exists(svc.BinCovePath));
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
-    [Fact]
+    [ExternalFact(TestOperatingSystem.Unix, "bash")]
     public void EnvSh_SourcesInBash()
     {
-        if (System.OperatingSystem.IsWindows()) return;
-        if (!ShellExists("bash")) return;
         var dir = NewDir();
         try
         {
@@ -139,13 +138,12 @@ public sealed class ManagedShellTests
             Assert.Equal(0, exit);
             Assert.Contains(dir, output);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
-    [Fact]
+    [ExternalFact(TestOperatingSystem.Unix, "zsh")]
     public void EnvSh_SourcesInZsh()
     {
-        if (!ShellExists("zsh")) return;
         var dir = NewDir();
         try
         {
@@ -155,13 +153,12 @@ public sealed class ManagedShellTests
             Assert.Equal(0, exit);
             Assert.Contains(dir, output);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
-    [Fact]
+    [ExternalFact(TestOperatingSystem.Unix, "fish")]
     public void EnvFish_SourcesInFish()
     {
-        if (!ShellExists("fish")) return;
         var dir = NewDir();
         try
         {
@@ -171,18 +168,7 @@ public sealed class ManagedShellTests
             Assert.Equal(0, exit);
             Assert.Contains(dir, output);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
-    }
-
-    private static bool ShellExists(string shell)
-    {
-        try
-        {
-            var p = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("which", shell) { RedirectStandardOutput = true, RedirectStandardError = true })!;
-            p.WaitForExit(2000);
-            return p.ExitCode == 0;
-        }
-        catch { return false; }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     private static (int exit, string output) RunShell(string shell, string envFile, string echoCmd)
@@ -193,8 +179,8 @@ public sealed class ManagedShellTests
             psi.ArgumentList.Add($"source \"{envFile}\"; {echoCmd}");
         else
             psi.ArgumentList.Add($". \"{envFile}\"; {echoCmd}");
-        var p = System.Diagnostics.Process.Start(psi)!;
-        p.WaitForExit(5000);
+        using var p = System.Diagnostics.Process.Start(psi)!;
+        Assert.True(p.WaitForExit(5000), $"{shell} did not exit within 5 seconds");
         return (p.ExitCode, p.StandardOutput.ReadToEnd().Trim());
     }
 }

@@ -1,17 +1,16 @@
 using Cove.Engine.Pty;
 using Cove.Pty.Harness;
+using Cove.Testing;
 using Xunit;
 
 namespace Cove.Pty.Harness.Tests;
 
 public sealed class ThrottledConsumerTests
 {
-    [Fact]
-    [Trait("Category", "PtyResync")]
+    [PlatformFact(TestOperatingSystem.Unix)]
+    [Trait("Suite", "PtyResync")]
     public void ThrottledConsumer_ExactlyOneResync()
     {
-        if (OperatingSystem.IsWindows())
-            return;
         const long total = 262144;
         var (ring, reader, session) = PtyHarnessFixture.StartGen(65536, total);
         try

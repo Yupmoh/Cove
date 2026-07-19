@@ -2,6 +2,7 @@ using System.Text.Json;
 using Cove.Engine.Protocol;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
+using Cove.Testing;
 
 namespace Cove.Engine.Tests;
 
@@ -20,11 +21,10 @@ public sealed class ScopeEnforcementTests
         return resp!.Data!.Value.GetProperty("nookId").GetString()!;
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task NookWrite_CrossNook_SameTabScope_ReturnsAccessDenied()
     {
-        if (System.OperatingSystem.IsWindows()) return;
-        var nooks = NewNooks();
+        using var nooks = NewNooks();
         var scopeStore = new NookScopeStore(NewDir(), NullLogger.Instance);
         string callerNook = "", targetNook = "";
         try
@@ -42,16 +42,15 @@ public sealed class ScopeEnforcementTests
         }
         finally
         {
-            try { nooks.Kill(callerNook); } catch { }
-            try { nooks.Kill(targetNook); } catch { }
+            if (!string.IsNullOrEmpty(callerNook)) nooks.Kill(callerNook);
+            if (!string.IsNullOrEmpty(targetNook)) nooks.Kill(targetNook);
         }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task NookWrite_SameNook_SameTabScope_Allowed()
     {
-        if (System.OperatingSystem.IsWindows()) return;
-        var nooks = NewNooks();
+        using var nooks = NewNooks();
         var scopeStore = new NookScopeStore(NewDir(), NullLogger.Instance);
         string nook = "";
         try
@@ -64,14 +63,13 @@ public sealed class ScopeEnforcementTests
             Assert.NotNull(response);
             Assert.True(response!.Ok);
         }
-        finally { try { nooks.Kill(nook); } catch { } }
+        finally { if (!string.IsNullOrEmpty(nook)) nooks.Kill(nook); }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task NookWrite_CrossNook_AllScope_Allowed()
     {
-        if (System.OperatingSystem.IsWindows()) return;
-        var nooks = NewNooks();
+        using var nooks = NewNooks();
         var scopeStore = new NookScopeStore(NewDir(), NullLogger.Instance);
         string callerNook = "", targetNook = "";
         try
@@ -87,16 +85,15 @@ public sealed class ScopeEnforcementTests
         }
         finally
         {
-            try { nooks.Kill(callerNook); } catch { }
-            try { nooks.Kill(targetNook); } catch { }
+            if (!string.IsNullOrEmpty(callerNook)) nooks.Kill(callerNook);
+            if (!string.IsNullOrEmpty(targetNook)) nooks.Kill(targetNook);
         }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task NookWrite_NoCallerNookId_Allowed()
     {
-        if (System.OperatingSystem.IsWindows()) return;
-        var nooks = NewNooks();
+        using var nooks = NewNooks();
         var scopeStore = new NookScopeStore(NewDir(), NullLogger.Instance);
         string nook = "";
         try
@@ -109,6 +106,6 @@ public sealed class ScopeEnforcementTests
             Assert.NotNull(response);
             Assert.True(response!.Ok);
         }
-        finally { try { nooks.Kill(nook); } catch { } }
+        finally { if (!string.IsNullOrEmpty(nook)) nooks.Kill(nook); }
     }
 }

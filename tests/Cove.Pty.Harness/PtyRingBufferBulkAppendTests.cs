@@ -6,7 +6,7 @@ namespace Cove.Pty.Harness.Tests;
 public sealed class PtyRingBufferBulkAppendTests
 {
     [Fact]
-    [Trait("Category", "PtyRing")]
+    [Trait("Suite", "PtyRing")]
     public void BulkAppend_UnalignedHead_ReadBackIsExact()
     {
         var ring = new PtyRingBuffer(4096);
@@ -33,7 +33,7 @@ public sealed class PtyRingBufferBulkAppendTests
     }
 
     [Fact]
-    [Trait("Category", "PtyRing")]
+    [Trait("Suite", "PtyRing")]
     public void BulkAppend_ExactCapacity_UnalignedHead_ReadBackIsExact()
     {
         var ring = new PtyRingBuffer(4096);
@@ -53,7 +53,7 @@ public sealed class PtyRingBufferBulkAppendTests
     }
 
     [Fact]
-    [Trait("Category", "PtyRing")]
+    [Trait("Suite", "PtyRing")]
     public void BulkAppend_AlignedHead_StillExact()
     {
         var ring = new PtyRingBuffer(4096);

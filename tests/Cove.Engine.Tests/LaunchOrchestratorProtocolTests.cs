@@ -2,6 +2,7 @@ using Cove.Adapters;
 using Cove.Engine.Launch;
 using Cove.Engine.Restart;
 using Xunit;
+using Cove.Testing;
 
 namespace Cove.Engine.Tests;
 
@@ -62,10 +63,9 @@ public sealed class LaunchOrchestratorProtocolTests
         Permissions: new Dictionary<string, bool>(),
         Skills: new List<string>(), Agent: null, SchemaVersion: 1);
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task BuildLaunchCommandAsync_MethodBranch_ParsesCommand_NoFlagDuplication()
     {
-        if (OperatingSystem.IsWindows()) return;
         var root = NewDir();
         try
         {
@@ -83,13 +83,12 @@ public sealed class LaunchOrchestratorProtocolTests
             Assert.Equal(1, cmd.Args.Count(a => a == "--dangerously-skip-permissions"));
             Assert.Equal("/tmp", cmd.Cwd);
         }
-        finally { try { Directory.Delete(root, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(root); }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task BuildLaunchCommandAsync_MethodBranch_PassesProfileCommandInFlags()
     {
-        if (OperatingSystem.IsWindows()) return;
         var root = NewDir();
         try
         {
@@ -107,13 +106,12 @@ public sealed class LaunchOrchestratorProtocolTests
             Assert.Contains("\"command\":\"ccx\"", flags);
             Assert.Contains("--foo", flags);
         }
-        finally { try { Directory.Delete(root, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(root); }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task BuildLaunchCommandAsync_MethodBranch_OmitsCommandWhenProfileHasNoCliArgs()
     {
-        if (OperatingSystem.IsWindows()) return;
         var root = NewDir();
         try
         {
@@ -129,7 +127,7 @@ public sealed class LaunchOrchestratorProtocolTests
             var flags = File.ReadAllText(Path.Combine(root, "claude-code", "flags-capture.json"));
             Assert.DoesNotContain("\"command\"", flags);
         }
-        finally { try { Directory.Delete(root, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(root); }
     }
 
     [Fact]
@@ -144,13 +142,12 @@ public sealed class LaunchOrchestratorProtocolTests
 
             await Assert.ThrowsAsync<ResumeFailedException>(() => orch.BuildLaunchCommandAsync(profile, overrides));
         }
-        finally { try { Directory.Delete(root, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(root); }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task BuildLaunchCommandAsync_MethodExit1_ThrowsCannotBuild()
     {
-        if (OperatingSystem.IsWindows()) return;
         var root = NewDir();
         try
         {
@@ -162,13 +159,12 @@ public sealed class LaunchOrchestratorProtocolTests
 
             await Assert.ThrowsAsync<ResumeFailedException>(() => orch.BuildLaunchCommandAsync(profile, overrides));
         }
-        finally { try { Directory.Delete(root, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(root); }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task BuildLaunchCommandAsync_FallbackBranch_ComposesFromBinaryDiscovery()
     {
-        if (OperatingSystem.IsWindows()) return;
         var root = NewDir();
         try
         {
@@ -176,7 +172,8 @@ public sealed class LaunchOrchestratorProtocolTests
             Directory.CreateDirectory(fakeBinaryPath);
             var fakeBinary = Path.Combine(fakeBinaryPath, "fake-cli");
             File.WriteAllText(fakeBinary, "#!/usr/bin/env bash\necho '1.0.0'\n");
-            File.SetUnixFileMode(fakeBinary, System.IO.UnixFileMode.UserRead | System.IO.UnixFileMode.UserWrite | System.IO.UnixFileMode.UserExecute);
+            if (!OperatingSystem.IsWindows())
+                File.SetUnixFileMode(fakeBinary, System.IO.UnixFileMode.UserRead | System.IO.UnixFileMode.UserWrite | System.IO.UnixFileMode.UserExecute);
 
             WriteAdapter(root, "simple", "fake-cli", includeBinaryDiscovery: true);
             var orch = NewOrchestrator(root, loginShellPath: fakeBinaryPath);
@@ -188,13 +185,12 @@ public sealed class LaunchOrchestratorProtocolTests
             Assert.EndsWith("fake-cli", cmd.Command);
             Assert.Contains("--verbose", cmd.Args);
         }
-        finally { try { Directory.Delete(root, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(root); }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task BuildLaunchCommandAsync_FallbackBranch_AppliesYoloWhenNoMethod()
     {
-        if (OperatingSystem.IsWindows()) return;
         var root = NewDir();
         try
         {
@@ -202,7 +198,8 @@ public sealed class LaunchOrchestratorProtocolTests
             Directory.CreateDirectory(fakeBinaryPath);
             var fakeBinary = Path.Combine(fakeBinaryPath, "yolo-cli");
             File.WriteAllText(fakeBinary, "#!/usr/bin/env bash\necho '1.0.0'\n");
-            File.SetUnixFileMode(fakeBinary, System.IO.UnixFileMode.UserRead | System.IO.UnixFileMode.UserWrite | System.IO.UnixFileMode.UserExecute);
+            if (!OperatingSystem.IsWindows())
+                File.SetUnixFileMode(fakeBinary, System.IO.UnixFileMode.UserRead | System.IO.UnixFileMode.UserWrite | System.IO.UnixFileMode.UserExecute);
 
             WriteAdapter(root, "yolo-adapter", "yolo-cli");
             var orch = NewOrchestrator(root, loginShellPath: fakeBinaryPath);
@@ -213,13 +210,12 @@ public sealed class LaunchOrchestratorProtocolTests
 
             Assert.Contains("--dangerously-skip-permissions", cmd.Args);
         }
-        finally { try { Directory.Delete(root, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(root); }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task BuildLaunchCommandAsync_V1DetectBinaryFallback_ReturnsPath()
     {
-        if (OperatingSystem.IsWindows()) return;
         var root = NewDir();
         try
         {
@@ -227,7 +223,8 @@ public sealed class LaunchOrchestratorProtocolTests
             Directory.CreateDirectory(fakeBinaryPath);
             var fakeBinary = Path.Combine(fakeBinaryPath, "v1-cli");
             File.WriteAllText(fakeBinary, "#!/usr/bin/env bash\nexit 0\n");
-            File.SetUnixFileMode(fakeBinary, System.IO.UnixFileMode.UserRead | System.IO.UnixFileMode.UserWrite | System.IO.UnixFileMode.UserExecute);
+            if (!OperatingSystem.IsWindows())
+                File.SetUnixFileMode(fakeBinary, System.IO.UnixFileMode.UserRead | System.IO.UnixFileMode.UserWrite | System.IO.UnixFileMode.UserExecute);
 
             WriteAdapter(root, "v1-adapter", "v1-cli", detectBinaryScript: "scripts/detect_binary.sh", includeBinaryDiscovery: false);
             WriteScript(root, "v1-adapter", "scripts/detect_binary.sh", $"echo '{{\"path\":\"{fakeBinary}\"}}'");
@@ -239,6 +236,6 @@ public sealed class LaunchOrchestratorProtocolTests
 
             Assert.Equal(fakeBinary, cmd.Command);
         }
-        finally { try { Directory.Delete(root, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(root); }
     }
 }

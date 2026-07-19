@@ -29,7 +29,7 @@ public sealed class ConfigSettingCoverageTests
             }
             Assert.True(missing.Count == 0, "schema keys without a Get arm: " + string.Join(", ", missing));
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -60,7 +60,7 @@ public sealed class ConfigSettingCoverageTests
             }
             Assert.True(broken.Count == 0, "schema keys that do not round-trip: " + string.Join(", ", broken));
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]

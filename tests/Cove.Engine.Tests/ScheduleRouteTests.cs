@@ -3,6 +3,7 @@ using Cove.Engine;
 using Cove.Platform.Ipc;
 using Cove.Protocol;
 using Xunit;
+using Cove.Testing;
 
 namespace Cove.Engine.Tests;
 
@@ -28,10 +29,9 @@ public sealed class ScheduleRouteTests
         return resp.Data!.Value.GetProperty("id").GetString()!;
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task RepeatSet_Get_Pause_Resume_SkipNext_Stop_OverSocket()
     {
-        if (System.OperatingSystem.IsWindows()) return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(60));
         CancellationToken ct = cts.Token;
 
@@ -74,10 +74,9 @@ public sealed class ScheduleRouteTests
         Assert.Equal("not_found", getAfterStop.Error!.Code);
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task RepeatSet_BadCron_RejectsWithValidationErrors()
     {
-        if (System.OperatingSystem.IsWindows()) return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(60));
         CancellationToken ct = cts.Token;
 
@@ -92,10 +91,9 @@ public sealed class ScheduleRouteTests
         Assert.True(setResp.Data!.Value.GetProperty("errors").GetArrayLength() > 0);
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task RepeatSet_Datetime_ComputesNextFireAt()
     {
-        if (System.OperatingSystem.IsWindows()) return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(60));
         CancellationToken ct = cts.Token;
 

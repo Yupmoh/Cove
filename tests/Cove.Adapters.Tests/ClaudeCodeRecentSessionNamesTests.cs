@@ -1,4 +1,5 @@
 using Cove.Adapters;
+using Cove.Testing;
 using Xunit;
 
 namespace Cove.Adapters.Tests;
@@ -9,21 +10,9 @@ public sealed class ClaudeCodeRecentSessionNamesTests
         Directory.GetCurrentDirectory(), "..", "..", "..", "..", "..",
         "adapters", "claude-code");
 
-    private static bool JqAvailable()
-    {
-        foreach (var dir in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator))
-        {
-            if (!string.IsNullOrEmpty(dir) && File.Exists(Path.Combine(dir, "jq")))
-                return true;
-        }
-        return false;
-    }
-
-    [Fact]
+    [ExternalFact(TestOperatingSystem.Unix, "bash", "jq")]
     public async Task ListRecent_PrefersClaudeSessionName_OverAiTitle()
     {
-        if (OperatingSystem.IsWindows() || !JqAvailable()) return;
-
         var config = Path.Combine(Path.GetTempPath(), "cove-cc-" + Guid.NewGuid().ToString("N"));
         var cwd = "/repo/work";
         var slug = "-repo-work";
@@ -48,14 +37,12 @@ public sealed class ClaudeCodeRecentSessionNamesTests
             Assert.Contains("second auto", result.Stdout);
             Assert.DoesNotContain("auto title", result.Stdout);
         }
-        finally { try { Directory.Delete(config, true); } catch { } }
+        finally { TestDirectory.Delete(config); }
     }
 
-    [Fact]
+    [ExternalFact(TestOperatingSystem.Unix, "bash", "jq")]
     public async Task ListRecent_MissingSessionsDir_FallsBackToAiTitle()
     {
-        if (OperatingSystem.IsWindows() || !JqAvailable()) return;
-
         var config = Path.Combine(Path.GetTempPath(), "cove-cc-" + Guid.NewGuid().ToString("N"));
         var cwd = "/repo/work/";
         var slug = "-repo-work";
@@ -72,6 +59,6 @@ public sealed class ClaudeCodeRecentSessionNamesTests
             Assert.True(result.ExitCode == 0, $"exit={result.ExitCode} stderr='{result.Stderr}' stdout='{result.Stdout}'");
             Assert.Contains("auto title", result.Stdout);
         }
-        finally { try { Directory.Delete(config, true); } catch { } }
+        finally { TestDirectory.Delete(config); }
     }
 }

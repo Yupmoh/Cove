@@ -10,17 +10,11 @@ public sealed class TaskFilterPlumbingTests
     private static (CommandContext ctx, System.IO.StringWriter stdout) NewCtx(params string[] args)
     {
         var tempRoot = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "cove-filter-" + System.Guid.NewGuid().ToString("N"));
-        var prev = System.Environment.GetEnvironmentVariable("COVE_DATA_DIR");
-        System.Environment.SetEnvironmentVariable("COVE_DATA_DIR", tempRoot);
         var stdout = new System.IO.StringWriter();
-        try
-        {
-            var dataDir = Cove.Platform.CoveDataDir.Resolve(Cove.Platform.CoveChannel.Stable);
-            var paths = new Cove.Engine.Daemon.DaemonPaths(dataDir);
-            var endpoint = Cove.Platform.Ipc.ControlEndpointFactory.FromSocketPath(System.IO.Path.Combine(tempRoot, "test.sock"));
-            return (new CommandContext(paths, endpoint, stdout, args: args), stdout);
-        }
-        finally { System.Environment.SetEnvironmentVariable("COVE_DATA_DIR", prev); }
+        var dataDir = Cove.Platform.CoveDataDir.ForRoot(Cove.Platform.CoveChannel.Stable, tempRoot);
+        var paths = new Cove.Engine.Daemon.DaemonPaths(dataDir);
+        var endpoint = Cove.Platform.Ipc.ControlEndpointFactory.FromSocketPath(System.IO.Path.Combine(tempRoot, "test.sock"));
+        return (new CommandContext(paths, endpoint, stdout, args: args), stdout);
     }
 
     private static JsonElement Array(params string[] rows)

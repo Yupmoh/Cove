@@ -2,18 +2,18 @@ using System.Text.Json;
 using Cove.Platform.Ipc;
 using Cove.Protocol;
 using Xunit;
+using Cove.Testing;
 
 namespace Cove.Engine.Tests;
 
 public sealed class Osc7LiveTests
 {
-    [Fact]
+    [LiveFact(TestOperatingSystem.Unix)]
     public async Task Cd_UpdatesNookCwd_ViaOsc7_OverSocket()
     {
-        if (System.OperatingSystem.IsWindows())
-            return;
-        if (!System.IO.File.Exists("/bin/zsh") && !System.IO.File.Exists("/usr/bin/zsh") && !System.IO.File.Exists("/bin/bash") && !System.IO.File.Exists("/usr/bin/bash"))
-            return;
+        Assert.True(System.IO.File.Exists("/bin/zsh") || System.IO.File.Exists("/usr/bin/zsh")
+            || System.IO.File.Exists("/bin/bash") || System.IO.File.Exists("/usr/bin/bash"),
+            "Requires zsh or bash");
 
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(60));
         CancellationToken ct = cts.Token;
@@ -29,7 +29,6 @@ public sealed class Osc7LiveTests
         Assert.True(spawnResp.Ok, spawnResp.Error?.Message);
         string nookId = spawnResp.Data!.Value.Deserialize(CoveJsonContext.Default.NookInfo)!.NookId;
 
-        await Task.Delay(1000, ct);
         JsonElement wp = JsonSerializer.SerializeToElement(
             new NookWriteParams(nookId, System.Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("cd /tmp\n"))),
             CoveJsonContext.Default.NookWriteParams);
@@ -38,8 +37,7 @@ public sealed class Osc7LiveTests
 
         JsonElement ssp = JsonSerializer.SerializeToElement(new NookRefParams(nookId), CoveJsonContext.Default.NookRefParams);
         string? cwd = null;
-        var deadline = Task.Delay(System.TimeSpan.FromSeconds(30), ct);
-        while (!deadline.IsCompleted)
+        await AsyncTest.EventuallyAsync(async () =>
         {
             ControlResponse st = await RequestAsync(ctl, "st", "cove://commands/session.state", ssp, ct);
             if (st.Ok)
@@ -49,11 +47,11 @@ public sealed class Osc7LiveTests
                 {
                     cwd = res.Cwd;
                     if (cwd.EndsWith("/tmp"))
-                        break;
+                        return true;
                 }
             }
-            await Task.Delay(100, ct);
-        }
+            return false;
+        }, TimeSpan.FromSeconds(30), "nook did not report /tmp through OSC 7", ct);
 
         Assert.NotNull(cwd);
         Assert.EndsWith("/tmp", cwd);

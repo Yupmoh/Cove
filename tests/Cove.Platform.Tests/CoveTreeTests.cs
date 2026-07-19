@@ -1,44 +1,39 @@
 using System;
 using System.IO;
+using System.Text.Json;
+using Cove.Persistence;
 using Cove.Platform;
+using Cove.Testing;
 using Xunit;
 
 namespace Cove.Platform.Tests;
 
 public sealed class CoveTreeTests
 {
-    private static (CoveDataDir dd, string parent, string? prev) MakeHermeticRoot()
+    private static (CoveDataDir DataDir, string Parent) MakeHermeticRoot()
     {
-        var parent = Path.Combine(Path.GetTempPath(), "cove-tree-" + Guid.NewGuid().ToString("N"));
+        var parent = TestDirectory.Create("cove-tree-");
         var root = Path.Combine(parent, ".cove");
-        var prev = Environment.GetEnvironmentVariable("COVE_DATA_DIR");
-        Environment.SetEnvironmentVariable("COVE_DATA_DIR", root);
-        return (CoveDataDir.Resolve(CoveChannel.Stable), parent, prev);
-    }
-
-    private static void Cleanup(string parent, string? prev)
-    {
-        Environment.SetEnvironmentVariable("COVE_DATA_DIR", prev);
-        try { if (Directory.Exists(parent)) Directory.Delete(parent, recursive: true); } catch { }
+        return (CoveDataDir.ForRoot(CoveChannel.Stable, root), parent);
     }
 
     [Fact]
     public void Ensure_CreatesAllSkeletonDirs()
     {
-        var (dd, parent, prev) = MakeHermeticRoot();
+        var (dd, parent) = MakeHermeticRoot();
         try
         {
             CoveTree.Ensure(dd);
             foreach (var name in new[] { "ipc", "logs", "bin", "cache", "bays", "themes", "library", "run-commands", "skills" })
                 Assert.True(Directory.Exists(Path.Combine(dd.Root, name)), $"missing dir {name}");
         }
-        finally { Cleanup(parent, prev); }
+        finally { TestDirectory.Delete(parent); }
     }
 
     [Fact]
     public void Ensure_WritesGitIgnoreWithExpectedLines()
     {
-        var (dd, parent, prev) = MakeHermeticRoot();
+        var (dd, parent) = MakeHermeticRoot();
         try
         {
             CoveTree.Ensure(dd);
@@ -48,28 +43,35 @@ public sealed class CoveTreeTests
             Assert.Contains("*.db\n", text);
             Assert.Contains("ipc/\n", text);
         }
-        finally { Cleanup(parent, prev); }
+        finally { TestDirectory.Delete(parent); }
     }
 
     [Fact]
-    public void Ensure_WritesMetaFile()
+    public void Ensure_WritesTypedMetaFile()
     {
-        var (dd, parent, prev) = MakeHermeticRoot();
+        var (dd, parent) = MakeHermeticRoot();
         try
         {
+            var before = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             CoveTree.Ensure(dd);
-            Assert.True(File.Exists(dd.MetaJson));
-            var text = File.ReadAllText(dd.MetaJson);
-            Assert.Contains("dataDirSchemaVersion", text);
-            Assert.Contains("createdAtUnixMs", text);
+            var after = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+            var meta = JsonSerializer.Deserialize(
+                File.ReadAllText(dd.MetaJson),
+                CoveJsonContext.Default.DataDirMeta);
+
+            Assert.NotNull(meta);
+            Assert.Equal(DataDirMetaStore.CurrentSchemaVersion, meta.DataDirSchemaVersion);
+            Assert.InRange(meta.CreatedAtUnixMs, before, after);
+            Assert.Equal(CoveBuild.InformationalVersion, meta.CoveVersionAtCreate);
         }
-        finally { Cleanup(parent, prev); }
+        finally { TestDirectory.Delete(parent); }
     }
 
     [Fact]
     public void Ensure_IsIdempotent_MetaUnchanged()
     {
-        var (dd, parent, prev) = MakeHermeticRoot();
+        var (dd, parent) = MakeHermeticRoot();
         try
         {
             CoveTree.Ensure(dd);
@@ -78,13 +80,13 @@ public sealed class CoveTreeTests
             var after = File.ReadAllText(dd.MetaJson);
             Assert.Equal(before, after);
         }
-        finally { Cleanup(parent, prev); }
+        finally { TestDirectory.Delete(parent); }
     }
 
     [Fact]
     public void Ensure_DoesNotCreateLazyDirs()
     {
-        var (dd, parent, prev) = MakeHermeticRoot();
+        var (dd, parent) = MakeHermeticRoot();
         try
         {
             CoveTree.Ensure(dd);
@@ -94,28 +96,31 @@ public sealed class CoveTreeTests
             Assert.False(Directory.Exists(dd.ReviewsDir));
             Assert.False(Directory.Exists(dd.AdaptersDir));
         }
-        finally { Cleanup(parent, prev); }
+        finally { TestDirectory.Delete(parent); }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
+    [Trait(TestTraits.Category, TestTraits.Platform)]
     public void Ensure_AppliesOwnerOnlyPerms_Posix()
     {
-        if (OperatingSystem.IsWindows())
-            return;
-        var (dd, parent, prev) = MakeHermeticRoot();
+        var (dd, parent) = MakeHermeticRoot();
         try
         {
             CoveTree.Ensure(dd);
-            Assert.Equal(
-                UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute,
-                File.GetUnixFileMode(dd.Root));
-            Assert.Equal(
-                UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute,
-                File.GetUnixFileMode(dd.IpcDir));
-            Assert.Equal(
-                UnixFileMode.UserRead | UnixFileMode.UserWrite,
-                File.GetUnixFileMode(dd.MetaJson));
+            Assert.False(OperatingSystem.IsWindows());
+            if (!OperatingSystem.IsWindows())
+            {
+                Assert.Equal(
+                    UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute,
+                    File.GetUnixFileMode(dd.Root));
+                Assert.Equal(
+                    UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute,
+                    File.GetUnixFileMode(dd.IpcDir));
+                Assert.Equal(
+                    UnixFileMode.UserRead | UnixFileMode.UserWrite,
+                    File.GetUnixFileMode(dd.MetaJson));
+            }
         }
-        finally { Cleanup(parent, prev); }
+        finally { TestDirectory.Delete(parent); }
     }
 }

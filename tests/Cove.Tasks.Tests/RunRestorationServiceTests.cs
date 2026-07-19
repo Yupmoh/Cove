@@ -1,20 +1,16 @@
 using Cove.Tasks.Restart;
 using Cove.Tasks.Runs;
+using Cove.Testing;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace Cove.Tasks.Tests;
 
-public sealed class RunRestorationServiceTests
+public sealed class RunRestorationServiceTests : TasksTestBase
 {
-    private static async System.Threading.Tasks.Task<TaskService> NewSvcAsync()
-    {
-        var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "cove-restore-" + System.Guid.NewGuid().ToString("N"));
-        System.IO.Directory.CreateDirectory(dir);
-        var svc = new TaskService(dir, NullLogger.Instance);
-        await svc.StartAsync();
-        return svc;
-    }
+    private static readonly System.TimeSpan LifecycleTimeout = System.TimeSpan.FromSeconds(10);
+
+    private System.Threading.Tasks.Task<TaskService> NewSvcAsync() => CreateTaskServiceAsync("cove-restore-");
 
     private static async System.Threading.Tasks.Task<(TaskService svc, string cardId, string runId)> SeedActiveRunWithOpenSegmentAsync(TaskService svc)
     {
@@ -141,20 +137,18 @@ public sealed class RunRestorationServiceTests
     [Fact]
     public async System.Threading.Tasks.Task PendingPrompt_SurvivesRestart_NotSilentlyDropped()
     {
-        var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "cove-restore-" + System.Guid.NewGuid().ToString("N"));
-        System.IO.Directory.CreateDirectory(dir);
-
-        string runId;
-        var svc1 = new TaskService(dir, NullLogger.Instance);
-        await svc1.StartAsync();
+        var fixture = await CreateTaskServiceFixtureAsync("cove-restore-");
+        var svc1 = fixture.Service;
         var cardId = (await svc1.CreateCardAsync("ws1", "needs-input card", "user:test", "", 1, 2, null)).Id;
         var run = await svc1.CreateRunAsync(cardId, "ws1", null);
-        runId = run!.Id;
+        var runId = run!.Id;
         await svc1.AddRunSegmentAsync(runId, "nook-1", "adapter-session-abc");
         await svc1.SetPendingPromptAsync(runId, "Should I proceed with the refactor?");
 
-        var svc2 = new TaskService(dir, NullLogger.Instance);
-        await svc2.StartAsync();
+        var svc2 = await AsyncTest.CompletesWithinAsync(
+            fixture.RestartAsync(),
+            LifecycleTimeout,
+            "Task service fixture restart did not complete");
         var restoration = new RunRestorationService(svc2, NullLogger.Instance);
         var summary = restoration.RestoreOnStartup();
 

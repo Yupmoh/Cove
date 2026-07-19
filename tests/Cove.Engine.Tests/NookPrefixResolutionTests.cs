@@ -5,6 +5,7 @@ using Cove.Platform.Pty;
 using Cove.Protocol;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
+using Cove.Testing;
 
 namespace Cove.Engine.Tests;
 
@@ -21,11 +22,10 @@ public sealed class NookPrefixResolutionTests
         return resp!.Data!.Value.GetProperty("nookId").GetString()!;
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task NookKill_UniquePrefix_Resolves()
     {
-        if (System.OperatingSystem.IsWindows()) return;
-        var nooks = NewNooks();
+        using var nooks = NewNooks();
         var nook = SpawnNook(nooks);
         var prefix = nook.Substring(0, 8);
         var prm = JsonDocument.Parse($"{{\"nookId\":\"{prefix}\"}}").RootElement.Clone();
@@ -36,11 +36,10 @@ public sealed class NookPrefixResolutionTests
         Assert.DoesNotContain(nooks.List(), p => p.NookId == nook);
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task NookRename_UniquePrefix_Resolves()
     {
-        if (System.OperatingSystem.IsWindows()) return;
-        var nooks = NewNooks();
+        using var nooks = NewNooks();
         string target = "", other = "";
         try
         {
@@ -57,16 +56,15 @@ public sealed class NookPrefixResolutionTests
         }
         finally
         {
-            try { nooks.Kill(target); } catch { }
-            try { nooks.Kill(other); } catch { }
+            if (!string.IsNullOrEmpty(target)) nooks.Kill(target);
+            if (!string.IsNullOrEmpty(other)) nooks.Kill(other);
         }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task NookWrite_UniquePrefix_Resolves()
     {
-        if (System.OperatingSystem.IsWindows()) return;
-        var nooks = NewNooks();
+        using var nooks = NewNooks();
         string nook = "";
         try
         {
@@ -78,14 +76,13 @@ public sealed class NookPrefixResolutionTests
             Assert.NotNull(response);
             Assert.True(response!.Ok);
         }
-        finally { try { nooks.Kill(nook); } catch { } }
+        finally { if (!string.IsNullOrEmpty(nook)) nooks.Kill(nook); }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task NookResize_UniquePrefix_Resolves()
     {
-        if (System.OperatingSystem.IsWindows()) return;
-        var nooks = NewNooks();
+        using var nooks = NewNooks();
         string nook = "";
         try
         {
@@ -97,14 +94,13 @@ public sealed class NookPrefixResolutionTests
             Assert.NotNull(response);
             Assert.True(response!.Ok);
         }
-        finally { try { nooks.Kill(nook); } catch { } }
+        finally { if (!string.IsNullOrEmpty(nook)) nooks.Kill(nook); }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task NookWrite_AmbiguousPrefix_ReturnsAmbiguousId()
     {
-        if (System.OperatingSystem.IsWindows()) return;
-        var nooks = NewNooks();
+        using var nooks = NewNooks();
         string a = "", b = "";
         try
         {
@@ -119,16 +115,15 @@ public sealed class NookPrefixResolutionTests
         }
         finally
         {
-            try { nooks.Kill(a); } catch { }
-            try { nooks.Kill(b); } catch { }
+            if (!string.IsNullOrEmpty(a)) nooks.Kill(a);
+            if (!string.IsNullOrEmpty(b)) nooks.Kill(b);
         }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task NookKill_UnknownPrefix_ReturnsNotFound()
     {
-        if (System.OperatingSystem.IsWindows()) return;
-        var nooks = NewNooks();
+        using var nooks = NewNooks();
         string nook = "";
         try
         {
@@ -140,6 +135,6 @@ public sealed class NookPrefixResolutionTests
             Assert.False(response!.Ok);
             Assert.Equal("not_found", response.Error?.Code);
         }
-        finally { try { nooks.Kill(nook); } catch { } }
+        finally { if (!string.IsNullOrEmpty(nook)) nooks.Kill(nook); }
     }
 }

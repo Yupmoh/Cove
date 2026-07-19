@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using Cove.Engine.Pty;
 using Cove.Platform.Pty;
 using Cove.Platform.Pty.Windows;
+using Cove.Testing;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -16,13 +18,10 @@ public sealed class ConPtyDiagnosticMatrix
     private const int CaptureMilliseconds = 2000;
     private const int LongCaptureMilliseconds = 4000;
 
-    [Trait("Category", "PtyInteractive")]
-    [Fact]
-    public void ConPtyVariantMatrixReportsWhichSpawnShapeSurfacesChildOutput()
+    [Trait("Suite", "PtyInteractive")]
+    [PlatformFact(TestOperatingSystem.Windows)]
+    public async Task ConPtyVariantMatrixReportsWhichSpawnShapeSurfacesChildOutput()
     {
-        if (!OperatingSystem.IsWindows())
-            return;
-
         var cmdArgs = new[] { "/c", "echo hello" };
         var variants = new (string Id, string Description, string Command, string[] Args, int CaptureMs, ConPtyDiagnosticOptions Options)[]
         {
@@ -43,16 +42,19 @@ public sealed class ConPtyDiagnosticMatrix
 
         var report = new StringBuilder();
         report.Append("ConPtyDiagnosticMatrix: spawned per-variant children under ").Append(variants.Length).Append(" variants.\n");
+        var results = new List<VariantResult>(variants.Length);
 
         foreach (var variant in variants)
         {
-            report.Append('\n').Append(RunVariant(variant.Id, variant.Description, variant.Command, variant.Args, variant.CaptureMs, variant.Options));
+            var result = await RunVariant(variant.Id, variant.Description, variant.Command, variant.Args, variant.CaptureMs, variant.Options);
+            results.Add(result);
+            report.Append('\n').Append(result.Report);
         }
 
-        Assert.Fail(report.ToString());
+        Assert.True(results.Single(result => result.Id == "A").SawHello, report.ToString());
     }
 
-    private static string RunVariant(string id, string description, string command, string[] args, int captureMs, ConPtyDiagnosticOptions options)
+    private static async Task<VariantResult> RunVariant(string id, string description, string command, string[] args, int captureMs, ConPtyDiagnosticOptions options)
     {
         var logger = NullLogger.Instance;
         var request = new PtySpawnRequest
@@ -64,15 +66,7 @@ public sealed class ConPtyDiagnosticMatrix
             Environment = new Dictionary<string, string> { ["COVE_NOOK_ID"] = "conpty-matrix" },
         };
 
-        ConPtyDiagnosticSpawn spawn;
-        try
-        {
-            spawn = WindowsPtyHost.SpawnWithOptions(request, options, logger);
-        }
-        catch (Exception ex)
-        {
-            return $"[{id}] {description}: SPAWN THREW {ex.GetType().Name}: {ex.Message}";
-        }
+        var spawn = WindowsPtyHost.SpawnWithOptions(request, options, logger);
 
         var session = spawn.Session;
         var ring = new PtyRingBuffer(1 << 20);
@@ -81,13 +75,23 @@ public sealed class ConPtyDiagnosticMatrix
         reader.Start();
         try
         {
-            var sw = Stopwatch.StartNew();
-            while (sw.ElapsedMilliseconds < captureMs)
-                Thread.Sleep(10);
-
             var cursor = new PtyClientCursor();
             var sink = new RecordingSink();
             var delivery = new PtyDelivery(session.SessionId, ring, cursor, sink);
+            try
+            {
+                await AsyncTest.EventuallyAsync(
+                    () =>
+                    {
+                        delivery.PumpAvailable();
+                        return reader.HasCompleted || sink.Contains("hello"u8);
+                    },
+                    TimeSpan.FromMilliseconds(captureMs),
+                    $"variant {id} produced neither output nor completion");
+            }
+            catch (TimeoutException)
+            {
+            }
             delivery.PumpAvailable();
             byte[] raw = sink.Delivered;
             string text = Encoding.UTF8.GetString(raw);
@@ -110,14 +114,22 @@ public sealed class ConPtyDiagnosticMatrix
             line.Append(" hStdErr=").Append(spawn.StdError).Append('\n');
             line.Append("      commandLine=\"").Append(spawn.CommandLine).Append("\"\n");
             line.Append("      capture=\"").Append(DescribeCapture(text)).Append('"');
-            return line.ToString();
+            return new VariantResult(id, sawHello, line.ToString());
         }
         finally
         {
-            reader.Dispose();
-            session.Dispose();
+            try
+            {
+                reader.Dispose();
+            }
+            finally
+            {
+                session.Dispose();
+            }
         }
     }
+
+    private sealed record VariantResult(string Id, bool SawHello, string Report);
 
     private static string DescribeCapture(string text)
     {

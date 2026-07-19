@@ -6,6 +6,7 @@ using Cove.Platform.Ipc;
 using Cove.Protocol;
 using Microsoft.Extensions.Logging;
 using Xunit;
+using Cove.Testing;
 
 namespace Cove.Engine.Tests;
 
@@ -43,7 +44,7 @@ public sealed class RestorationTests
         }
         finally
         {
-            try { Directory.Delete(dir, true); } catch { }
+            Cove.Testing.TestDirectory.Delete(dir);
         }
     }
 
@@ -63,7 +64,7 @@ public sealed class RestorationTests
         }
         finally
         {
-            try { Directory.Delete(dir, true); } catch { }
+            Cove.Testing.TestDirectory.Delete(dir);
         }
     }
 
@@ -90,7 +91,7 @@ public sealed class RestorationTests
         }
         finally
         {
-            try { Directory.Delete(dir, true); } catch { }
+            Cove.Testing.TestDirectory.Delete(dir);
         }
     }
 
@@ -113,15 +114,13 @@ public sealed class RestorationTests
         }
         finally
         {
-            try { Directory.Delete(dir, true); } catch { }
+            Cove.Testing.TestDirectory.Delete(dir);
         }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task DaemonRestart_RestoresNooksAndScrollback_IdenticalState()
     {
-        if (System.OperatingSystem.IsWindows())
-            return;
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
         CancellationToken ct = cts.Token;
 
@@ -146,7 +145,7 @@ public sealed class RestorationTests
         ControlResponse mutateResp = await ReadResponseAsync(ctl, "2", ct);
         Assert.True(mutateResp.Ok, mutateResp.Error?.Message);
 
-        await Task.Delay(2000, ct);
+        await AwaitNookOutputAsync(ctl, nookId, marker, ct);
 
         await h.RestartAsync();
         await using FrameConnection ctl2 = await h.ConnectAsync("cli");
@@ -176,11 +175,9 @@ public sealed class RestorationTests
         Assert.Contains(marker, restored);
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task DaemonRestart_RestoresCheckpointAndRawTail()
     {
-        if (System.OperatingSystem.IsWindows())
-            return;
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
         CancellationToken ct = cts.Token;
         await using var h = await DaemonTestHarness.StartAsync();
@@ -209,15 +206,7 @@ public sealed class RestorationTests
         await ctl.WriteFrameAsync(FrameType.Request, 0,
             ControlCodec.Encode(new ControlRequest("3", "cove://commands/nook.write", beforeWrite)), ct);
         Assert.True((await ReadResponseAsync(ctl, "3", ct)).Ok);
-        await Task.Delay(300, ct);
-
-        JsonElement readParams = JsonSerializer.SerializeToElement(
-            new NookReadParams(nookId, 0, 65536),
-            CoveJsonContext.Default.NookReadParams);
-        await ctl.WriteFrameAsync(FrameType.Request, 0,
-            ControlCodec.Encode(new ControlRequest("4", "cove://commands/nook.read", readParams)), ct);
-        ControlResponse readResponse = await ReadResponseAsync(ctl, "4", ct);
-        var readResult = readResponse.Data!.Value.Deserialize(CoveJsonContext.Default.NookReadResult)!;
+        var readResult = await AwaitNookOutputAsync(ctl, nookId, "BEFORE_CHECKPOINT", ct);
         Assert.Contains("BEFORE_CHECKPOINT", Encoding.ASCII.GetString(Convert.FromBase64String(readResult.DataBase64)));
 
         byte[] serializedState = Encoding.ASCII.GetBytes("SERIALIZED_BEFORE_CHECKPOINT");
@@ -235,7 +224,7 @@ public sealed class RestorationTests
         await ctl.WriteFrameAsync(FrameType.Request, 0,
             ControlCodec.Encode(new ControlRequest("6", "cove://commands/nook.write", tailWrite)), ct);
         Assert.True((await ReadResponseAsync(ctl, "6", ct)).Ok);
-        await Task.Delay(2000, ct);
+        await AwaitNookOutputAsync(ctl, nookId, "AFTER_CHECKPOINT", ct);
 
         await h.RestartAsync();
         await using FrameConnection restoredConnection = await h.ConnectAsync("cli");
@@ -262,11 +251,9 @@ public sealed class RestorationTests
         Assert.Contains("AFTER_CHECKPOINT", Encoding.ASCII.GetString(restoredTail.ToArray()));
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task DaemonRestart_CapturesHookSessionId_PersistsOntoNookRecord_AndRespawnsSameNook()
     {
-        if (System.OperatingSystem.IsWindows())
-            return;
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
         CancellationToken ct = cts.Token;
 
@@ -356,6 +343,32 @@ public sealed class RestorationTests
             total += n;
         }
         Assert.Contains(marker, Encoding.ASCII.GetString(buf, 0, total));
+    }
+
+    private static async Task<NookReadResult> AwaitNookOutputAsync(
+        FrameConnection connection,
+        string nookId,
+        string marker,
+        CancellationToken cancellationToken)
+    {
+        NookReadResult? observed = null;
+        await AsyncTest.EventuallyAsync(async () =>
+        {
+            var parameters = JsonSerializer.SerializeToElement(
+                new NookReadParams(nookId, 0, 65536),
+                CoveJsonContext.Default.NookReadParams);
+            var id = $"await-{marker}";
+            await connection.WriteFrameAsync(FrameType.Request, 0,
+                ControlCodec.Encode(new ControlRequest(id, "cove://commands/nook.read", parameters)), cancellationToken);
+            var response = await ReadResponseAsync(connection, id, cancellationToken);
+            if (!response.Ok)
+                return false;
+            observed = response.Data!.Value.Deserialize(CoveJsonContext.Default.NookReadResult);
+            return observed is not null
+                && !string.IsNullOrEmpty(observed.DataBase64)
+                && Encoding.UTF8.GetString(Convert.FromBase64String(observed.DataBase64)).Contains(marker, StringComparison.Ordinal);
+        }, TimeSpan.FromSeconds(10), $"nook output did not contain {marker}", cancellationToken);
+        return observed!;
     }
 
     private static async Task<ControlResponse> ReadResponseAsync(FrameConnection conn, string id, CancellationToken ct)

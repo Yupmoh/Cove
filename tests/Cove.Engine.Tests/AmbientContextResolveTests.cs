@@ -38,7 +38,7 @@ public sealed class AmbientContextResolveTests
             var json = JsonDocument.Parse(body);
             Assert.Equal("ambient primer", json.RootElement.GetProperty("context").GetString());
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -64,7 +64,7 @@ public sealed class AmbientContextResolveTests
             var body = await resp.Content.ReadAsStringAsync();
             Assert.Equal("{}", body);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -94,6 +94,6 @@ public sealed class AmbientContextResolveTests
             var body = await resp.Content.ReadAsStringAsync();
             Assert.Equal("explicit body", body);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 }

@@ -7,6 +7,7 @@ using Cove.Platform.Ipc;
 using Cove.Protocol;
 using Microsoft.Extensions.Logging;
 using Xunit;
+using Cove.Testing;
 
 namespace Cove.Engine.Tests;
 
@@ -43,7 +44,7 @@ public sealed class DurabilityHarnessTests
             var (loaded, _) = Cove.Engine.Layout.BayPersistence.Load(wsDir, new NoOpLogger());
             Assert.NotNull(loaded);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -73,16 +74,14 @@ public sealed class DurabilityHarnessTests
         }
         finally
         {
-            try { Directory.Delete(repo, true); } catch { }
-            try { Directory.Delete(wtPath, true); } catch { }
+            Cove.Testing.TestDirectory.Delete(repo);
+            Cove.Testing.TestDirectory.Delete(wtPath);
         }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task ControlPlaneRoundTrip_CreateAndListBay()
     {
-        if (System.OperatingSystem.IsWindows())
-            return;
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         CancellationToken ct = cts.Token;
         await using var h = await DaemonTestHarness.StartAsync();
@@ -104,10 +103,9 @@ public sealed class DurabilityHarnessTests
         Assert.Contains(list.Bays, w => w.Name == "test-ws");
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task SnapshotTakeAndRestore_RoundTripsContent()
     {
-        if (System.OperatingSystem.IsWindows()) return;
         var dir = NewDir();
         try
         {
@@ -124,7 +122,7 @@ public sealed class DurabilityHarnessTests
             Assert.NotNull(restored);
             Assert.Contains("content-v1", restored!["bays/ws-1/bay.json"]);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     private static async Task<ControlResponse> ReadResponseAsync(FrameConnection conn, string id, CancellationToken ct)

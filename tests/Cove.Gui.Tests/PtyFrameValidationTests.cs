@@ -40,14 +40,14 @@ public sealed class PtyFrameValidationTests
         ulong decodedOffset = 0;
         byte[]? decodedPayload = null;
         await client.PumpAsync(
-            (offset, data, _) =>
+            (data, _) =>
             {
-                decodedOffset = offset;
-                decodedPayload = data.ToArray();
+                decodedOffset = data.Offset;
+                decodedPayload = data.Data.ToArray();
                 return Task.CompletedTask;
             },
-            (_, _, _, _, _, _) => Task.CompletedTask,
-            (_, _, _) => Task.CompletedTask,
+            (_, _) => Task.CompletedTask,
+            (_, _) => Task.CompletedTask,
             CancellationToken.None);
 
         Assert.Equal(42UL, decodedOffset);
@@ -62,9 +62,9 @@ public sealed class PtyFrameValidationTests
         await using var client = await PtyStreamClient.SubscribeAsync(engine.Dial, "0.1.0", "dev", "nook", 0, CancellationToken.None);
 
         var exception = await Assert.ThrowsAsync<InvalidDataException>(() => client.PumpAsync(
-            (_, _, _) => Task.CompletedTask,
-            (_, _, _, _, _, _) => Task.CompletedTask,
-            (_, _, _) => Task.CompletedTask,
+            (_, _) => Task.CompletedTask,
+            (_, _) => Task.CompletedTask,
+            (_, _) => Task.CompletedTask,
             CancellationToken.None));
         Assert.Contains(type.ToString(), exception.Message);
         Assert.Contains(payload.Length.ToString(), exception.Message);

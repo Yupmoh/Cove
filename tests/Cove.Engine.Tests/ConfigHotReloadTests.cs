@@ -21,7 +21,7 @@ public sealed class ConfigHotReloadTests
             cfg.Set("terminal.fontSize", "14");
             Assert.Equal("14", cfg.Get("terminal.fontSize"));
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -34,7 +34,7 @@ public sealed class ConfigHotReloadTests
             cfg.Set("ui.animations", "true");
             Assert.Equal("true", cfg.Get("ui.animations"));
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -48,7 +48,7 @@ public sealed class ConfigHotReloadTests
             var cfg2 = new ConfigService(dir, NullLogger.Instance);
             Assert.Equal("FiraCode", cfg2.Get("terminal.fontFamily"));
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -63,7 +63,7 @@ public sealed class ConfigHotReloadTests
             cfg.Set("terminal.fontSize", "14");
             Assert.Equal("terminal.fontSize", changedKey);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -82,11 +82,11 @@ public sealed class ConfigHotReloadTests
             cfg.Reload();
             Assert.Equal("14", cfg.Get("terminal.fontSize"));
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
-    public void HotReload_AtomicWrite_FiresSettingsChanged()
+    public async Task HotReload_AtomicWrite_FiresSettingsChanged()
     {
         var dir = NewDir();
         Directory.CreateDirectory(dir);
@@ -103,15 +103,19 @@ public sealed class ConfigHotReloadTests
             var cfg2 = new ConfigService(dir, NullLogger.Instance);
             cfg2.Set("terminal.fontSize", "14");
 
-            for (var i = 0; i < 300 && cfg.Get("terminal.fontSize") != "14"; i++)
-                Thread.Sleep(100);
-            for (var i = 0; i < 300 && !changedKeys.Contains("terminal.fontSize"); i++)
-                Thread.Sleep(100);
+            await Cove.Testing.AsyncTest.EventuallyAsync(
+                () => cfg.Get("terminal.fontSize") == "14",
+                TimeSpan.FromSeconds(30),
+                "hot-reloaded font size was not observed");
+            await Cove.Testing.AsyncTest.EventuallyAsync(
+                () => changedKeys.Contains("terminal.fontSize"),
+                TimeSpan.FromSeconds(30),
+                "settings-changed event was not observed");
 
             Assert.Equal("14", cfg.Get("terminal.fontSize"));
             Assert.Contains("terminal.fontSize", changedKeys);
         }
-        finally { try { cfg?.Dispose(); } catch { } try { Directory.Delete(dir, true); } catch { } }
+        finally { cfg?.Dispose(); Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -127,7 +131,7 @@ public sealed class ConfigHotReloadTests
             Assert.False(cfg.IsWritable());
             Assert.Equal("11", cfg.Get("terminal.fontSize"));
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -146,7 +150,7 @@ public sealed class ConfigHotReloadTests
             Assert.Equal("preserved", cfg2.Get("custom.unknown"));
             Assert.Equal("14", cfg2.Get("terminal.fontSize"));
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -160,7 +164,7 @@ public sealed class ConfigHotReloadTests
             var raw = File.ReadAllText(Path.Combine(dir, "config.json"));
             Assert.Contains("\"fontSize\": 14", raw);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -185,7 +189,7 @@ public sealed class ConfigHotReloadTests
             Assert.Equal("#ff5500", cfg2.Get("appearance.accent"));
             Assert.Equal("true", cfg2.Get("appearance.nookLight"));
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -202,7 +206,7 @@ public sealed class ConfigHotReloadTests
             Assert.Equal("", cfg.Get("appearance.accent"));
             Assert.Equal("false", cfg.Get("appearance.nookLight"));
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -218,6 +222,6 @@ public sealed class ConfigHotReloadTests
             var readBack = cfg2.Get("onboarding.completed");
             Assert.True(string.Equals(readBack, "true", System.StringComparison.Ordinal), $"expected exact 'true' but got '{readBack}' (raw: {raw})");
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 }

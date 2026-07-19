@@ -1,5 +1,6 @@
 using Cove.Adapters;
 using Cove.Protocol;
+using Cove.Testing;
 using Xunit;
 
 namespace Cove.Adapters.Tests;
@@ -29,7 +30,7 @@ public sealed class AdapterEnvStoreTests
             Assert.True(loaded[0].Enabled);
             Assert.False(loaded[1].Enabled);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -41,7 +42,7 @@ public sealed class AdapterEnvStoreTests
             var store = new AdapterEnvStore(dir);
             Assert.Empty(store.Load("claude-code"));
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -59,7 +60,7 @@ public sealed class AdapterEnvStoreTests
             Assert.Contains("claude-code", adapters);
             Assert.Contains("codex", adapters);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -73,7 +74,7 @@ public sealed class AdapterEnvStoreTests
             store.Delete("claude-code");
             Assert.Empty(store.Load("claude-code"));
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -90,7 +91,7 @@ public sealed class AdapterEnvStoreTests
 
             Assert.Equal("claude-code", firedAdapter);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -107,6 +108,6 @@ public sealed class AdapterEnvStoreTests
 
             Assert.Equal(0, fireCount);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 }

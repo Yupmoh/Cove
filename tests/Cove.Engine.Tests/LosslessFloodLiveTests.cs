@@ -2,16 +2,15 @@ using System.Text.Json;
 using Cove.Platform.Ipc;
 using Cove.Protocol;
 using Xunit;
+using Cove.Testing;
 
 namespace Cove.Engine.Tests;
 
 public sealed class LosslessFloodLiveTests
 {
-    [Fact]
+    [LiveFact(TestOperatingSystem.Unix)]
     public async Task YesFlood_NeverDropsByte_OverRingRotation()
     {
-        if (System.OperatingSystem.IsWindows())
-            return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(90));
         CancellationToken ct = cts.Token;
 
@@ -19,7 +18,6 @@ public sealed class LosslessFloodLiveTests
         await using FrameConnection ctl = await h.ConnectAsync("cli");
 
         string nookId = await SpawnAsync(ctl, "/bin/sh", new[] { "-c", "yes FLOOD_MARK_LINE; sleep 30" }, ct);
-        await Task.Delay(3000, ct);
 
         ControlResponse subResp = await RequestAsync(ctl, "sub", "cove://commands/nook.subscribe",
             JsonSerializer.SerializeToElement(new NookRefParams(nookId), CoveJsonContext.Default.NookRefParams), ct);
@@ -30,19 +28,12 @@ public sealed class LosslessFloodLiveTests
         int totalLines = 0;
         while (!deadline.IsCompleted)
         {
-            try
-            {
-                Frame f = (await ctl.ReadFrameAsync(ct))!.Value;
-                if (f.Header.Type != FrameType.StreamData)
-                    continue;
-                string text = System.Text.Encoding.UTF8.GetString(f.Payload);
-                totalLines += text.Split('\n').Length - 1;
-                seen.Add(text.Trim());
-            }
-            catch
-            {
-                break;
-            }
+            Frame f = (await ctl.ReadFrameAsync(ct))!.Value;
+            if (f.Header.Type != FrameType.StreamData)
+                continue;
+            string text = System.Text.Encoding.UTF8.GetString(f.Payload);
+            totalLines += text.Split('\n').Length - 1;
+            seen.Add(text.Trim());
         }
         Assert.True(seen.Count >= 1, "expected at least the yes-flood marker line");
         Assert.Contains("FLOOD_MARK_LINE", seen.First());

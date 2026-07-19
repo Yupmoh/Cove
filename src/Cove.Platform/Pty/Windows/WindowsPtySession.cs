@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Threading;
 using Microsoft.Extensions.Logging;
@@ -11,6 +12,7 @@ public sealed class WindowsPtySession : IPtySession
     private const int PostExitFlushMilliseconds = 1000;
     private const int OutputQuiesceMilliseconds = 150;
     private const int PostExitDrainCapMilliseconds = 3000;
+    private const int DisposeTimeoutMilliseconds = 3000;
 
     private readonly ILogger _logger;
     private readonly SafeFileHandle _outputRead;
@@ -25,12 +27,14 @@ public sealed class WindowsPtySession : IPtySession
     private readonly ManualResetEventSlim _exitEvent = new(false);
     private readonly ManualResetEventSlim _disposeRequested = new(false);
     private readonly Thread _exitWatcher;
+    private readonly WindowsPtySessionTestHooks? _testHooks;
 
     private int _hasExited;
     private int _exitCode = -1;
     private int _consoleClosed;
     private int _killed;
-    private int _handlesClosed;
+    private int _watcherCleanupState;
+    private int _sessionResourcesClosed;
     private int _disposed;
     private int _firstReadLogged;
     private long _lastReadTicks;
@@ -46,7 +50,8 @@ public sealed class WindowsPtySession : IPtySession
         ILogger logger,
         bool suppressWatcherClose = false,
         SafeFileHandle? conptyInputRead = null,
-        SafeFileHandle? conptyOutputWrite = null)
+        SafeFileHandle? conptyOutputWrite = null,
+        WindowsPtySessionTestHooks? testHooks = null)
     {
         SessionId = sessionId;
         _pseudoConsole = pseudoConsole;
@@ -59,6 +64,7 @@ public sealed class WindowsPtySession : IPtySession
         _threadHandle = threadHandle;
         _processId = processId;
         _logger = logger;
+        _testHooks = testHooks;
 
         _exitWatcher = new Thread(WatchForExit)
         {
@@ -156,6 +162,11 @@ public sealed class WindowsPtySession : IPtySession
         if (HasExited)
             return;
         _logger.WinKillRequested(SessionId);
+        if (_testHooks?.TerminateProcess is { } terminateProcess)
+        {
+            terminateProcess();
+            return;
+        }
         if (!ConPtyNative.TerminateProcess(_processHandle, 1))
         {
             int error = Marshal.GetLastPInvokeError();
@@ -182,20 +193,36 @@ public sealed class WindowsPtySession : IPtySession
 
     private void WatchForExit()
     {
-        ConPtyNative.WaitForSingleObject(_processHandle, ConPtyNative.Infinite);
-        if (ConPtyNative.GetExitCodeProcess(_processHandle, out uint code))
-            _exitCode = unchecked((int)code);
-        else
+        try
         {
-            _logger.WinGetExitCodeFailed(SessionId, Marshal.GetLastPInvokeError());
-            _exitCode = -1;
+            if (_testHooks?.WaitForExit is { } waitForExit)
+            {
+                _exitCode = waitForExit();
+            }
+            else
+            {
+                ConPtyNative.WaitForSingleObject(_processHandle, ConPtyNative.Infinite);
+                if (ConPtyNative.GetExitCodeProcess(_processHandle, out uint code))
+                    _exitCode = unchecked((int)code);
+                else
+                {
+                    _logger.WinGetExitCodeFailed(SessionId, Marshal.GetLastPInvokeError());
+                    _exitCode = -1;
+                }
+            }
+            Volatile.Write(ref _hasExited, 1);
+            _exitEvent.Set();
+            _testHooks?.ExitSignalSet?.Invoke();
+            _logger.WinExitObserved(SessionId, _exitCode);
+            _logger.SessionExited(SessionId, _exitCode);
+            if (!_suppressWatcherClose && Volatile.Read(ref _disposed) == 0)
+                DrainPostExitThenClose();
         }
-        Volatile.Write(ref _hasExited, 1);
-        _exitEvent.Set();
-        _logger.WinExitObserved(SessionId, _exitCode);
-        _logger.SessionExited(SessionId, _exitCode);
-        if (!_suppressWatcherClose && Volatile.Read(ref _disposed) == 0)
-            DrainPostExitThenClose();
+        finally
+        {
+            if (Interlocked.CompareExchange(ref _watcherCleanupState, 2, 0) == 1)
+                CloseWatcherResources();
+        }
     }
 
     private void DrainPostExitThenClose()
@@ -225,7 +252,8 @@ public sealed class WindowsPtySession : IPtySession
         if (Interlocked.Exchange(ref _consoleClosed, 1) != 0)
             return;
         _logger.WinPseudoConsoleClosed(SessionId);
-        ConPtyNative.ClosePseudoConsole(_pseudoConsole);
+        if (_pseudoConsole != IntPtr.Zero)
+            ConPtyNative.ClosePseudoConsole(_pseudoConsole);
     }
 
     public void Dispose()
@@ -238,23 +266,124 @@ public sealed class WindowsPtySession : IPtySession
         if (!HasExited)
             Kill();
 
-        _exitEvent.Wait(TimeSpan.FromSeconds(3));
-        CloseConsole();
-        _exitWatcher.Join(TimeSpan.FromSeconds(3));
-
-        if (Interlocked.Exchange(ref _handlesClosed, 1) == 0)
+        TimeSpan timeout = _testHooks?.DisposeTimeout ?? TimeSpan.FromMilliseconds(DisposeTimeoutMilliseconds);
+        long deadline = Environment.TickCount64 + Math.Max(0L, (long)timeout.TotalMilliseconds);
+        bool exitObserved = _exitEvent.Wait(Remaining(deadline));
+        List<Exception>? failures = null;
+        try
         {
-            if (_threadHandle != IntPtr.Zero)
-                ConPtyNative.CloseHandle(_threadHandle);
-            if (_processHandle != IntPtr.Zero)
-                ConPtyNative.CloseHandle(_processHandle);
-            _logger.WinDisposeHandlesClosed(SessionId);
+            CloseSessionResources();
+        }
+        catch (Exception ex)
+        {
+            AddFailure(ref failures, ex);
         }
 
+        bool watcherJoined = _exitWatcher.Join(Remaining(deadline));
+        if (watcherJoined)
+        {
+            try
+            {
+                CloseWatcherResources();
+            }
+            catch (Exception ex)
+            {
+                AddFailure(ref failures, ex);
+            }
+        }
+        else
+        {
+            int cleanupState = Interlocked.CompareExchange(ref _watcherCleanupState, 1, 0);
+            if (cleanupState == 2)
+            {
+                try
+                {
+                    CloseWatcherResources();
+                }
+                catch (Exception ex)
+                {
+                    AddFailure(ref failures, ex);
+                }
+            }
+        }
+
+        if (!exitObserved || !watcherJoined)
+        {
+            string state = !exitObserved
+                ? "process exit was not observed"
+                : "the exit watcher did not stop";
+            AddFailure(
+                ref failures,
+                new TimeoutException(
+                    $"Timed out after {timeout.TotalMilliseconds:0} ms disposing Windows PTY session {SessionId}: {state}. Retained process and event resources will be closed by the exit watcher when it completes."));
+        }
+
+        if (failures is { Count: 1 })
+            throw failures[0];
+        if (failures is { Count: > 1 })
+            throw new AggregateException(failures);
+    }
+
+    private static TimeSpan Remaining(long deadline)
+    {
+        long milliseconds = deadline - Environment.TickCount64;
+        return milliseconds <= 0 ? TimeSpan.Zero : TimeSpan.FromMilliseconds(milliseconds);
+    }
+
+    private static void AddFailure(ref List<Exception>? failures, Exception failure)
+    {
+        failures ??= new List<Exception>();
+        failures.Add(failure);
+    }
+
+    private void CloseSessionResources()
+    {
+        if (Interlocked.Exchange(ref _sessionResourcesClosed, 1) != 0)
+            return;
+        CloseConsole();
         _inputWrite.Dispose();
         _conptyInputRead?.Dispose();
         _conptyOutputWrite?.Dispose();
         _outputRead.Dispose();
-        _disposeRequested.Dispose();
     }
+
+    private void CloseWatcherResources()
+    {
+        if (Interlocked.Exchange(ref _watcherCleanupState, 3) == 3)
+            return;
+        if (_threadHandle != IntPtr.Zero)
+            CloseHandle(_threadHandle);
+        if (_processHandle != IntPtr.Zero)
+            CloseHandle(_processHandle);
+        _exitEvent.Dispose();
+        _disposeRequested.Dispose();
+        _logger.WinDisposeHandlesClosed(SessionId);
+        _testHooks?.WatcherResourcesClosed?.Invoke();
+    }
+
+    private void CloseHandle(IntPtr handle)
+    {
+        if (_testHooks?.CloseHandle is { } closeHandle)
+        {
+            closeHandle(handle);
+            return;
+        }
+        if (!ConPtyNative.CloseHandle(handle))
+        {
+            int error = Marshal.GetLastPInvokeError();
+            throw new PtyIoException(
+                $"failed to close Windows PTY session {SessionId} handle (error {error}).",
+                error);
+        }
+    }
+}
+
+internal sealed class WindowsPtySessionTestHooks
+{
+    public required Func<int> WaitForExit { get; init; }
+    public Action? TerminateProcess { get; init; }
+    public Action<IntPtr>? CloseHandle { get; init; }
+    public Action? ExitSignalSet { get; init; }
+    public Action? WatcherResourcesClosed { get; init; }
+    public TimeSpan DisposeTimeout { get; init; } = TimeSpan.FromMilliseconds(3000);
 }

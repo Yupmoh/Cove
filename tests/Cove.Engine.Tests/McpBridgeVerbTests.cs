@@ -35,7 +35,7 @@ public sealed class McpBridgeVerbTests
             Assert.True(response!.Ok);
             Assert.Equal("dracula", response.Data!.Value.GetProperty("value").GetString());
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]

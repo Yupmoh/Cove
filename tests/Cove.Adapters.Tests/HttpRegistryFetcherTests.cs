@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http;
 using System.Text;
 using Cove.Adapters;
+using Cove.Testing;
 using Xunit;
 
 namespace Cove.Adapters.Tests;
@@ -129,7 +130,7 @@ public sealed class FileRegistryFetcherTests
 
             Assert.Equal(json, result);
         }
-        finally { try { File.Delete(path); } catch { } }
+        finally { TestFile.Delete(path); }
     }
 
     [Fact]

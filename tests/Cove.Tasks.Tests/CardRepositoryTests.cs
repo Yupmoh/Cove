@@ -6,20 +6,18 @@ using Xunit;
 
 namespace Cove.Tasks.Tests;
 
-public sealed class CardRepositoryTests
+public sealed class CardRepositoryTests : TasksTestBase
 {
-    private static string NewDb() => System.IO.Path.Combine(System.IO.Path.GetTempPath(), "cove-cards-" + System.Guid.NewGuid().ToString("N") + ".db");
-
-    private static async System.Threading.Tasks.Task<(SqliteConnectionFactory factory, TasksStore store, TasksWriteChannel channel, TaskCounterRepository counter, CardRepository cards)> NewAsync()
+    private async System.Threading.Tasks.Task<(SqliteConnectionFactory factory, TasksStore store, TasksWriteChannel channel, TaskCounterRepository counter, CardRepository cards)> NewAsync()
     {
-        var factory = new SqliteConnectionFactory(NewDb());
-        var store = new TasksStore(factory, NullLogger.Instance);
+        var fixture = CreateDatabase("cove-cards-");
+        var factory = fixture.Factory;
+        var store = fixture.Store;
         store.EnsureSchema();
         SeedStatus(factory, "ws1", "todo");
         SeedStatus(factory, "ws1", "in-progress");
         SeedStatus(factory, "ws2", "todo");
-        var channel = new TasksWriteChannel(factory);
-        await channel.StartAsync();
+        var channel = await fixture.StartChannelAsync();
         var counter = new TaskCounterRepository(factory, channel);
         var cards = new CardRepository(factory, channel);
         return (factory, store, channel, counter, cards);

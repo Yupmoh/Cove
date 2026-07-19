@@ -2,6 +2,7 @@ using System.Text;
 using Cove.Engine.Restart;
 using Cove.Platform.Pty.Unix;
 using Cove.Protocol;
+using Cove.Testing;
 using Xunit;
 
 namespace Cove.Pty.Harness;
@@ -11,19 +12,19 @@ public sealed class HandoffWireTests
     private static HandoffNookRecord Record(string id, int ringLength) =>
         new(id, 4242, "/bin/zsh", new[] { "-i" }, "/repo", null, 80, 24, null, "omp", "omp", 1000 + ringLength, ringLength, "sess-1", "idle", null);
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task Records_RoundTripWithFdsAndRingPayloads()
     {
-        if (OperatingSystem.IsWindows()) return;
         var (a, b) = UnixFdChannel.CreateSocketPair();
         var (fdIn, fdOut) = UnixFdChannel.CreateSocketPair();
+        Task? writer = null;
         try
         {
             var smallRing = Encoding.UTF8.GetBytes("tail");
             var bigRing = new byte[1 << 20];
             new Random(7).NextBytes(bigRing);
 
-            var writer = Task.Run(() =>
+            writer = Task.Run(() =>
             {
                 HandoffWire.WriteRecord(a, Record("nook-small", smallRing.Length), fdIn, smallRing);
                 HandoffWire.WriteRecord(a, Record("nook-big", bigRing.Length), -1, bigRing);
@@ -55,14 +56,16 @@ public sealed class HandoffWireTests
             UnixFdChannel.CloseFd(b);
             UnixFdChannel.CloseFd(fdIn);
             UnixFdChannel.CloseFd(fdOut);
+            if (writer is not null)
+                await writer.WaitAsync(TimeSpan.FromSeconds(10));
         }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task Records_WithMultiMegabyteCheckpoint_RoundTrip()
     {
-        if (OperatingSystem.IsWindows()) return;
         var (a, b) = UnixFdChannel.CreateSocketPair();
+        Task? writer = null;
         try
         {
             var data = new byte[3 << 20];
@@ -70,7 +73,7 @@ public sealed class HandoffWireTests
             var checkpoint = new HandoffCheckpointDto(Convert.ToBase64String(data), 123, 80, 24, 10000, "");
             var record = new HandoffNookRecord("nook-cp", 4242, "/bin/zsh", new[] { "-i" }, "/repo", null, 80, 24, null, "omp", "omp", 5, 4, "sess-1", "idle", checkpoint);
             var ring = Encoding.UTF8.GetBytes("tail");
-            var writer = Task.Run(() => HandoffWire.WriteRecord(a, record, -1, ring));
+            writer = Task.Run(() => HandoffWire.WriteRecord(a, record, -1, ring));
 
             var received = HandoffWire.ReadRecord(b);
             Assert.NotNull(received);
@@ -83,13 +86,14 @@ public sealed class HandoffWireTests
         {
             UnixFdChannel.CloseFd(a);
             UnixFdChannel.CloseFd(b);
+            if (writer is not null)
+                await writer.WaitAsync(TimeSpan.FromSeconds(10));
         }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public void ReadRecord_OnClosedPeer_ReturnsNull()
     {
-        if (OperatingSystem.IsWindows()) return;
         var (a, b) = UnixFdChannel.CreateSocketPair();
         UnixFdChannel.CloseFd(a);
         try

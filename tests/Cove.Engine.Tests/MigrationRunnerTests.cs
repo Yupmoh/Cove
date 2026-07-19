@@ -28,7 +28,7 @@ public sealed class MigrationRunnerTests
             Assert.True(result.NoOp);
             Assert.Equal(DataDirMetaStore.CurrentSchemaVersion, result.ToVersion);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -43,7 +43,7 @@ public sealed class MigrationRunnerTests
             var result = runner.Migrate();
             Assert.True(result.NoOp);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -63,7 +63,7 @@ public sealed class MigrationRunnerTests
             Assert.True(ran);
             Assert.True(File.Exists(Path.Combine(dir, "migrated-v2")));
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -82,7 +82,7 @@ public sealed class MigrationRunnerTests
             Assert.Equal(3, result.ToVersion);
             Assert.Equal(new[] { 2, 3 }, order);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -100,6 +100,6 @@ public sealed class MigrationRunnerTests
             Assert.True(result2.NoOp);
             Assert.Equal(2, result2.FromVersion);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 }

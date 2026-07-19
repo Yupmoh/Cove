@@ -66,13 +66,12 @@ public sealed class ScheduleRepository
             new { CardId = cardId });
     }
 
-    public System.Collections.Generic.IReadOnlyList<ScheduleRow> ListDue(System.DateTimeOffset now)
+    public System.Collections.Generic.IReadOnlyList<ScheduleRow> ListActive()
     {
         using var conn = _factory.Open();
-        var nowStr = now.ToString("o");
         return conn.Query<ScheduleRow>(
-            $"SELECT {SelectColumns} FROM card_schedules WHERE paused = 0 AND next_fire_at IS NOT NULL AND next_fire_at <= @Now ORDER BY next_fire_at",
-            new { Now = nowStr }).AsList();
+            $"SELECT {SelectColumns} FROM card_schedules WHERE paused = 0 AND next_fire_at IS NOT NULL AND next_fire_at <> '' ORDER BY next_fire_at")
+            .AsList();
     }
 
     public System.Threading.Tasks.Task UpdateAsync(string cardId, bool? paused, bool? skipNext, string? nextFireAt, string? lastFiredAt, string? pendingIntent = null)

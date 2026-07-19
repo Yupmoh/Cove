@@ -1,23 +1,24 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
 using System.Threading;
 using Cove.Engine.Pty;
 using Cove.Platform.Pty;
+using Cove.Platform.Pty.Windows;
+using Cove.Testing;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Win32.SafeHandles;
 using Xunit;
 
 namespace Cove.Pty.Harness;
 
 public sealed class WindowsConPtyTests
 {
-    [Trait("Category", "PtyInteractive")]
-    [Fact]
+    [Trait("Suite", "PtyInteractive")]
+    [PlatformFact(TestOperatingSystem.Windows)]
     public void ConPtySpawnEchoesOutputAndExitsWithCodeZero()
     {
-        if (!OperatingSystem.IsWindows())
-            return;
-
         var logger = NullLogger.Instance;
         var host = PtyHostFactory.Create(logger);
         var session = host.Spawn(new PtySpawnRequest
@@ -65,13 +66,10 @@ public sealed class WindowsConPtyTests
         }
     }
 
-    [Trait("Category", "PtyInteractive")]
-    [Fact]
+    [Trait("Suite", "PtyInteractive")]
+    [PlatformFact(TestOperatingSystem.Windows)]
     public void ConPtyForwardsInputToLiveChild()
     {
-        if (!OperatingSystem.IsWindows())
-            return;
-
         var logger = NullLogger.Instance;
         var host = PtyHostFactory.Create(logger);
         var session = host.Spawn(new PtySpawnRequest
@@ -117,13 +115,10 @@ public sealed class WindowsConPtyTests
         }
     }
 
-    [Trait("Category", "PtyInteractive")]
-    [Fact]
+    [Trait("Suite", "PtyInteractive")]
+    [PlatformFact(TestOperatingSystem.Windows)]
     public void ConPtyDisposeDoesNotHangForLiveProcess()
     {
-        if (!OperatingSystem.IsWindows())
-            return;
-
         var logger = NullLogger.Instance;
         var host = PtyHostFactory.Create(logger);
         var session = host.Spawn(new PtySpawnRequest
@@ -143,7 +138,142 @@ public sealed class WindowsConPtyTests
             IsBackground = true,
         };
         teardown.Start();
-        Assert.True(teardown.Join(TimeSpan.FromSeconds(10)), "ConPTY dispose hung for a live process.");
+        var completedInTime = teardown.Join(TimeSpan.FromSeconds(10));
+        if (!completedInTime)
+        {
+            try
+            {
+                session.Kill();
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+            Assert.True(
+                teardown.Join(TimeSpan.FromSeconds(5)),
+                "ConPTY dispose remained hung after the child was killed.");
+        }
+        Assert.True(completedInTime, "ConPTY dispose hung for a live process.");
+    }
+
+    [PlatformFact(TestOperatingSystem.Windows)]
+    public void DisposeTransfersDelayedWatcherResourcesWithoutUseAfterClose()
+    {
+        using var watcherEntered = new ManualResetEventSlim();
+        using var releaseWatcher = new ManualResetEventSlim();
+        using var exitSignalSet = new ManualResetEventSlim();
+        using var watcherResourcesClosed = new ManualResetEventSlim();
+        var closedHandles = new List<IntPtr>();
+        object closedHandlesLock = new();
+        int watcherReleaseTimedOut = 0;
+        var hooks = new WindowsPtySessionTestHooks
+        {
+            WaitForExit = () =>
+            {
+                watcherEntered.Set();
+                if (!releaseWatcher.Wait(TimeSpan.FromSeconds(5)))
+                {
+                    Volatile.Write(ref watcherReleaseTimedOut, 1);
+                    return -1;
+                }
+                return 29;
+            },
+            TerminateProcess = () => { },
+            CloseHandle = handle =>
+            {
+                lock (closedHandlesLock)
+                    closedHandles.Add(handle);
+            },
+            ExitSignalSet = exitSignalSet.Set,
+            WatcherResourcesClosed = watcherResourcesClosed.Set,
+            DisposeTimeout = TimeSpan.FromMilliseconds(100),
+        };
+        var session = CreateTestSession(hooks);
+        try
+        {
+            Assert.True(
+                watcherEntered.Wait(TimeSpan.FromSeconds(5)),
+                "Exit watcher did not enter its delayed wait within 5 seconds.");
+
+            var stopwatch = Stopwatch.StartNew();
+            var failure = Assert.Throws<TimeoutException>(session.Dispose);
+            Assert.True(
+                stopwatch.Elapsed < TimeSpan.FromSeconds(2),
+                $"Dispose exceeded its bounded deadline: {stopwatch.Elapsed}.");
+            Assert.Contains("exit watcher", failure.Message, StringComparison.OrdinalIgnoreCase);
+            lock (closedHandlesLock)
+                Assert.Empty(closedHandles);
+            Assert.False(watcherResourcesClosed.IsSet);
+
+            releaseWatcher.Set();
+            Assert.True(
+                exitSignalSet.Wait(TimeSpan.FromSeconds(5)),
+                "Watcher did not safely set the retained exit event within 5 seconds.");
+            Assert.True(
+                watcherResourcesClosed.Wait(TimeSpan.FromSeconds(5)),
+                "Watcher did not close its transferred resources within 5 seconds.");
+            lock (closedHandlesLock)
+            {
+                Assert.Equal(
+                    new[] { new IntPtr(202), new IntPtr(101) },
+                    closedHandles);
+            }
+            Assert.Equal(0, Volatile.Read(ref watcherReleaseTimedOut));
+            Assert.True(session.HasExited);
+            Assert.Equal(29, session.ExitCode);
+        }
+        finally
+        {
+            releaseWatcher.Set();
+            session.Dispose();
+        }
+    }
+
+    [PlatformFact(TestOperatingSystem.Windows)]
+    public void DisposeAfterWatcherExitClosesResourcesExactlyOnce()
+    {
+        using var exitSignalSet = new ManualResetEventSlim();
+        int resourcesClosed = 0;
+        var closedHandles = new List<IntPtr>();
+        var outputRead = new SafeFileHandle(IntPtr.Zero, ownsHandle: false);
+        var inputWrite = new SafeFileHandle(IntPtr.Zero, ownsHandle: false);
+        var hooks = new WindowsPtySessionTestHooks
+        {
+            WaitForExit = () => 17,
+            TerminateProcess = () => { },
+            CloseHandle = closedHandles.Add,
+            ExitSignalSet = exitSignalSet.Set,
+            WatcherResourcesClosed = () => Interlocked.Increment(ref resourcesClosed),
+            DisposeTimeout = TimeSpan.FromSeconds(1),
+        };
+        var session = CreateTestSession(hooks, outputRead, inputWrite);
+
+        Assert.True(
+            exitSignalSet.Wait(TimeSpan.FromSeconds(5)),
+            "Exit watcher did not signal completion within 5 seconds.");
+        session.Dispose();
+        session.Dispose();
+
+        Assert.Equal(1, Volatile.Read(ref resourcesClosed));
+        Assert.Equal(new[] { new IntPtr(202), new IntPtr(101) }, closedHandles);
+        Assert.True(outputRead.IsClosed);
+        Assert.True(inputWrite.IsClosed);
+    }
+
+    private static WindowsPtySession CreateTestSession(
+        WindowsPtySessionTestHooks hooks,
+        SafeFileHandle? outputRead = null,
+        SafeFileHandle? inputWrite = null)
+    {
+        return new WindowsPtySession(
+            sessionId: 77,
+            pseudoConsole: IntPtr.Zero,
+            outputRead ?? new SafeFileHandle(IntPtr.Zero, ownsHandle: false),
+            inputWrite ?? new SafeFileHandle(IntPtr.Zero, ownsHandle: false),
+            processHandle: new IntPtr(101),
+            threadHandle: new IntPtr(202),
+            processId: 303,
+            logger: NullLogger.Instance,
+            testHooks: hooks);
     }
 
     private static string DescribeCapture(byte[] raw, string text)

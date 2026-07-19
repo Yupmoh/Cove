@@ -1,67 +1,89 @@
-using System.Linq;
+using System.Collections;
 using Cove.SourceGen;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
 
-public class GeneratorTests
+namespace Cove.SourceGen.Tests;
+
+public sealed class GeneratorTests
 {
-    private const string AttrSource = """
+    private const string AttributeSource = """
         namespace Cove.Protocol;
         [System.AttributeUsage(System.AttributeTargets.Method)]
         public sealed class CoveCommandAttribute : System.Attribute
         {
             public CoveCommandAttribute(string key) => Key = key;
             public string Key { get; }
+            public string? Description { get; set; }
+            public string? Source { get; set; }
         }
         """;
 
-    private static string RunGenerator(string userSource)
+    [Fact]
+    public void EmitsExactHandlerRegistryForAttributedMethods()
     {
-        var compilation = CSharpCompilation.Create(
-            "TestAsm",
-            new[] { CSharpSyntaxTree.ParseText(AttrSource), CSharpSyntaxTree.ParseText(userSource) },
-            new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        const string source = """
+            using Cove.Protocol;
+            namespace Cove.Cli;
+            internal static class CliCommands
+            {
+                [CoveCommand("version")] public static int Version(string command) => 0;
+                [CoveCommand("nook list")] public static int NookList(string command) => 0;
+            }
+            """;
 
-        var driver = CSharpGeneratorDriver.Create(new CoveCommandGenerator());
-        driver.RunGeneratorsAndUpdateCompilation(compilation, out var output, out var diagnostics);
+        var (output, diagnostics) = GeneratorTestHarness.Run(
+            new CoveCommandGenerator(),
+            ("CoveCommandAttribute.cs", AttributeSource),
+            ("CliCommands.cs", source));
+
         Assert.Empty(diagnostics);
-        var generated = output.SyntaxTrees.Single(t => t.FilePath.EndsWith("CoveCommandRegistry.g.cs"));
-        return generated.ToString();
+        var generated = Assert.Single(output.SyntaxTrees, tree => tree.FilePath.EndsWith("CoveCommandRegistry.g.cs"));
+        Assert.NotEmpty(generated.GetRoot().DescendantNodes());
+        var assembly = GeneratorTestHarness.EmitAndLoad(output);
+        var registry = assembly.GetType("Cove.Generated.CoveCommandRegistry");
+        Assert.NotNull(registry);
+        var handlers = Assert.IsAssignableFrom<IReadOnlyDictionary<string, Delegate>>(
+            registry.GetField("Handlers")!.GetValue(null));
+
+        Assert.Equal(new[] { "nook list", "version" }, handlers.Keys.Order(StringComparer.Ordinal));
+        Assert.Equal("NookList", handlers["nook list"].Method.Name);
+        Assert.Equal("Version", handlers["version"].Method.Name);
     }
 
     [Fact]
-    public void EmitsEntryPerAttributedMethod()
+    public void ThirdVerbAppearsInExactCatalogueWithoutGeneratorChanges()
     {
-        var src = """
+        const string source = """
             using Cove.Protocol;
             namespace Cove.Cli;
             internal static class CliCommands
             {
-                [CoveCommand("version")] public static int Version(string c) => 0;
-                [CoveCommand("nook list")] public static int NookList(string c) => 0;
+                [CoveCommand("version")] public static int Version(string command) => 0;
+                [CoveCommand("nook list")] public static int NookList(string command) => 0;
+                [CoveCommand("theme list", Description = "Lists themes", Source = "core")] public static int ThemeList(string command) => 0;
             }
             """;
-        var g = RunGenerator(src);
-        Assert.Contains("[\"version\"] = (System.Func<string, int>)global::Cove.Cli.CliCommands.Version", g);
-        Assert.Contains("[\"nook list\"] = (System.Func<string, int>)global::Cove.Cli.CliCommands.NookList", g);
-    }
 
-    [Fact]
-    public void ThirdVerbNeedsOnlyTheAttribute()
-    {
-        var src = """
-            using Cove.Protocol;
-            namespace Cove.Cli;
-            internal static class CliCommands
-            {
-                [CoveCommand("version")] public static int Version(string c) => 0;
-                [CoveCommand("nook list")] public static int NookList(string c) => 0;
-                [CoveCommand("theme list")] public static int ThemeList(string c) => 0;
-            }
-            """;
-        var g = RunGenerator(src);
-        Assert.Contains("\"theme list\"", g);
+        var (output, diagnostics) = GeneratorTestHarness.Run(
+            new CoveCommandGenerator(),
+            ("CoveCommandAttribute.cs", AttributeSource),
+            ("CliCommands.cs", source));
+
+        Assert.Empty(diagnostics);
+        var assembly = GeneratorTestHarness.EmitAndLoad(output);
+        var registry = assembly.GetType("Cove.Generated.CoveCommandRegistry");
+        Assert.NotNull(registry);
+        var keys = Assert.IsAssignableFrom<IReadOnlyList<string>>(
+            registry.GetField("Keys")!.GetValue(null));
+        Assert.Equal(new[] { "nook list", "theme list", "version" }, keys);
+
+        var catalogue = Assert.IsAssignableFrom<IEnumerable>(registry.GetField("Catalogue")!.GetValue(null))
+            .Cast<object>()
+            .ToArray();
+        Assert.Equal(3, catalogue.Length);
+        var theme = Assert.Single(catalogue, entry =>
+            (string)entry.GetType().GetProperty("Command")!.GetValue(entry)! == "theme list");
+        Assert.Equal("Lists themes", theme.GetType().GetProperty("Description")!.GetValue(theme));
+        Assert.Equal("core", theme.GetType().GetProperty("Source")!.GetValue(theme));
     }
 }

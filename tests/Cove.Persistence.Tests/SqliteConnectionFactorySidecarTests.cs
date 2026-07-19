@@ -1,4 +1,5 @@
 using Cove.Persistence;
+using Cove.Testing;
 using Xunit;
 
 namespace Cove.Persistence.Tests;
@@ -19,25 +20,25 @@ public sealed class SqliteConnectionFactorySidecarTests : IDisposable
     public void Dispose()
     {
         Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
-        if (Directory.Exists(_directory)) Directory.Delete(_directory, true);
+        TestDirectory.Delete(_directory);
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
+    [Trait(TestTraits.Category, TestTraits.Platform)]
+    [System.Runtime.Versioning.UnsupportedOSPlatform("windows")]
     public void Open_SetsOwnerOnlyModeOnMainDatabase()
     {
-        if (OperatingSystem.IsWindows()) return;
-
         var factory = new SqliteConnectionFactory(_databasePath);
         using var connection = factory.Open();
 
         Assert.Equal(OwnerOnly, File.GetUnixFileMode(_databasePath));
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
+    [Trait(TestTraits.Category, TestTraits.Platform)]
+    [System.Runtime.Versioning.UnsupportedOSPlatform("windows")]
     public void Open_AfterWalWrite_SetsOwnerOnlyModeOnWalAndShmSidecars()
     {
-        if (OperatingSystem.IsWindows()) return;
-
         var factory = new SqliteConnectionFactory(_databasePath);
         using var connection = factory.Open();
         using var command = connection.CreateCommand();

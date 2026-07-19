@@ -1,4 +1,3 @@
-using System.Buffers.Binary;
 using System.Text.Json;
 using Cove.Protocol;
 
@@ -8,29 +7,54 @@ public sealed class AttachSession
 {
     private readonly FrameConnection _conn;
     private readonly string _nookId;
+    private readonly string _clientKind;
+    private readonly string _clientVersion;
+    private readonly string _channel;
+    private readonly string _source;
     private ulong _streamId;
     private ulong _ackedOffset;
     private uint _seq;
+    private int _requestId;
+    private bool _helloCompleted;
 
     public ulong StreamId => _streamId;
     public ulong AckedOffset => _ackedOffset;
 
-    public AttachSession(FrameConnection conn, string nookId)
+    public AttachSession(
+        FrameConnection conn,
+        string nookId,
+        string clientKind,
+        string clientVersion,
+        string channel,
+        string source)
     {
         _conn = conn;
         _nookId = nookId;
+        _clientKind = clientKind;
+        _clientVersion = clientVersion;
+        _channel = channel;
+        _source = source;
     }
 
-    public async Task<SubscribeResult> SubscribeAsync(string clientKind, CancellationToken ct)
+    public async Task ConnectAsync(CancellationToken ct)
     {
+        if (_helloCompleted)
+            return;
         var helloEl = JsonSerializer.SerializeToElement(
-            new HelloParams(ProtocolConstants.SemanticProtocolVersion, clientKind, "0.1.0", "stable"),
+            new HelloParams(ProtocolConstants.SemanticProtocolVersion, _clientKind, _clientVersion, _channel),
             CoveJsonContext.Default.HelloParams);
-        await SendRequestAsync("h", "cove://sys/hello", helloEl, ct).ConfigureAwait(false);
-        await ReadResponseAsync("h", ct).ConfigureAwait(false);
+        await SendRequestAsync("h", "cove://sys/hello", helloEl, null, ct).ConfigureAwait(false);
+        var response = await ReadResponseAsync("h", ct).ConfigureAwait(false);
+        if (!response.Ok)
+            throw new InvalidOperationException($"hello failed: {response.Error?.Code}");
+        _helloCompleted = true;
+    }
 
+    public async Task<SubscribeResult> SubscribeAsync(CancellationToken ct)
+    {
+        await ConnectAsync(ct).ConfigureAwait(false);
         var subEl = JsonSerializer.SerializeToElement(new SubscribeParams(_nookId, 0), CoveJsonContext.Default.SubscribeParams);
-        await SendRequestAsync("s", "cove://commands/nook.subscribe", subEl, ct).ConfigureAwait(false);
+        await SendRequestAsync("s", "cove://commands/nook.subscribe", subEl, _source, ct).ConfigureAwait(false);
         var subResp = await ReadResponseAsync("s", ct).ConfigureAwait(false);
         if (!subResp.Ok || subResp.Data is null)
             throw new InvalidOperationException($"subscribe failed: {subResp.Error?.Code}");
@@ -41,7 +65,22 @@ public sealed class AttachSession
         return result;
     }
 
-    public async Task PumpAsync(Func<ReadOnlyMemory<byte>, CancellationToken, Task> onData, Func<ulong, int, CancellationToken, Task> onEnd, CancellationToken ct)
+    public async Task<ControlResponse> RequestAsync(
+        string uri,
+        JsonElement? parameters,
+        CancellationToken ct)
+    {
+        await ConnectAsync(ct).ConfigureAwait(false);
+        var id = "r" + Interlocked.Increment(ref _requestId);
+        await SendRequestAsync(id, uri, parameters, _source, ct).ConfigureAwait(false);
+        return await ReadResponseAsync(id, ct).ConfigureAwait(false);
+    }
+
+    public async Task PumpAsync(
+        Func<StreamDataMessage, CancellationToken, Task> onData,
+        Func<StreamResyncMessage, CancellationToken, Task> onResync,
+        Func<StreamEndMessage, CancellationToken, Task> onEnd,
+        CancellationToken ct)
     {
         while (true)
         {
@@ -51,19 +90,18 @@ public sealed class AttachSession
             switch (f.Value.Header.Type)
             {
                 case FrameType.StreamData:
-                    var offset = BinaryPrimitives.ReadUInt64LittleEndian(f.Value.Payload);
-                    var raw = f.Value.Payload.AsMemory(8);
-                    await onData(raw, ct).ConfigureAwait(false);
-                    _ackedOffset = AttachFrameDecode.NextAckOffset(_ackedOffset, offset, raw.Length);
+                    var data = StreamPayload.ReadStreamData(f.Value.Payload);
+                    await onData(data, ct).ConfigureAwait(false);
+                    _ackedOffset = AttachFrameDecode.NextAckOffset(_ackedOffset, data.Offset, data.Data.Length);
                     await AckAsync(_ackedOffset, ct).ConfigureAwait(false);
                     break;
                 case FrameType.Resync:
-                    _ackedOffset = BinaryPrimitives.ReadUInt64LittleEndian(f.Value.Payload);
+                    var resync = StreamPayload.ReadResync(f.Value.Payload);
+                    _ackedOffset = resync.BaseOffset;
+                    await onResync(resync, ct).ConfigureAwait(false);
                     break;
                 case FrameType.StreamEnd:
-                    var finalOffset = BinaryPrimitives.ReadUInt64LittleEndian(f.Value.Payload);
-                    var exitCode = BinaryPrimitives.ReadInt32LittleEndian(f.Value.Payload.AsSpan(8));
-                    await onEnd(finalOffset, exitCode, ct).ConfigureAwait(false);
+                    await onEnd(StreamPayload.ReadStreamEndMessage(f.Value.Payload), ct).ConfigureAwait(false);
                     return;
             }
         }
@@ -73,7 +111,7 @@ public sealed class AttachSession
     {
         if (data.Length == 0) return;
         var writeEl = JsonSerializer.SerializeToElement(new NookWriteParams(_nookId, toBase64(data)), CoveJsonContext.Default.NookWriteParams);
-        await SendRequestAsync("w" + (++_seq), "cove://commands/nook.write", writeEl, ct).ConfigureAwait(false);
+        await SendRequestAsync("w" + (++_seq), "cove://commands/nook.write", writeEl, _source, ct).ConfigureAwait(false);
     }
 
     public async Task AckAsync(ulong ackOffset, CancellationToken ct)
@@ -82,9 +120,14 @@ public sealed class AttachSession
         await _conn.WriteFrameAsync(FrameType.Credit, _streamId, payload, ct).ConfigureAwait(false);
     }
 
-    private async Task SendRequestAsync(string id, string uri, JsonElement? parameters, CancellationToken ct)
+    private async Task SendRequestAsync(
+        string id,
+        string uri,
+        JsonElement? parameters,
+        string? source,
+        CancellationToken ct)
     {
-        var req = new ControlRequest(id, uri, parameters, "user:tui");
+        var req = new ControlRequest(id, uri, parameters, source);
         var bytes = JsonSerializer.SerializeToUtf8Bytes(req, CoveJsonContext.Default.ControlRequest);
         await _conn.WriteFrameAsync(FrameType.Request, 0, bytes, ct).ConfigureAwait(false);
     }

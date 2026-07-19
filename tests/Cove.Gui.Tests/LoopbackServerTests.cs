@@ -1,5 +1,6 @@
 using System.Net;
 using Cove.Gui;
+using Cove.Gui.Tests;
 using Xunit;
 
 public class LoopbackServerTests
@@ -7,10 +8,10 @@ public class LoopbackServerTests
     [Fact]
     public async Task Serves_Index_200_And_Missing_404()
     {
-        var tmp = Directory.CreateTempSubdirectory().FullName;
-        await File.WriteAllTextAsync(Path.Combine(tmp, "index.html"), "<html>hello</html>");
-        await File.WriteAllTextAsync(Path.Combine(tmp, "app.js"), "console.log(1)");
-        await using var server = new LoopbackServer(tmp, _ => throw new NotImplementedException(), "0.1.0", "dev", port: 0);
+        using var temp = GuiTestDirectory.Create("cove-loopback-");
+        await File.WriteAllTextAsync(Path.Combine(temp.Path, "index.html"), "<html>hello</html>");
+        await File.WriteAllTextAsync(Path.Combine(temp.Path, "app.js"), "console.log(1)");
+        await using var server = new LoopbackServer(temp.Path, _ => throw new NotImplementedException(), "0.1.0", "dev", port: 0);
         server.Start();
         using var http = new HttpClient();
 

@@ -4,6 +4,7 @@ using Cove.Engine.Protocol;
 using Cove.Protocol;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
+using Cove.Testing;
 
 namespace Cove.Engine.Tests;
 
@@ -58,11 +59,10 @@ public sealed class ScopeMatrixTests
         Assert.Equal(request.CallerNookId, redriven.CallerNookId);
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task ExecuteCommand_ForeignNook_PreservesCallerScopeWhileAnonymousStillPasses()
     {
-        if (System.OperatingSystem.IsWindows()) return;
-        var nooks = NewNooks();
+        using var nooks = NewNooks();
         var scopeStore = new NookScopeStore(NewDir(), NullLogger.Instance);
         string callerNook = "", targetNook = "";
         try
@@ -94,16 +94,15 @@ public sealed class ScopeMatrixTests
         }
         finally
         {
-            try { nooks.Kill(callerNook); } catch { }
-            try { nooks.Kill(targetNook); } catch { }
+            if (!string.IsNullOrEmpty(callerNook)) nooks.Kill(callerNook);
+            if (!string.IsNullOrEmpty(targetNook)) nooks.Kill(targetNook);
         }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task CanvasSendToAgent_ForeignNook_DeniesIdentifiedCallerWhileAnonymousStillPasses()
     {
-        if (System.OperatingSystem.IsWindows()) return;
-        var nooks = NewNooks();
+        using var nooks = NewNooks();
         var scopeStore = new NookScopeStore(NewDir(), NullLogger.Instance);
         string callerNook = "", targetNook = "";
         try
@@ -137,8 +136,8 @@ public sealed class ScopeMatrixTests
         }
         finally
         {
-            try { nooks.Kill(callerNook); } catch { }
-            try { nooks.Kill(targetNook); } catch { }
+            if (!string.IsNullOrEmpty(callerNook)) nooks.Kill(callerNook);
+            if (!string.IsNullOrEmpty(targetNook)) nooks.Kill(targetNook);
         }
     }
 

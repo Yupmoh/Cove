@@ -1,15 +1,15 @@
 using System.Text;
 using Cove.Platform.Pty.Unix;
+using Cove.Testing;
 using Xunit;
 
 namespace Cove.Pty.Harness;
 
 public sealed class UnixFdChannelTests
 {
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public void SendWithFd_TransfersAFunctionalDescriptor()
     {
-        if (OperatingSystem.IsWindows()) return;
         var (a, b) = UnixFdChannel.CreateSocketPair();
         var (payloadIn, payloadOut) = UnixFdChannel.CreateSocketPair();
         try
@@ -37,10 +37,9 @@ public sealed class UnixFdChannelTests
         }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public void Send_WithoutFd_YieldsMinusOneOnReceive()
     {
-        if (OperatingSystem.IsWindows()) return;
         var (a, b) = UnixFdChannel.CreateSocketPair();
         try
         {
@@ -58,10 +57,9 @@ public sealed class UnixFdChannelTests
         }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public void Receive_OnClosedPeer_ReturnsZero()
     {
-        if (OperatingSystem.IsWindows()) return;
         var (a, b) = UnixFdChannel.CreateSocketPair();
         UnixFdChannel.CloseFd(a);
         try

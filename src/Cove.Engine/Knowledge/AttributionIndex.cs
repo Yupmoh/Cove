@@ -16,19 +16,21 @@ public sealed class AttributionIndex
 {
     private readonly string _dbPath;
     private readonly ILogger _logger;
+    private readonly TimeProvider _timeProvider;
 
-    public AttributionIndex(string dataDir, ILogger logger)
+    public AttributionIndex(string dataDir, ILogger logger, TimeProvider? timeProvider = null)
     {
         _dbPath = System.IO.Path.Combine(dataDir, "attribution", "index.db");
         System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(_dbPath)!);
         _logger = logger;
+        _timeProvider = timeProvider ?? TimeProvider.System;
         EnsureSchema();
     }
 
     public AttributionEntry Record(string sessionId, string toolUseId, string filePath, int startLine, int endLine)
     {
         var id = System.Guid.NewGuid().ToString("N");
-        var at = System.DateTimeOffset.UtcNow;
+        var at = _timeProvider.GetUtcNow();
         using var conn = new SqliteConnection($"Data Source={_dbPath}");
         conn.Open();
         using var cmd = conn.CreateCommand();

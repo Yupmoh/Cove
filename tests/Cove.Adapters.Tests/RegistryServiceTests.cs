@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Cove.Adapters;
+using Cove.Testing;
 using Xunit;
 
 namespace Cove.Adapters.Tests;
@@ -124,7 +125,7 @@ public sealed class RegistryServiceTests
 
             Assert.Equal(1, fetcher.CallCount);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -138,7 +139,6 @@ public sealed class RegistryServiceTests
             var fetcher = new TestFetcher("""{"schemaVersion":1,"adapters":[{"name":"x","displayName":"X","description":"","accent":"#000000","binary":"x","sdkVersion":2,"version":"1.0.0","official":false}]}""");
             var svc = new RegistryService(cachePath, fetcher, cacheTtl: TimeSpan.FromMilliseconds(1));
             await svc.FetchAsync();
-            await Task.Delay(10);
 
             File.SetLastWriteTimeUtc(cachePath, DateTime.UtcNow.AddHours(-2));
 
@@ -150,7 +150,7 @@ public sealed class RegistryServiceTests
             Assert.Single(result!.Adapters);
             Assert.Equal("x", result.Adapters[0].Name);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -164,7 +164,6 @@ public sealed class RegistryServiceTests
             var fetcher = new TestFetcher("""{"schemaVersion":1,"adapters":[{"name":"x","displayName":"X","description":"","accent":"#000000","binary":"x","sdkVersion":2,"version":"1.0.0","official":false}]}""");
             var svc = new RegistryService(cachePath, fetcher, cacheTtl: TimeSpan.FromMilliseconds(1));
             await svc.FetchAsync();
-            await Task.Delay(10);
 
             File.SetLastWriteTimeUtc(cachePath, DateTime.UtcNow.AddHours(-2));
 
@@ -176,7 +175,7 @@ public sealed class RegistryServiceTests
             Assert.Single(result!.Adapters);
             Assert.Equal("x", result.Adapters[0].Name);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
     [Fact]
     public async Task FetchAsync_OfflineFallsBackToDiskCache()
@@ -197,7 +196,7 @@ public sealed class RegistryServiceTests
             Assert.Single(result!.Adapters);
             Assert.Equal("x", result.Adapters[0].Name);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 }
 

@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Cove.Protocol;
 using Xunit;
+using Cove.Testing;
 
 namespace Cove.Engine.Tests;
 
@@ -99,11 +100,9 @@ public sealed class NookLiveHandlerTests
         return doc.RootElement.Clone();
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task RunningNook_SurvivesClientClose_AndReplaysRingIdenticallyOnReattach()
     {
-        if (OperatingSystem.IsWindows())
-            return;
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         CancellationToken ct = cts.Token;
         await using var h = await DaemonTestHarness.StartAsync();
@@ -134,11 +133,9 @@ public sealed class NookLiveHandlerTests
         Assert.Equal(first, second);
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task NookSpawn_ListsAlive_ThenKill_Removes()
     {
-        if (OperatingSystem.IsWindows())
-            return;
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         CancellationToken ct = cts.Token;
         await using var h = await DaemonTestHarness.StartAsync();
@@ -163,11 +160,9 @@ public sealed class NookLiveHandlerTests
         Assert.Equal("not_found", missing.Error!.Code);
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task NookWrite_ReachesChild_AndOutputStreams()
     {
-        if (OperatingSystem.IsWindows())
-            return;
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         CancellationToken ct = cts.Token;
         await using var h = await DaemonTestHarness.StartAsync();
@@ -187,11 +182,9 @@ public sealed class NookLiveHandlerTests
         Assert.Equal("COVE_PING", Encoding.ASCII.GetString(echoed));
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task NookResize_LiveNook_Ok_MissingNook_NotFound()
     {
-        if (OperatingSystem.IsWindows())
-            return;
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         CancellationToken ct = cts.Token;
         await using var h = await DaemonTestHarness.StartAsync();
@@ -210,17 +203,24 @@ public sealed class NookLiveHandlerTests
         Assert.Equal("not_found", missing.Error!.Code);
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task Subscribe_FromCheckpointOffset_ReturnsSerializedStateAndDimensions()
     {
-        if (OperatingSystem.IsWindows())
-            return;
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         CancellationToken ct = cts.Token;
         await using var h = await DaemonTestHarness.StartAsync();
         await using FrameConnection ctl = await h.ConnectAsync("cli");
         string nookId = await SpawnAsync(ctl, "/bin/sh", new[] { "-c", "printf '\\033[?1049h\\033[?1006h'; sleep 30" }, 80, 24, ct);
-        await Task.Delay(200, ct);
+        await AsyncTest.EventuallyAsync(async () =>
+        {
+            var read = await RequestAsync(ctl, "mode-ready", "cove://commands/nook.read",
+                JsonSerializer.SerializeToElement(new NookReadParams(nookId, 0, 65536), CoveJsonContext.Default.NookReadParams), ct);
+            if (!read.Ok)
+                return false;
+            var result = read.Data!.Value.Deserialize(CoveJsonContext.Default.NookReadResult)!;
+            return !string.IsNullOrEmpty(result.DataBase64)
+                && Encoding.UTF8.GetString(Convert.FromBase64String(result.DataBase64)).Contains("\x1b[?1006h", StringComparison.Ordinal);
+        }, TimeSpan.FromSeconds(5), "terminal mode output was not observed", ct);
         byte[] checkpoint = Encoding.UTF8.GetBytes("SERIALIZED_STATE");
         var checkpointParams = new NookCheckpointParams(nookId, Convert.ToBase64String(checkpoint), 1, 132, 40, 10000);
         JsonElement checkpointElement = JsonSerializer.SerializeToElement(checkpointParams, CoveJsonContext.Default.NookCheckpointParams);
@@ -241,11 +241,9 @@ public sealed class NookLiveHandlerTests
         Assert.Equal("", continued.TerminalCheckpointBase64);
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task Subscribe_UnknownNook_ReturnsNotFound()
     {
-        if (OperatingSystem.IsWindows())
-            return;
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         CancellationToken ct = cts.Token;
         await using var h = await DaemonTestHarness.StartAsync();

@@ -18,7 +18,7 @@ public sealed class ReviewReadyDismissalStoreTests
             store.Dismiss("review-1");
             Assert.True(store.IsDismissed("review-1"));
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -30,7 +30,7 @@ public sealed class ReviewReadyDismissalStoreTests
             var store = new ReviewReadyDismissalStore(dir, NullLogger.Instance);
             Assert.False(store.IsDismissed("review-1"));
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -44,7 +44,7 @@ public sealed class ReviewReadyDismissalStoreTests
             var store2 = new ReviewReadyDismissalStore(dir, NullLogger.Instance);
             Assert.True(store2.IsDismissed("review-1"));
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -58,7 +58,7 @@ public sealed class ReviewReadyDismissalStoreTests
             Assert.True(store.Restore("review-1"));
             Assert.False(store.IsDismissed("review-1"));
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -70,7 +70,7 @@ public sealed class ReviewReadyDismissalStoreTests
             var store = new ReviewReadyDismissalStore(dir, NullLogger.Instance);
             Assert.False(store.Restore("nonexistent"));
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -87,7 +87,7 @@ public sealed class ReviewReadyDismissalStoreTests
             Assert.Contains("review-1", list);
             Assert.Contains("review-2", list);
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -102,7 +102,7 @@ public sealed class ReviewReadyDismissalStoreTests
             store.ClearAll();
             Assert.Empty(store.ListDismissed());
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -116,7 +116,7 @@ public sealed class ReviewReadyDismissalStoreTests
             store.Dismiss("review-1");
             Assert.Single(store.ListDismissed());
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -129,7 +129,7 @@ public sealed class ReviewReadyDismissalStoreTests
             store.Dismiss("");
             Assert.Empty(store.ListDismissed());
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -141,6 +141,6 @@ public sealed class ReviewReadyDismissalStoreTests
             var store = new ReviewReadyDismissalStore(dir, NullLogger.Instance);
             Assert.False(store.IsDismissed(""));
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 }

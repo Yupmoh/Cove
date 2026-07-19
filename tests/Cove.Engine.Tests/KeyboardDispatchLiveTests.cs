@@ -3,12 +3,13 @@ using System.Text.Json;
 using Cove.Platform.Ipc;
 using Cove.Protocol;
 using Xunit;
+using Cove.Testing;
 
 namespace Cove.Engine.Tests;
 
 public sealed class KeyboardDispatchLiveTests
 {
-    [Theory]
+    [LiveTheory(TestOperatingSystem.Unix)]
     [InlineData("\u0003", "SIGINT Ctrl-C")]
     [InlineData("\u0001", "line-start Ctrl-A")]
     [InlineData("\u0005", "line-end Ctrl-E")]
@@ -16,8 +17,6 @@ public sealed class KeyboardDispatchLiveTests
     [InlineData("\n", "newline Shift-Enter")]
     public async Task SendText_Passthrough_ReachesPty(string input, string label)
     {
-        if (System.OperatingSystem.IsWindows())
-            return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(60));
         CancellationToken ct = cts.Token;
 
@@ -26,7 +25,19 @@ public sealed class KeyboardDispatchLiveTests
 
         string marker = "KB_" + label.Replace(" ", "_").Replace("/", "_");
         string nookId = await SpawnAsync(ctl, "/bin/sh", new[] { "-c", $"printf '%s\\n' '{marker}'; sleep 30" }, ct);
-        await Task.Delay(500, ct);
+        JsonElement rp = JsonSerializer.SerializeToElement(new NookReadParams(nookId, 0, 65536), CoveJsonContext.Default.NookReadParams);
+        string output = "";
+        await AsyncTest.EventuallyAsync(async () =>
+        {
+            ControlResponse r = await RequestAsync(ctl, "ready", "cove://commands/nook.read", rp, ct);
+            if (!r.Ok)
+                return false;
+            var result = r.Data!.Value.Deserialize(CoveJsonContext.Default.NookReadResult)!;
+            output = string.IsNullOrEmpty(result.DataBase64)
+                ? ""
+                : Encoding.UTF8.GetString(Convert.FromBase64String(result.DataBase64));
+            return output.Contains(marker, StringComparison.Ordinal);
+        }, TimeSpan.FromSeconds(30), $"nook did not emit {marker}", ct);
 
         JsonElement wp = JsonSerializer.SerializeToElement(
             new NookWriteParams(nookId, System.Convert.ToBase64String(Encoding.UTF8.GetBytes(input))),
@@ -34,23 +45,6 @@ public sealed class KeyboardDispatchLiveTests
         ControlResponse writeResp = await RequestAsync(ctl, "w", "cove://commands/nook.write", wp, ct);
         Assert.True(writeResp.Ok, writeResp.Error?.Message);
 
-        JsonElement rp = JsonSerializer.SerializeToElement(new NookReadParams(nookId, 0, 65536), CoveJsonContext.Default.NookReadParams);
-        var deadline = Task.Delay(System.TimeSpan.FromSeconds(30), ct);
-        string output = "";
-        while (!deadline.IsCompleted)
-        {
-            ControlResponse r = await RequestAsync(ctl, "rd", "cove://commands/nook.read", rp, ct);
-            if (r.Ok)
-            {
-                var result = r.Data!.Value.Deserialize(CoveJsonContext.Default.NookReadResult)!;
-                if (!string.IsNullOrEmpty(result.DataBase64))
-                {
-                    output = Encoding.UTF8.GetString(System.Convert.FromBase64String(result.DataBase64));
-                    if (output.Contains(marker)) break;
-                }
-            }
-            await Task.Delay(100, ct);
-        }
         Assert.Contains(marker, output);
     }
 

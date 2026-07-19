@@ -2,6 +2,7 @@ using Cove.Adapters;
 using Cove.Engine.Adapters;
 using Cove.Protocol;
 using Xunit;
+using Cove.Testing;
 
 namespace Cove.Engine.Tests;
 
@@ -40,10 +41,9 @@ public sealed class EnvPropagationServiceTests
 
     private static string NewDir() => Path.Combine(Path.GetTempPath(), "cove-envprop-" + Guid.NewGuid().ToString("N"));
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public void Save_FiresEnvSaved_PropagatesUsr1ToMatchingNooks()
     {
-        if (OperatingSystem.IsWindows()) return;
         var dir = NewDir();
         try
         {
@@ -61,7 +61,7 @@ public sealed class EnvPropagationServiceTests
             Assert.Single(nook1.Signals);
             Assert.Single(nook2.Signals);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -83,7 +83,7 @@ public sealed class EnvPropagationServiceTests
             var loaded = store.Load("codex");
             Assert.Single(loaded);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -99,6 +99,6 @@ public sealed class EnvPropagationServiceTests
             var ex = Record.Exception(() => store.Save("unknown-adapter", new List<AdapterEnvVar> { new("A", "1") }));
             Assert.Null(ex);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 }

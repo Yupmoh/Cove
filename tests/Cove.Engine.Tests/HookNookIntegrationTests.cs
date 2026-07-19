@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Cove.Platform.Ipc;
 using Cove.Protocol;
 using Xunit;
+using Cove.Testing;
 
 namespace Cove.Engine.Tests;
 
@@ -39,10 +40,9 @@ public sealed class HookNookIntegrationTests
         resp.EnsureSuccessStatusCode();
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task HookPost_SessionStart_PopulatesNookState()
     {
-        if (System.OperatingSystem.IsWindows()) return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(20));
         var ct = cts.Token;
         await using var h = await DaemonTestHarness.StartAsync();
@@ -67,10 +67,9 @@ public sealed class HookNookIntegrationTests
         Assert.True(found, $"nook {nookId} not found in nook-states after hook POST");
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task HookPost_StopTransitions_NookToDone()
     {
-        if (System.OperatingSystem.IsWindows()) return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(20));
         var ct = cts.Token;
         await using var h = await DaemonTestHarness.StartAsync();
@@ -95,10 +94,9 @@ public sealed class HookNookIntegrationTests
         Assert.Equal("done", status);
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task HookPost_NotificationTransitions_NookToNeedsInput()
     {
-        if (System.OperatingSystem.IsWindows()) return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(20));
         var ct = cts.Token;
         await using var h = await DaemonTestHarness.StartAsync();
@@ -123,10 +121,9 @@ public sealed class HookNookIntegrationTests
         Assert.Equal("needs-input", status);
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task HookPost_UnknownAdapter_StillAcceptsEvent()
     {
-        if (System.OperatingSystem.IsWindows()) return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(20));
         var ct = cts.Token;
         await using var h = await DaemonTestHarness.StartAsync();

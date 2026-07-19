@@ -3,6 +3,7 @@ using Cove.Engine;
 using Cove.Platform.Ipc;
 using Cove.Protocol;
 using Xunit;
+using Cove.Testing;
 
 namespace Cove.Engine.Tests;
 
@@ -22,10 +23,9 @@ public sealed class ExportRouteTests
         }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task Export_ProducesConsistentCopyWithManifest()
     {
-        if (System.OperatingSystem.IsWindows()) return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(60));
         CancellationToken ct = cts.Token;
 
@@ -41,13 +41,12 @@ public sealed class ExportRouteTests
         Assert.Equal(1, exportResp.Data!.Value.GetProperty("schemaVersion").GetInt32());
         Assert.True(System.IO.File.Exists(exportPath));
 
-        try { System.IO.File.Delete(exportPath); } catch { }
+        Cove.Testing.TestFile.Delete(exportPath);
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task Diff_GeneratesRowDifferences()
     {
-        if (System.OperatingSystem.IsWindows()) return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(60));
         CancellationToken ct = cts.Token;
 
@@ -65,6 +64,6 @@ public sealed class ExportRouteTests
         Assert.True(diffResp.Data!.Value.GetProperty("success").GetBoolean());
         Assert.True(diffResp.Data!.Value.GetProperty("diffs").GetArrayLength() > 0);
 
-        try { System.IO.File.Delete(exportPath); } catch { }
+        Cove.Testing.TestFile.Delete(exportPath);
     }
 }

@@ -9,11 +9,13 @@ public sealed class EditsIndex
 {
     private readonly string _dbPath;
     private readonly ILogger _logger;
+    private readonly TimeProvider _timeProvider;
 
-    public EditsIndex(string dataDir, ILogger logger)
+    public EditsIndex(string dataDir, ILogger logger, TimeProvider? timeProvider = null)
     {
         _dbPath = System.IO.Path.Combine(dataDir, "fts", "index.db");
         _logger = logger;
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     public void RecordEdit(string sessionId, string filePath, string? tool, string? op, string? editSummary)
@@ -30,7 +32,7 @@ public sealed class EditsIndex
         cmd.Parameters.AddWithValue("@fp", filePath);
         cmd.Parameters.AddWithValue("@tool", (object?)tool ?? System.DBNull.Value);
         cmd.Parameters.AddWithValue("@op", (object?)op ?? System.DBNull.Value);
-        cmd.Parameters.AddWithValue("@ts", System.DateTimeOffset.UtcNow.ToString("o"));
+        cmd.Parameters.AddWithValue("@ts", _timeProvider.GetUtcNow().ToString("o"));
         cmd.Parameters.AddWithValue("@summary", (object?)editSummary ?? System.DBNull.Value);
         cmd.ExecuteNonQuery();
 

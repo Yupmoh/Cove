@@ -28,7 +28,7 @@ public sealed class HookEmitClientTests
             Assert.True(result.Ok);
             Assert.Equal(200, result.StatusCode);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -49,7 +49,7 @@ public sealed class HookEmitClientTests
             Assert.True(result.Ok);
             Assert.Equal("nook-99", receivedNookId);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]

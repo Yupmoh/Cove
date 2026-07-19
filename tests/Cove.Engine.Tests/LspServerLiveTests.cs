@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Cove.Engine.Lsp;
+using Cove.Testing;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -25,8 +26,8 @@ public sealed class LspServerLiveTests : IAsyncLifetime
             _serverPath = FindServerOnPath("typescript-language-server");
             _serverArgs = new[] { "--stdio" };
         }
-        _workDir = Path.Combine(Path.GetTempPath(), "cove-lsp-live-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(_workDir);
+        Assert.NotNull(_serverPath);
+        _workDir = TestDirectory.Create("cove-lsp-live");
         return Task.CompletedTask;
     }
 
@@ -46,7 +47,7 @@ public sealed class LspServerLiveTests : IAsyncLifetime
 
     public Task DisposeAsync()
     {
-        try { Directory.Delete(_workDir, true); } catch (IOException) { }
+        TestDirectory.Delete(_workDir);
         return Task.CompletedTask;
     }
 
@@ -90,10 +91,9 @@ public sealed class LspServerLiveTests : IAsyncLifetime
         await server.SendNotificationAsync("textDocument/didOpen", didOpen, ct);
     }
 
-    [Fact]
+    [LiveFact]
     public async Task Initialize_RealServer_Succeeds()
     {
-        if (_serverPath is null) return;
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         await using var server = CreateServer();
 
@@ -103,10 +103,9 @@ public sealed class LspServerLiveTests : IAsyncLifetime
         Assert.True(server.IsRunning);
     }
 
-    [Fact]
+    [LiveFact]
     public async Task PullDiagnostics_TypeError_ReportsAssignabilityError()
     {
-        if (_serverPath is null) return;
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
         await using var server = CreateServer();
         Assert.True(await server.StartAsync(cts.Token));
@@ -128,10 +127,9 @@ public sealed class LspServerLiveTests : IAsyncLifetime
         Assert.Equal(2322, first.GetProperty("code").GetInt32());
     }
 
-    [Fact]
+    [LiveFact]
     public async Task Hover_OverTypedConst_ReturnsContents()
     {
-        if (_serverPath is null) return;
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
         await using var server = CreateServer();
         Assert.True(await server.StartAsync(cts.Token));
@@ -150,10 +148,9 @@ public sealed class LspServerLiveTests : IAsyncLifetime
         Assert.Contains("string", contents.GetRawText(), StringComparison.OrdinalIgnoreCase);
     }
 
-    [Fact]
+    [LiveFact]
     public async Task Definition_AtCallSite_ReturnsDeclarationLocation()
     {
-        if (_serverPath is null) return;
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
         await using var server = CreateServer();
         Assert.True(await server.StartAsync(cts.Token));

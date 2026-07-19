@@ -109,7 +109,7 @@ public sealed class BayCommandsTests
             var ws = listed!.Data!.Value.GetProperty("bays")[0];
             Assert.Equal(Path.GetFullPath(dir), ws.GetProperty("projectDir").GetString());
         }
-        finally { try { Directory.Delete(Path.GetDirectoryName(dir)!, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(Path.GetDirectoryName(dir)!); }
     }
 
     [Fact]
@@ -129,6 +129,6 @@ public sealed class BayCommandsTests
             var ws = listed!.Data!.Value.GetProperty("bays")[0];
             Assert.Equal(expected, ws.GetProperty("projectDir").GetString());
         }
-        finally { try { Directory.Delete(expected, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(expected); }
     }
 }

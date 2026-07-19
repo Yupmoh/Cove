@@ -1,4 +1,5 @@
 using Cove.Adapters;
+using Cove.Testing;
 using Xunit;
 
 namespace Cove.Adapters.Tests;
@@ -17,34 +18,28 @@ public sealed class BinaryDiscoveryTests
         return path;
     }
 
-    [Fact]
+    [ExternalFact(TestOperatingSystem.Unix, "bash")]
     public void Discover_FindsBinaryOnPath()
     {
-        if (OperatingSystem.IsWindows()) return;
         var binDir = NewDir();
         try
         {
             MakeExecutable(binDir, "fake-cli", "echo '1.0.0'");
             var path = Environment.GetEnvironmentVariable("PATH") ?? "";
-            Environment.SetEnvironmentVariable("PATH", binDir + Path.PathSeparator + path);
-            try
-            {
-                var discovery = new BinaryDiscoveryService();
-                var result = discovery.Discover(new BinaryDiscovery { Commands = ["fake-cli"], VersionFlag = "--version" });
+            var discovery = new BinaryDiscoveryService(
+                pathResolver: () => binDir + Path.PathSeparator + path);
+            var result = discovery.Discover(new BinaryDiscovery { Commands = ["fake-cli"], VersionFlag = "--version" });
 
-                Assert.Equal(AdapterDetectionState.Detected, result.State);
-                Assert.NotNull(result.BinaryPath);
-                Assert.Equal("1.0.0", result.Version);
-            }
-            finally { Environment.SetEnvironmentVariable("PATH", path); }
+            Assert.Equal(AdapterDetectionState.Detected, result.State);
+            Assert.NotNull(result.BinaryPath);
+            Assert.Equal("1.0.0", result.Version);
         }
-        finally { try { Directory.Delete(binDir, true); } catch { } }
+        finally { TestDirectory.Delete(binDir); }
     }
 
-    [Fact]
+    [ExternalFact(TestOperatingSystem.Unix, "bash")]
     public void Discover_FindsBinaryInWellKnownPath()
     {
-        if (OperatingSystem.IsWindows()) return;
         var wkDir = NewDir();
         try
         {
@@ -59,7 +54,7 @@ public sealed class BinaryDiscoveryTests
             Assert.Equal(AdapterDetectionState.Detected, result.State);
             Assert.Contains("wk-cli", result.BinaryPath ?? "");
         }
-        finally { try { Directory.Delete(wkDir, true); } catch { } }
+        finally { TestDirectory.Delete(wkDir); }
     }
 
     [Fact]
@@ -76,63 +71,53 @@ public sealed class BinaryDiscoveryTests
         Assert.Null(result.BinaryPath);
     }
 
-    [Fact]
+    [ExternalFact(TestOperatingSystem.Unix, "bash")]
     public void Discover_BinaryWithNoVersion_ReturnsBrokenState()
     {
-        if (OperatingSystem.IsWindows()) return;
         var binDir = NewDir();
         try
         {
             MakeExecutable(binDir, "no-version-cli", "exit 0");
             var path = Environment.GetEnvironmentVariable("PATH") ?? "";
-            Environment.SetEnvironmentVariable("PATH", binDir + Path.PathSeparator + path);
-            try
-            {
-                var discovery = new BinaryDiscoveryService();
-                var result = discovery.Discover(new BinaryDiscovery { Commands = ["no-version-cli"], VersionFlag = "--version" });
+            var discovery = new BinaryDiscoveryService(
+                pathResolver: () => binDir + Path.PathSeparator + path);
+            var result = discovery.Discover(new BinaryDiscovery { Commands = ["no-version-cli"], VersionFlag = "--version" });
 
-                Assert.Equal(AdapterDetectionState.Broken, result.State);
-                Assert.NotNull(result.BinaryPath);
-                Assert.True(string.IsNullOrEmpty(result.Version));
-            }
-            finally { Environment.SetEnvironmentVariable("PATH", path); }
+            Assert.Equal(AdapterDetectionState.Broken, result.State);
+            Assert.NotNull(result.BinaryPath);
+            Assert.True(string.IsNullOrEmpty(result.Version));
         }
-        finally { try { Directory.Delete(binDir, true); } catch { } }
+        finally { TestDirectory.Delete(binDir); }
     }
 
-    [Fact]
+    [ExternalFact(TestOperatingSystem.Unix, "bash")]
     public void Discover_VersionFromStderr_IsTolerated()
     {
-        if (OperatingSystem.IsWindows()) return;
         var binDir = NewDir();
         try
         {
             MakeExecutable(binDir, "stderr-cli", "echo '3.1.0' >&2; exit 1");
             var path = Environment.GetEnvironmentVariable("PATH") ?? "";
-            Environment.SetEnvironmentVariable("PATH", binDir + Path.PathSeparator + path);
-            try
-            {
-                var discovery = new BinaryDiscoveryService();
-                var result = discovery.Discover(new BinaryDiscovery { Commands = ["stderr-cli"], VersionFlag = "--version" });
+            var discovery = new BinaryDiscoveryService(
+                pathResolver: () => binDir + Path.PathSeparator + path);
+            var result = discovery.Discover(new BinaryDiscovery { Commands = ["stderr-cli"], VersionFlag = "--version" });
 
-                Assert.Equal(AdapterDetectionState.Detected, result.State);
-                Assert.Equal("3.1.0", result.Version);
-            }
-            finally { Environment.SetEnvironmentVariable("PATH", path); }
+            Assert.Equal(AdapterDetectionState.Detected, result.State);
+            Assert.Equal("3.1.0", result.Version);
         }
-        finally { try { Directory.Delete(binDir, true); } catch { } }
+        finally { TestDirectory.Delete(binDir); }
     }
 
-    [Fact]
+    [ExternalFact(TestOperatingSystem.Unix, "bash")]
     public void Discover_ExpandsTildeInWellKnownPaths()
     {
-        if (OperatingSystem.IsWindows()) return;
-        var homeSub = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".cove-test-wk-" + Guid.NewGuid().ToString("N"));
+        var home = NewDir();
+        var homeSub = Path.Combine(home, ".cove-test-wk-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(homeSub);
         try
         {
             MakeExecutable(homeSub, "tilde-cli", "echo '1.5.0'");
-            var discovery = new BinaryDiscoveryService();
+            var discovery = new BinaryDiscoveryService(homeResolver: () => home);
             var result = discovery.Discover(new BinaryDiscovery
             {
                 Commands = ["tilde-cli"],
@@ -141,13 +126,12 @@ public sealed class BinaryDiscoveryTests
 
             Assert.Equal(AdapterDetectionState.Detected, result.State);
         }
-        finally { try { Directory.Delete(homeSub, true); } catch { } }
+        finally { TestDirectory.Delete(home); }
     }
 
-    [Fact]
+    [ExternalFact(TestOperatingSystem.Unix, "bash")]
     public void Discover_HangingVersionProbe_ReturnsWithinTimeout()
     {
-        if (OperatingSystem.IsWindows()) return;
         var wkDir = NewDir();
         try
         {
@@ -165,6 +149,6 @@ public sealed class BinaryDiscoveryTests
             Assert.Equal(AdapterDetectionState.Detected, result.State);
             Assert.Equal("4.2.0", result.Version);
         }
-        finally { try { Directory.Delete(wkDir, true); } catch { } }
+        finally { TestDirectory.Delete(wkDir); }
     }
 }

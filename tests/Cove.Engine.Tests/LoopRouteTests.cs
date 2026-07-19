@@ -3,6 +3,7 @@ using Cove.Engine;
 using Cove.Platform.Ipc;
 using Cove.Protocol;
 using Xunit;
+using Cove.Testing;
 
 namespace Cove.Engine.Tests;
 
@@ -30,10 +31,9 @@ public sealed class LoopRouteTests
         return cardId;
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task RunNow_FiresOffCadenceEvenWithActiveRun()
     {
-        if (System.OperatingSystem.IsWindows()) return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(60));
         CancellationToken ct = cts.Token;
 
@@ -51,10 +51,9 @@ public sealed class LoopRouteTests
         Assert.Equal(2, runs.Data!.Value.GetProperty("runs").GetArrayLength());
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task RepeatContinue_WritesPendingIntent()
     {
-        if (System.OperatingSystem.IsWindows()) return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(60));
         CancellationToken ct = cts.Token;
 
@@ -70,10 +69,9 @@ public sealed class LoopRouteTests
         Assert.True(getResp.Ok, getResp.Error?.Code);
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task RepeatFinish_WritesPendingIntent()
     {
-        if (System.OperatingSystem.IsWindows()) return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(60));
         CancellationToken ct = cts.Token;
 
@@ -86,10 +84,9 @@ public sealed class LoopRouteTests
         Assert.True(finishResp.Ok, finishResp.Error?.Code);
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task RepeatContinue_NoSchedule_ReturnsNotFound()
     {
-        if (System.OperatingSystem.IsWindows()) return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(60));
         CancellationToken ct = cts.Token;
 

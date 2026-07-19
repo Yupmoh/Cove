@@ -8,14 +8,14 @@ public sealed class EditsIndexTests
 {
     private static string NewDir() => System.IO.Path.Combine(System.IO.Path.GetTempPath(), "cove-edits-" + System.Guid.NewGuid().ToString("N"));
 
-    private static (string dir, EditsIndex index, SessionCorpusIndexer corpus) NewIndex()
+    private static (string dir, EditsIndex index, SessionCorpusIndexer corpus) NewIndex(TimeProvider? timeProvider = null)
     {
         var dir = NewDir();
         System.IO.Directory.CreateDirectory(dir);
         var kernel = new KnowledgePersistenceKernel(dir, NullLogger.Instance);
         kernel.EnsureAllSchemas();
         var corpus = new SessionCorpusIndexer(dir, NullLogger.Instance);
-        return (dir, new EditsIndex(dir, NullLogger.Instance), corpus);
+        return (dir, new EditsIndex(dir, NullLogger.Instance, timeProvider), corpus);
     }
 
     private static string CreateSession(SessionCorpusIndexer corpus, string bayId = "ws1")
@@ -49,11 +49,12 @@ public sealed class EditsIndexTests
     [Fact]
     public void FindByFile_ResultsOrderedByRecency()
     {
-        var (_, index, corpus) = NewIndex();
+        var time = new ManualTimeProvider();
+        var (_, index, corpus) = NewIndex(time);
         var s1 = CreateSession(corpus);
         var s2 = CreateSession(corpus);
         index.RecordEdit(s1, "/path/File.cs", "Edit", "write", "old");
-        System.Threading.Thread.Sleep(10);
+        time.Advance(TimeSpan.FromMilliseconds(1));
         index.RecordEdit(s2, "/path/File.cs", "Edit", "write", "new");
 
         var results = index.FindByFile("/path/File.cs");

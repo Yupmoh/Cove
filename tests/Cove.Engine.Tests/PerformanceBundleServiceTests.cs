@@ -65,10 +65,11 @@ public sealed class PerformanceBundleServiceTests
     {
         var dir = NewDir();
         var hub = new DiagnosticsHub(new DiagnosticsConfig(true, false, 100, TimeSpan.FromMinutes(5)));
-        var service = new PerformanceBundleService(hub, dir, NullLogger.Instance);
+        var time = new ManualTimeProvider();
+        var service = new PerformanceBundleService(hub, dir, NullLogger.Instance, time);
 
         var first = service.CreateBundle();
-        System.Threading.Thread.Sleep(50);
+        time.Advance(TimeSpan.FromMilliseconds(1));
         var second = service.CreateBundle();
 
         var bundles = service.ListBundles();

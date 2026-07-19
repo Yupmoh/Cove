@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using Cove.Engine.Daemon;
 using Xunit;
+using Cove.Testing;
 
 namespace Cove.Engine.Tests;
 
@@ -24,14 +25,12 @@ public sealed class PidFileAndGuardTests
                 Assert.Equal("43127\n", sr.ReadToEnd());
             Assert.Equal(43127, PidFile.Read(path));
         }
-        finally { try { File.Delete(path); } catch { } }
+        finally { Cove.Testing.TestFile.Delete(path); }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public void Guard_SecondAcquire_FailsWhileHeld_ThenSucceedsAfterDispose()
     {
-        if (OperatingSystem.IsWindows())
-            return;
         string path = TempPidPath();
         try
         {
@@ -44,7 +43,7 @@ public sealed class PidFileAndGuardTests
             Assert.NotNull(third);
             third!.Dispose();
         }
-        finally { try { File.Delete(path); } catch { } }
+        finally { Cove.Testing.TestFile.Delete(path); }
     }
 
     [Fact]

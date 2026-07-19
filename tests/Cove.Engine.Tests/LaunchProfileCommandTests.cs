@@ -35,7 +35,7 @@ public class LaunchProfileCommandTests
             var profiles = response.Data!.Value.GetProperty("profiles");
             Assert.Equal(2, profiles.GetArrayLength());
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -58,7 +58,7 @@ public class LaunchProfileCommandTests
             Assert.False(profiles.First(p => p.Slug == "default").IsDefault);
             Assert.True(profiles.First(p => p.Slug == "fast").IsDefault);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -81,7 +81,7 @@ public class LaunchProfileCommandTests
             Assert.Single(profiles);
             Assert.True(profiles[0].IsDefault);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -109,7 +109,7 @@ public class LaunchProfileCommandTests
             Assert.False(response!.Ok);
             Assert.Equal("invalid_params", response.Error!.Code);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -133,7 +133,7 @@ public class LaunchProfileCommandTests
             Assert.Equal("glm", response.Data!.Value.GetProperty("model").GetString());
             Assert.Equal("https://umans.ai", response.Data!.Value.GetProperty("env").GetProperty("ANTHROPIC_BASE_URL").GetString());
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -151,7 +151,7 @@ public class LaunchProfileCommandTests
             Assert.False(response!.Ok);
             Assert.Equal("not_found", response.Error!.Code);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -180,7 +180,7 @@ public class LaunchProfileCommandTests
             Assert.Equal("https://umans.ai", created.Env["ANTHROPIC_BASE_URL"]);
             Assert.True(created.IsDefault);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -201,7 +201,7 @@ public class LaunchProfileCommandTests
             Assert.False(response!.Ok);
             Assert.Equal("conflict", response.Error!.Code);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -233,7 +233,7 @@ public class LaunchProfileCommandTests
             Assert.Equal("https://umans.ai/v2", updated.Env["ANTHROPIC_BASE_URL"]);
             Assert.True(updated.IsDefault);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -251,7 +251,7 @@ public class LaunchProfileCommandTests
             Assert.False(response!.Ok);
             Assert.Equal("not_found", response.Error!.Code);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -269,6 +269,6 @@ public class LaunchProfileCommandTests
             Assert.False(response!.Ok);
             Assert.Equal("invalid_params", response.Error!.Code);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 }

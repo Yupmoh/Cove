@@ -6,17 +6,15 @@ using Xunit;
 
 namespace Cove.Tasks.Tests;
 
-public sealed class CommentRepositoryTests
+public sealed class CommentRepositoryTests : TasksTestBase
 {
-    private static string NewDb() => System.IO.Path.Combine(System.IO.Path.GetTempPath(), "cove-comments-" + System.Guid.NewGuid().ToString("N") + ".db");
-
-    private static async System.Threading.Tasks.Task<(SqliteConnectionFactory factory, CommentRepository comments, CardRepository cards, TasksWriteChannel channel)> NewAsync()
+    private async System.Threading.Tasks.Task<(SqliteConnectionFactory factory, CommentRepository comments, CardRepository cards, TasksWriteChannel channel)> NewAsync()
     {
-        var factory = new SqliteConnectionFactory(NewDb());
-        var store = new TasksStore(factory, NullLogger.Instance);
+        var fixture = CreateDatabase("cove-comments-");
+        var factory = fixture.Factory;
+        var store = fixture.Store;
         store.EnsureSchema();
-        var channel = new TasksWriteChannel(factory);
-        await channel.StartAsync();
+        var channel = await fixture.StartChannelAsync();
         var comments = new CommentRepository(factory, channel);
         var cards = new CardRepository(factory, channel);
         SeedStatus(factory, "ws1", "todo");
@@ -78,11 +76,17 @@ public sealed class CommentRepositoryTests
     [Fact]
     public async System.Threading.Tasks.Task ListByCard_ReturnsOrderedByCreatedAt()
     {
-        var (_, comments, cards, _) = await NewAsync();
+        var (factory, comments, cards, _) = await NewAsync();
         var cardId = await SeedCardAsync(cards, "ws1", 1);
         await comments.AddAsync(cardId, "discussion", "first", "user:a");
-        await System.Threading.Tasks.Task.Delay(10);
         await comments.AddAsync(cardId, "instruction", "second", "user:b");
+        using (var connection = factory.Open())
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = "UPDATE comments SET created_at = '2026-01-01T00:00:00.0000000+00:00' WHERE card_id = @CardId";
+            command.Parameters.AddWithValue("@CardId", cardId);
+            command.ExecuteNonQuery();
+        }
 
         var list = comments.ListByCard(cardId);
         Assert.Equal(2, list.Count);

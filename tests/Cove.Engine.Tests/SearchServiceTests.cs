@@ -1,4 +1,5 @@
 using Cove.Engine.Search;
+using Cove.Testing;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -16,99 +17,99 @@ public sealed class SearchServiceTests
         return dir;
     }
 
-    [Fact]
+    [ExternalFact(TestOperatingSystem.Any, "rg")]
     public async Task SearchAsync_FindsMatches()
     {
         var dir = CreateTestRepo();
         try
         {
             var service = new SearchService(NullLogger.Instance);
-            if (!service.IsAvailable) return;
+            Assert.True(service.IsAvailable);
 
             var result = await service.SearchAsync(new SearchParams("hello", dir, false, false, true, null, null));
             Assert.NotEmpty(result.Matches);
             Assert.Contains(result.Matches, m => m.FilePath.EndsWith("file1.txt"));
             Assert.Contains(result.Matches, m => m.FilePath.EndsWith("file2.ts"));
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
-    [Fact]
+    [ExternalFact(TestOperatingSystem.Any, "rg")]
     public async Task SearchAsync_CaseInsensitive_FindsLowercase()
     {
         var dir = CreateTestRepo();
         try
         {
             var service = new SearchService(NullLogger.Instance);
-            if (!service.IsAvailable) return;
+            Assert.True(service.IsAvailable);
 
             var result = await service.SearchAsync(new SearchParams("HELLO", dir, false, false, true, null, null));
             Assert.NotEmpty(result.Matches);
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
-    [Fact]
+    [ExternalFact(TestOperatingSystem.Any, "rg")]
     public async Task SearchAsync_CaseSensitive_NoMatchForWrongCase()
     {
         var dir = CreateTestRepo();
         try
         {
             var service = new SearchService(NullLogger.Instance);
-            if (!service.IsAvailable) return;
+            Assert.True(service.IsAvailable);
 
             var result = await service.SearchAsync(new SearchParams("HELLO", dir, false, false, false, null, null));
             Assert.Empty(result.Matches);
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
-    [Fact]
+    [ExternalFact(TestOperatingSystem.Any, "rg")]
     public async Task SearchAsync_Regex_FindsPattern()
     {
         var dir = CreateTestRepo();
         try
         {
             var service = new SearchService(NullLogger.Instance);
-            if (!service.IsAvailable) return;
+            Assert.True(service.IsAvailable);
 
             var result = await service.SearchAsync(new SearchParams("const\\s+\\w+", dir, true, false, false, "*.ts", null));
             Assert.NotEmpty(result.Matches);
             Assert.All(result.Matches, m => Assert.EndsWith(".ts", m.FilePath));
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
-    [Fact]
+    [ExternalFact(TestOperatingSystem.Any, "rg")]
     public async Task SearchAsync_IncludeGlob_FiltersByFilePattern()
     {
         var dir = CreateTestRepo();
         try
         {
             var service = new SearchService(NullLogger.Instance);
-            if (!service.IsAvailable) return;
+            Assert.True(service.IsAvailable);
 
             var result = await service.SearchAsync(new SearchParams("hello", dir, false, false, true, "*.txt", null));
             Assert.NotEmpty(result.Matches);
             Assert.All(result.Matches, m => Assert.EndsWith(".txt", m.FilePath));
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
-    [Fact]
+    [ExternalFact(TestOperatingSystem.Any, "rg")]
     public async Task SearchAsync_ExcludeGlob_ExcludesFiles()
     {
         var dir = CreateTestRepo();
         try
         {
             var service = new SearchService(NullLogger.Instance);
-            if (!service.IsAvailable) return;
+            Assert.True(service.IsAvailable);
 
             var result = await service.SearchAsync(new SearchParams("hello", dir, false, false, true, null, "*.me"));
             Assert.NotEmpty(result.Matches);
             Assert.DoesNotContain(result.Matches, m => m.FilePath.EndsWith(".me"));
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -119,14 +120,14 @@ public sealed class SearchServiceTests
         Assert.Empty(result.Matches);
     }
 
-    [Fact]
+    [ExternalFact(TestOperatingSystem.Any, "rg")]
     public async Task SearchAsync_ReturnsLineAndColumn()
     {
         var dir = CreateTestRepo();
         try
         {
             var service = new SearchService(NullLogger.Instance);
-            if (!service.IsAvailable) return;
+            Assert.True(service.IsAvailable);
 
             var result = await service.SearchAsync(new SearchParams("foo", dir, false, false, true, null, null));
             var match = Assert.Single(result.Matches);
@@ -134,6 +135,6 @@ public sealed class SearchServiceTests
             Assert.True(match.Column > 0);
             Assert.Contains("foo", match.Text);
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 }

@@ -30,7 +30,7 @@ public sealed class LayoutPersistenceTests
             Assert.NotNull(loaded);
             Assert.IsType<SplitNode>(loaded!.Shores[0].LayoutTree);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -51,7 +51,7 @@ public sealed class LayoutPersistenceTests
             Assert.NotNull(loaded);
             Assert.Equal("ws1", loaded!.Id);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -69,7 +69,7 @@ public sealed class LayoutPersistenceTests
             var (loaded, _) = BayPersistence.Load(dir, NullLogger.Instance);
             Assert.Equal("/my/project", loaded!.ProjectDir);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -93,6 +93,6 @@ public sealed class LayoutPersistenceTests
             Assert.True(sessions.ContainsKey("p1"));
             Assert.Equal("my nook", sessions["p1"].Title);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 }

@@ -10,6 +10,7 @@ using Cove.Engine.Restart;
 using Cove.Generated;
 using Cove.Protocol;
 using Xunit;
+using Cove.Testing;
 
 namespace Cove.Engine.Tests;
 
@@ -45,10 +46,9 @@ public sealed class VaultResumeTests
     private static VaultResumeResult Deserialize(ControlResponse resp)
         => resp.Data!.Value.Deserialize(CoveJsonContext.Default.VaultResumeResult)!;
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task VaultResume_AdapterWithResumeMethod_ReturnsResumeArgv()
     {
-        if (OperatingSystem.IsWindows()) return;
         var root = WriteFixtures("test-v2");
         try
         {
@@ -63,13 +63,12 @@ public sealed class VaultResumeTests
             Assert.Equal(new[] { "test-v2", "resume", "sess-123" }, result.Command);
             Assert.Equal("/tmp/work", result.Cwd);
         }
-        finally { try { Directory.Delete(root, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(root); }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task VaultResume_Yolo_AddsSkipPermissionsFlag()
     {
-        if (OperatingSystem.IsWindows()) return;
         var root = WriteFixtures("test-v2");
         try
         {
@@ -82,13 +81,12 @@ public sealed class VaultResumeTests
             Assert.Equal("none", result.Fallback);
             Assert.Equal(new[] { "test-v2", "resume", "sess-123", "--dangerously-skip-permissions" }, result.Command);
         }
-        finally { try { Directory.Delete(root, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(root); }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task VaultResume_NoYolo_OmitsSkipPermissionsFlag()
     {
-        if (OperatingSystem.IsWindows()) return;
         var root = WriteFixtures("test-v2");
         try
         {
@@ -99,13 +97,12 @@ public sealed class VaultResumeTests
             var result = Deserialize(resp);
             Assert.Equal(new[] { "test-v2", "resume", "sess-123" }, result.Command);
         }
-        finally { try { Directory.Delete(root, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(root); }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task VaultResume_AdapterWithoutResumeMethod_FallsBackToFreshLaunch()
     {
-        if (OperatingSystem.IsWindows()) return;
         var root = WriteFixtures("test-v1");
         try
         {
@@ -121,7 +118,7 @@ public sealed class VaultResumeTests
             Assert.Equal("/tmp/work", result.Cwd);
             Assert.NotNull(result.Error);
         }
-        finally { try { Directory.Delete(root, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(root); }
     }
 
     [Fact]
@@ -136,6 +133,6 @@ public sealed class VaultResumeTests
             Assert.False(resp.Ok);
             Assert.Equal("not_found", resp.Error!.Code);
         }
-        finally { try { Directory.Delete(root, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(root); }
     }
 }

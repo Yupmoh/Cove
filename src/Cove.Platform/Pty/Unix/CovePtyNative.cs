@@ -39,13 +39,22 @@ internal static partial class CovePtyNative
     internal static partial nint RecvWithFd(int sock, Span<byte> buffer, int length, out int fd);
 
     [LibraryImport(PtyConstants.NativeLibrary, EntryPoint = "cove_pty_exitwatch_new")]
-    internal static partial int ExitWatchNew();
+    internal static partial nint ExitWatchNew();
 
     [LibraryImport(PtyConstants.NativeLibrary, EntryPoint = "cove_pty_exitwatch_add")]
-    internal static partial int ExitWatchAdd(int watchFd, int pid);
+    internal static partial int ExitWatchAdd(nint watch, int pid, long token);
+
+    [LibraryImport(PtyConstants.NativeLibrary, EntryPoint = "cove_pty_exitwatch_remove")]
+    internal static partial int ExitWatchRemove(nint watch, long token);
 
     [LibraryImport(PtyConstants.NativeLibrary, EntryPoint = "cove_pty_exitwatch_next")]
-    internal static partial int ExitWatchNext(int watchFd, out int status);
+    internal static partial long ExitWatchNext(nint watch, out int status);
+
+    [LibraryImport(PtyConstants.NativeLibrary, EntryPoint = "cove_pty_exitwatch_wait_reader_entered")]
+    internal static partial int ExitWatchWaitReaderEntered(nint watch);
+
+    [LibraryImport(PtyConstants.NativeLibrary, EntryPoint = "cove_pty_exitwatch_free")]
+    internal static partial void ExitWatchFree(nint watch);
 
     [LibraryImport(PtyConstants.NativeLibrary, EntryPoint = "cove_pty_dup")]
     internal static partial int Dup(int fd);

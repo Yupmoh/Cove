@@ -8,18 +8,9 @@ using Xunit;
 
 namespace Cove.Tasks.Tests;
 
-public sealed class ResumeSagaTests
+public sealed class ResumeSagaTests : TasksTestBase
 {
-    private static string NewDb() => System.IO.Path.Combine(System.IO.Path.GetTempPath(), "cove-resume-" + System.Guid.NewGuid().ToString("N") + ".db");
-
-    private static async System.Threading.Tasks.Task<TaskService> NewSvcAsync()
-    {
-        var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "cove-resume-" + System.Guid.NewGuid().ToString("N"));
-        System.IO.Directory.CreateDirectory(dir);
-        var svc = new TaskService(dir, NullLogger.Instance);
-        await svc.StartAsync();
-        return svc;
-    }
+    private System.Threading.Tasks.Task<TaskService> NewSvcAsync() => CreateTaskServiceAsync("cove-resume-");
 
     private sealed class FakeProfileResolver : ILaunchProfileResolver
     {

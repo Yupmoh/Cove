@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text.RegularExpressions;
 using Cove.Adapters;
+using Cove.Testing;
 using Xunit;
 
 namespace Cove.Adapters.Tests;
@@ -86,7 +87,7 @@ public sealed class AgentDefinitionTests
             Assert.Equal("claude-code", agent.Adapter);
             Assert.Contains("You are a test agent", agent.Prompt);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -105,7 +106,7 @@ public sealed class AgentDefinitionTests
             Assert.Contains("skill-a", agent.AttachedSkills);
             Assert.Contains("skill-b", agent.AttachedSkills);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -131,7 +132,7 @@ public sealed class AgentDefinitionTests
             Assert.Equal("Stored", loaded.Name);
             Assert.Contains("skill1", loaded.AttachedSkills);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -147,7 +148,7 @@ public sealed class AgentDefinitionTests
             var list = store.List();
             Assert.Equal(2, list.Count);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -162,6 +163,6 @@ public sealed class AgentDefinitionTests
 
             Assert.Null(store.Load("doomed"));
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 }

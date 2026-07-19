@@ -87,7 +87,7 @@ public sealed class HandlerOutputContractTests
             Assert.Equal("deep", settings.Depth);
             Assert.Equal(90, settings.Horizon);
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -114,7 +114,7 @@ public sealed class HandlerOutputContractTests
             Assert.DoesNotContain("AKIAIOSFODNN7EXAMPLE", redacted);
             Assert.Contains("[REDACTED]", redacted);
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -136,7 +136,7 @@ public sealed class HandlerOutputContractTests
             Assert.Equal("open", audit[1].ToState);
             Assert.Equal("resolved", audit[2].ToState);
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -159,6 +159,6 @@ public sealed class HandlerOutputContractTests
             var afterRestore = await svc.ListAsync();
             Assert.Contains(afterRestore, s => s.Trigger == SnapshotTrigger.PreRestore);
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 }

@@ -1,5 +1,9 @@
 <Project>
 
+  <ItemGroup Condition="'$(IsTestProject)' == 'true'">
+    <ProjectReference Include="$(MSBuildThisFileDirectory)tests/Cove.Testing/Cove.Testing.csproj" />
+  </ItemGroup>
+
   <Target Name="CovePrintVersion" DependsOnTargets="MinVer">
     <Message Importance="high" Text="COVE_VERSION=$(MinVerVersion)" />
   </Target>

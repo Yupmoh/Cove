@@ -17,7 +17,7 @@ public sealed class SettingsStoreTests
             var store = new SettingsStore(dir);
             Assert.Equal("default", store.Get("nonexistent", "default"));
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -31,7 +31,7 @@ public sealed class SettingsStoreTests
             store.Set("terminal.fontSize", "14");
             Assert.Equal("14", store.Get("terminal.fontSize", ""));
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -46,7 +46,7 @@ public sealed class SettingsStoreTests
             var store2 = new SettingsStore(dir);
             Assert.Equal("dark", store2.Get("theme", ""));
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -60,7 +60,7 @@ public sealed class SettingsStoreTests
             store.Set("terminal.fontSize", "14");
             Assert.Equal(14, store.GetInt("terminal.fontSize", 12));
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -74,7 +74,7 @@ public sealed class SettingsStoreTests
             store.Set("terminal.showBell", "true");
             Assert.True(store.GetBool("terminal.showBell", false));
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -89,7 +89,7 @@ public sealed class SettingsStoreTests
             store.Delete("temp");
             Assert.False(store.HasKey("temp"));
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -107,7 +107,7 @@ public sealed class SettingsStoreTests
             Assert.Equal("1", all["a"]);
             Assert.Equal("2", all["b"]);
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 }
 
@@ -145,7 +145,7 @@ public sealed class KeybindingStoreTests
             var store = new KeybindingStore(dir);
             Assert.Equal("cmd+t", store.Get("nook.newTerminal", "none"));
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -159,6 +159,6 @@ public sealed class KeybindingStoreTests
             store.Set("nook.newTerminal", "ctrl+t");
             Assert.Equal("ctrl+t", store.Get("nook.newTerminal", "none"));
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 }

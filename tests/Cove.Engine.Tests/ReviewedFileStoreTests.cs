@@ -18,7 +18,7 @@ public sealed class ReviewedFileStoreTests
             store.MarkReviewed("/repo", "main", "src/file.cs", "user");
             Assert.True(store.IsReviewed("/repo", "main", "src/file.cs"));
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -30,7 +30,7 @@ public sealed class ReviewedFileStoreTests
             var store = new ReviewedFileStore(dir, NullLogger.Instance);
             Assert.False(store.IsReviewed("/repo", "main", "src/file.cs"));
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -45,7 +45,7 @@ public sealed class ReviewedFileStoreTests
             Assert.False(store.IsReviewed("/repo-b", "main", "file.cs"));
             Assert.False(store.IsReviewed("/repo-a", "feature", "file.cs"));
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -62,7 +62,7 @@ public sealed class ReviewedFileStoreTests
             Assert.Contains(list, f => f.FilePath == "a.cs" && f.ReviewedBy == "user1");
             Assert.Contains(list, f => f.FilePath == "b.cs" && f.ReviewedBy == "user2");
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -79,7 +79,7 @@ public sealed class ReviewedFileStoreTests
             Assert.True(removed);
             Assert.False(store.IsReviewed("/repo", "main", "file.cs"));
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -91,7 +91,7 @@ public sealed class ReviewedFileStoreTests
             var store = new ReviewedFileStore(dir, NullLogger.Instance);
             Assert.False(store.UnmarkReviewed("/repo", "main", "file.cs"));
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -107,7 +107,7 @@ public sealed class ReviewedFileStoreTests
             Assert.Single(list);
             Assert.Equal("user2", list[0].ReviewedBy);
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]

@@ -103,7 +103,7 @@ public sealed class LayoutWingPinFocusTests
             Assert.Equal(wingId, reloaded.ShoresFor(LayoutService.DefaultBayId).Single(s => s.Id == b).WingId);
             Assert.Equal("p1", reloaded.FocusedNookFor(LayoutService.DefaultBayId));
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]

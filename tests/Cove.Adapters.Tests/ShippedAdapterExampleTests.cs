@@ -1,4 +1,5 @@
 using Cove.Adapters;
+using Cove.Testing;
 using Xunit;
 
 namespace Cove.Adapters.Tests;
@@ -64,13 +65,14 @@ public sealed class ShippedAdapterExampleTests
         Assert.Contains("--nook-id \"$COVE_NOOK_ID\"", idleCommand!);
     }
 
-    [Theory]
+    [PlatformTheory(TestOperatingSystem.Unix)]
+    [Trait(TestTraits.Category, TestTraits.Platform)]
+    [System.Runtime.Versioning.UnsupportedOSPlatform("windows")]
     [InlineData("claude-code")]
     [InlineData("codex")]
     [InlineData("omp")]
-    public void ShippedAdapter_ScriptsExistAndExecutable(string adapterName)
+    public void ShippedScripts_AreExecutable(string adapterName)
     {
-        if (System.OperatingSystem.IsWindows()) return;
         var dir = Path.Combine(AdaptersRoot, adapterName);
         foreach (var script in new[] { "build_launch_command.sh", "build_resume_command.sh", "list_recent_sessions.sh" })
         {

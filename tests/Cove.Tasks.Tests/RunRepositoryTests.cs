@@ -7,17 +7,15 @@ using Xunit;
 
 namespace Cove.Tasks.Tests;
 
-public sealed class RunRepositoryTests
+public sealed class RunRepositoryTests : TasksTestBase
 {
-    private static string NewDb() => System.IO.Path.Combine(System.IO.Path.GetTempPath(), "cove-runs-" + System.Guid.NewGuid().ToString("N") + ".db");
-
-    private static async System.Threading.Tasks.Task<(SqliteConnectionFactory factory, RunRepository runs, RunSegmentRepository segments, CardRepository cards, TasksWriteChannel channel)> NewAsync()
+    private async System.Threading.Tasks.Task<(SqliteConnectionFactory factory, RunRepository runs, RunSegmentRepository segments, CardRepository cards, TasksWriteChannel channel)> NewAsync()
     {
-        var factory = new SqliteConnectionFactory(NewDb());
-        var store = new TasksStore(factory, NullLogger.Instance);
+        var fixture = CreateDatabase("cove-runs-");
+        var factory = fixture.Factory;
+        var store = fixture.Store;
         store.EnsureSchema();
-        var channel = new TasksWriteChannel(factory);
-        await channel.StartAsync();
+        var channel = await fixture.StartChannelAsync();
         var runs = new RunRepository(factory, channel);
         var segments = new RunSegmentRepository(factory, channel);
         var cards = new CardRepository(factory, channel);

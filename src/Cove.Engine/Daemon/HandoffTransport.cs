@@ -1,4 +1,5 @@
 using System.Net.Sockets;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Cove.Engine.Agents;
 using Cove.Engine.Hooks;
@@ -9,7 +10,20 @@ using Cove.Platform.Ipc;
 using Cove.Protocol;
 using Microsoft.Extensions.Logging;
 
+[assembly: InternalsVisibleTo("Cove.Engine.Tests")]
+
 namespace Cove.Engine.Daemon;
+
+internal sealed class HandoffTransportTestHooks
+{
+    public Action? ListenerReady { get; init; }
+    public Action? ServeCleanupStarting { get; init; }
+    public Action? ServeCleanupCompleted { get; init; }
+    public Action? DisposeStarted { get; init; }
+    public Action? SocketPathReleased { get; init; }
+    public Action? ListenerReleased { get; init; }
+    public Action? CancellationReleased { get; init; }
+}
 
 internal sealed class HandoffTransport : IAsyncDisposable
 {
@@ -21,11 +35,26 @@ internal sealed class HandoffTransport : IAsyncDisposable
     private readonly EngineEventRouter _events;
     private readonly ILogger _logger;
     private readonly Action _requestShutdown;
-    private readonly object _serveLock = new();
-    private Socket? _listener;
-    private Task? _serveTask;
-    private int _handoffStarted;
-    private int _disposed;
+    private readonly HandoffTransportTestHooks? _testHooks;
+    private readonly object _ownershipLock = new();
+    private HandoffOwnership? _ownership;
+    private long _generation;
+    private bool _disposed;
+
+    private sealed class HandoffOwnership(
+        long generation,
+        string socketPath)
+    {
+        public long Generation { get; } = generation;
+        public string SocketPath { get; } = socketPath;
+        public TaskCompletionSource Completion { get; } = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        public Socket? Listener { get; set; }
+        public CancellationTokenSource? Cancellation { get; set; }
+        public Task? ServeTask { get; set; }
+        public bool CleanupStarted { get; set; }
+        public bool CancellationRequested { get; set; }
+    }
 
     public HandoffTransport(
         DaemonPaths paths,
@@ -35,7 +64,8 @@ internal sealed class HandoffTransport : IAsyncDisposable
         SessionResumeOrchestrator sessions,
         EngineEventRouter events,
         ILogger logger,
-        Action requestShutdown)
+        Action requestShutdown,
+        HandoffTransportTestHooks? testHooks = null)
     {
         _paths = paths;
         _nooks = nooks;
@@ -45,6 +75,7 @@ internal sealed class HandoffTransport : IAsyncDisposable
         _events = events;
         _logger = logger;
         _requestShutdown = requestShutdown;
+        _testHooks = testHooks;
     }
 
     public static Task<HandoffTakeover?> TryTakeOverAsync(
@@ -113,63 +144,104 @@ internal sealed class HandoffTransport : IAsyncDisposable
     {
         if (OperatingSystem.IsWindows())
             return Fail(requestId, "unsupported", "handoff requires a unix host");
-        if (Interlocked.Exchange(ref _handoffStarted, 1) != 0)
-            return Fail(requestId, "conflict", "handoff already in progress");
-
-        var exported = _nooks.ExportForHandoff();
-        var items = new List<HandoffExportItem>(exported.Count);
-        foreach (var item in exported)
+        var socketPath = Path.Combine(
+            _paths.DataDir.IpcDir,
+            "handoff.sock");
+        HandoffOwnership ownership;
+        lock (_ownershipLock)
         {
-            var state = _hookRouter.GetNookState(item.Record.NookId);
-            items.Add(
-                item with
-                {
-                    Record = item.Record with
-                    {
-                        SessionId = state?.SessionId,
-                        HookStatus = state?.Status,
-                    },
-                });
+            if (_disposed)
+                return Fail(requestId, "disposed", "handoff transport is disposed");
+            if (_ownership is not null)
+                return Fail(requestId, "conflict", "handoff already in progress");
+            ownership = new HandoffOwnership(
+                ++_generation,
+                socketPath);
+            _ownership = ownership;
         }
 
-        var socketPath = Path.Combine(_paths.DataDir.IpcDir, "handoff.sock");
+        var items = new List<HandoffExportItem>();
         Socket? listener = null;
+        CancellationTokenSource? serveCts = null;
+        var ownsSocketPath = false;
         try
         {
-            try
+            var exported = _nooks.ExportForHandoff();
+            items.Capacity = exported.Count;
+            foreach (var item in exported)
             {
-                File.Delete(socketPath);
+                var state = _hookRouter.GetNookState(item.Record.NookId);
+                items.Add(
+                    item with
+                    {
+                        Record = item.Record with
+                        {
+                            SessionId = state?.SessionId,
+                            HookStatus = state?.Status,
+                        },
+                    });
             }
-            catch (IOException)
-            {
-            }
+            File.Delete(socketPath);
             listener = new Socket(
                 AddressFamily.Unix,
                 SocketType.Stream,
                 ProtocolType.Unspecified);
             listener.Bind(new UnixDomainSocketEndPoint(socketPath));
+            ownsSocketPath = true;
             listener.Listen(1);
+            _testHooks?.ListenerReady?.Invoke();
+            serveCts = new CancellationTokenSource(
+                TimeSpan.FromSeconds(15));
         }
         catch (Exception ex)
         {
-            listener?.Dispose();
-            DaemonLog.Write(
-                _paths,
-                "handoff begin failed: "
-                    + ex.Message
-                    + "; re-adopting exported sessions");
-            ReadoptExports(items);
-            Volatile.Write(ref _handoffStarted, 0);
+            var cleanupFailure = CleanupUnpublished(
+                ownership,
+                listener,
+                serveCts,
+                ownsSocketPath,
+                items);
+            var failure = CombineFailures(ex, cleanupFailure);
+            DaemonLog.Write(_paths, "handoff begin failed: " + failure);
             return Fail(
                 requestId,
                 "io_error",
                 "handoff socket setup failed: " + ex.Message);
         }
 
-        lock (_serveLock)
+        var published = false;
+        lock (_ownershipLock)
         {
-            _listener = listener;
-            _serveTask = Task.Run(() => Serve(listener, socketPath, items));
+            if (!_disposed && ReferenceEquals(_ownership, ownership))
+            {
+                ownership.Listener = listener;
+                ownership.Cancellation = serveCts;
+                ownership.ServeTask = ServeAsync(
+                    ownership,
+                    listener!,
+                    items,
+                    serveCts!.Token);
+                published = true;
+            }
+        }
+        if (!published)
+        {
+            var cleanupFailure = CleanupUnpublished(
+                ownership,
+                listener,
+                serveCts,
+                ownsSocketPath,
+                items);
+            if (cleanupFailure is not null)
+            {
+                DaemonLog.Write(
+                    _paths,
+                    "handoff disposal unwind failed: " + cleanupFailure);
+            }
+            return Fail(
+                requestId,
+                "disposed",
+                "handoff transport is disposed");
         }
         DaemonLog.Write(
             _paths,
@@ -195,21 +267,19 @@ internal sealed class HandoffTransport : IAsyncDisposable
         }
     }
 
-    private void Serve(
+    private async Task ServeAsync(
+        HandoffOwnership ownership,
         Socket listener,
-        string socketPath,
-        IReadOnlyList<HandoffExportItem> items)
+        IReadOnlyList<HandoffExportItem> items,
+        CancellationToken cancellationToken)
     {
+        Exception? primaryFailure = null;
+        List<Exception>? cleanupFailures = null;
         try
         {
-            if (!listener.Poll(
-                    15_000_000,
-                    SelectMode.SelectRead))
-            {
-                throw new TimeoutException(
-                    "no successor connected within 15s");
-            }
-            using var accepted = listener.Accept();
+            using var accepted = await listener
+                .AcceptAsync(cancellationToken)
+                .ConfigureAwait(false);
             accepted.SendTimeout = 10_000;
             accepted.ReceiveTimeout = 10_000;
             var socketFd = (int)accepted.Handle;
@@ -235,30 +305,176 @@ internal sealed class HandoffTransport : IAsyncDisposable
         }
         catch (Exception ex)
         {
+            primaryFailure = ex;
             DaemonLog.Write(
                 _paths,
                 "handoff aborted: "
                     + ex.Message
                     + "; re-adopting exported sessions");
-            ReadoptExports(items);
-            Volatile.Write(ref _handoffStarted, 0);
+            try
+            {
+                ReadoptExports(items);
+            }
+            catch (Exception cleanupException)
+            {
+                (cleanupFailures ??= []).Add(cleanupException);
+            }
         }
         finally
         {
-            listener.Dispose();
-            lock (_serveLock)
+            lock (_ownershipLock)
+                ownership.CleanupStarted = true;
+            CaptureCleanupFailure(
+                cleanupFailures ??= [],
+                _testHooks?.ServeCleanupStarting);
+            try
             {
-                if (ReferenceEquals(_listener, listener))
-                    _listener = null;
+                if (OwnsSocketPath(ownership))
+                {
+                    File.Delete(ownership.SocketPath);
+                    _testHooks?.SocketPathReleased?.Invoke();
+                }
+            }
+            catch (Exception ex)
+            {
+                cleanupFailures.Add(ex);
             }
             try
             {
-                File.Delete(socketPath);
+                listener.Dispose();
+                _testHooks?.ListenerReleased?.Invoke();
             }
-            catch (IOException)
+            catch (Exception ex)
             {
+                cleanupFailures.Add(ex);
+            }
+            try
+            {
+                ownership.Cancellation!.Dispose();
+                _testHooks?.CancellationReleased?.Invoke();
+            }
+            catch (Exception ex)
+            {
+                cleanupFailures.Add(ex);
+            }
+            lock (_ownershipLock)
+            {
+                if (ReferenceEquals(_ownership, ownership))
+                    _ownership = null;
+            }
+            CaptureCleanupFailure(
+                cleanupFailures,
+                _testHooks?.ServeCleanupCompleted);
+            ownership.Completion.TrySetResult();
+            if (cleanupFailures.Count > 0)
+            {
+                DaemonLog.Write(
+                    _paths,
+                    "handoff cleanup failed: "
+                        + CombineFailures(
+                            primaryFailure,
+                            new AggregateException(cleanupFailures)));
             }
         }
+    }
+
+    private Exception? CleanupUnpublished(
+        HandoffOwnership ownership,
+        Socket? listener,
+        CancellationTokenSource? cancellation,
+        bool ownsSocketPath,
+        IReadOnlyList<HandoffExportItem> items)
+    {
+        List<Exception>? failures = null;
+        if (items.Count > 0)
+        {
+            try
+            {
+                ReadoptExports(items);
+            }
+            catch (Exception ex)
+            {
+                (failures ??= []).Add(ex);
+            }
+        }
+        if (ownsSocketPath && OwnsSocketPath(ownership))
+        {
+            try
+            {
+                File.Delete(ownership.SocketPath);
+                _testHooks?.SocketPathReleased?.Invoke();
+            }
+            catch (Exception ex)
+            {
+                (failures ??= []).Add(ex);
+            }
+        }
+        try
+        {
+            listener?.Dispose();
+            if (listener is not null)
+                _testHooks?.ListenerReleased?.Invoke();
+        }
+        catch (Exception ex)
+        {
+            (failures ??= []).Add(ex);
+        }
+        try
+        {
+            cancellation?.Dispose();
+            if (cancellation is not null)
+                _testHooks?.CancellationReleased?.Invoke();
+        }
+        catch (Exception ex)
+        {
+            (failures ??= []).Add(ex);
+        }
+        lock (_ownershipLock)
+        {
+            if (ReferenceEquals(_ownership, ownership))
+                _ownership = null;
+        }
+        ownership.Completion.TrySetResult();
+        return failures is { Count: > 0 }
+            ? new AggregateException(failures)
+            : null;
+    }
+
+    private bool OwnsSocketPath(HandoffOwnership ownership)
+    {
+        lock (_ownershipLock)
+        {
+            return ReferenceEquals(_ownership, ownership)
+                && _ownership.Generation == ownership.Generation;
+        }
+    }
+
+    private static void CaptureCleanupFailure(
+        List<Exception> failures,
+        Action? cleanup)
+    {
+        if (cleanup is null)
+            return;
+        try
+        {
+            cleanup();
+        }
+        catch (Exception ex)
+        {
+            failures.Add(ex);
+        }
+    }
+
+    private static Exception CombineFailures(
+        Exception? primary,
+        Exception? cleanup)
+    {
+        if (primary is null)
+            return cleanup ?? new InvalidOperationException(
+                "handoff failed without an exception");
+        if (cleanup is null)
+            return primary;
+        return new AggregateException(primary, cleanup);
     }
 
     private static ControlResponse Fail(
@@ -275,28 +491,31 @@ internal sealed class HandoffTransport : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        if (Interlocked.Exchange(ref _disposed, 1) != 0)
-            return;
-        Socket? listener;
-        Task? serveTask;
-        lock (_serveLock)
+        HandoffOwnership? ownership;
+        var startedDisposal = false;
+        lock (_ownershipLock)
         {
-            listener = _listener;
-            serveTask = _serveTask;
-        }
-        listener?.Dispose();
-        if (serveTask is not null)
-        {
-            try
+            if (!_disposed)
             {
-                await serveTask.ConfigureAwait(false);
+                _disposed = true;
+                startedDisposal = true;
             }
-            catch (Exception ex)
+            ownership = _ownership;
+            if (startedDisposal
+                && ownership is
+                {
+                    CleanupStarted: false,
+                    Cancellation: not null,
+                    CancellationRequested: false,
+                })
             {
-                DaemonLog.Write(
-                    _paths,
-                    "handoff shutdown failed: " + ex.Message);
+                ownership.CancellationRequested = true;
+                ownership.Cancellation.Cancel();
             }
         }
+        if (startedDisposal)
+            _testHooks?.DisposeStarted?.Invoke();
+        if (ownership is not null)
+            await ownership.Completion.Task.ConfigureAwait(false);
     }
 }

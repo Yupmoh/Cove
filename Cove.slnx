@@ -18,6 +18,7 @@
   <Folder Name="/tests/">
     <Project Path="tests/Cove.Adapters.Tests/Cove.Adapters.Tests.csproj" />
     <Project Path="tests/Cove.Architecture.Tests/Cove.Architecture.Tests.csproj" />
+    <Project Path="tests/Cove.ClientContract.Tests/Cove.ClientContract.Tests.csproj" />
     <Project Path="tests/Cove.Cli.Tests/Cove.Cli.Tests.csproj" />
     <Project Path="tests/Cove.Engine.Tests/Cove.Engine.Tests.csproj" />
     <Project Path="tests/Cove.Dictation.Tests/Cove.Dictation.Tests.csproj" />
@@ -29,6 +30,7 @@
     <Project Path="tests/Cove.Pty.Harness/Cove.Pty.Harness.csproj" />
     <Project Path="tests/Cove.SourceGen.Tests/Cove.SourceGen.Tests.csproj" />
     <Project Path="tests/Cove.Tasks.Tests/Cove.Tasks.Tests.csproj" />
+    <Project Path="tests/Cove.Testing/Cove.Testing.csproj" />
     <Project Path="tests/Cove.Tui.Tests/Cove.Tui.Tests.csproj" />
   </Folder>
 </Solution>

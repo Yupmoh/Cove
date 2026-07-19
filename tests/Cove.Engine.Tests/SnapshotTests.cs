@@ -17,11 +17,11 @@ public sealed class SnapshotTests
 
     private static string NewDir() => Path.Combine(Path.GetTempPath(), "cove-snap-" + Guid.NewGuid().ToString("N"));
 
-    private static SnapshotService NewService(string dir)
+    private static SnapshotService NewService(string dir, TimeProvider? timeProvider = null)
     {
         Directory.CreateDirectory(dir);
         var snapshotsDir = Path.Combine(dir, "snapshots");
-        return new SnapshotService(dir, snapshotsDir, new ProcessGitRunner(), new NoOpLogger());
+        return new SnapshotService(dir, snapshotsDir, new ProcessGitRunner(), new NoOpLogger(), timeProvider);
     }
 
     private static IReadOnlyDictionary<string, string> State(string bayId = "ws-1", string content = "hello") =>
@@ -42,7 +42,7 @@ public sealed class SnapshotTests
             Assert.Equal(SnapshotTrigger.Manual, snap.Trigger);
             Assert.Single(await svc.ListAsync());
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -59,7 +59,7 @@ public sealed class SnapshotTests
 
             Assert.Single(await svc.ListAsync());
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -76,7 +76,7 @@ public sealed class SnapshotTests
 
             Assert.Equal(2, (await svc.ListAsync()).Count);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -85,15 +85,16 @@ public sealed class SnapshotTests
         var dir = NewDir();
         try
         {
-            var svc = NewService(dir);
+            var time = new ManualTimeProvider();
+            var svc = NewService(dir, time);
             await svc.TakeAsync(State(content: "v1"), SnapshotTrigger.Manual);
-            await Task.Delay(1100);
+            time.Advance(TimeSpan.FromSeconds(1));
             await svc.TakeAsync(State(content: "v2"), SnapshotTrigger.Manual);
 
             var list = await svc.ListAsync();
             Assert.Equal(2, list.Count);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -111,7 +112,7 @@ public sealed class SnapshotTests
             Assert.NotNull(restored);
             Assert.Contains(restored!, kv => kv.Value.Contains("restored-content"));
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -128,7 +129,7 @@ public sealed class SnapshotTests
             var list = await svc.ListAsync();
             Assert.Single(list);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -137,9 +138,10 @@ public sealed class SnapshotTests
         var dir = NewDir();
         try
         {
-            var svc = NewService(dir);
+            var time = new ManualTimeProvider();
+            var svc = NewService(dir, time);
             await svc.TakeAsync(State(content: "FIRST"), SnapshotTrigger.Manual);
-            await Task.Delay(1100);
+            time.Advance(TimeSpan.FromSeconds(1));
             await svc.TakeAsync(State(content: "SECOND"), SnapshotTrigger.Manual);
 
             var list = await svc.ListAsync();
@@ -151,7 +153,7 @@ public sealed class SnapshotTests
             Assert.Contains("FIRST", restored!.Values.First());
             Assert.DoesNotContain("SECOND", restored.Values.First());
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -160,9 +162,10 @@ public sealed class SnapshotTests
         var dir = NewDir();
         try
         {
-            var svc = NewService(dir);
+            var time = new ManualTimeProvider();
+            var svc = NewService(dir, time);
             await svc.TakeAsync(State(content: "v1"), SnapshotTrigger.Manual);
-            await Task.Delay(1100);
+            time.Advance(TimeSpan.FromSeconds(1));
             await svc.TakeAsync(State(content: "v2"), SnapshotTrigger.Manual);
 
             var list = await svc.ListAsync();
@@ -179,7 +182,7 @@ public sealed class SnapshotTests
             var preRestoreCommit = afterRestore.FirstOrDefault(s => s.Trigger == SnapshotTrigger.PreRestore);
             Assert.NotNull(preRestoreCommit);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -207,7 +210,7 @@ public sealed class SnapshotTests
             Assert.DoesNotContain(restored, kv => kv.Key.Contains("secret"));
             Assert.DoesNotContain(restored, kv => kv.Key.Contains("cookies"));
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
     [Fact]
     public async Task Inspect_ReturnsNull_ForUnknownSnapshot()
@@ -222,7 +225,7 @@ public sealed class SnapshotTests
 
             Assert.Null(diffs);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -239,7 +242,7 @@ public sealed class SnapshotTests
             Assert.NotNull(diffs);
             Assert.Empty(diffs);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -264,7 +267,7 @@ public sealed class SnapshotTests
             Assert.Contains("v2-modified", diff.NewValue);
             Assert.Equal("changed", diff.ChangeType);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -289,7 +292,7 @@ public sealed class SnapshotTests
             Assert.Null(added.OldValue);
             Assert.Contains("new-content", added.NewValue);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -317,7 +320,7 @@ public sealed class SnapshotTests
             Assert.Contains("extra-content", removed.OldValue);
             Assert.Null(removed.NewValue);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -326,9 +329,10 @@ public sealed class SnapshotTests
         var dir = NewDir();
         try
         {
-            var svc = NewService(dir);
+            var time = new ManualTimeProvider();
+            var svc = NewService(dir, time);
             await svc.TakeAsync(State(content: "v1"), SnapshotTrigger.Manual);
-            await Task.Delay(1100);
+            time.Advance(TimeSpan.FromSeconds(1));
             await svc.TakeAsync(State(content: "v2"), SnapshotTrigger.Manual);
 
             var list = await svc.ListAsync();
@@ -344,6 +348,6 @@ public sealed class SnapshotTests
             var undoDiffs = await svc.InspectAsync(preRestoreSnap!.Id);
             Assert.NotNull(undoDiffs);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 }

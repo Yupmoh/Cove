@@ -191,14 +191,14 @@ public sealed partial class GitReadModelTests : IAsyncDisposable
             var unpushed = await model.GetUnpushedAsync(dir);
             Assert.Empty(unpushed.Commits);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     public async ValueTask DisposeAsync()
     {
         await Task.Run(() =>
         {
-            try { Directory.Delete(_repoDir, true); } catch { }
+            Cove.Testing.TestDirectory.Delete(_repoDir);
         });
     }
 }

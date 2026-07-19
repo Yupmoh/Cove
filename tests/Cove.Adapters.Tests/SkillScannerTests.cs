@@ -1,4 +1,5 @@
 using Cove.Adapters;
+using Cove.Testing;
 using Xunit;
 
 namespace Cove.Adapters.Tests;
@@ -36,7 +37,7 @@ public sealed class SkillScannerTests
             Assert.Equal("does the thing", skills[0].Description);
             Assert.Equal(SkillSource.CoveUser, skills[0].Source);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -59,7 +60,7 @@ public sealed class SkillScannerTests
             Assert.Contains(skills, s => s.Name == "nested");
             Assert.DoesNotContain(skills, s => s.Name == "too-deep");
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -75,7 +76,7 @@ public sealed class SkillScannerTests
             Assert.Single(skills);
             Assert.Equal("harness:claude-code", skills[0].Provenance);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -95,7 +96,7 @@ public sealed class SkillScannerTests
             Assert.Single(skills);
             Assert.Equal("good-skill", skills[0].Name);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -111,7 +112,7 @@ public sealed class SkillScannerTests
 
             Assert.Single(skills);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -127,7 +128,7 @@ public sealed class SkillScannerTests
 
             Assert.Empty(skills);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -152,7 +153,7 @@ public sealed class SkillScannerTests
             Assert.Equal(SkillSource.CoveUser, shared.Source);
             Assert.Equal("from cove", shared.Description);
         }
-        finally { try { Directory.Delete(dir1, true); } catch { } try { Directory.Delete(dir2, true); } catch { } }
+        finally { TestDirectory.Delete(dir1); TestDirectory.Delete(dir2); }
     }
 
     [Fact]
@@ -171,7 +172,7 @@ public sealed class SkillScannerTests
             Assert.Single(results);
             Assert.Equal("git-helper", results[0].Name);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -189,7 +190,7 @@ public sealed class SkillScannerTests
             Assert.NotNull(skill);
             Assert.Equal("findable", skill!.Name);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
     [Fact]

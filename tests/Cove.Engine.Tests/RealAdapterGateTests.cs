@@ -3,6 +3,7 @@ using Cove.Adapters;
 using Cove.Engine.Launch;
 using Cove.Engine.Restart;
 using Xunit;
+using Cove.Testing;
 
 namespace Cove.Engine.Tests;
 
@@ -21,12 +22,12 @@ public sealed class RealAdapterGateTests
         return null;
     }
 
-    [Fact]
+    [ExternalFact(TestOperatingSystem.Any)]
     public async Task RealClaudeCode_Manifest_ParsesAllFields()
     {
         var root = RealAdaptersRoot();
-        if (root is null) return;
-        var store = new AdapterManifestStore(root);
+        Assert.NotNull(root);
+        var store = new AdapterManifestStore(root!);
         var manifest = store.Load("claude-code");
         Assert.NotNull(manifest);
         Assert.Equal("claude-code", manifest!.Name);
@@ -39,12 +40,12 @@ public sealed class RealAdapterGateTests
         Assert.Contains("build_resume_command", manifest.Methods.Keys);
     }
 
-    [Fact]
+    [ExternalFact(TestOperatingSystem.Any)]
     public async Task RealClaudeCode_BuildLaunchCommand_ManifestProtocol()
     {
         var root = RealAdaptersRoot();
-        if (root is null) return;
-        var store = new AdapterManifestStore(root);
+        Assert.NotNull(root);
+        var store = new AdapterManifestStore(root!);
         var runner = new MethodRunner();
         var orch = new LaunchOrchestrator(store, runner, new BinaryDiscoveryService());
         var profile = new LaunchProfile("claude-code", "default", "claude-code", true, null, null,
@@ -60,12 +61,12 @@ public sealed class RealAdapterGateTests
         Assert.Equal("claude", Path.GetFileNameWithoutExtension(cmd.Command));
     }
 
-    [Fact]
+    [ExternalFact(TestOperatingSystem.Any)]
     public async Task RealClaudeCode_BuildResumeCommand_ManifestProtocol()
     {
         var root = RealAdaptersRoot();
-        if (root is null) return;
-        var store = new AdapterManifestStore(root);
+        Assert.NotNull(root);
+        var store = new AdapterManifestStore(root!);
         var runner = new MethodRunner();
         var proto = new AdapterResumeProtocol(store, runner);
         var overrides = new LauncherOverrides { WorkingDir = "/tmp" };
@@ -77,12 +78,12 @@ public sealed class RealAdapterGateTests
         Assert.Contains("gate1-test-session", cmd.Args);
     }
 
-    [Fact]
+    [ExternalFact(TestOperatingSystem.Any)]
     public async Task RealClaudeCode_LauncherOptions_Parse()
     {
         var root = RealAdaptersRoot();
-        if (root is null) return;
-        var store = new AdapterManifestStore(root);
+        Assert.NotNull(root);
+        var store = new AdapterManifestStore(root!);
         var runner = new MethodRunner();
         var orch = new LaunchOrchestrator(store, runner, new BinaryDiscoveryService());
 
@@ -92,12 +93,11 @@ public sealed class RealAdapterGateTests
         Assert.NotEmpty(options!.Options);
     }
 
-    [Fact]
+    [ExternalFact(TestOperatingSystem.Unix, "bash")]
     public void HookEnvelopeKind_SerializesCamelCase_RoundTripsThroughSchema()
     {
-        if (System.OperatingSystem.IsWindows()) return;
         var scriptPath = Path.Combine(Directory.GetCurrentDirectory(), "..", "..", "..", "..", "..", "validate-adapter.sh");
-        if (!File.Exists(scriptPath)) return;
+        Assert.True(File.Exists(scriptPath), $"Requires file {scriptPath}");
 
         var manifest = new AdapterManifest
         {
@@ -143,6 +143,6 @@ public sealed class RealAdapterGateTests
             proc.WaitForExit(5000);
             Assert.True(proc.ExitCode == 0, $"validate-adapter failed: {output}");
         }
-        finally { try { Directory.Delete(root, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(root); }
     }
 }

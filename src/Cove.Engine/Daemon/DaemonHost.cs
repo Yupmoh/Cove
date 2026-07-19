@@ -36,6 +36,11 @@ public sealed class DaemonHost
         _sagas.Set(dispatchSaga, resumeSaga);
     }
 
+    public void RequestHardStop()
+    {
+        _shutdown.Cancel();
+    }
+
     public async Task<int> RunAsync(
         CancellationToken externalCancellation)
     {

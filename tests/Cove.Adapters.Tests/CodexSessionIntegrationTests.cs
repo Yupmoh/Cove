@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
+using Cove.Testing;
 using Xunit;
 
 namespace Cove.Adapters.Tests;
@@ -10,25 +11,11 @@ public sealed class CodexSessionIntegrationTests
         Directory.GetCurrentDirectory(), "..", "..", "..", "..", "..",
         "adapters", "codex");
 
-    private static string? FindExecutable(string name)
-    {
-        foreach (var dir in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator))
-        {
-            if (!string.IsNullOrEmpty(dir))
-            {
-                var candidate = Path.Combine(dir, name);
-                if (File.Exists(candidate)) return candidate;
-            }
-        }
-        return null;
-    }
-
-    [Fact]
+    [ExternalFact(TestOperatingSystem.Unix, "bash", "sqlite3")]
     public async Task ListRecent_ReturnsNamedThreadsForNormalizedWorkingDirectory()
     {
-        if (OperatingSystem.IsWindows()) return;
-        var sqlite = FindExecutable("sqlite3");
-        if (sqlite is null) return;
+        var sqlite = TestPrerequisite.FindExecutable("sqlite3");
+        Assert.NotNull(sqlite);
 
         var root = Path.Combine(Path.GetTempPath(), "cove-codex-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
@@ -62,15 +49,14 @@ public sealed class CodexSessionIntegrationTests
             Assert.Equal("Named Codex thread", sessions[0].GetProperty("name").GetString());
             Assert.Equal("/repo/work", sessions[0].GetProperty("cwd").GetString());
         }
-        finally { try { Directory.Delete(root, true); } catch { } }
+        finally { TestDirectory.Delete(root); }
     }
 
-    [Fact]
+    [ExternalFact(TestOperatingSystem.Unix, "bash", "sqlite3")]
     public async Task ListRecent_MergesHistoricalThreadsAcrossCodexStateDatabases()
     {
-        if (OperatingSystem.IsWindows()) return;
-        var sqlite = FindExecutable("sqlite3");
-        if (sqlite is null) return;
+        var sqlite = TestPrerequisite.FindExecutable("sqlite3");
+        Assert.NotNull(sqlite);
 
         var root = Path.Combine(Path.GetTempPath(), "cove-codex-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
@@ -102,24 +88,22 @@ public sealed class CodexSessionIntegrationTests
             Assert.Contains("historical-thread", ids);
             Assert.Contains("current-thread", ids);
         }
-        finally { try { Directory.Delete(root, true); } catch { } }
+        finally { TestDirectory.Delete(root); }
     }
 
-    [Theory]
+    [ExternalTheory(TestOperatingSystem.Unix, "bash", "sqlite3")]
     [InlineData("build_launch_command.sh", null)]
     [InlineData("build_resume_command.sh", "thread-1")]
     public async Task BuildCommand_BypassesTrustForInstalledCoveHook(string script, string? sessionId)
     {
-        if (OperatingSystem.IsWindows()) return;
-
         var runner = new MethodRunner();
         var args = sessionId is null ? Array.Empty<string>() : new[] { sessionId };
         var env = new Dictionary<string, string>();
         string? root = null;
         if (sessionId is not null)
         {
-            var sqlite = FindExecutable("sqlite3");
-            if (sqlite is null) return;
+            var sqlite = TestPrerequisite.FindExecutable("sqlite3");
+            Assert.NotNull(sqlite);
             root = Path.Combine(Path.GetTempPath(), "cove-codex-resume-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(root);
             using var process = Process.Start(new ProcessStartInfo(sqlite)
@@ -143,13 +127,12 @@ public sealed class CodexSessionIntegrationTests
             Assert.Contains("resume", command);
             Assert.Contains(sessionId, command);
         }
-        if (root is not null) try { Directory.Delete(root, true); } catch { }
+        if (root is not null) TestDirectory.Delete(root);
     }
 
-    [Fact]
+    [ExternalFact(TestOperatingSystem.Unix, "bash")]
     public async Task BuildResumeCommand_FallsBackToFreshWhenSessionIsMissingFromCodexState()
     {
-        if (OperatingSystem.IsWindows()) return;
         var root = Path.Combine(Path.GetTempPath(), "cove-codex-missing-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
         try
@@ -166,16 +149,14 @@ public sealed class CodexSessionIntegrationTests
             Assert.DoesNotContain("resume", command);
             Assert.DoesNotContain("missing-thread", command);
         }
-        finally { try { Directory.Delete(root, true); } catch { } }
+        finally { TestDirectory.Delete(root); }
     }
 
-    [Theory]
+    [ExternalTheory(TestOperatingSystem.Unix, "bash", "sqlite3")]
     [InlineData("build_launch_command.sh", null)]
     [InlineData("build_resume_command.sh", "thread-1")]
     public async Task BuildCommand_MapsDangerouslySkipPermissionsToYolo(string script, string? sessionId)
     {
-        if (OperatingSystem.IsWindows()) return;
-
         var runner = new MethodRunner();
         var flags = """{"dangerouslySkipPermissions":true}""";
         var args = sessionId is null ? new[] { flags } : new[] { sessionId, flags };
@@ -183,8 +164,8 @@ public sealed class CodexSessionIntegrationTests
         string? root = null;
         if (sessionId is not null)
         {
-            var sqlite = FindExecutable("sqlite3");
-            if (sqlite is null) return;
+            var sqlite = TestPrerequisite.FindExecutable("sqlite3");
+            Assert.NotNull(sqlite);
             root = Path.Combine(Path.GetTempPath(), "cove-codex-resume-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(root);
             using var process = Process.Start(new ProcessStartInfo(sqlite)
@@ -203,14 +184,12 @@ public sealed class CodexSessionIntegrationTests
         using var document = JsonDocument.Parse(result.Stdout);
         var command = document.RootElement.GetProperty("command").EnumerateArray().Select(value => value.GetString()).ToArray();
         Assert.Contains("--yolo", command);
-        if (root is not null) try { Directory.Delete(root, true); } catch { }
+        if (root is not null) TestDirectory.Delete(root);
     }
 
-    [Fact]
+    [ExternalFact(TestOperatingSystem.Unix, "bash")]
     public async Task HookCommand_ExitsSilentlyOutsideCove()
     {
-        if (OperatingSystem.IsWindows()) return;
-
         var runner = new MethodRunner();
         var env = new Dictionary<string, string> { ["COVE"] = "0" };
         var result = await runner.RunAsync(AdapterDir, "cove-hooks.sh", Array.Empty<string>(), TimeSpan.FromSeconds(20), env);
@@ -219,11 +198,9 @@ public sealed class CodexSessionIntegrationTests
         Assert.Empty(result.Stdout);
     }
 
-    [Fact]
+    [ExternalFact(TestOperatingSystem.Unix, "bash")]
     public async Task HooksInstaller_AddsAndRemovesCoveSessionStartHook()
     {
-        if (OperatingSystem.IsWindows()) return;
-
         var root = Path.Combine(Path.GetTempPath(), "cove-codex-hooks-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
         try
@@ -250,6 +227,6 @@ public sealed class CodexSessionIntegrationTests
             using var removed = JsonDocument.Parse(File.ReadAllText(hooksPath));
             Assert.Empty(removed.RootElement.GetProperty("hooks").GetProperty("SessionStart").EnumerateArray());
         }
-        finally { try { Directory.Delete(root, true); } catch { } }
+        finally { TestDirectory.Delete(root); }
     }
 }

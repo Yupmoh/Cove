@@ -7,6 +7,7 @@ using Cove.Platform.Pty;
 using Cove.Protocol;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
+using Cove.Testing;
 
 namespace Cove.Engine.Tests;
 
@@ -18,10 +19,9 @@ public sealed class NookRouteTests
         return new NookRegistry(host, NullLogger.Instance);
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public void Rename_UpdatesTitle()
     {
-        if (System.OperatingSystem.IsWindows()) return;
         using var reg = NewRegistry();
         var info = reg.Spawn(new SpawnParams("/bin/sh", new[] { "-c", "sleep 30" }, "/tmp", null, 40, 10));
         Assert.True(reg.Rename(info.NookId, "my nook"));
@@ -36,15 +36,18 @@ public sealed class NookRouteTests
         Assert.False(reg.Rename("nope", "x"));
     }
 
-    [Fact]
-    public void Read_ReturnsBytesFromOffset()
+    [PlatformFact(TestOperatingSystem.Unix)]
+    public async Task Read_ReturnsBytesFromOffset()
     {
-        if (System.OperatingSystem.IsWindows()) return;
         using var reg = NewRegistry();
         var info = reg.Spawn(new SpawnParams("/bin/sh", new[] { "-c", "sleep 30" }, "/tmp", null, 40, 10));
         reg.Write(info.NookId, System.Text.Encoding.UTF8.GetBytes("echo hello\n"));
-        System.Threading.Thread.Sleep(300);
-        var bytes = reg.Read(info.NookId, 0, 4096);
+        byte[] bytes = [];
+        await AsyncTest.EventuallyAsync(() =>
+        {
+            bytes = reg.Read(info.NookId, 0, 4096);
+            return System.Text.Encoding.UTF8.GetString(bytes).Contains("hello", StringComparison.Ordinal);
+        }, TimeSpan.FromSeconds(5), "nook output did not contain hello");
         Assert.NotEmpty(bytes);
         var text = System.Text.Encoding.UTF8.GetString(bytes);
         Assert.Contains("hello", text);
@@ -57,10 +60,9 @@ public sealed class NookRouteTests
         Assert.Empty(reg.Read("nope", 0, 64));
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task Checkpoint_Route_StoresSerializedTerminalState()
     {
-        if (System.OperatingSystem.IsWindows()) return;
         using var reg = NewRegistry();
         var info = reg.RespawnAs("checkpoint-route", "/bin/sh", new[] { "-c", "sleep 30" }, "/tmp", 80, 24, System.Text.Encoding.UTF8.GetBytes("prior"));
         var checkpoint = System.Text.Encoding.UTF8.GetBytes("serialized");

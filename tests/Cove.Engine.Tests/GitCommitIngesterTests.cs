@@ -60,7 +60,7 @@ public sealed class GitCommitIngesterTests
             Assert.Equal("git.commit", list[0].Kind);
             Assert.Contains("resolve race", list[0].Summary);
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -80,7 +80,7 @@ public sealed class GitCommitIngesterTests
             var list = store.ListByBay("ws1");
             Assert.Single(list);
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -95,7 +95,7 @@ public sealed class GitCommitIngesterTests
             var count = await ingester.IngestAsync(dir, "ws1");
             Assert.Equal(0, count);
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     private static (string dir, TimelineStore store) NewStore(string dir)

@@ -146,7 +146,7 @@ public sealed class KeybindingCommandsTests
             Assert.NotNull(resolved);
             Assert.Equal("custom.action", resolved!.Action);
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 
     [Fact]
@@ -173,6 +173,6 @@ public sealed class KeybindingCommandsTests
             var resolved = kb2.Resolve("cmd+shift+x");
             Assert.Null(resolved);
         }
-        finally { try { System.IO.Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 }

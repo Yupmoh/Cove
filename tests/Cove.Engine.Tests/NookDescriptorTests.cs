@@ -3,16 +3,15 @@ using Cove.Platform.Pty;
 using Cove.Protocol;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
+using Cove.Testing;
 
 namespace Cove.Engine.Tests;
 
 public sealed class NookDescriptorTests
 {
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public void Descriptors_ReflectsSpawnedNook()
     {
-        if (System.OperatingSystem.IsWindows())
-            return;
 
         using var reg = NewRegistry();
         var info = reg.Spawn(new SpawnParams("/bin/sh", new[] { "-c", "sleep 1" }, "/tmp", null, 80, 24));
@@ -22,11 +21,9 @@ public sealed class NookDescriptorTests
         Assert.Equal("/bin/sh", d[0].Command);
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public void Descriptors_CarryLiveDimensions()
     {
-        if (System.OperatingSystem.IsWindows())
-            return;
 
         using var reg = NewRegistry();
         reg.Spawn(new SpawnParams("/bin/sh", new[] { "-c", "sleep 1" }, "/tmp", null, 120, 40));
@@ -41,11 +38,9 @@ public sealed class NookDescriptorTests
         Assert.Equal(60, d2[0].Rows);
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public void RespawnAs_RegistersUnderGivenId()
     {
-        if (System.OperatingSystem.IsWindows())
-            return;
 
         using var reg = NewRegistry();
         reg.RespawnAs("nook-fixed", "/bin/sh", new[] { "-c", "sleep 1" }, "/tmp", 80, 24);

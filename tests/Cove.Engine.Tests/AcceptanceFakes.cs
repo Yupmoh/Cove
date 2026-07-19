@@ -37,3 +37,12 @@ public sealed class AcceptanceFakeResumeLauncher : IAdapterResumeLauncher
 {
     public AdapterResumeResult Resume(string nookId, string adapter, string cmd, string priorSessionId, IReadOnlyDictionary<string, string> env) => new("resumed-1", true, null);
 }
+
+public sealed class ManualTimeProvider(DateTimeOffset? initial = null) : TimeProvider
+{
+    private DateTimeOffset _utcNow = initial ?? DateTimeOffset.UnixEpoch;
+
+    public override DateTimeOffset GetUtcNow() => _utcNow;
+
+    public void Advance(TimeSpan duration) => _utcNow += duration;
+}

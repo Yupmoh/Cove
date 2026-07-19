@@ -1,4 +1,5 @@
 using Cove.Adapters;
+using Cove.Testing;
 using Xunit;
 
 namespace Cove.Adapters.Tests;
@@ -44,7 +45,7 @@ public sealed class AdapterManifestStoreTests
             Assert.Equal("claude-code", manifest!.Name);
             Assert.Equal("claude", manifest.Binary);
         }
-        finally { try { Directory.Delete(root, true); } catch { } }
+        finally { TestDirectory.Delete(root); }
     }
 
     [Fact]
@@ -66,7 +67,7 @@ public sealed class AdapterManifestStoreTests
             Assert.NotNull(manifest.WellKnownPaths);
             Assert.NotNull(manifest.SuggestedFlags);
         }
-        finally { try { Directory.Delete(root, true); } catch { } }
+        finally { TestDirectory.Delete(root); }
     }
 
     [Fact]
@@ -81,7 +82,7 @@ public sealed class AdapterManifestStoreTests
 
             Assert.Null(manifest);
         }
-        finally { try { Directory.Delete(root, true); } catch { } }
+        finally { TestDirectory.Delete(root); }
     }
 
     [Fact]
@@ -99,7 +100,7 @@ public sealed class AdapterManifestStoreTests
 
             Assert.Null(manifest);
         }
-        finally { try { Directory.Delete(root, true); } catch { } }
+        finally { TestDirectory.Delete(root); }
     }
 
     [Fact]
@@ -126,7 +127,7 @@ public sealed class AdapterManifestStoreTests
             Assert.NotSame(first, third);
             Assert.Equal("cli-v2", third!.Binary);
         }
-        finally { try { Directory.Delete(root, true); } catch { } }
+        finally { TestDirectory.Delete(root); }
     }
 
     [Fact]
@@ -145,7 +146,7 @@ public sealed class AdapterManifestStoreTests
             Assert.Contains(manifests, m => m.Name == "alpha");
             Assert.Contains(manifests, m => m.Name == "beta");
         }
-        finally { try { Directory.Delete(root, true); } catch { } }
+        finally { TestDirectory.Delete(root); }
     }
 
     [Fact]
@@ -171,6 +172,6 @@ public sealed class AdapterManifestStoreTests
 
             Assert.Null(manifest);
         }
-        finally { try { Directory.Delete(root, true); } catch { } }
+        finally { TestDirectory.Delete(root); }
     }
 }

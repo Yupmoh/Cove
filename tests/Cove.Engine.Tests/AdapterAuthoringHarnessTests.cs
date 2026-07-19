@@ -23,7 +23,7 @@ public sealed class AdapterAuthoringHarnessTests
             Assert.True(Directory.Exists(dir));
             Assert.True(File.Exists(Path.Combine(dir, "adapter.json")));
         }
-        finally { try { Directory.Delete(root, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(root); }
     }
 
     [Fact]
@@ -46,7 +46,7 @@ public sealed class AdapterAuthoringHarnessTests
             Assert.Equal("A test agent", manifest.Description);
             Assert.True(manifest.SdkVersion > 0);
         }
-        finally { try { Directory.Delete(root, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(root); }
     }
 
     [Fact]
@@ -61,7 +61,7 @@ public sealed class AdapterAuthoringHarnessTests
 
             Assert.True(Directory.Exists(Path.Combine(dir, "scripts")));
         }
-        finally { try { Directory.Delete(root, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(root); }
     }
 
     [Fact]
@@ -76,7 +76,7 @@ public sealed class AdapterAuthoringHarnessTests
 
             Assert.True(File.Exists(Path.Combine(dir, "scripts", "hooks.sh")));
         }
-        finally { try { Directory.Delete(root, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(root); }
     }
 
     [Fact]
@@ -90,7 +90,7 @@ public sealed class AdapterAuthoringHarnessTests
             var harness = new AdapterAuthoringHarness(root);
             Assert.Throws<IOException>(() => harness.Scaffold("my-agent", "My Agent", "A test agent"));
         }
-        finally { try { Directory.Delete(root, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(root); }
     }
 
     [Fact]
@@ -105,7 +105,7 @@ public sealed class AdapterAuthoringHarnessTests
             var errors = harness.Validate(dir);
             Assert.Empty(errors);
         }
-        finally { try { Directory.Delete(root, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(root); }
     }
 
     [Fact]
@@ -121,7 +121,7 @@ public sealed class AdapterAuthoringHarnessTests
             var errors = harness.Validate(dir);
             Assert.NotEmpty(errors);
         }
-        finally { try { Directory.Delete(root, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(root); }
     }
 }
 
@@ -162,6 +162,6 @@ public sealed class AdapterTestFixtureTests
             Assert.NotNull(parsed);
             Assert.Equal("test-adapter", parsed!.Name);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { Cove.Testing.TestDirectory.Delete(dir); }
     }
 }

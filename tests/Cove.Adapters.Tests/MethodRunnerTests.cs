@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Cove.Adapters;
+using Cove.Testing;
 using Xunit;
 
 namespace Cove.Adapters.Tests;
@@ -18,10 +19,9 @@ public sealed class MethodRunnerTests
         return path;
     }
 
-    [Fact]
+    [ExternalFact(TestOperatingSystem.Unix, "bash")]
     public async Task RunAsync_ParsesJsonStdout_OnExit0()
     {
-        if (OperatingSystem.IsWindows()) return;
         var dir = NewDir();
         try
         {
@@ -34,13 +34,12 @@ public sealed class MethodRunnerTests
             Assert.True(result.Json!.Value.TryGetProperty("command", out var cmd));
             Assert.Equal("claude", cmd[0].GetString());
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
-    [Fact]
+    [ExternalFact(TestOperatingSystem.Unix, "bash")]
     public async Task RunAsync_Exit1_IsGracefulFailure_NotCrash()
     {
-        if (OperatingSystem.IsWindows()) return;
         var dir = NewDir();
         try
         {
@@ -52,13 +51,12 @@ public sealed class MethodRunnerTests
             Assert.Null(result.Json);
             Assert.Contains("not found", result.Stderr);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
-    [Fact]
+    [ExternalFact(TestOperatingSystem.Unix, "bash")]
     public async Task RunAsync_Exit2_IsError_LoggedToStderr()
     {
-        if (OperatingSystem.IsWindows()) return;
         var dir = NewDir();
         try
         {
@@ -70,13 +68,12 @@ public sealed class MethodRunnerTests
             Assert.Null(result.Json);
             Assert.Contains("boom", result.Stderr);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
-    [Fact]
+    [ExternalFact(TestOperatingSystem.Unix, "bash")]
     public async Task RunAsync_NonJsonStdout_ReportsNotCrash()
     {
-        if (OperatingSystem.IsWindows()) return;
         var dir = NewDir();
         try
         {
@@ -87,13 +84,12 @@ public sealed class MethodRunnerTests
             Assert.Equal(0, result.ExitCode);
             Assert.Null(result.Json);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
-    [Fact]
+    [ExternalFact(TestOperatingSystem.Unix, "bash")]
     public async Task RunAsync_HangingScript_KilledAtTimeout()
     {
-        if (OperatingSystem.IsWindows()) return;
         var dir = NewDir();
         try
         {
@@ -104,13 +100,12 @@ public sealed class MethodRunnerTests
             Assert.Equal(-1, result.ExitCode);
             Assert.Null(result.Json);
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 
-    [Fact]
+    [ExternalFact(TestOperatingSystem.Unix, "bash")]
     public async Task RunAsync_SetsMethodEnvContract()
     {
-        if (OperatingSystem.IsWindows()) return;
         var dir = NewDir();
         try
         {
@@ -130,6 +125,6 @@ public sealed class MethodRunnerTests
             Assert.Equal(dir, result.Json!.Value.GetProperty("coveAdapterDir").GetString());
             Assert.Equal("2", result.Json!.Value.GetProperty("sdkVersion").GetString());
         }
-        finally { try { Directory.Delete(dir, true); } catch { } }
+        finally { TestDirectory.Delete(dir); }
     }
 }

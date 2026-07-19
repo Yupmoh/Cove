@@ -7,51 +7,86 @@ namespace Cove.Protocol.Tests;
 public sealed class ControlCodecTests
 {
     [Fact]
-    public void HelloRequest_SerializesExact()
+    public void HelloRequest_EncodesAndDecodesCanonicalVector()
     {
-        JsonElement p = JsonSerializer.SerializeToElement(
+        JsonElement parameters = JsonSerializer.SerializeToElement(
             new HelloParams(1, "cli", "0.1.0", "stable"), CoveJsonContext.Default.HelloParams);
-        var req = new ControlRequest("1", "cove://sys/hello", p);
-        string json = Encoding.UTF8.GetString(ControlCodec.Encode(req));
-        Assert.Equal(
-            "{\"id\":\"1\",\"uri\":\"cove://sys/hello\",\"params\":{\"protocolVersion\":1,\"clientKind\":\"cli\",\"clientVersion\":\"0.1.0\",\"channel\":\"stable\"}}",
-            json);
+        var request = new ControlRequest("1", "cove://sys/hello", parameters);
+
+        byte[] encoded = ControlCodec.Encode(request);
+        Assert.Equal(ProtocolVectors.HelloRequestJson, Encoding.UTF8.GetString(encoded));
+
+        ControlRequest decoded = ControlCodec.DecodeRequest(encoded);
+        Assert.Equal(request.Id, decoded.Id);
+        Assert.Equal(request.Uri, decoded.Uri);
+        var hello = decoded.Params!.Value.Deserialize(CoveJsonContext.Default.HelloParams);
+        Assert.Equal(new HelloParams(1, "cli", "0.1.0", "stable"), hello);
     }
 
     [Fact]
-    public void HelloResponse_SerializesExact()
+    public void HelloResponse_EncodesAndDecodesCanonicalVector()
     {
-        JsonElement d = JsonSerializer.SerializeToElement(
+        JsonElement data = JsonSerializer.SerializeToElement(
             new HelloResult(1, "0.1.0", 12345, "stable"), CoveJsonContext.Default.HelloResult);
-        var resp = new ControlResponse("1", true, d);
-        string json = Encoding.UTF8.GetString(ControlCodec.Encode(resp));
-        Assert.Equal(
-            "{\"id\":\"1\",\"ok\":true,\"data\":{\"protocolVersion\":1,\"engineVersion\":\"0.1.0\",\"enginePid\":12345,\"channel\":\"stable\"}}",
-            json);
+        var response = new ControlResponse("1", true, data);
+
+        byte[] encoded = ControlCodec.Encode(response);
+        Assert.Equal(ProtocolVectors.HelloResponseJson, Encoding.UTF8.GetString(encoded));
+
+        ControlResponse decoded = ControlCodec.DecodeResponse(encoded);
+        Assert.Equal(response.Id, decoded.Id);
+        Assert.True(decoded.Ok);
+        Assert.Null(decoded.Error);
+        var hello = decoded.Data!.Value.Deserialize(CoveJsonContext.Default.HelloResult);
+        Assert.Equal(new HelloResult(1, "0.1.0", 12345, "stable"), hello);
     }
 
     [Fact]
-    public void NookListRequest_OmitsNullFields()
+    public void NookListRequest_EncodesAndDecodesCanonicalVector()
     {
-        var req = new ControlRequest("1", "cove://commands/nook.list");
-        string json = Encoding.UTF8.GetString(ControlCodec.Encode(req));
-        Assert.Equal("{\"id\":\"1\",\"uri\":\"cove://commands/nook.list\"}", json);
+        var request = new ControlRequest("1", "cove://commands/nook.list");
+
+        byte[] encoded = ControlCodec.Encode(request);
+        Assert.Equal(ProtocolVectors.NookListRequestJson, Encoding.UTF8.GetString(encoded));
+
+        ControlRequest decoded = ControlCodec.DecodeRequest(encoded);
+        Assert.Equal(request.Id, decoded.Id);
+        Assert.Equal(request.Uri, decoded.Uri);
+        Assert.Null(decoded.Params);
     }
 
     [Fact]
-    public void SuccessResponse_OmitsError()
+    public void SuccessResponse_EncodesAndDecodesCanonicalVector()
     {
-        JsonElement d = JsonDocument.Parse("{\"nooks\":[]}").RootElement.Clone();
-        var resp = new ControlResponse("1", true, d);
-        string json = Encoding.UTF8.GetString(ControlCodec.Encode(resp));
-        Assert.Equal("{\"id\":\"1\",\"ok\":true,\"data\":{\"nooks\":[]}}", json);
+        using var document = JsonDocument.Parse("{\"nooks\":[]}");
+        var response = new ControlResponse("1", true, document.RootElement.Clone());
+
+        byte[] encoded = ControlCodec.Encode(response);
+        Assert.Equal(ProtocolVectors.NookListResponseJson, Encoding.UTF8.GetString(encoded));
+
+        ControlResponse decoded = ControlCodec.DecodeResponse(encoded);
+        Assert.Equal(response.Id, decoded.Id);
+        Assert.True(decoded.Ok);
+        Assert.Equal(0, decoded.Data!.Value.GetProperty("nooks").GetArrayLength());
+        Assert.Null(decoded.Error);
     }
 
     [Fact]
-    public void ErrorResponse_OmitsData()
+    public void ErrorResponse_EncodesAndDecodesCanonicalVector()
     {
-        var resp = new ControlResponse("1", false, null, new ControlError("not_found", "no nook 7f3a"));
-        string json = Encoding.UTF8.GetString(ControlCodec.Encode(resp));
-        Assert.Equal("{\"id\":\"1\",\"ok\":false,\"error\":{\"code\":\"not_found\",\"message\":\"no nook 7f3a\"}}", json);
+        var response = new ControlResponse(
+            "1",
+            false,
+            null,
+            new ControlError("not_found", "no nook 7f3a"));
+
+        byte[] encoded = ControlCodec.Encode(response);
+        Assert.Equal(ProtocolVectors.NotFoundResponseJson, Encoding.UTF8.GetString(encoded));
+
+        ControlResponse decoded = ControlCodec.DecodeResponse(encoded);
+        Assert.Equal(response.Id, decoded.Id);
+        Assert.False(decoded.Ok);
+        Assert.Null(decoded.Data);
+        Assert.Equal(response.Error, decoded.Error);
     }
 }

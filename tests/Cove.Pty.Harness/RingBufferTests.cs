@@ -15,7 +15,7 @@ public sealed class RingBufferTests
     }
 
     [Fact]
-    [Trait("Category", "PtyRing")]
+    [Trait("Suite", "PtyRing")]
     public void Replay_FromAnyOffset_IsByteExact()
     {
         var ring = new PtyRingBuffer(4096);
@@ -34,7 +34,7 @@ public sealed class RingBufferTests
     }
 
     [Fact]
-    [Trait("Category", "PtyRing")]
+    [Trait("Suite", "PtyRing")]
     public void Eviction_OldestOverwritten()
     {
         const int c = 4096;
@@ -57,7 +57,7 @@ public sealed class RingBufferTests
     }
 
     [Fact]
-    [Trait("Category", "PtyRing")]
+    [Trait("Suite", "PtyRing")]
     public void IndependentCursors_DoNotInterfere()
     {
         var ring = new PtyRingBuffer(4096);
@@ -80,7 +80,7 @@ public sealed class RingBufferTests
     }
 
     [Fact]
-    [Trait("Category", "PtyRing")]
+    [Trait("Suite", "PtyRing")]
     public void Constructor_RejectsInvalidCapacity()
     {
         Assert.Throws<ArgumentException>(() => new PtyRingBuffer(4095));

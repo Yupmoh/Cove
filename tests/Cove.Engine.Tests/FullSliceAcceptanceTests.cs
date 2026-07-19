@@ -3,6 +3,7 @@ using Cove.Engine;
 using Cove.Platform.Ipc;
 using Cove.Protocol;
 using Xunit;
+using Cove.Testing;
 
 namespace Cove.Engine.Tests;
 
@@ -36,10 +37,9 @@ public sealed class FullSliceAcceptanceTests
         return (dispatch, resume);
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task FullSlice_Launch_SetInReview_SetDone_OverSocket()
     {
-        if (System.OperatingSystem.IsWindows()) return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(60));
         CancellationToken ct = cts.Token;
 
@@ -84,13 +84,12 @@ public sealed class FullSliceAcceptanceTests
         var exportResp = await SendAsync(ctl, "e", "cove://commands/task-board.export", P($"{{\"exportPath\":\"{exportPath}\",\"bayCount\":1}}"), ct);
         Assert.True(exportResp.Ok, exportResp.Error?.Code);
         Assert.True(System.IO.File.Exists(exportPath));
-        try { System.IO.File.Delete(exportPath); } catch { }
+        Cove.Testing.TestFile.Delete(exportPath);
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task ScheduleLifecycle_Set_Pause_Resume_SkipNext_Stop_OverSocket()
     {
-        if (System.OperatingSystem.IsWindows()) return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(60));
         CancellationToken ct = cts.Token;
 

@@ -3,6 +3,7 @@ using Cove.Engine;
 using Cove.Platform.Ipc;
 using Cove.Protocol;
 using Xunit;
+using Cove.Testing;
 
 namespace Cove.Engine.Tests;
 
@@ -39,10 +40,9 @@ public sealed class TaskEventFanoutTests
         catch (OperationCanceledException) { return null; }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task TaskCreate_EmitsCardChangedEventToGuiClient()
     {
-        if (System.OperatingSystem.IsWindows()) return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(60));
         CancellationToken ct = cts.Token;
 
@@ -57,10 +57,9 @@ public sealed class TaskEventFanoutTests
         Assert.True(evt!.Channel == "task.card.changed" || evt.Channel == "state.changed", $"got {evt.Channel}");
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task RunCreate_EmitsRunChangedEventToGuiClient()
     {
-        if (System.OperatingSystem.IsWindows()) return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(60));
         CancellationToken ct = cts.Token;
 
@@ -78,10 +77,9 @@ public sealed class TaskEventFanoutTests
         Assert.True(evt!.Channel == "task.run.changed" || evt.Channel == "state.changed", $"got {evt.Channel}");
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task StatusCreate_EmitsBoardInvalidatedEventToGuiClient()
     {
-        if (System.OperatingSystem.IsWindows()) return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(60));
         CancellationToken ct = cts.Token;
 

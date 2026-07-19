@@ -1,4 +1,6 @@
 using Cove.Gui;
+using Cove.Gui.Tests;
+using Cove.Testing;
 using Xunit;
 
 public class PerfWriterTests
@@ -6,7 +8,8 @@ public class PerfWriterTests
     [Fact]
     public void Save_Writes_Latest_And_Timestamped_Files()
     {
-        var dir = Path.Combine(Directory.CreateTempSubdirectory().FullName, "perf");
+        using var directory = GuiTestDirectory.Create("cove-perf-");
+        var dir = Path.Combine(directory.Path, "perf");
         var ret = PerfWriter.Save(dir, "{\"done\":true}", "| a |\n|---|");
 
         Assert.Equal(dir, ret);
@@ -17,14 +20,13 @@ public class PerfWriterTests
     }
 
     [Fact]
-    public void PerfDir_Honors_CoveDataDir_Override()
+    public async Task PerfDir_Honors_CoveDataDir_Override()
     {
-        var prev = Environment.GetEnvironmentVariable("COVE_DATA_DIR");
-        try
+        await using (await ProcessEnvironmentScope.SetAsync(
+            "COVE_DATA_DIR",
+            "/tmp/cove-perf-test-root"))
         {
-            Environment.SetEnvironmentVariable("COVE_DATA_DIR", "/tmp/cove-perf-test-root");
             Assert.Equal(Path.Combine("/tmp/cove-perf-test-root", "cache", "perf"), PerfWriter.PerfDir());
         }
-        finally { Environment.SetEnvironmentVariable("COVE_DATA_DIR", prev); }
     }
 }

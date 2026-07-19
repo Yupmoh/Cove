@@ -1,16 +1,15 @@
 using Cove.Pty.Harness;
+using Cove.Testing;
 using Xunit;
 
 namespace Cove.Pty.Harness.Tests;
 
 public sealed class FastfetchBurstTests
 {
-    [Fact]
-    [Trait("Category", "PtyDrain")]
+    [PlatformFact(TestOperatingSystem.Unix)]
+    [Trait("Suite", "PtyDrain")]
     public void FastfetchBurst_NeverWedges_DrainsAllBytes()
     {
-        if (OperatingSystem.IsWindows())
-            return;
         const long total = 16L * 1024 * 1024;
         var (ring, reader, session) = PtyHarnessFixture.StartGen(65536, total);
         try

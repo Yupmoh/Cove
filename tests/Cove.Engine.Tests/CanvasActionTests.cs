@@ -3,6 +3,7 @@ using Cove.Engine;
 using Cove.Platform.Ipc;
 using Cove.Protocol;
 using Xunit;
+using Cove.Testing;
 
 namespace Cove.Engine.Tests;
 
@@ -22,10 +23,9 @@ public sealed class CanvasActionTests
         }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task CoveCommandAction_ReturnsResolvedUri()
     {
-        if (System.OperatingSystem.IsWindows()) return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(60));
         CancellationToken ct = cts.Token;
 
@@ -38,10 +38,9 @@ public sealed class CanvasActionTests
         Assert.Equal("cove://commands/note.list", resp.Data!.Value.GetProperty("resolvedUri").GetString());
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task SendToAgentAction_DispatchesPayloadToTargetNook()
     {
-        if (System.OperatingSystem.IsWindows()) return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(60));
         CancellationToken ct = cts.Token;
 
@@ -58,10 +57,9 @@ public sealed class CanvasActionTests
         Assert.Equal(nookId, resp.Data!.Value.GetProperty("targetNookId").GetString());
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task SendToAgentAction_NonexistentNook_ReturnsNotFoundError()
     {
-        if (System.OperatingSystem.IsWindows()) return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(60));
         CancellationToken ct = cts.Token;
 
@@ -73,10 +71,9 @@ public sealed class CanvasActionTests
         Assert.Equal("not_found", resp.Error!.Code);
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task UnknownAction_ReturnsInvalidActionError()
     {
-        if (System.OperatingSystem.IsWindows()) return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(60));
         CancellationToken ct = cts.Token;
 
@@ -88,10 +85,9 @@ public sealed class CanvasActionTests
         Assert.Equal("invalid_action", resp.Error!.Code);
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public async Task CoveCommandWithoutUri_ReturnsInvalidParamsError()
     {
-        if (System.OperatingSystem.IsWindows()) return;
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(60));
         CancellationToken ct = cts.Token;
 
