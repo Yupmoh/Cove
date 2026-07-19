@@ -63,7 +63,7 @@ public sealed class NookRegistryOwnershipTests
     }
 
     private static SpawnEnvironment SpawnEnvironment() =>
-        new("/usr/bin:/bin", "/tmp/cove-tests", "/usr/bin/cove", "bay-test");
+        new("/usr/bin:/bin", "/tmp/cove-tests", "/usr/bin/cove", "bay-test", "dev");
 
     [Fact]
     public void Spawn_AllocatesUniqueIdentityAndAuthenticatesOnlyItsToken()

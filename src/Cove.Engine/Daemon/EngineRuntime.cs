@@ -108,7 +108,8 @@ internal sealed class EngineRuntime : IAsyncDisposable
             probedPath,
             dataDir,
             cliPath,
-            "default");
+            "default",
+            paths.Channel);
         var shellDir = ShellIntegration.Install(dataDir);
         var nooks = new NookRegistry(
             ptyHost,

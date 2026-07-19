@@ -8,13 +8,15 @@ public sealed class SpawnEnvironment
     private readonly string _dataDir;
     private readonly string _cliPath;
     private readonly string _bayId;
+    private readonly string _channel;
 
-    public SpawnEnvironment(string probedPath, string dataDir, string cliPath, string bayId)
+    public SpawnEnvironment(string probedPath, string dataDir, string cliPath, string bayId, string channel)
     {
         _probedPath = probedPath;
         _dataDir = dataDir;
         _cliPath = cliPath;
         _bayId = bayId;
+        _channel = channel;
     }
 
     private static readonly string[] HostOnlyKeys =
@@ -64,6 +66,7 @@ public sealed class SpawnEnvironment
                 env[kv.Key] = kv.Value;
         }
         env["COVE"] = "1";
+        env["COVE_CHANNEL"] = _channel;
         env["COVE_CLI_PATH"] = _cliPath;
         env["COVE_DATA_DIR"] = _dataDir;
         env["COVE_NOOK_ID"] = nookId;

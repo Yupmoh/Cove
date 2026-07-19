@@ -48,4 +48,28 @@ public sealed class ChannelResolutionTests
     {
         Assert.Equal(CoveChannel.Stable, CliChannel.Resolve(new[] { "--channel", "bogus" }, "dev", null));
     }
+
+    [Fact]
+    public void HookCandidates_Probe_All_Channels_For_Legacy_Nook()
+    {
+        Assert.Equal(
+            new[] { CoveChannel.Stable, CoveChannel.Beta, CoveChannel.Dev },
+            CliChannel.HookCandidates(Array.Empty<string>(), null, hasNookCredential: true));
+    }
+
+    [Fact]
+    public void HookCandidates_Use_Declared_Channel_When_Present()
+    {
+        Assert.Equal(
+            new[] { CoveChannel.Dev },
+            CliChannel.HookCandidates(Array.Empty<string>(), "dev", hasNookCredential: true));
+    }
+
+    [Fact]
+    public void HookCandidates_Keep_Default_For_Control_Client()
+    {
+        Assert.Equal(
+            new[] { CoveChannel.Stable },
+            CliChannel.HookCandidates(Array.Empty<string>(), null, hasNookCredential: false));
+    }
 }

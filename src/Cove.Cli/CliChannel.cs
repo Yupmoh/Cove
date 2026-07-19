@@ -5,6 +5,16 @@ namespace Cove.Cli;
 
 internal static class CliChannel
 {
+    private static readonly IReadOnlyList<CoveChannel> StableOnly = new[] { CoveChannel.Stable };
+    private static readonly IReadOnlyList<CoveChannel> BetaOnly = new[] { CoveChannel.Beta };
+    private static readonly IReadOnlyList<CoveChannel> DevOnly = new[] { CoveChannel.Dev };
+    private static readonly IReadOnlyList<CoveChannel> AllChannels = new[]
+    {
+        CoveChannel.Stable,
+        CoveChannel.Beta,
+        CoveChannel.Dev,
+    };
+
     internal static CoveChannel Resolve(string[] args, ILogger? logger = null)
         => Resolve(args, System.Environment.GetEnvironmentVariable("COVE_CHANNEL"), logger);
 
@@ -26,6 +36,24 @@ internal static class CliChannel
             return CoveChannel.Stable;
         }
         return CoveChannel.Stable;
+    }
+
+    internal static IReadOnlyList<CoveChannel> HookCandidates(
+        string[] args,
+        string? env,
+        bool hasNookCredential)
+    {
+        if (hasNookCredential
+            && string.IsNullOrWhiteSpace(FlagValue(args, "--channel"))
+            && string.IsNullOrWhiteSpace(env))
+            return AllChannels;
+
+        return Resolve(args, env, null) switch
+        {
+            CoveChannel.Beta => BetaOnly,
+            CoveChannel.Dev => DevOnly,
+            _ => StableOnly,
+        };
     }
 
     internal static bool TryParse(string? value, out CoveChannel channel)

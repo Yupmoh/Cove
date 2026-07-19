@@ -378,7 +378,7 @@ public sealed class ConnectionPrincipalTests
         var dataDir = TestDirectory.Create("cove-handoff");
         try
         {
-            var spawnEnv = new SpawnEnvironment("/usr/bin:/bin", dataDir, "/bin/echo", "default");
+            var spawnEnv = new SpawnEnvironment("/usr/bin:/bin", dataDir, "/bin/echo", "default", "dev");
             using var source = new NookRegistry(PtyHostFactory.Create(NullLogger.Instance), NullLogger.Instance, spawnEnv);
             using var successor = new NookRegistry(PtyHostFactory.Create(NullLogger.Instance), NullLogger.Instance, spawnEnv);
 

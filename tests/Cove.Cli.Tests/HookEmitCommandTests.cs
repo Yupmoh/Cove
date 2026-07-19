@@ -147,6 +147,9 @@ public sealed class HookEmitCommandTests
         startInfo.ArgumentList.Add("emit");
         foreach (var argument in commandArgs)
             startInfo.ArgumentList.Add(argument);
+        startInfo.Environment.Remove("COVE_CHANNEL");
+        startInfo.Environment.Remove("COVE_NOOK_ID");
+        startInfo.Environment.Remove("COVE_NOOK_TOKEN");
         startInfo.Environment["COVE_DATA_DIR"] = root;
         return startInfo;
     }

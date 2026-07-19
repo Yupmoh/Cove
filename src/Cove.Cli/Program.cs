@@ -49,6 +49,42 @@ string? matchedVerb = null;
 }
 if (matchedVerb is not null)
 {
+    if (matchedVerb == "hook emit")
+    {
+        var nookId = Environment.GetEnvironmentVariable("COVE_NOOK_ID");
+        var nookToken = Environment.GetEnvironmentVariable("COVE_NOOK_TOKEN");
+        var candidates = CliChannel.HookCandidates(
+            cliArgs,
+            Environment.GetEnvironmentVariable("COVE_CHANNEL"),
+            !string.IsNullOrEmpty(nookId)
+                && !string.IsNullOrEmpty(nookToken));
+        if (candidates.Count > 1)
+        {
+            foreach (var candidate in candidates)
+            {
+                var candidateDataDir = CoveDataDir.Resolve(candidate);
+                var candidatePaths = new DaemonPaths(candidateDataDir);
+                var candidateEndpoint =
+                    ControlEndpointFactory.FromSocketPath(
+                        candidateDataDir.SocketPath);
+                var connector = new DaemonConnector(
+                    candidatePaths,
+                    candidateEndpoint);
+                var connection = await connector
+                    .TryConnectAndHelloAsync(
+                        "hook",
+                        CancellationToken.None);
+                if (connection is null)
+                    continue;
+                await connection.DisposeAsync();
+                channel = candidate;
+                dataDir = candidateDataDir;
+                paths = candidatePaths;
+                endpoint = candidateEndpoint;
+                break;
+            }
+        }
+    }
     var verbArgs = CommandContext.SliceVerbArgs(matchedVerb, cliArgs);
     var context = new CommandContext(
         paths,

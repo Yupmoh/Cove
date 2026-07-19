@@ -9,10 +9,11 @@ public sealed class SpawnEnvironmentTests
     [Fact]
     public void Build_InjectsCoveContract()
     {
-        var se = new SpawnEnvironment("/probed/bin:/usr/bin", "/data", "/data/bin/cove", "ws1");
+        var se = new SpawnEnvironment("/probed/bin:/usr/bin", "/data", "/data/bin/cove", "ws1", "dev");
         var env = se.Build("nook-abc", null);
 
         Assert.Equal("1", env["COVE"]);
+        Assert.Equal("dev", env["COVE_CHANNEL"]);
         Assert.Equal("nook-abc", env["COVE_NOOK_ID"]);
         Assert.Equal("/data", env["COVE_DATA_DIR"]);
         Assert.Equal("/data/bin/cove", env["COVE_CLI_PATH"]);
@@ -26,15 +27,17 @@ public sealed class SpawnEnvironmentTests
     [Fact]
     public void Build_CoveVarsAreNonOverridable()
     {
-        var se = new SpawnEnvironment("/probed/bin:/usr/bin", "/data", "/data/bin/cove", "ws1");
+        var se = new SpawnEnvironment("/probed/bin:/usr/bin", "/data", "/data/bin/cove", "ws1", "dev");
         var env = se.Build("p1", new Dictionary<string, string>
         {
             ["COVE"] = "0",
+            ["COVE_CHANNEL"] = "stable",
             ["COVE_NOOK_ID"] = "evil",
             ["MYVAR"] = "x",
         });
 
         Assert.Equal("1", env["COVE"]);
+        Assert.Equal("dev", env["COVE_CHANNEL"]);
         Assert.Equal("p1", env["COVE_NOOK_ID"]);
         Assert.Equal("x", env["MYVAR"]);
     }
@@ -77,7 +80,7 @@ public sealed class SpawnEnvironmentTests
     [Fact]
     public void Build_CallerEnvOverridesTerminalIdentity()
     {
-        var se = new SpawnEnvironment("/probed/bin:/usr/bin", "/data", "/data/bin/cove", "ws1");
+        var se = new SpawnEnvironment("/probed/bin:/usr/bin", "/data", "/data/bin/cove", "ws1", "dev");
         var env = se.Build("p1", new Dictionary<string, string> { ["TERM"] = "xterm-kitty" });
 
         Assert.Equal("xterm-kitty", env["TERM"]);
@@ -86,7 +89,7 @@ public sealed class SpawnEnvironmentTests
     [Fact]
     public void Build_EstablishesCoveTerminalIdentity()
     {
-        var se = new SpawnEnvironment("/probed/bin:/usr/bin", "/data", "/data/bin/cove", "ws1");
+        var se = new SpawnEnvironment("/probed/bin:/usr/bin", "/data", "/data/bin/cove", "ws1", "dev");
         var env = se.Build("p1", null);
 
         Assert.Equal("xterm-256color", env["TERM"]);
