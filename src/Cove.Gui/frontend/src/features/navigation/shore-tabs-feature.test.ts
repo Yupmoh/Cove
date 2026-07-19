@@ -48,7 +48,14 @@ describe("ShoreTabsFeature", () => {
       contextMenu: { openAt: vi.fn() },
       nooks: new Map(),
       nookDrag: { nookId: null },
-      invoke: vi.fn(async () => ({ wings: [] })),
+      invoke: vi.fn(async (command: string) => command === "cove://commands/wing.list"
+        ? { wings: [{ id: "main", name: "main" }] }
+        : {
+          shores: [
+            { id: "shore-1", wingId: "main", pinned: false },
+            { id: "shore-2", wingId: "main", pinned: false },
+          ],
+        }),
       reload: vi.fn(async () => {}),
       renderShore,
       focusNook: vi.fn(),
@@ -77,6 +84,19 @@ describe("ShoreTabsFeature", () => {
       "cove://commands/wing.list",
       { bayId: "bay-1" },
     );
+    const updated = snapshot();
+    updated.activeShoreId = "shore-3";
+    updated.shores.push({
+      id: "shore-3",
+      name: "Three",
+      zoomedNookId: null,
+      wingId: "main",
+      layoutTree: { kind: "leaf", nookId: "nook-3", subtabs: [], activeSubtab: 0 },
+    });
+    workspace.applySnapshot(updated);
+    feature.render();
+    expect(root.querySelectorAll(".rtab")).toHaveLength(3);
+
     vi.mocked(dependencies.invoke).mockClear();
     workspace.snapshot = null;
     await feature.loadWings();

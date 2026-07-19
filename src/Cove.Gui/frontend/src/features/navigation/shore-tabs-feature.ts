@@ -98,14 +98,11 @@ let activeWingId: string | null = "main";
 
 let wingSwitcherExpanded = false;
 
-let shoreWingSummaries: { id: string; wingId: string; pinned: boolean }[] = [];
-
 async function loadWings(): Promise<void> {
   const wsId = workspace.snapshot?.id;
   if (!wsId) {
     console.warn("wing load skipped without an active bay");
     wings = [{ id: "main", name: "main" }];
-    shoreWingSummaries = [];
     return;
   }
   try {
@@ -114,13 +111,6 @@ async function loadWings(): Promise<void> {
   } catch (error) {
     console.warn("wing list failed", { bayId: wsId, error });
     wings = [{ id: "main", name: "main" }];
-  }
-  try {
-    const list = await invoke<{ shores: { id: string; wingId: string; pinned: boolean }[] }>(FrontendCommand.ShoreList, { bayId: wsId });
-    shoreWingSummaries = list.shores ?? [];
-  } catch (error) {
-    console.warn("shore wing list failed", { bayId: wsId, error });
-    shoreWingSummaries = [];
   }
 }
 
@@ -157,7 +147,12 @@ function renderShoreTabs(): void {
   if (activeRename && activeRename === document.activeElement) return;
   shoreTabsEl.innerHTML = "";
   const allShores = workspace.snapshot?.shores ?? [];
-  const wingModel = buildWingModel(wings, shoreWingSummaries, activeWingId);
+  const liveShoreWingSummaries = allShores.map((shore) => ({
+    id: shore.id,
+    wingId: shore.wingId ?? "main",
+    pinned: shore.pinned ?? false,
+  }));
+  const wingModel = buildWingModel(wings, liveShoreWingSummaries, activeWingId);
   const visibleIds = visibleShoreIds(wingModel);
   const shores = visibleIds.length > 0 || wings.length > 1 ? filterShoresByWing(allShores, visibleIds) : allShores;
   if (shores.length === 0) { shoreTabsEl.style.display = "none"; shoresRowEl.style.display = "none"; return; }
