@@ -1,7 +1,6 @@
 using System;
 using System.IO;
 using System.Text.Json;
-using Cove.Persistence;
 using Cove.Platform;
 using Cove.Testing;
 using Xunit;
@@ -58,7 +57,7 @@ public sealed class CoveTreeTests
 
             var meta = JsonSerializer.Deserialize(
                 File.ReadAllText(dd.MetaJson),
-                CoveJsonContext.Default.DataDirMeta);
+                PlatformJsonContext.Default.DataDirMeta);
 
             Assert.NotNull(meta);
             Assert.Equal(DataDirMetaStore.CurrentSchemaVersion, meta.DataDirSchemaVersion);

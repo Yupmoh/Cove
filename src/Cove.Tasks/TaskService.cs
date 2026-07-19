@@ -1,102 +1,48 @@
 using Cove.Persistence;
 using Cove.Tasks.Store;
-using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 
 namespace Cove.Tasks;
 
 public sealed class TaskService : IAsyncDisposable
 {
-    private readonly SqliteConnectionFactory _factory;
     private readonly TasksWriteChannel _channel;
     private readonly CardRepository _cards;
-    private readonly TaskCounterRepository _counter;
     private readonly LabelRepository _labels;
     private readonly StatusRepository _statuses;
     private readonly Runs.RunRepository _runs;
     private readonly Runs.RunSegmentRepository _segments;
     private readonly CommentRepository _comments;
     private readonly Schedules.ScheduleRepository _schedules;
-    private readonly TasksStore _store;
+    private readonly TaskMutationRepository _mutations;
+    private readonly Export.TaskBoardExportService _exports;
 
     public TaskService(string dataDir, ILogger logger)
     {
         var dbPath = System.IO.Path.Combine(dataDir, "tasks.db");
-        _factory = new SqliteConnectionFactory(dbPath);
-        _store = new TasksStore(_factory, logger);
-        _store.EnsureSchema();
-        _channel = new TasksWriteChannel(_factory, logger);
-        _cards = new CardRepository(_factory, _channel);
-        _counter = new TaskCounterRepository(_factory, _channel);
-        _statuses = new StatusRepository(_factory, _channel);
-        _comments = new CommentRepository(_factory, _channel, _cards);
-        _labels = new LabelRepository(_factory, _channel);
-        _runs = new Runs.RunRepository(_factory, _channel);
-        _segments = new Runs.RunSegmentRepository(_factory, _channel);
-        _schedules = new Schedules.ScheduleRepository(_factory, _channel);
+        var factory = new SqliteConnectionFactory(dbPath);
+        var store = new TasksStore(factory, logger);
+        store.EnsureSchema();
+        _channel = new TasksWriteChannel(factory, logger);
+        _mutations = new TaskMutationRepository(_channel);
+        _cards = new CardRepository(factory, _channel);
+        _statuses = new StatusRepository(factory, _channel);
+        _comments = new CommentRepository(factory, _channel, _cards);
+        _labels = new LabelRepository(factory, _channel);
+        _runs = new Runs.RunRepository(factory, _channel);
+        _segments = new Runs.RunSegmentRepository(factory, _channel);
+        _schedules = new Schedules.ScheduleRepository(factory, _channel);
+        _exports = new Export.TaskBoardExportService(
+            new Export.SqliteTaskBoardExportRepository(factory),
+            logger);
     }
-
-
 
     public System.Threading.Tasks.Task StartAsync() => _channel.StartAsync();
 
     public ValueTask DisposeAsync() => _channel.DisposeAsync();
 
-    public void SeedDefaultStatuses(string bayId)
-    {
-        var now = System.DateTimeOffset.UtcNow.ToString("o");
-        var defaults = new[]
-        {
-            ("todo", "Todo", "808080", 0, 0, 0, 0, 0),
-            ("in-progress", "In Progress", "4a9eff", 1, 1, 0, 0, 0),
-            ("in-review", "In Review", "f5a623", 2, 0, 0, 1, 0),
-            ("done", "Done", "34c759", 3, 0, 0, 0, 1),
-            ("looping", "Looping", "9b59b6", 4, 0, 1, 0, 0),
-        };
-        using var conn = _factory.Open();
-        foreach (var (id, name, color, pos, isProg, isLoop, isReview, isDone) in defaults)
-        {
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = "INSERT OR IGNORE INTO statuses (bay_id, id, name, hex_color, position, is_in_progress, is_looping, is_review, is_completion, created_at, updated_at) VALUES (@BayId, @Id, @Name, @Color, @Pos, @IsProg, @IsLoop, @IsReview, @IsDone, @Now, @Now)";
-            cmd.Parameters.AddWithValue("@BayId", bayId);
-            cmd.Parameters.AddWithValue("@Id", id);
-            cmd.Parameters.AddWithValue("@Name", name);
-            cmd.Parameters.AddWithValue("@Color", color);
-            cmd.Parameters.AddWithValue("@Pos", pos);
-            cmd.Parameters.AddWithValue("@IsProg", isProg);
-            cmd.Parameters.AddWithValue("@IsLoop", isLoop);
-            cmd.Parameters.AddWithValue("@IsReview", isReview);
-            cmd.Parameters.AddWithValue("@IsDone", isDone);
-            cmd.Parameters.AddWithValue("@Now", now);
-            cmd.ExecuteNonQuery();
-        }
-    }
-
-    public async System.Threading.Tasks.Task<CardRow> CreateCardAsync(string bayId, string title, string source, string? description, int priority, int size, string? assignee, string statusId = "todo")
-    {
-        SeedDefaultStatuses(bayId);
-        var number = await _counter.NextNumberAsync(bayId);
-        var orderKey = await _cards.NextOrderKeyAsync(bayId, statusId);
-        var now = System.DateTimeOffset.UtcNow.ToString("o");
-        var row = new CardRow
-        {
-            Id = System.Guid.NewGuid().ToString("N"),
-            BayId = bayId,
-            TaskNumber = number,
-            Title = title,
-            Description = description ?? "",
-            StatusId = statusId,
-            Priority = priority,
-            Size = size,
-            Assignee = assignee,
-            Source = source,
-            OrderKey = orderKey,
-            CreatedAt = now,
-            UpdatedAt = now,
-        };
-        await _cards.InsertAsync(row);
-        return row;
-    }
+    public System.Threading.Tasks.Task<CardRow> CreateCardAsync(string bayId, string title, string source, string? description, int priority, int size, string? assignee, string statusId = "todo")
+        => _mutations.CreateCardAsync(bayId, title, source, description, priority, size, assignee, statusId);
 
     public CardRow? GetCard(string id) => _cards.GetById(id);
     public CardRow? GetCardByHumanId(string bayId, int number) => _cards.GetByBayAndNumber(bayId, number);
@@ -112,10 +58,7 @@ public sealed class TaskService : IAsyncDisposable
     public async System.Threading.Tasks.Task<int> DeleteCardAsync(string id) => await _cards.DeleteAsync(id);
 
     public System.Threading.Tasks.Task<Cove.Tasks.Store.StatusRow?> CreateStatusAsync(string bayId, string id, string name, string hexColor, double position)
-    {
-        SeedDefaultStatuses(bayId);
-        return _statuses.CreateAsync(bayId, id, name, hexColor, position);
-    }
+        => _mutations.CreateStatusAsync(bayId, id, name, hexColor, position);
 
     public System.Collections.Generic.IReadOnlyList<Cove.Tasks.Store.StatusRow> ListStatuses(string bayId, bool includeHidden = false)
         => _statuses.ListByBay(bayId, includeHidden);
@@ -227,11 +170,23 @@ public sealed class TaskService : IAsyncDisposable
     public System.Threading.Tasks.Task<Runs.RunRow?> CreateRunAsync(string cardId, string bayId, string? launchProfileJson, string? runFamilyId = null, bool backgrounded = false, string? reviewStatusId = null, string? completionStatusId = null) => _runs.CreateAsync(cardId, bayId, launchProfileJson, runFamilyId, backgrounded, reviewStatusId, completionStatusId);
     public System.Threading.Tasks.Task<Runs.RunSegmentRow?> AddRunSegmentAsync(string runId, string? nookId, string? adapterSessionId) => _segments.AddAsync(runId, nookId, adapterSessionId);
     public System.Threading.Tasks.Task EndRunSegmentAsync(string segmentId) => _segments.EndAsync(segmentId);
+    public System.Threading.Tasks.Task<Runs.RunSegmentRow> CompleteDispatchAsync(string runId, string nookId, string? adapterSessionId, string cardId, string statusId)
+        => _mutations.CompleteDispatchAsync(runId, nookId, adapterSessionId, cardId, statusId);
+    public System.Threading.Tasks.Task<Runs.RunRow> CreateScheduledRunAndAdvanceAsync(CardRow card, string? nextFireAt, string lastFiredAt)
+        => _mutations.CreateScheduledRunAndAdvanceAsync(card, nextFireAt, lastFiredAt);
 
     public Schedules.ScheduleRow? GetSchedule(string cardId) => _schedules.GetByCard(cardId);
     public System.Threading.Tasks.Task UpsertScheduleAsync(Schedules.ScheduleRow row) => _schedules.UpsertAsync(row);
     public System.Threading.Tasks.Task UpdateScheduleAsync(string cardId, bool? paused, bool? skipNext, string? nextFireAt, string? lastFiredAt, string? pendingIntent = null) => _schedules.UpdateAsync(cardId, paused, skipNext, nextFireAt, lastFiredAt, pendingIntent);
     public System.Threading.Tasks.Task DeleteScheduleAsync(string cardId) => _schedules.DeleteAsync(cardId);
     public System.Collections.Generic.IReadOnlyList<Schedules.ScheduleRow> ListActiveSchedules() => _schedules.ListActive();
-    public Cove.Persistence.SqliteConnectionFactory GetConnectionFactory() => _factory;
+    public System.Collections.Generic.IReadOnlyList<Schedules.ScheduleRow> ListPendingSchedules() => _schedules.ListPending();
+    public System.Threading.Tasks.Task CompleteScheduleIntentAsync(string cardId, string? nextFireAt)
+        => _schedules.CompleteIntentAsync(cardId, nextFireAt);
+    public System.Threading.Tasks.Task<Export.ExportResult> ExportTaskBoardAsync(string exportPath, int bayCount)
+        => _channel.ExecuteAsync(
+            _ => System.Threading.Tasks.Task.FromResult(_exports.Export(exportPath, bayCount)));
+    public System.Threading.Tasks.Task<Export.RestoreDiffResult> DiffTaskBoardAsync(string importPath)
+        => _channel.ExecuteAsync(
+            _ => System.Threading.Tasks.Task.FromResult(_exports.DiffAgainst(importPath)));
 }

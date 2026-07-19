@@ -27,8 +27,4 @@
     <ProjectReference Include="..\Cove.Platform\Cove.Platform.csproj" />
   </ItemGroup>
 
-  <PropertyGroup>
-    <NoWarn>$(NoWarn);NU1903</NoWarn>
-  </PropertyGroup>
-
 </Project>

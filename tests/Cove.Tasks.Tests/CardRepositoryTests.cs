@@ -215,4 +215,20 @@ public sealed class CardRepositoryTests : TasksTestBase
         var ws2Key = await cards.NextOrderKeyAsync("ws2", "todo");
         Assert.Equal(0.0, ws2Key);
     }
+
+    [Fact]
+    public async System.Threading.Tasks.Task CreateCard_WhenInsertFails_RollsBackDefaultsAndCounter()
+    {
+        var svc = await CreateTaskServiceAsync("cove-card-atomic-");
+
+        await Assert.ThrowsAsync<SqliteException>(
+            () => svc.CreateCardAsync("atomic-bay", "invalid", "user:test", "", 1, 2, null, "missing-status"));
+
+        Assert.Empty(svc.ListCards("atomic-bay"));
+        Assert.Empty(svc.ListStatuses("atomic-bay", includeHidden: true));
+
+        var created = await svc.CreateCardAsync("atomic-bay", "valid", "user:test", "", 1, 2, null);
+        Assert.Equal(1, created.TaskNumber);
+        Assert.Equal(0, created.OrderKey);
+    }
 }

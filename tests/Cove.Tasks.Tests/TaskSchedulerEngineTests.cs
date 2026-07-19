@@ -354,6 +354,69 @@ public sealed class TaskSchedulerEngineTests : TasksTestBase
         await StopWithinAsync(engine, cts, runTask);
     }
 
+    [Fact]
+    public async System.Threading.Tasks.Task ContinueIntent_IsDurablyConsumedBeforeMutationAcknowledgement()
+    {
+        var svc = await NewSvcAsync();
+        var now = System.DateTimeOffset.Parse("2026-01-01T00:00:00Z");
+        var cardId = await SeedCardWithCronScheduleAsync(svc, "0 9 * * *", scheduleBaseTime: now);
+        await svc.UpdateScheduleAsync(
+            cardId,
+            paused: null,
+            skipNext: null,
+            nextFireAt: "",
+            lastFiredAt: null,
+            pendingIntent: "continue");
+        var engine = new TaskSchedulerEngine(svc, new HandRolledCronExpander(), new VirtualClock(now), NullLogger.Instance);
+        using var cts = new System.Threading.CancellationTokenSource();
+        var runTask = engine.StartAsync(cts.Token);
+
+        await SignalMutationWithinAsync(engine);
+
+        var completed = Assert.IsType<ScheduleRow>(svc.GetSchedule(cardId));
+        Assert.Null(completed.PendingIntent);
+        Assert.True(System.DateTimeOffset.Parse(completed.NextFireAt!) > now);
+        await StopWithinAsync(engine, cts, runTask);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task FinishIntent_IsDurablyConsumedBeforeMutationAcknowledgement()
+    {
+        var svc = await NewSvcAsync();
+        var now = System.DateTimeOffset.Parse("2026-01-01T00:00:00Z");
+        var cardId = await SeedCardWithCronScheduleAsync(svc, "0 9 * * *", scheduleBaseTime: now);
+        await svc.UpdateScheduleAsync(
+            cardId,
+            paused: null,
+            skipNext: null,
+            nextFireAt: "",
+            lastFiredAt: null,
+            pendingIntent: "finish");
+        var engine = new TaskSchedulerEngine(svc, new HandRolledCronExpander(), new VirtualClock(now), NullLogger.Instance);
+        using var cts = new System.Threading.CancellationTokenSource();
+        var runTask = engine.StartAsync(cts.Token);
+
+        await SignalMutationWithinAsync(engine);
+
+        Assert.Null(svc.GetSchedule(cardId));
+        await StopWithinAsync(engine, cts, runTask);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task ScheduledRun_WhenScheduleAdvanceFails_RollsBackRun()
+    {
+        var svc = await NewSvcAsync();
+        var card = await svc.CreateCardAsync("ws1", "orphan guard", "user:test", "", 1, 2, null);
+
+        await Assert.ThrowsAsync<System.InvalidOperationException>(
+            () => svc.CreateScheduledRunAndAdvanceAsync(
+                card,
+                "2026-01-02T09:00:00Z",
+                "2026-01-01T09:00:00Z"));
+
+        Assert.Empty(svc.ListRuns(card.Id, null, null));
+    }
+
     private sealed class TrackingVirtualClock : IVirtualClock
     {
         private readonly VirtualClock _inner;

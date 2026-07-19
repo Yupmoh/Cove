@@ -79,4 +79,13 @@ internal static partial class PlatformLog
 
     [ZLoggerMessage(LogLevel.Warning, "login shell path probe failed, falling back to process path error={error}", EventId = 2075)]
     public static partial void LoginShellProbeFailed(this ILogger logger, string error);
+
+    [ZLoggerMessage(LogLevel.Warning, "file durability directory open failed path={path} errno={errno}", EventId = 2080)]
+    public static partial void FileDurabilityDirectoryOpenFailed(this ILogger logger, string path, int errno);
+
+    [ZLoggerMessage(LogLevel.Warning, "file durability directory flush failed path={path} errno={errno}", EventId = 2081)]
+    public static partial void FileDurabilityDirectoryFlushFailed(this ILogger logger, string path, int errno);
+
+    [ZLoggerMessage(LogLevel.Warning, "file durability directory close failed path={path} errno={errno}", EventId = 2082)]
+    public static partial void FileDurabilityDirectoryCloseFailed(this ILogger logger, string path, int errno);
 }

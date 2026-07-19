@@ -136,7 +136,11 @@ public sealed class StatusRepository
             DeleteSync(bayId, id, rehomeToStatusId);
             return;
         }
-        await _channel.ExecuteAsync(conn => { DeleteInternal(conn, bayId, id, rehomeToStatusId); return System.Threading.Tasks.Task.CompletedTask; });
+        await _channel.ExecuteTransactionAsync<object?>((conn, transaction) =>
+        {
+            DeleteInternal(conn, bayId, id, rehomeToStatusId, transaction);
+            return System.Threading.Tasks.Task.FromResult<object?>(null);
+        });
     }
 
     private void DeleteSync(string bayId, string id, string? rehomeToStatusId)
@@ -145,21 +149,29 @@ public sealed class StatusRepository
         DeleteInternal(conn, bayId, id, rehomeToStatusId);
     }
 
-    private static void DeleteInternal(SqliteConnection conn, string bayId, string id, string? rehomeToStatusId)
+    private static void DeleteInternal(
+        SqliteConnection conn,
+        string bayId,
+        string id,
+        string? rehomeToStatusId,
+        SqliteTransaction? transaction = null)
     {
         var cardCount = conn.ExecuteScalar<int>(
             "SELECT count(*) FROM cards WHERE bay_id = @BayId AND status_id = @Id",
-            new { BayId = bayId, Id = id });
+            new { BayId = bayId, Id = id },
+            transaction);
         if (cardCount > 0)
         {
             if (rehomeToStatusId is null)
                 throw new System.InvalidOperationException($"cannot delete status '{id}' with {cardCount} cards without rehome target");
             conn.Execute(
                 "UPDATE cards SET status_id = @RehomeTo, updated_at = @Now WHERE bay_id = @BayId AND status_id = @Id",
-                new { RehomeTo = rehomeToStatusId, Now = System.DateTimeOffset.UtcNow.ToString("o"), BayId = bayId, Id = id });
+                new { RehomeTo = rehomeToStatusId, Now = System.DateTimeOffset.UtcNow.ToString("o"), BayId = bayId, Id = id },
+                transaction);
         }
         conn.Execute(
             "DELETE FROM statuses WHERE bay_id = @BayId AND id = @Id",
-            new { BayId = bayId, Id = id });
+            new { BayId = bayId, Id = id },
+            transaction);
     }
 }

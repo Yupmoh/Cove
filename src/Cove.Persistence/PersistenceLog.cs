@@ -41,9 +41,4 @@ internal static partial class PersistenceLog
     [ZLoggerMessage(LogLevel.Information, "sqlite migrations complete fromVersion={fromVersion} toVersion={toVersion} applied={applied}")]
     public static partial void SqliteMigrationsComplete(this ILogger logger, long fromVersion, long toVersion, int applied);
 
-    [ZLoggerMessage(LogLevel.Warning, "fsync dir open failed dir={dir} errno={errno}")]
-    public static partial void FsyncDirOpenFailed(this ILogger logger, string dir, int errno);
-
-    [ZLoggerMessage(LogLevel.Warning, "fsync dir failed dir={dir} errno={errno}")]
-    public static partial void FsyncDirFailed(this ILogger logger, string dir, int errno);
 }

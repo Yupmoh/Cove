@@ -22,6 +22,7 @@ public interface INookHost
     NookCreationResult? CreateNook(string? adapter, int cols, int rows);
     bool InjectEnv(string nookId, System.Collections.Generic.IReadOnlyDictionary<string, string> env);
     bool BindTaskCard(string nookId, string cardId);
+    bool RemoveNook(string nookId);
 }
 
 public sealed record ShoreCreationResult(string ShoreId);
@@ -29,6 +30,7 @@ public sealed record ShoreCreationResult(string ShoreId);
 public interface IShoreService
 {
     ShoreCreationResult? CreateShore(string bayId, string name, string? parentShoreId);
+    bool RemoveShore(string bayId, string shoreId);
 }
 
 public sealed record AdapterLaunchResult(string AdapterSessionId, bool Success, string? Error);
@@ -36,6 +38,7 @@ public sealed record AdapterLaunchResult(string AdapterSessionId, bool Success, 
 public interface IAgentLauncher
 {
     AdapterLaunchResult Launch(string nookId, string adapter, string resolvedCommand, System.Collections.Generic.IReadOnlyDictionary<string, string> env, string prompt);
+    bool Stop(string adapterSessionId);
 }
 
 public sealed record AdapterResumeResult(string AdapterSessionId, bool Success, string? Error);

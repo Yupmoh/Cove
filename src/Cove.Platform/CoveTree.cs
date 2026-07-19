@@ -1,6 +1,6 @@
 namespace Cove.Platform;
 
-using Cove.Persistence;
+using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -22,7 +22,7 @@ public static class CoveTree
 
         if (!File.Exists(dataDir.GitIgnore))
         {
-            AtomicJsonStore.WriteRawText(dataDir.GitIgnore, CoveGitIgnore.Content);
+            AtomicFile.Replace(dataDir.GitIgnore, Encoding.UTF8.GetBytes(CoveGitIgnore.Content), log);
             log.CoveTreeGitIgnoreWritten(dataDir.GitIgnore);
         }
 

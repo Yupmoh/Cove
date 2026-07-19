@@ -1,4 +1,4 @@
-namespace Cove.Persistence;
+namespace Cove.Platform;
 
 public sealed record DataDirMeta(
     int DataDirSchemaVersion,

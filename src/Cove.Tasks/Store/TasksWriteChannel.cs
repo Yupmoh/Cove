@@ -82,6 +82,26 @@ public sealed class TasksWriteChannel : IAsyncDisposable
         await tcs.Task;
     }
 
+    public System.Threading.Tasks.Task<T> ExecuteTransactionAsync<T>(
+        Func<SqliteConnection, SqliteTransaction, System.Threading.Tasks.Task<T>> work)
+    {
+        return ExecuteAsync(async conn =>
+        {
+            using var transaction = conn.BeginTransaction();
+            try
+            {
+                var result = await work(conn, transaction).ConfigureAwait(false);
+                transaction.Commit();
+                return result;
+            }
+            catch
+            {
+                transaction.Rollback();
+                throw;
+            }
+        });
+    }
+
     public async ValueTask DisposeAsync()
     {
         _queue.Writer.TryComplete();

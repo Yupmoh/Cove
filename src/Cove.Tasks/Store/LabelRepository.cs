@@ -79,7 +79,11 @@ public sealed class LabelRepository
             DeleteSync(bayId, id);
             return System.Threading.Tasks.Task.CompletedTask;
         }
-        return _channel.ExecuteAsync(conn => { DeleteInternal(conn, bayId, id); return System.Threading.Tasks.Task.CompletedTask; });
+        return _channel.ExecuteTransactionAsync<object?>((conn, transaction) =>
+        {
+            DeleteInternal(conn, bayId, id, transaction);
+            return System.Threading.Tasks.Task.FromResult<object?>(null);
+        });
     }
 
     private void DeleteSync(string bayId, string id)
@@ -88,10 +92,20 @@ public sealed class LabelRepository
         DeleteInternal(conn, bayId, id);
     }
 
-    private static void DeleteInternal(SqliteConnection conn, string bayId, string id)
+    private static void DeleteInternal(
+        SqliteConnection conn,
+        string bayId,
+        string id,
+        SqliteTransaction? transaction = null)
     {
-        conn.Execute("DELETE FROM card_labels WHERE label_id = @Id AND card_id IN (SELECT id FROM cards WHERE bay_id = @BayId)", new { Id = id, BayId = bayId });
-        conn.Execute("DELETE FROM labels WHERE bay_id = @BayId AND id = @Id", new { BayId = bayId, Id = id });
+        conn.Execute(
+            "DELETE FROM card_labels WHERE label_id = @Id AND card_id IN (SELECT id FROM cards WHERE bay_id = @BayId)",
+            new { Id = id, BayId = bayId },
+            transaction);
+        conn.Execute(
+            "DELETE FROM labels WHERE bay_id = @BayId AND id = @Id",
+            new { BayId = bayId, Id = id },
+            transaction);
     }
 
 

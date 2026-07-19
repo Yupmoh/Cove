@@ -31,6 +31,7 @@ public sealed class ResumeSagaTests : TasksTestBase
             return true;
         }
         public bool BindTaskCard(string nookId, string cardId) { BoundCards[nookId] = cardId; return true; }
+        public bool RemoveNook(string nookId) => true;
     }
 
     private sealed class FakeResumeLauncher : IAdapterResumeLauncher

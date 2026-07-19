@@ -14,12 +14,20 @@ public static class ProcessExitWatch
 
     internal static bool TryObserveExit(Task<int> observation, TimeSpan timeout, out int exitCode)
     {
-        if (!observation.Wait(timeout))
+        try
         {
-            exitCode = -1;
-            return false;
+            if (!observation.Wait(timeout))
+            {
+                exitCode = -1;
+                return false;
+            }
         }
-        exitCode = DecodeWaitStatus(observation.Result);
+        catch (AggregateException)
+        {
+            observation.GetAwaiter().GetResult();
+            throw;
+        }
+        exitCode = DecodeWaitStatus(observation.GetAwaiter().GetResult());
         return true;
     }
 

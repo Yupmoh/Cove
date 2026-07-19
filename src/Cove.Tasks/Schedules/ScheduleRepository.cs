@@ -74,6 +74,14 @@ public sealed class ScheduleRepository
             .AsList();
     }
 
+    public System.Collections.Generic.IReadOnlyList<ScheduleRow> ListPending()
+    {
+        using var conn = _factory.Open();
+        return conn.Query<ScheduleRow>(
+            $"SELECT {SelectColumns} FROM card_schedules WHERE pending_intent IS NOT NULL ORDER BY updated_at")
+            .AsList();
+    }
+
     public System.Threading.Tasks.Task UpdateAsync(string cardId, bool? paused, bool? skipNext, string? nextFireAt, string? lastFiredAt, string? pendingIntent = null)
     {
         if (_channel is null)
@@ -122,5 +130,35 @@ public sealed class ScheduleRepository
             return System.Threading.Tasks.Task.CompletedTask;
         }
         return _channel.ExecuteAsync(conn => { conn.Execute("DELETE FROM card_schedules WHERE card_id = @CardId", new { CardId = cardId }); return System.Threading.Tasks.Task.CompletedTask; });
+    }
+
+    public System.Threading.Tasks.Task CompleteIntentAsync(string cardId, string? nextFireAt)
+    {
+        if (_channel is null)
+        {
+            using var conn = _factory.Open();
+            CompleteIntentInternal(conn, cardId, nextFireAt);
+            return System.Threading.Tasks.Task.CompletedTask;
+        }
+        return _channel.ExecuteAsync(conn =>
+        {
+            CompleteIntentInternal(conn, cardId, nextFireAt);
+            return System.Threading.Tasks.Task.CompletedTask;
+        });
+    }
+
+    private static void CompleteIntentInternal(
+        SqliteConnection conn,
+        string cardId,
+        string? nextFireAt)
+    {
+        conn.Execute(
+            "UPDATE card_schedules SET pending_intent = NULL, next_fire_at = @NextFireAt, updated_at = @Now WHERE card_id = @CardId",
+            new
+            {
+                CardId = cardId,
+                NextFireAt = nextFireAt,
+                Now = System.DateTimeOffset.UtcNow.ToString("o"),
+            });
     }
 }

@@ -1,6 +1,6 @@
 namespace Cove.Platform;
 
-using Cove.Persistence;
+using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -14,7 +14,8 @@ public static class DataDirMetaStore
             DataDirSchemaVersion: CurrentSchemaVersion,
             CreatedAtUnixMs: DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
             CoveVersionAtCreate: CoveBuild.InformationalVersion);
-        AtomicJsonStore.Write(dataDir.MetaJson, meta, CoveJsonContext.Default.DataDirMeta);
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(meta, PlatformJsonContext.Default.DataDirMeta);
+        AtomicFile.Replace(dataDir.MetaJson, bytes, logger);
         (logger ?? NullLogger.Instance).CoveTreeMetaWritten(dataDir.MetaJson, CurrentSchemaVersion);
     }
 }

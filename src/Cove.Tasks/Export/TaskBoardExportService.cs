@@ -9,6 +9,13 @@ public sealed record ExportResult(bool Success, string? ExportPath, ExportManife
 public sealed record RestoreDiffResult(bool Success, System.Collections.Generic.IReadOnlyList<RowDiff> Diffs, string? Error);
 
 public sealed record RowDiff(string Table, string Id, string ChangeType, string? Before, string? After);
+public sealed record RepositoryExportResult(bool Success, string? Error);
+
+public interface ITaskBoardExportRepository
+{
+    RepositoryExportResult Export(string exportPath);
+    System.Collections.Generic.IReadOnlyList<RowDiff> DiffAgainst(string importPath);
+}
 
 public interface ISnapshotSink
 {
@@ -23,12 +30,12 @@ public sealed class NullSnapshotSink : ISnapshotSink
 
 public sealed class TaskBoardExportService
 {
-    private readonly SqliteConnectionFactory _factory;
+    private readonly ITaskBoardExportRepository _repository;
     private readonly ILogger _logger;
 
-    public TaskBoardExportService(SqliteConnectionFactory factory, ILogger logger)
+    public TaskBoardExportService(ITaskBoardExportRepository repository, ILogger logger)
     {
-        _factory = factory;
+        _repository = repository;
         _logger = logger;
     }
 
@@ -36,15 +43,12 @@ public sealed class TaskBoardExportService
     {
         try
         {
-            using var conn = _factory.Open();
-            using (var checkpointCmd = conn.CreateCommand())
+            var repositoryResult = _repository.Export(exportPath);
+            if (!repositoryResult.Success)
             {
-                checkpointCmd.CommandText = "PRAGMA wal_checkpoint(TRUNCATE)";
-                checkpointCmd.ExecuteNonQuery();
+                _logger.LogWarning("export: failed to export tasks.db: {error}", repositoryResult.Error);
+                return new ExportResult(false, null, null, repositoryResult.Error);
             }
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = $"VACUUM INTO '{exportPath.Replace("'", "''")}'";
-            cmd.ExecuteNonQuery();
             var manifest = new ExportManifest(System.DateTimeOffset.UtcNow, 1, bayCount);
             _logger.LogWarning("export: tasks.db exported to {path} ({bayCount} bays)", exportPath, bayCount);
             return new ExportResult(true, exportPath, manifest, null);
@@ -60,14 +64,7 @@ public sealed class TaskBoardExportService
     {
         try
         {
-            var diffs = new System.Collections.Generic.List<RowDiff>();
-            using var conn = _factory.Open();
-
-            foreach (var (table, keyCol) in new (string Table, string KeyCol)[] { ("cards", "id"), ("statuses", "id"), ("labels", "id"), ("comments", "id"), ("task_runs", "id"), ("task_run_segments", "id"), ("card_schedules", "card_id") })
-            {
-                diffs.AddRange(DiffTable(conn, importPath, table, keyCol));
-            }
-
+            var diffs = _repository.DiffAgainst(importPath);
             return new RestoreDiffResult(true, diffs, null);
         }
         catch (System.Exception ex)
@@ -77,7 +74,58 @@ public sealed class TaskBoardExportService
         }
     }
 
-    private static System.Collections.Generic.IReadOnlyList<RowDiff> DiffTable(SqliteConnection conn, string importPath, string table, string keyCol)
+}
+
+public sealed class SqliteTaskBoardExportRepository : ITaskBoardExportRepository
+{
+    private readonly SqliteConnectionFactory _factory;
+
+    public SqliteTaskBoardExportRepository(SqliteConnectionFactory factory)
+    {
+        _factory = factory;
+    }
+
+    public RepositoryExportResult Export(string exportPath)
+    {
+        using var conn = _factory.Open();
+        using (var checkpointCommand = conn.CreateCommand())
+        {
+            checkpointCommand.CommandText = "PRAGMA wal_checkpoint(TRUNCATE)";
+            checkpointCommand.ExecuteNonQuery();
+        }
+        using var exportCommand = conn.CreateCommand();
+        exportCommand.CommandText = $"VACUUM INTO '{exportPath.Replace("'", "''")}'";
+        exportCommand.ExecuteNonQuery();
+        SqliteConnectionFactory.ProtectOwnedDatabaseFiles(exportPath);
+        return new RepositoryExportResult(true, null);
+    }
+
+    public System.Collections.Generic.IReadOnlyList<RowDiff> DiffAgainst(string importPath)
+    {
+        var diffs = new System.Collections.Generic.List<RowDiff>();
+        using var conn = _factory.Open();
+        using var importConn = SqliteConnectionFactory.CreateReadOnlyImport(importPath).Open();
+        foreach (var (table, keyColumn) in new (string Table, string KeyColumn)[]
+                 {
+                     ("cards", "id"),
+                     ("statuses", "id"),
+                     ("labels", "id"),
+                     ("comments", "id"),
+                     ("task_runs", "id"),
+                     ("task_run_segments", "id"),
+                     ("card_schedules", "card_id"),
+                 })
+        {
+            diffs.AddRange(DiffTable(conn, importConn, table, keyColumn));
+        }
+        return diffs;
+    }
+
+    private static System.Collections.Generic.IReadOnlyList<RowDiff> DiffTable(
+        SqliteConnection conn,
+        SqliteConnection importConn,
+        string table,
+        string keyCol)
     {
         var diffs = new System.Collections.Generic.List<RowDiff>();
 
@@ -90,8 +138,6 @@ public sealed class TaskBoardExportService
                 currentIds.Add(reader.GetString(0));
         }
 
-        using var importConn = new SqliteConnection($"Data Source={importPath};Mode=ReadOnly");
-        importConn.Open();
         var importIds = new System.Collections.Generic.HashSet<string>();
         using (var cmd = importConn.CreateCommand())
         {

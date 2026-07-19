@@ -8,7 +8,7 @@ namespace Cove.Persistence;
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
 [JsonSerializable(typeof(CoveState))]
 [JsonSerializable(typeof(WindowGeometry))]
-[JsonSerializable(typeof(DataDirMeta))]
+
 [JsonSerializable(typeof(BaySnapshot))]
 [JsonSerializable(typeof(ShoreSnapshot))]
 [JsonSerializable(typeof(WingSnapshot))]

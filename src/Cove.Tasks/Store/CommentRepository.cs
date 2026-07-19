@@ -51,7 +51,12 @@ public sealed class CommentRepository
             AddSync(row);
             return System.Threading.Tasks.Task.FromResult<CommentRow?>(row);
         }
-        return _channel.ExecuteAsync(conn => { AddInternal(conn, row); SyncCardCommentIds(conn, cardId); return System.Threading.Tasks.Task.CompletedTask; }).ContinueWith(_ => (CommentRow?)row);
+        return _channel.ExecuteTransactionAsync<CommentRow?>((conn, transaction) =>
+        {
+            AddInternal(conn, row, transaction);
+            SyncCardCommentIds(conn, cardId, transaction);
+            return System.Threading.Tasks.Task.FromResult<CommentRow?>(row);
+        });
     }
 
     private void AddSync(CommentRow row)
@@ -61,22 +66,31 @@ public sealed class CommentRepository
         SyncCardCommentIds(conn, row.CardId);
     }
 
-    private static void AddInternal(SqliteConnection conn, CommentRow row)
+    private static void AddInternal(
+        SqliteConnection conn,
+        CommentRow row,
+        SqliteTransaction? transaction = null)
     {
         conn.Execute(
             "INSERT INTO comments (id, card_id, kind, body, source, created_at) VALUES (@Id, @CardId, @Kind, @Body, @Source, @CreatedAt)",
-            row);
+            row,
+            transaction);
     }
 
-    private static void SyncCardCommentIds(SqliteConnection conn, string cardId)
+    private static void SyncCardCommentIds(
+        SqliteConnection conn,
+        string cardId,
+        SqliteTransaction? transaction = null)
     {
         var ids = conn.Query<string>(
             "SELECT id FROM comments WHERE card_id = @CardId ORDER BY created_at, rowid",
-            new { CardId = cardId }).AsList();
+            new { CardId = cardId },
+            transaction).AsList();
         var json = BuildJsonArray(ids);
         conn.Execute(
             "UPDATE cards SET comment_ids_json = @Json, updated_at = @Now WHERE id = @CardId",
-            new { Json = json, Now = System.DateTimeOffset.UtcNow.ToString("o"), CardId = cardId });
+            new { Json = json, Now = System.DateTimeOffset.UtcNow.ToString("o"), CardId = cardId },
+            transaction);
     }
 
     private static string BuildJsonArray(System.Collections.Generic.IReadOnlyList<string> ids)
@@ -114,7 +128,13 @@ public sealed class CommentRepository
             DeleteSync(id);
             return System.Threading.Tasks.Task.CompletedTask;
         }
-        return _channel.ExecuteAsync(conn => { var cardId = DeleteInternal(conn, id); if (cardId is not null) SyncCardCommentIds(conn, cardId); return System.Threading.Tasks.Task.CompletedTask; });
+        return _channel.ExecuteTransactionAsync<object?>((conn, transaction) =>
+        {
+            var cardId = DeleteInternal(conn, id, transaction);
+            if (cardId is not null)
+                SyncCardCommentIds(conn, cardId, transaction);
+            return System.Threading.Tasks.Task.FromResult<object?>(null);
+        });
     }
 
     private void DeleteSync(string id)
@@ -125,10 +145,19 @@ public sealed class CommentRepository
             SyncCardCommentIds(conn, cardId);
     }
 
-    private static string? DeleteInternal(SqliteConnection conn, string id)
+    private static string? DeleteInternal(
+        SqliteConnection conn,
+        string id,
+        SqliteTransaction? transaction = null)
     {
-        var cardId = conn.QueryFirstOrDefault<string>("SELECT card_id FROM comments WHERE id = @Id", new { Id = id });
-        conn.Execute("DELETE FROM comments WHERE id = @Id", new { Id = id });
+        var cardId = conn.QueryFirstOrDefault<string>(
+            "SELECT card_id FROM comments WHERE id = @Id",
+            new { Id = id },
+            transaction);
+        conn.Execute(
+            "DELETE FROM comments WHERE id = @Id",
+            new { Id = id },
+            transaction);
         return cardId;
     }
 }

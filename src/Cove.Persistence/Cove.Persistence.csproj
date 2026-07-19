@@ -6,6 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="../Cove.Platform/Cove.Platform.csproj" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
     <PackageReference Include="ZLogger" />
   </ItemGroup>
@@ -21,9 +22,5 @@
     <PackageReference Include="Dapper" />
     <PackageReference Include="Dapper.AOT" />
   </ItemGroup>
-
-  <PropertyGroup>
-    <NoWarn>$(NoWarn);NU1903</NoWarn>
-  </PropertyGroup>
 
 </Project>

@@ -79,4 +79,34 @@ public sealed class ControlEndpointLoggingTests
             TestDirectory.Delete(dir);
         }
     }
+
+    [PlatformFact(TestOperatingSystem.Unix)]
+    [Trait(TestTraits.Category, TestTraits.Platform)]
+    public async Task Socket_path_endpoint_exchanges_data()
+    {
+        string dir = Path.Combine("/tmp", "cove-ipc-" + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(dir);
+        string socketPath = Path.Combine(dir, "dev.sock");
+        var endpoint = ControlEndpointFactory.FromSocketPath(socketPath);
+
+        try
+        {
+            await using var listener = endpoint.Bind();
+            using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            Task<Stream> accept = listener.AcceptAsync(cancellation.Token).AsTask();
+            await using var client = await endpoint.ConnectAsync(1_000, cancellation.Token);
+            await using var server = await accept;
+
+            await client.WriteAsync("ping"u8.ToArray(), cancellation.Token);
+            var buffer = new byte[4];
+            await server.ReadExactlyAsync(buffer, cancellation.Token);
+
+            Assert.Equal("ping"u8.ToArray(), buffer);
+        }
+        finally
+        {
+            TestFile.Delete(socketPath);
+            TestDirectory.Delete(dir);
+        }
+    }
 }

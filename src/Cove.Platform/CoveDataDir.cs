@@ -75,6 +75,11 @@ public sealed class CoveDataDir
 
     public string IpcDir => Path.Combine(Root, "ipc");
     public string SocketPath => Path.Combine(Root, "ipc", $"{ChannelName}.sock");
+    public string ControlTokenPath =>
+        Path.Combine(
+            Root,
+            "ipc",
+            $"{ChannelName}.control-token");
     public string HookPortFile => Path.Combine(Root, "hook-port");
     public string LogsDir => Path.Combine(Root, "logs");
     public string BinDir => Path.Combine(Root, "bin");

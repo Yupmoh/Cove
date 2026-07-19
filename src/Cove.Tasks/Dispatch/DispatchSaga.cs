@@ -12,7 +12,9 @@ public enum DispatchStep
     MintRun,
     CreateWorktree,
     EnsureNook,
+    EnsureShore,
     InjectEnv,
+    BindCard,
     LaunchAdapter,
     MoveStatus,
     Completed,
@@ -45,12 +47,18 @@ public sealed class DispatchSaga
     {
         var card = _tasks.GetCard(cardId);
         if (card is null)
+        {
+            _logger.LogWarning("dispatch: card {cardId} not found in bay {bayId}", cardId, bayId);
             return new DispatchResult(false, null, "card not found", DispatchStep.NotStarted);
+        }
 
         var config = Cove.Tasks.LaunchConfig.LaunchConfigSerializer.Deserialize(card.LaunchConfigJson);
         var executionMode = executionModeOverride ?? config?.ExecutionMode ?? "nook";
 
         var step = DispatchStep.ResolveConfig;
+        var compensations = new System.Collections.Generic.Stack<
+            (string Name, System.Func<System.Threading.Tasks.Task<bool>> Run)>();
+        RunRow? run = null;
         try
         {
             var resolution = _profileResolver.ResolveTaskProfile(bayId, cardId);
@@ -62,11 +70,20 @@ public sealed class DispatchSaga
             step = DispatchStep.MintRun;
 
             var launchProfileJson = config is not null ? Cove.Tasks.LaunchConfig.LaunchConfigSerializer.Serialize(config) : null;
-            var run = await _tasks.CreateRunAsync(cardId, bayId, launchProfileJson, reviewStatusId: config?.ReviewStatusId, completionStatusId: config?.CompletionStatusId);
+            run = await _tasks.CreateRunAsync(cardId, bayId, launchProfileJson, reviewStatusId: config?.ReviewStatusId, completionStatusId: config?.CompletionStatusId);
             if (run is null)
+            {
+                _logger.LogWarning("dispatch: run creation failed for card {cardId}", cardId);
                 return new DispatchResult(false, null, "failed to create run", step);
+            }
+            compensations.Push((
+                "run",
+                async () =>
+                {
+                    await _tasks.TransitionRunAsync(run.Id, RunState.Cancelled);
+                    return true;
+                }));
 
-            string? worktreeBranch = null;
             if (executionMode == "worktree")
             {
                 step = DispatchStep.CreateWorktree;
@@ -76,10 +93,13 @@ public sealed class DispatchSaga
                 if (worktree is null)
                 {
                     _logger.LogWarning("dispatch: worktree creation failed for card {cardId}", cardId);
-                    await CompensateRunAsync(run.Id);
+                    await CompensateAsync(compensations, cardId);
                     return new DispatchResult(false, run.Id, "worktree creation failed", step);
                 }
-                worktreeBranch = worktree.BranchName;
+                compensations.Push((
+                    "worktree",
+                    () => System.Threading.Tasks.Task.FromResult(
+                        _worktreeService.RemoveAsync(bayId, worktree.BranchName))));
             }
 
             step = DispatchStep.EnsureNook;
@@ -87,15 +107,29 @@ public sealed class DispatchSaga
             if (nookResult is null)
             {
                 _logger.LogWarning("dispatch: nook creation failed for card {cardId}", cardId);
-                await CompensateRunAsync(run.Id);
-                if (worktreeBranch is not null) _worktreeService.RemoveAsync(bayId, worktreeBranch);
+                await CompensateAsync(compensations, cardId);
                 return new DispatchResult(false, run.Id, "nook creation failed", step);
             }
+            compensations.Push((
+                "nook",
+                () => System.Threading.Tasks.Task.FromResult(
+                    _nookHost.RemoveNook(nookResult.NookId))));
 
             if (executionMode == "worktree" && card.Title is not null)
             {
+                step = DispatchStep.EnsureShore;
                 var shoreName = $"COVE-{card.TaskNumber} - {card.Title}";
-                _shoreService.CreateShore(bayId, shoreName, null);
+                var shore = _shoreService.CreateShore(bayId, shoreName, null);
+                if (shore is null)
+                {
+                    _logger.LogWarning("dispatch: shore creation failed for card {cardId}", cardId);
+                    await CompensateAsync(compensations, cardId);
+                    return new DispatchResult(false, run.Id, "shore creation failed", step);
+                }
+                compensations.Push((
+                    "shore",
+                    () => System.Threading.Tasks.Task.FromResult(
+                        _shoreService.RemoveShore(bayId, shore.ShoreId))));
             }
 
             step = DispatchStep.InjectEnv;
@@ -108,11 +142,17 @@ public sealed class DispatchSaga
             if (!_nookHost.InjectEnv(nookResult.NookId, env))
             {
                 _logger.LogWarning("dispatch: env injection failed for nook {nookId}", nookResult.NookId);
-                await CompensateRunAsync(run.Id);
-                if (worktreeBranch is not null) _worktreeService.RemoveAsync(bayId, worktreeBranch);
+                await CompensateAsync(compensations, cardId);
                 return new DispatchResult(false, run.Id, "env injection failed", step);
             }
-            _nookHost.BindTaskCard(nookResult.NookId, cardId);
+
+            step = DispatchStep.BindCard;
+            if (!_nookHost.BindTaskCard(nookResult.NookId, cardId))
+            {
+                _logger.LogWarning("dispatch: card binding failed for nook {nookId}", nookResult.NookId);
+                await CompensateAsync(compensations, cardId);
+                return new DispatchResult(false, run.Id, "card binding failed", step);
+            }
 
             step = DispatchStep.LaunchAdapter;
             var prompt = $"{card.Title}\n\n{card.Description}";
@@ -120,31 +160,58 @@ public sealed class DispatchSaga
             if (!launchResult.Success)
             {
                 _logger.LogWarning("dispatch: adapter launch failed for card {cardId}: {error}", cardId, launchResult.Error);
-                await CompensateRunAsync(run.Id);
-                if (worktreeBranch is not null) _worktreeService.RemoveAsync(bayId, worktreeBranch);
+                await CompensateAsync(compensations, cardId);
                 return new DispatchResult(false, run.Id, launchResult.Error ?? "adapter launch failed", step);
             }
-
-            await _tasks.AddRunSegmentAsync(run.Id, nookResult.NookId, launchResult.AdapterSessionId);
+            compensations.Push((
+                "adapter",
+                () => System.Threading.Tasks.Task.FromResult(
+                    _agentLauncher.Stop(launchResult.AdapterSessionId))));
 
             step = DispatchStep.MoveStatus;
             var inProgressStatus = config?.InProgressStatusId ?? "in-progress";
-            card.StatusId = inProgressStatus;
-            card.CurrentPrimaryRunId = run.Id;
-            await _tasks.UpdateCardAsync(card);
+            await _tasks.CompleteDispatchAsync(
+                run.Id,
+                nookResult.NookId,
+                launchResult.AdapterSessionId,
+                card.Id,
+                inProgressStatus);
 
             return new DispatchResult(true, run.Id, null, DispatchStep.Completed);
         }
         catch (System.Exception ex)
         {
             _logger.LogWarning("dispatch: saga failed at step {step} for card {cardId}: {error}", step, cardId, ex.Message);
-            return new DispatchResult(false, null, ex.Message, step);
+            await CompensateAsync(compensations, cardId);
+            return new DispatchResult(false, run?.Id, ex.Message, step);
         }
     }
 
-    private async System.Threading.Tasks.Task CompensateRunAsync(string runId)
+    private async System.Threading.Tasks.Task CompensateAsync(
+        System.Collections.Generic.Stack<
+            (string Name, System.Func<System.Threading.Tasks.Task<bool>> Run)> compensations,
+        string cardId)
     {
-        try { await _tasks.TransitionRunAsync(runId, RunState.Cancelled); }
-        catch (System.InvalidOperationException) { }
+        while (compensations.TryPop(out var compensation))
+        {
+            try
+            {
+                if (!await compensation.Run())
+                {
+                    _logger.LogWarning(
+                        "dispatch: compensation {compensation} failed for card {cardId}",
+                        compensation.Name,
+                        cardId);
+                }
+            }
+            catch (System.Exception exception)
+            {
+                _logger.LogWarning(
+                    "dispatch: compensation {compensation} failed for card {cardId}: {error}",
+                    compensation.Name,
+                    cardId,
+                    exception.Message);
+            }
+        }
     }
 }

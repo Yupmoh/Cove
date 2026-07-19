@@ -97,7 +97,13 @@ public sealed class VirtualClock : IVirtualClock
     }
 }
 
-public sealed class TaskSchedulerEngine
+public interface IScheduleMutationAcknowledger
+{
+    System.Threading.Tasks.Task SignalMutationAsync(
+        System.Threading.CancellationToken ct = default);
+}
+
+public sealed class TaskSchedulerEngine : IScheduleMutationAcknowledger
 {
     private readonly TaskService _tasks;
     private readonly Schedules.ICronExpander _cronExpander;
@@ -167,6 +173,7 @@ public sealed class TaskSchedulerEngine
             while (!ct.IsCancellationRequested)
             {
                 var now = _clock.UtcNow;
+                await ConsumePendingIntentsAsync(now, ct);
                 var active = _tasks.ListActiveSchedules();
 
                 foreach (var schedule in active)
@@ -341,12 +348,36 @@ public sealed class TaskSchedulerEngine
             return;
         }
 
-        var launchProfileJson = card.LaunchConfigJson;
-        var run = await _tasks.CreateRunAsync(card.Id, card.BayId, launchProfileJson, backgrounded: true);
-        _logger.LogWarning("scheduler: minted background run {runId} for card {cardId}", run?.Id, card.Id);
-
         var nextFire = ComputeNextFire(schedule, now);
-        await _tasks.UpdateScheduleAsync(schedule.CardId, paused: null, skipNext: null, nextFireAt: nextFire, lastFiredAt: now.ToString("o"));
+        var run = await _tasks.CreateScheduledRunAndAdvanceAsync(card, nextFire, now.ToString("o"));
+        _logger.LogWarning("scheduler: minted background run {runId} for card {cardId}", run?.Id, card.Id);
+    }
+
+    private async System.Threading.Tasks.Task ConsumePendingIntentsAsync(
+        System.DateTimeOffset now,
+        System.Threading.CancellationToken ct)
+    {
+        foreach (var schedule in _tasks.ListPendingSchedules())
+        {
+            ct.ThrowIfCancellationRequested();
+            if (schedule.PendingIntent == "continue")
+            {
+                var nextFire = ComputeNextFire(schedule, now);
+                await _tasks.CompleteScheduleIntentAsync(schedule.CardId, nextFire);
+                continue;
+            }
+
+            if (schedule.PendingIntent == "finish")
+            {
+                await _tasks.DeleteScheduleAsync(schedule.CardId);
+                continue;
+            }
+
+            _logger.LogWarning(
+                "scheduler: unknown pending intent {intent} for card {cardId}",
+                schedule.PendingIntent,
+                schedule.CardId);
+        }
     }
 
     private string? ComputeNextFire(Schedules.ScheduleRow schedule, System.DateTimeOffset now)

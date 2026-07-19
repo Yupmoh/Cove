@@ -295,6 +295,12 @@ public sealed class FakeNookHost : INookHost
         return true;
     }
     public bool BindTaskCard(string nookId, string cardId) { BoundCards[nookId] = cardId; return true; }
+    public bool RemoveNook(string nookId)
+    {
+        BoundCards.Remove(nookId);
+        InjectedEnvs.Remove(nookId);
+        return true;
+    }
 }
 
 public sealed class FakeShoreService : IShoreService
@@ -305,6 +311,7 @@ public sealed class FakeShoreService : IShoreService
         CreatedShoreNames.Add(name);
         return new ShoreCreationResult($"shore-{CreatedShoreNames.Count}");
     }
+    public bool RemoveShore(string bayId, string shoreId) => true;
 }
 
 public sealed class FakeAgentLauncher : IAgentLauncher
@@ -319,6 +326,7 @@ public sealed class FakeAgentLauncher : IAgentLauncher
         LastPrompt = prompt;
         return ShouldFail ? new AdapterLaunchResult("", false, Error ?? "launch failed") : new AdapterLaunchResult($"session-{LaunchCalls}", true, null);
     }
+    public bool Stop(string adapterSessionId) => true;
 }
 
 public sealed class FakeAdapterResumeLauncher : IAdapterResumeLauncher
