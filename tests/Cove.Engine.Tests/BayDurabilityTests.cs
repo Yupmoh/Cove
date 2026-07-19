@@ -13,6 +13,33 @@ namespace Cove.Engine.Tests;
 public sealed class BayDurabilityTests
 {
     [Fact]
+    public async Task ActiveBaySwitch_SurvivesRestartFromCanonicalWorkspaceState()
+    {
+        await using var h = await DaemonTestHarness.StartAsync();
+
+        string seedId;
+        await using (FrameConnection cli = await h.ConnectAsync("cli"))
+        {
+            seedId = (await ListBays(cli)).Single().GetProperty("id").GetString()!;
+            await CreateBay(cli, "Second", System.IO.Path.GetTempPath());
+            await Request(
+                cli,
+                "cove://commands/bay.switch",
+                JsonSerializer.SerializeToElement(
+                    new BayIdParams(seedId),
+                    BaysJsonContext.Default.BayIdParams));
+        }
+
+        await h.RestartAsync();
+
+        await using FrameConnection cli2 = await h.ConnectAsync("cli");
+        var bays = await ListBays(cli2);
+        Assert.True(bays.Single(bay => bay.GetProperty("id").GetString() == seedId)
+            .GetProperty("active")
+            .GetBoolean());
+    }
+
+    [Fact]
     public async Task SetIcon_OnNonActiveBay_SurvivesRestart_WithoutOtherEvent()
     {
         await using var h = await DaemonTestHarness.StartAsync();

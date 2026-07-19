@@ -84,10 +84,14 @@ public static class AdapterListCommands
         return null;
     }
 
-    private static string? PlatformRecipe(IReadOnlyDictionary<string, InstallRecipe> recipes)
+    private static string? PlatformRecipe(PlatformRecipes? recipes)
     {
-        var platform = OperatingSystem.IsWindows() ? "windows" : OperatingSystem.IsMacOS() ? "macos" : "linux";
-        return recipes.TryGetValue(platform, out var recipe) && !string.IsNullOrWhiteSpace(recipe.Cmd) ? recipe.Cmd : null;
+        var recipe = OperatingSystem.IsWindows()
+            ? recipes?.Windows
+            : OperatingSystem.IsMacOS()
+                ? recipes?.Macos
+                : recipes?.Linux;
+        return !string.IsNullOrWhiteSpace(recipe?.Cmd) ? recipe.Cmd : null;
     }
 
     public static string? KnownNpmPackage(string adapterName) => adapterName switch

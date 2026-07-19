@@ -52,7 +52,11 @@ public sealed class LaunchOrchestratorProtocolTests
         var manifestStore = new AdapterManifestStore(root);
         var methodRunner = new MethodRunner();
         var binaryDiscovery = new BinaryDiscoveryService();
-        return new LaunchOrchestrator(manifestStore, methodRunner, binaryDiscovery, loginShellPath);
+        return LaunchTestFactory.Create(
+            manifestStore,
+            methodRunner,
+            binaryDiscovery,
+            loginShellPath);
     }
 
     private static LaunchProfile NewProfile(string adapter = "claude-code") => new(

@@ -11,6 +11,7 @@
   <ItemGroup>
     <ProjectReference Include="../Cove.Platform/Cove.Platform.csproj" />
     <ProjectReference Include="../Cove.Protocol/Cove.Protocol.csproj" />
+    <ProjectReference Include="../Cove.Dictation/Cove.Dictation.csproj" />
     <ProjectReference Include="../Cove.Persistence/Cove.Persistence.csproj" />
     <ProjectReference Include="../Cove.Adapters/Cove.Adapters.csproj" />
     <ProjectReference Include="../Cove.Tasks/Cove.Tasks.csproj" />

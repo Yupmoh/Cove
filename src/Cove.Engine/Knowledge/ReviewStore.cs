@@ -1,3 +1,4 @@
+using Cove.Persistence;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 
@@ -36,6 +37,7 @@ public sealed class ReviewStore
 {
     private readonly string _reviewsDir;
     private readonly ILogger _logger;
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, SqliteConnectionFactory> _databases = new();
 
     public ReviewStore(string dataDir, ILogger logger)
     {
@@ -89,8 +91,7 @@ public sealed class ReviewStore
     {
         foreach (var dbPath in System.IO.Directory.EnumerateFiles(_reviewsDir, "review.db", System.IO.SearchOption.AllDirectories))
         {
-            using var conn = new SqliteConnection($"Data Source={dbPath}");
-            conn.Open();
+            using var conn = OpenDatabase(dbPath);
             using var cmd = conn.CreateCommand();
             cmd.CommandText = "SELECT id, root_id, parent_id, commit_sha, file_path, line, author, body, state, created_at, orphaned_at, hunk_id, context_hash FROM comments WHERE id = @id";
             cmd.Parameters.AddWithValue("@id", commentId);
@@ -275,11 +276,15 @@ public sealed class ReviewStore
         var dir = System.IO.Path.Combine(_reviewsDir, commitSha);
         System.IO.Directory.CreateDirectory(dir);
         var path = System.IO.Path.Combine(dir, "review.db");
-        var conn = new SqliteConnection($"Data Source={path}");
-        conn.Open();
+        var conn = OpenDatabase(path);
         EnsureSchema(conn);
         return conn;
     }
+
+    private SqliteConnection OpenDatabase(string path)
+        => _databases.GetOrAdd(
+            path,
+            databasePath => new SqliteConnectionFactory(databasePath, _logger)).Open();
 
     private static void EnsureSchema(SqliteConnection conn)
     {

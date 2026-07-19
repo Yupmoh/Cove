@@ -17,7 +17,6 @@ public static class BayCommands
         var outcome = await manager.CreateValidatedBayAsync(p.Name, p.ProjectDir, p.CollectionId).ConfigureAwait(false);
         if (outcome.Bay is not { } bay)
             return ctx.Fail(outcome.ErrorCode ?? "bad_params", outcome.ErrorMessage ?? "invalid params");
-        ctx.Layout?.SetActiveBay(bay.Id);
         return ctx.Ok(new BayIdResult(bay.Id), BaysJsonContext.Default.BayIdResult);
     }
 
@@ -32,7 +31,6 @@ public static class BayCommands
 
         if (!await manager.SwitchBayAsync(p.Id).ConfigureAwait(false))
             return ctx.Fail("not_found", $"bay {p.Id} not found");
-        ctx.Layout?.SetActiveBay(p.Id);
         return ctx.Ok();
     }
 
@@ -53,21 +51,14 @@ public static class BayCommands
             || el.Deserialize(BaysJsonContext.Default.BayIdParams) is not { } p)
             return ctx.Fail("bad_params", "id is required");
 
-        if (ctx.Layout is { } layout)
-        {
-            var nookIds = layout.RemoveBay(p.Id);
-            if (ctx.Nooks is { } nooks)
-                foreach (var nookId in nookIds)
-                    nooks.Kill(nookId);
-        }
+        if (manager.Get(p.Id) is null)
+            return ctx.Fail("not_found", $"bay {p.Id} not found");
+        var nookIds = manager.Layout.LeafNookIds(p.Id);
         if (!await manager.DeleteBayAsync(p.Id).ConfigureAwait(false))
             return ctx.Fail("not_found", $"bay {p.Id} not found");
-        Cove.Engine.Layout.BayPersistence.Delete(
-            p.Id,
-            ctx.BaysDir,
-            ctx.Restoration?.Logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
-        if (ctx.Layout is { } layout2 && manager.Registry.FocusedBayId is { } focused)
-            layout2.SetActiveBay(focused);
+        if (ctx.Nooks is { } nooks)
+            foreach (var nookId in nookIds)
+                nooks.Kill(nookId);
         return ctx.Ok();
     }
 }

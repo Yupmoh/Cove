@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Cove.Persistence;
 using Cove.Protocol;
 using Cove.Platform;
 using Microsoft.Data.Sqlite;
@@ -11,17 +12,22 @@ namespace Cove.Engine.Knowledge;
 public sealed class NoteFileStore
 {
     private readonly string _notesRoot;
-    private readonly string _indexPath;
+    private readonly SqliteConnectionFactory _database;
     private readonly ILogger _logger;
     private readonly NoteSnapshotService? _snapshots;
 
-    public NoteFileStore(string dataDir, ILogger logger, NoteSnapshotService? snapshots = null)
+    public NoteFileStore(
+        string dataDir,
+        ILogger logger,
+        NoteSnapshotService? snapshots = null,
+        SqliteConnectionFactory? database = null)
     {
         _notesRoot = System.IO.Path.Combine(dataDir, "notes");
-        _indexPath = System.IO.Path.Combine(dataDir, "notes", "index.db");
+        var indexPath = System.IO.Path.Combine(dataDir, "notes", "index.db");
         System.IO.Directory.CreateDirectory(_notesRoot);
         _logger = logger;
         _snapshots = snapshots;
+        _database = database ?? new SqliteConnectionFactory(indexPath, logger);
     }
 
     public Note Create(Note note)
@@ -141,9 +147,10 @@ public sealed class NoteFileStore
 
     public System.Collections.Generic.IReadOnlyList<Note> Search(string bayId, string query, int limit = 20)
     {
+        RebuildIndexFromDisk();
         var result = new System.Collections.Generic.List<Note>();
-        using var conn = new SqliteConnection($"Data Source={_indexPath}");
-        conn.Open();
+        using var conn = _database.Open();
+
         using var cmd = conn.CreateCommand();
         cmd.CommandText = """
             SELECT n.note_id, n.bay_id, n.title, n.body, n.type, n.updated_at
@@ -175,31 +182,50 @@ public sealed class NoteFileStore
 
     public void RebuildIndexFromDisk()
     {
-        using var conn = new SqliteConnection($"Data Source={_indexPath}");
-        conn.Open();
+        using var conn = _database.Open();
+        using var transaction = conn.BeginTransaction();
         using var clearCmd = conn.CreateCommand();
+        clearCmd.Transaction = transaction;
         clearCmd.CommandText = "DELETE FROM notes_index;";
         clearCmd.ExecuteNonQuery();
 
         int count = 0;
-        if (!System.IO.Directory.Exists(_notesRoot)) return;
-
-        foreach (var wsDir in System.IO.Directory.GetDirectories(_notesRoot))
+        if (System.IO.Directory.Exists(_notesRoot))
         {
-            var bayId = System.IO.Path.GetFileName(wsDir);
-            if (bayId == "index.db") continue;
-            foreach (var noteDir in System.IO.Directory.GetDirectories(wsDir))
+            foreach (var wsDir in System.IO.Directory.GetDirectories(_notesRoot))
             {
-                var metaPath = System.IO.Path.Combine(noteDir, "meta.json");
-                if (!System.IO.File.Exists(metaPath)) continue;
-                var meta = JsonSerializer.Deserialize(System.IO.File.ReadAllText(metaPath), NoteFileJsonContext.Default.NoteMeta);
-                if (meta is null) continue;
-                var body = ReadBody(noteDir, meta.Kind);
-                UpsertFtsIndex(conn, meta.Id, meta.BayId, meta.Title, body, meta.Kind, meta.UpdatedAt.ToString("o"));
-                count++;
+                foreach (var noteDir in System.IO.Directory.GetDirectories(wsDir))
+                {
+                    try
+                    {
+                        var metaPath = System.IO.Path.Combine(noteDir, "meta.json");
+                        if (!System.IO.File.Exists(metaPath)) continue;
+                        var meta = JsonSerializer.Deserialize(System.IO.File.ReadAllText(metaPath), NoteFileJsonContext.Default.NoteMeta);
+                        if (meta is null) continue;
+                        var body = ReadBody(noteDir, meta.Kind);
+                        UpsertFtsIndex(
+                            conn,
+                            transaction,
+                            meta.Id,
+                            meta.BayId,
+                            meta.Title,
+                            body,
+                            meta.Kind,
+                            meta.UpdatedAt.ToString("o"));
+                        count++;
+                    }
+                    catch (Exception exception)
+                    {
+                        _logger.LogWarning(
+                            "notes: skipped invalid note directory {path}: {error}",
+                            noteDir,
+                            exception.Message);
+                    }
+                }
             }
         }
 
+        transaction.Commit();
         _logger.LogWarning("notes: rebuilt FTS index from disk ({count} notes)", count);
     }
 
@@ -332,18 +358,35 @@ public sealed class NoteFileStore
 
     private void UpsertFtsIndex(string id, string bayId, string title, string body, string type, string updatedAt)
     {
-        using var conn = new SqliteConnection($"Data Source={_indexPath}");
-        conn.Open();
+        using var conn = _database.Open();
+
         UpsertFtsIndex(conn, id, bayId, title, body, type, updatedAt);
     }
 
     private static void UpsertFtsIndex(SqliteConnection conn, string id, string bayId, string title, string body, string type, string updatedAt)
+        => UpsertFtsIndex(conn, transaction: null, id, bayId, title, body, type, updatedAt);
+
+    private static void UpsertFtsIndex(
+        SqliteConnection conn,
+        SqliteTransaction? transaction,
+        string id,
+        string bayId,
+        string title,
+        string body,
+        string type,
+        string updatedAt)
     {
         using var cmd = conn.CreateCommand();
+        cmd.Transaction = transaction;
         cmd.CommandText = """
             INSERT INTO notes_index (note_id, bay_id, title, body, type, updated_at)
             VALUES (@id, @ws, @title, @body, @type, @ts)
-            ON CONFLICT(note_id) DO UPDATE SET title=@title, body=@body, type=@type, updated_at=@ts;
+            ON CONFLICT(note_id) DO UPDATE SET
+                bay_id=@ws,
+                title=@title,
+                body=@body,
+                type=@type,
+                updated_at=@ts;
             """;
         cmd.Parameters.AddWithValue("@id", id);
         cmd.Parameters.AddWithValue("@ws", bayId);
@@ -356,8 +399,8 @@ public sealed class NoteFileStore
 
     private void RemoveFromFtsIndex(string id)
     {
-        using var conn = new SqliteConnection($"Data Source={_indexPath}");
-        conn.Open();
+        using var conn = _database.Open();
+
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "DELETE FROM notes_index WHERE note_id = @id";
         cmd.Parameters.AddWithValue("@id", id);

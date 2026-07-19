@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using Cove.Persistence;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 
@@ -16,13 +17,17 @@ public sealed record RecentSession(
 
 public sealed class RecentSessionStore
 {
-    private readonly string _dbPath;
+    private readonly SqliteConnectionFactory _database;
     private readonly ILogger _logger;
 
-    public RecentSessionStore(string dataDir, ILogger logger)
+    public RecentSessionStore(
+        string dataDir,
+        ILogger logger,
+        SqliteConnectionFactory? database = null)
     {
-        _dbPath = Path.Combine(dataDir, "sessions.db");
+        var databasePath = Path.Combine(dataDir, "sessions.db");
         _logger = logger;
+        _database = database ?? new SqliteConnectionFactory(databasePath, logger);
         EnsureSchema();
     }
 
@@ -33,8 +38,8 @@ public sealed class RecentSessionStore
             _logger.LogWarning("recent session: skipped record with empty adapter or sessionId adapter={Adapter} sessionId={SessionId}", adapter, sessionId);
             return;
         }
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
+
         using var cmd = conn.CreateCommand();
         cmd.CommandText = """
             INSERT INTO sessions (adapter, session_id, bay_id, cwd, started_at)
@@ -52,8 +57,8 @@ public sealed class RecentSessionStore
     public IReadOnlyList<RecentSession> Recent(string? adapter, int limit)
     {
         var result = new List<RecentSession>();
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
+
         using var cmd = conn.CreateCommand();
         var filter = string.IsNullOrEmpty(adapter) ? "" : " WHERE adapter = @adapter";
         var cap = limit > 0 ? " LIMIT @limit" : "";
@@ -80,8 +85,8 @@ public sealed class RecentSessionStore
             _logger.LogWarning("recent session purge: skipped empty adapter");
             return 0;
         }
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
+
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "DELETE FROM sessions WHERE adapter = @adapter";
         cmd.Parameters.AddWithValue("@adapter", adapter);
@@ -90,8 +95,8 @@ public sealed class RecentSessionStore
 
     private void EnsureSchema()
     {
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
+
         using var cmd = conn.CreateCommand();
         cmd.CommandText = """
             CREATE TABLE IF NOT EXISTS sessions (

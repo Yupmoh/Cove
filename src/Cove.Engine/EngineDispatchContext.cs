@@ -6,6 +6,7 @@ using Cove.Engine.Agents;
 using Cove.Engine.Browser;
 using Cove.Engine.Captures;
 using Cove.Engine.Config;
+using Cove.Engine.Dictation;
 using Cove.Engine.Hooks;
 using Cove.Engine.Knowledge;
 using Cove.Engine.Launch;
@@ -13,6 +14,7 @@ using Cove.Engine.Lifecycle;
 using Cove.Engine.Nooks;
 using Cove.Engine.Protocol;
 using Cove.Engine.Pty;
+using Cove.Engine.Restart;
 using Cove.Engine.Sessions;
 using Cove.Engine.Tasks;
 using Cove.Protocol;
@@ -77,11 +79,21 @@ public sealed class EngineDispatchContext
         RecentSessionStore? recentSessions = null,
         Cove.Engine.Lsp.LspService? lspService = null,
         Cove.Adapters.SessionService? sessionService = null,
-        string? baysDir = null)
+        string? baysDir = null,
+        Cove.Tasks.Scheduler.IScheduleMutationAcknowledger? taskScheduler = null,
+        Cove.Engine.Filesystem.DirectoryListingService? directoryListing = null,
+        Cove.Engine.Bays.GitSummaryService? gitSummary = null,
+        Cove.Engine.Feedback.FeedbackStore? feedbackStore = null,
+        Cove.Engine.Diagnostics.PerformanceResultStore? performanceResults = null,
+        DictationTranscriptionRuntime? dictation = null,
+        CancellationToken cancellationToken = default,
+        Func<CancellationToken, bool>? forwardWindowFocus = null,
+        Func<RestorationSummaryEvent?>? getRestorationSummary = null,
+        DateTimeOffset? engineStartedAtUtc = null)
     {
         Request = request;
         Nooks = nooks;
-        Layout = layout;
+        Layout = bays?.Layout ?? layout;
         Bays = bays;
         RunCommands = runCommands;
         Restoration = restoration;
@@ -131,10 +143,20 @@ public sealed class EngineDispatchContext
         BrowserAutomation = browserAutomation;
         Diagnostics = diagnostics;
         PerfBundles = perfBundles;
+        DirectoryListing = directoryListing;
+        GitSummary = gitSummary;
+        FeedbackStore = feedbackStore;
+        PerformanceResults = performanceResults;
+        Dictation = dictation;
         RecentSessions = recentSessions;
         LspService = lspService;
         SessionService = sessionService;
         BaysDir = baysDir;
+        TaskScheduler = taskScheduler;
+        CancellationToken = cancellationToken;
+        ForwardWindowFocus = forwardWindowFocus;
+        GetRestorationSummary = getRestorationSummary;
+        EngineStartedAtUtc = engineStartedAtUtc;
     }
 
     public ControlRequest Request { get; }
@@ -158,6 +180,7 @@ public sealed class EngineDispatchContext
     public Cove.Tasks.Dispatch.ResumeSaga? ResumeSaga { get; }
     public Cove.Tasks.TaskService? TaskService { get; }
     public Cove.Tasks.Dispatch.DispatchSaga? DispatchSaga { get; }
+    public Cove.Tasks.Scheduler.IScheduleMutationAcknowledger? TaskScheduler { get; }
     public TimelineStore? Timeline { get; }
     public BlackboardStore? Blackboard { get; }
     public NoteFileStore? NoteFiles { get; }
@@ -189,10 +212,19 @@ public sealed class EngineDispatchContext
     public Cove.Engine.Browser.BrowserAutomationBridge? BrowserAutomation { get; }
     public Cove.Engine.Diagnostics.DiagnosticsHub? Diagnostics { get; }
     public Cove.Engine.Diagnostics.PerformanceBundleService? PerfBundles { get; }
+    public Cove.Engine.Filesystem.DirectoryListingService? DirectoryListing { get; }
+    public Cove.Engine.Bays.GitSummaryService? GitSummary { get; }
+    public Cove.Engine.Feedback.FeedbackStore? FeedbackStore { get; }
+    public Cove.Engine.Diagnostics.PerformanceResultStore? PerformanceResults { get; }
+    public DictationTranscriptionRuntime? Dictation { get; }
     public RecentSessionStore? RecentSessions { get; }
     public Cove.Engine.Lsp.LspService? LspService { get; }
     public Cove.Adapters.SessionService? SessionService { get; }
     public string? BaysDir { get; }
+    public CancellationToken CancellationToken { get; }
+    public Func<CancellationToken, bool>? ForwardWindowFocus { get; }
+    public Func<RestorationSummaryEvent?>? GetRestorationSummary { get; }
+    public DateTimeOffset? EngineStartedAtUtc { get; }
     public System.Func<ControlRequest, System.Threading.Tasks.Task<ControlResponse?>>? Redrive { get; set; }
 
     public ControlResponse Ok<T>(T data, JsonTypeInfo<T> typeInfo)

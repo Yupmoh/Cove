@@ -8,6 +8,7 @@ public enum FileChangeKind { Created, Changed, Deleted, Renamed }
 
 public sealed class NoteReconciliationService : IDisposable
 {
+    private readonly NoteFileStore _noteStore;
     private readonly ILogger _logger;
     private readonly System.Threading.Timer _debounceTimer;
     private readonly object _pendingLock = new();
@@ -22,8 +23,12 @@ public sealed class NoteReconciliationService : IDisposable
 
     public event System.EventHandler<FileReconcileEvent>? ReconcileNeeded;
 
-    public NoteReconciliationService(ILogger logger, System.TimeSpan? debounceDelay = null)
+    public NoteReconciliationService(
+        NoteFileStore noteStore,
+        ILogger logger,
+        System.TimeSpan? debounceDelay = null)
     {
+        _noteStore = noteStore;
         _logger = logger;
         _debounceDelay = debounceDelay ?? System.TimeSpan.FromMilliseconds(300);
         _debounceTimer = new System.Threading.Timer(FlushPending, null, System.Threading.Timeout.InfiniteTimeSpan, System.Threading.Timeout.InfiniteTimeSpan);
@@ -32,6 +37,7 @@ public sealed class NoteReconciliationService : IDisposable
     public void StartWatching(string notesRoot, string bayId)
     {
         _bayId = bayId;
+        ReconcileIndex();
         if (!System.IO.Directory.Exists(notesRoot))
         {
             _logger.LogWarning("reconcile: notes root {root} does not exist, not watching", notesRoot);
@@ -115,6 +121,9 @@ public sealed class NoteReconciliationService : IDisposable
                 _pending.Clear();
             }
 
+            if (toFire.Count > 0)
+                ReconcileIndex();
+
             foreach (var evt in toFire)
             {
                 lock (_pendingLock)
@@ -139,6 +148,20 @@ public sealed class NoteReconciliationService : IDisposable
                     ((System.EventHandler<FileReconcileEvent>)handler)(this, evt);
                 }
             }
+        }
+    }
+
+    private void ReconcileIndex()
+    {
+        try
+        {
+            _noteStore.RebuildIndexFromDisk();
+        }
+        catch (Exception exception)
+        {
+            _logger.LogWarning(
+                "reconcile: note index rebuild failed: {error}",
+                exception.Message);
         }
     }
 

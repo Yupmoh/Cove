@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Cove.Persistence;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 
@@ -9,7 +10,7 @@ public sealed record LibraryEntry(string Id, string BayId, string NookId, string
 
 public sealed class LibraryStore
 {
-    private readonly string _dbPath;
+    private readonly SqliteConnectionFactory _database;
     private readonly string _entriesDir;
     private readonly ILogger _logger;
 
@@ -23,19 +24,23 @@ public sealed class LibraryStore
         @"(sk-[a-zA-Z0-9]{20,}|AKIA[0-9A-Z]{16}|gh[pousr]_[a-zA-Z0-9]{36}|xox[baprs]-[a-zA-Z0-9-]+|eyJ[a-zA-Z0-9_-]+\.eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+|-----BEGIN [A-Z ]*PRIVATE KEY-----)",
         System.Text.RegularExpressions.RegexOptions.Compiled);
 
-    public LibraryStore(string dataDir, ILogger logger)
+    public LibraryStore(
+        string dataDir,
+        ILogger logger,
+        SqliteConnectionFactory? database = null)
     {
-        _dbPath = System.IO.Path.Combine(dataDir, "library", "catalog.db");
+        var databasePath = System.IO.Path.Combine(dataDir, "library", "catalog.db");
         _entriesDir = System.IO.Path.Combine(dataDir, "library", "entries");
-        System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(_dbPath)!);
+        System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(databasePath)!);
         System.IO.Directory.CreateDirectory(_entriesDir);
         _logger = logger;
+        _database = database ?? new SqliteConnectionFactory(databasePath, logger);
     }
 
     public void EnsureSchema()
     {
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
+
         using var cmd = conn.CreateCommand();
         cmd.CommandText = """
             CREATE TABLE IF NOT EXISTS catalog (
@@ -67,8 +72,8 @@ public sealed class LibraryStore
 
         var entry = new LibraryEntry(id, bayId, nookId, nookType, title, redactedState, redactedScrollback, kind, capturedAt);
 
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
+
         using var cmd = conn.CreateCommand();
         cmd.CommandText = """
             INSERT INTO catalog (id, bay_id, nook_id, nook_type, title, state_json, scrollback, kind, captured_at)
@@ -95,8 +100,8 @@ public sealed class LibraryStore
     public System.Collections.Generic.IReadOnlyList<LibraryEntry> ListByBay(string bayId, string? kind = null)
     {
         var result = new System.Collections.Generic.List<LibraryEntry>();
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
+
         using var cmd = conn.CreateCommand();
         if (kind is null)
         {
@@ -117,8 +122,8 @@ public sealed class LibraryStore
 
     public void Pin(string id)
     {
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
+
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "UPDATE catalog SET pinned = 1 WHERE id = @id";
         cmd.Parameters.AddWithValue("@id", id);
@@ -127,8 +132,8 @@ public sealed class LibraryStore
 
     public void Archive(string id)
     {
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
+
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "UPDATE catalog SET archived = 1 WHERE id = @id";
         cmd.Parameters.AddWithValue("@id", id);

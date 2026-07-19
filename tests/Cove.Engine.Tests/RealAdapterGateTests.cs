@@ -47,7 +47,7 @@ public sealed class RealAdapterGateTests
         Assert.NotNull(root);
         var store = new AdapterManifestStore(root!);
         var runner = new MethodRunner();
-        var orch = new LaunchOrchestrator(store, runner, new BinaryDiscoveryService());
+        var orch = LaunchTestFactory.Create(store, runner, new BinaryDiscoveryService());
         var profile = new LaunchProfile("claude-code", "default", "claude-code", true, null, null,
             new[] { "claude" }, new System.Collections.Generic.Dictionary<string, string>(),
             new System.Collections.Generic.Dictionary<string, bool>(),
@@ -85,7 +85,7 @@ public sealed class RealAdapterGateTests
         Assert.NotNull(root);
         var store = new AdapterManifestStore(root!);
         var runner = new MethodRunner();
-        var orch = new LaunchOrchestrator(store, runner, new BinaryDiscoveryService());
+        var orch = LaunchTestFactory.Create(store, runner, new BinaryDiscoveryService());
 
         var options = await orch.LoadLauncherOptionsAsync("claude-code");
 
@@ -113,7 +113,7 @@ public sealed class RealAdapterGateTests
             {
                 ["sessionStartManifest"] = new() { Kind = HookEnvelopeKind.Identity },
                 ["userPromptSubmit"] = new() { Kind = HookEnvelopeKind.HookSpecificOutput, IncludeSystemMessage = true },
-                ["preToolUse"] = new() { Kind = HookEnvelopeKind.FlatAdditionalContext },
+                ["preToolUse"] = new() { Kind = HookEnvelopeKind.HookSpecificOutput, HookEventName = "PreToolUse" },
             },
         };
         var json = System.Text.Json.JsonSerializer.Serialize(manifest, Cove.Adapters.AdaptersJsonContext.Default.AdapterManifest);

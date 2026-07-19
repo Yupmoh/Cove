@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Cove.Persistence;
 using Cove.Protocol;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
@@ -12,14 +13,19 @@ public sealed record RecallPreview(string Id, string Kind, string Preview, doubl
 public sealed class MemoryRanker
 {
     private readonly MemoryStore _store;
-    private readonly string _dbPath;
+    private readonly SqliteConnectionFactory _database;
     private readonly ILogger _logger;
 
-    public MemoryRanker(MemoryStore store, string dataDir, ILogger logger)
+    public MemoryRanker(
+        MemoryStore store,
+        string dataDir,
+        ILogger logger,
+        SqliteConnectionFactory? database = null)
     {
         _store = store;
-        _dbPath = System.IO.Path.Combine(dataDir, "memory", "memory.db");
+        var databasePath = System.IO.Path.Combine(dataDir, "memory", "memory.db");
         _logger = logger;
+        _database = database ?? new SqliteConnectionFactory(databasePath, logger);
     }
 
     public System.Collections.Generic.IReadOnlyList<RankedFact> SearchRanked(string bayId, string query, int limit = 20)
@@ -63,8 +69,8 @@ public sealed class MemoryRanker
 
     private double ComputeBm25(string bayId, string query, Fact fact)
     {
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
+
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT bm25(facts_fts) FROM facts_fts WHERE facts_fts MATCH @query AND rowid = (SELECT rowid FROM facts WHERE id = @id)";
         cmd.Parameters.AddWithValue("@query", query);
@@ -110,8 +116,8 @@ public sealed class MemoryRanker
     {
         try
         {
-            using var conn = new SqliteConnection($"Data Source={_dbPath}");
-            conn.Open();
+            using var conn = _database.Open();
+
             using var cmd = conn.CreateCommand();
             cmd.CommandText = """
                 CREATE TABLE IF NOT EXISTS feedback (

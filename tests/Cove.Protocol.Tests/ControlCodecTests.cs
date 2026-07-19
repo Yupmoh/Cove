@@ -7,6 +7,20 @@ namespace Cove.Protocol.Tests;
 public sealed class ControlCodecTests
 {
     [Fact]
+    public void NookSubscribe_IsExplicitStreamingRequest()
+    {
+        Assert.Equal(
+            "cove://commands/nook.subscribe",
+            ControlProtocolRoutes.NookSubscribe);
+        Assert.True(
+            ControlProtocolRoutes.IsStreamingRequest(
+                ControlProtocolRoutes.NookSubscribe));
+        Assert.False(
+            ControlProtocolRoutes.IsStreamingRequest(
+                "cove://commands/nook.list"));
+    }
+
+    [Fact]
     public void HelloRequest_EncodesAndDecodesCanonicalVector()
     {
         JsonElement parameters = JsonSerializer.SerializeToElement(
@@ -21,6 +35,52 @@ public sealed class ControlCodecTests
         Assert.Equal(request.Uri, decoded.Uri);
         var hello = decoded.Params!.Value.Deserialize(CoveJsonContext.Default.HelloParams);
         Assert.Equal(new HelloParams(1, "cli", "0.1.0", "stable"), hello);
+    }
+
+    [Fact]
+    public void SpawnRequest_NullCommandAndShellCommandRoundTrip()
+    {
+        JsonElement parameters = JsonSerializer.SerializeToElement(
+            new SpawnParams(
+                null,
+                [],
+                "/work/tree",
+                Cols: 132,
+                Rows: 40,
+                ShellCommand: "printf '%s' \"$HOME\""),
+            CoveJsonContext.Default.SpawnParams);
+        var request = new ControlRequest(
+            "spawn-1",
+            "cove://commands/nook.spawn",
+            parameters);
+
+        byte[] encoded = ControlCodec.Encode(request);
+        ControlRequest decoded = ControlCodec.DecodeRequest(encoded);
+        var spawn = decoded.Params!.Value.Deserialize(CoveJsonContext.Default.SpawnParams);
+
+        Assert.NotNull(spawn);
+        Assert.Null(spawn.Command);
+        Assert.Empty(spawn.Args);
+        Assert.Equal("/work/tree", spawn.Cwd);
+        Assert.Equal(132, spawn.Cols);
+        Assert.Equal(40, spawn.Rows);
+        Assert.Equal("printf '%s' \"$HOME\"", spawn.ShellCommand);
+    }
+
+    [Fact]
+    public void SpawnParams_ConcreteCommandWithoutShellCommandRemainsValid()
+    {
+        const string json =
+            """{"command":"/opt/custom shell","args":["","two words","quote\u0022value"],"cols":80,"rows":24}""";
+
+        var spawn = JsonSerializer.Deserialize(
+            json,
+            CoveJsonContext.Default.SpawnParams);
+
+        Assert.NotNull(spawn);
+        Assert.Equal("/opt/custom shell", spawn.Command);
+        Assert.Equal(["", "two words", "quote\"value"], spawn.Args);
+        Assert.Null(spawn.ShellCommand);
     }
 
     [Fact]

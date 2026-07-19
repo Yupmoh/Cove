@@ -1,12 +1,17 @@
 using Cove.Persistence;
+using Cove.Engine.Layout;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Cove.Engine.Bays;
 
-public enum BayChangeKind { Created, Switched, Deleted, Updated }
+public enum BayChangeKind { Created, Switched, Deleted, Updated, Reordered }
 
-public sealed record BayChange(BayChangeKind Kind, string BayId);
+public sealed record BayChange(
+    BayChangeKind Kind,
+    string BayId,
+    string ActiveBayId,
+    IReadOnlyList<string> OpenBayIds);
 
 public readonly record struct BayCreateOutcome(BayModel? Bay, string? ErrorCode, string? ErrorMessage);
 
@@ -20,7 +25,7 @@ public sealed class BayManager : IAsyncDisposable
     private readonly WorktreeService _worktrees;
     private readonly ILogger _logger;
     private readonly Dictionary<string, GitWatchService> _watchers = new(StringComparer.Ordinal);
-    private readonly Action<IReadOnlyList<string>>? _persistOrder;
+    private readonly LayoutService _layout;
     public BayManager(
         RegistryModel? registry = null,
         IEnumerable<BayModel>? bays = null,
@@ -28,17 +33,22 @@ public sealed class BayManager : IAsyncDisposable
         Func<string>? newId = null,
         IGitRunner? gitRunner = null,
         ILogger? logger = null,
-        Action<IReadOnlyList<string>>? persistOrder = null)
+        LayoutService? layout = null)
     {
         _newId = newId ?? (() => Guid.NewGuid().ToString("N"));
         _emit = emit;
         _logger = logger ?? NullLogger.Instance;
         _worktrees = new WorktreeService(gitRunner ?? new ProcessGitRunner());
         _registry = new Actor<RegistryModel>(registry ?? new RegistryModel());
-        _persistOrder = persistOrder;
+        _layout = layout ?? new LayoutService();
         if (bays is not null)
             foreach (var bay in bays)
+            {
                 _bays[bay.Id] = new Actor<BayModel>(bay);
+                _layout.RegisterBay(bay.Id, false);
+            }
+        if (registry is not null)
+            _layout.ReorderBays(registry.OpenBays);
     }
 
     public static bool TryResolveProjectDir(string? raw, out string resolved, out string? error)
@@ -95,7 +105,11 @@ public sealed class BayManager : IAsyncDisposable
         return new BayCreateOutcome(bay, null, null);
     }
 
-    public RegistryModel Registry => _registry.State;
+    public RegistryModel Registry => _registry.State with { OpenBays = _layout.OpenBayIds };
+
+    public string ActiveBayId => _layout.ActiveBayId;
+
+    public LayoutService Layout => _layout;
 
     public string NewId() => _newId();
 
@@ -105,7 +119,7 @@ public sealed class BayManager : IAsyncDisposable
             return _bays.TryGetValue(id, out var actor) ? actor : null;
     }
 
-    public async Task<BayModel> CreateBayAsync(string name, string projectDir, string? collectionId = null)
+    public Task<BayModel> CreateBayAsync(string name, string projectDir, string? collectionId = null)
     {
         var id = _newId();
         var model = new BayModel
@@ -120,17 +134,12 @@ public sealed class BayManager : IAsyncDisposable
         lock (_mapGate)
             _bays[id] = new Actor<BayModel>(model);
 
-        await _registry.Mutate(r => r with
-        {
-            OpenBays = Append(r.OpenBays, id),
-            FocusedBayId = r.FocusedBayId ?? id,
-        }).ConfigureAwait(false);
-
-        _emit?.Invoke(new BayChange(BayChangeKind.Created, id));
-        return model;
+        _layout.RegisterBay(id, true);
+        Emit(BayChangeKind.Created, id);
+        return Task.FromResult(model);
     }
 
-    public async Task<BayModel> AdoptExistingAsync(string id, string name, string projectDir, string? collectionId = null, BayIcon? icon = null)
+    public Task<BayModel> AdoptExistingAsync(string id, string name, string projectDir, string? collectionId = null, BayIcon? icon = null)
     {
         var model = new BayModel
         {
@@ -143,28 +152,74 @@ public sealed class BayManager : IAsyncDisposable
         };
         lock (_mapGate)
             _bays[id] = new Actor<BayModel>(model);
-        await _registry.Mutate(r => r with
+        _layout.RegisterBay(id, false);
+        Emit(BayChangeKind.Created, id);
+        return Task.FromResult(model);
+    }
+
+    public async Task<BayModel> RestoreBayAsync(
+        BaySnapshot snapshot,
+        string name,
+        string projectDir,
+        string? collectionId = null,
+        BayIcon? icon = null)
+    {
+        var model = new BayModel
         {
-            OpenBays = Append(r.OpenBays, id),
-            FocusedBayId = r.FocusedBayId ?? id,
-        }).ConfigureAwait(false);
-        _emit?.Invoke(new BayChange(BayChangeKind.Created, id));
+            Id = snapshot.Id,
+            Name = name,
+            ProjectDir = projectDir,
+            CollectionId = collectionId ?? BayModel.DefaultCollectionId,
+            Nooks = new Dictionary<string, NookRecord>(),
+            Icon = icon,
+        };
+        Actor<BayModel>? existing;
+        lock (_mapGate)
+            _bays.TryGetValue(snapshot.Id, out existing);
+        if (existing is null)
+        {
+            lock (_mapGate)
+                _bays[snapshot.Id] = new Actor<BayModel>(model);
+        }
+        else
+        {
+            await existing.Mutate(current => current with
+            {
+                Name = model.Name,
+                ProjectDir = model.ProjectDir,
+                CollectionId = model.CollectionId,
+                Icon = model.Icon,
+            }).ConfigureAwait(false);
+            model = existing.State;
+        }
+        _layout.LoadSnapshot(snapshot);
         return model;
     }
 
-    public async Task<bool> SwitchBayAsync(string id)
+    public Task<bool> SwitchBayAsync(string id)
     {
         if (Get(id) is null)
+            return Task.FromResult(false);
+        _layout.SetActiveBay(id, false);
+        Emit(BayChangeKind.Switched, id);
+        return Task.FromResult(true);
+    }
+
+    public bool RestoreActiveBay(string? id)
+    {
+        if (string.IsNullOrWhiteSpace(id) || Get(id) is null)
+        {
+            _logger.LogWarning("workspace restore ignored unknown active bay {BayId}", id);
             return false;
-        await _registry.Mutate(r => r with { FocusedBayId = id }).ConfigureAwait(false);
-        _emit?.Invoke(new BayChange(BayChangeKind.Switched, id));
+        }
+        _layout.SetActiveBay(id, false);
         return true;
     }
 
     public IReadOnlyList<BaySummary> ListBays()
     {
-        var registry = _registry.State;
-        var focused = registry.FocusedBayId;
+        var registry = Registry;
+        var focused = ActiveBayId;
         var result = new List<BaySummary>();
         foreach (var id in registry.OpenBays)
         {
@@ -188,14 +243,8 @@ public sealed class BayManager : IAsyncDisposable
         }
         await actor.DisposeAsync().ConfigureAwait(false);
 
-        await _registry.Mutate(r =>
-        {
-            var open = r.OpenBays.Where(x => x != id).ToList();
-            var focused = r.FocusedBayId == id ? (open.Count > 0 ? open[0] : null) : r.FocusedBayId;
-            return r with { OpenBays = open, FocusedBayId = focused };
-        }).ConfigureAwait(false);
-
-        _emit?.Invoke(new BayChange(BayChangeKind.Deleted, id));
+        _layout.RemoveBay(id, false);
+        Emit(BayChangeKind.Deleted, id);
         return true;
     }
 
@@ -278,7 +327,7 @@ public sealed class BayManager : IAsyncDisposable
         if (Get(id) is not { } actor)
             return false;
         await actor.Mutate(m => m with { Name = name }).ConfigureAwait(false);
-        _emit?.Invoke(new BayChange(BayChangeKind.Updated, id));
+        Emit(BayChangeKind.Updated, id);
         return true;
     }
 
@@ -287,7 +336,7 @@ public sealed class BayManager : IAsyncDisposable
         if (Get(id) is not { } actor)
             return false;
         await actor.Mutate(m => m with { Hidden = hidden }).ConfigureAwait(false);
-        _emit?.Invoke(new BayChange(BayChangeKind.Updated, id));
+        Emit(BayChangeKind.Updated, id);
         return true;
     }
 
@@ -296,7 +345,7 @@ public sealed class BayManager : IAsyncDisposable
         if (Get(id) is not { } actor)
             return false;
         await actor.Mutate(m => m with { Icon = icon }).ConfigureAwait(false);
-        _emit?.Invoke(new BayChange(BayChangeKind.Updated, id));
+        Emit(BayChangeKind.Updated, id);
         return true;
     }
 
@@ -305,25 +354,15 @@ public sealed class BayManager : IAsyncDisposable
         if (Get(id) is not { } actor)
             return false;
         await actor.Mutate(m => m with { AccentColor = accent }).ConfigureAwait(false);
-        _emit?.Invoke(new BayChange(BayChangeKind.Updated, id));
+        Emit(BayChangeKind.Updated, id);
         return true;
     }
 
-    public async Task ReorderBaysAsync(IReadOnlyList<string> orderedIds)
+    public Task ReorderBaysAsync(IReadOnlyList<string> orderedIds)
     {
-        await _registry.Mutate(r =>
-        {
-            var known = new HashSet<string>(r.OpenBays, StringComparer.Ordinal);
-            var next = new List<string>();
-            foreach (var id in orderedIds)
-                if (known.Contains(id) && !next.Contains(id))
-                    next.Add(id);
-            foreach (var id in r.OpenBays)
-                if (!next.Contains(id))
-                    next.Add(id);
-            return r with { OpenBays = next };
-        }).ConfigureAwait(false);
-        _persistOrder?.Invoke(_registry.State.OpenBays);
+        _layout.ReorderBays(orderedIds);
+        Emit(BayChangeKind.Reordered, ActiveBayId);
+        return Task.CompletedTask;
     }
     public async Task<string?> DockResidentAsync(string bayId, string? nookId, string scope, int slot)
     {
@@ -337,7 +376,7 @@ public sealed class BayManager : IAsyncDisposable
             nooks[id] = existing with { ResidentScope = scope, ResidentSlot = slot };
             return m with { Nooks = nooks };
         }).ConfigureAwait(false);
-        _emit?.Invoke(new BayChange(BayChangeKind.Updated, bayId));
+        Emit(BayChangeKind.Updated, bayId);
         return id;
     }
 
@@ -352,7 +391,7 @@ public sealed class BayManager : IAsyncDisposable
                 nooks[nookId] = record with { ResidentScope = "none", ResidentSlot = -1 };
             return m with { Nooks = nooks };
         }).ConfigureAwait(false);
-        _emit?.Invoke(new BayChange(BayChangeKind.Updated, bayId));
+        Emit(BayChangeKind.Updated, bayId);
         return true;
     }
 
@@ -423,8 +462,8 @@ public sealed class BayManager : IAsyncDisposable
         };
         lock (_mapGate)
             _bays[id] = new Actor<BayModel>(model);
-        await _registry.Mutate(r => r with { OpenBays = Append(r.OpenBays, id) }).ConfigureAwait(false);
-        _emit?.Invoke(new BayChange(BayChangeKind.Created, id));
+        _layout.RegisterBay(id, false);
+        Emit(BayChangeKind.Created, id);
         return model;
     }
 
@@ -465,8 +504,8 @@ public sealed class BayManager : IAsyncDisposable
         };
         lock (_mapGate)
             _bays[id] = new Actor<BayModel>(model);
-        await _registry.Mutate(r => r with { OpenBays = Append(r.OpenBays, id) }).ConfigureAwait(false);
-        _emit?.Invoke(new BayChange(BayChangeKind.Created, id));
+        _layout.RegisterBay(id, false);
+        Emit(BayChangeKind.Created, id);
         return model;
     }
 
@@ -481,16 +520,14 @@ public sealed class BayManager : IAsyncDisposable
         if (!result.Ok)
             return false;
 
+        var wasActive = ActiveBayId == worktreeBayId;
         lock (_mapGate)
             _bays.Remove(worktreeBayId);
         await actor.DisposeAsync().ConfigureAwait(false);
-        await _registry.Mutate(r =>
-        {
-            var open = r.OpenBays.Where(x => x != worktreeBayId).ToList();
-            var focused = r.FocusedBayId == worktreeBayId ? parentId : r.FocusedBayId;
-            return r with { OpenBays = open, FocusedBayId = focused };
-        }).ConfigureAwait(false);
-        _emit?.Invoke(new BayChange(BayChangeKind.Deleted, worktreeBayId));
+        _layout.RemoveBay(worktreeBayId, false);
+        if (wasActive && Get(parentId) is not null)
+            _layout.SetActiveBay(parentId, false);
+        Emit(BayChangeKind.Deleted, worktreeBayId);
         return true;
     }
 
@@ -555,6 +592,7 @@ public sealed class BayManager : IAsyncDisposable
         foreach (var id in deletedIds)
         {
             Actor<BayModel>? actor;
+            var wasActive = ActiveBayId == id;
             lock (_mapGate)
             {
                 if (!_bays.TryGetValue(id, out actor))
@@ -562,17 +600,14 @@ public sealed class BayManager : IAsyncDisposable
                 _bays.Remove(id);
             }
             await actor.DisposeAsync().ConfigureAwait(false);
-            await _registry.Mutate(r =>
-            {
-                var open = r.OpenBays.Where(x => x != id).ToList();
-                var focused = r.FocusedBayId == id ? parentId : r.FocusedBayId;
-                return r with { OpenBays = open, FocusedBayId = focused };
-            }).ConfigureAwait(false);
-            _emit?.Invoke(new BayChange(BayChangeKind.Deleted, id));
+            _layout.RemoveBay(id, false);
+            if (wasActive && Get(parentId) is not null)
+                _layout.SetActiveBay(parentId, false);
+            Emit(BayChangeKind.Deleted, id);
         }
 
         foreach (var id in updatedIds)
-            _emit?.Invoke(new BayChange(BayChangeKind.Updated, id));
+            Emit(BayChangeKind.Updated, id);
     }
 
     public Task WatchWorktreeRepoAsync(string parentId)
@@ -600,12 +635,9 @@ public sealed class BayManager : IAsyncDisposable
         return Task.CompletedTask;
     }
 
-    private static IReadOnlyList<string> Append(IReadOnlyList<string> list, string item)
+    private void Emit(BayChangeKind kind, string bayId)
     {
-        var next = new List<string>(list);
-        if (!next.Contains(item))
-            next.Add(item);
-        return next;
+        _emit?.Invoke(new BayChange(kind, bayId, ActiveBayId, _layout.OpenBayIds));
     }
 
     public async ValueTask DisposeAsync()

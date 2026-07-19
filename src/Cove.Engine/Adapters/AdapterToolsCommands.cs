@@ -54,7 +54,7 @@ public static class AdapterToolsCommands
         if (errors.Count > 0)
             return ctx.Fail("invalid_adapter", $"{errors[0].Field}: {errors[0].Message}");
 
-        var installer = new AdapterInstallService(new MethodRunner());
+        var installer = new AdapterInstallService();
         try
         {
             var installed = await installer.InstallAsync(store.AdaptersRoot, manifest.Name, new LocalDirAdapterFetcher(source)).ConfigureAwait(false);
@@ -81,7 +81,7 @@ public static class AdapterToolsCommands
 
         var manifest = store.Load(name);
         var skillPath = ExpandTilde(manifest?.SkillInstallPath);
-        var installer = new AdapterInstallService(new MethodRunner());
+        var installer = new AdapterInstallService();
         await installer.UninstallAsync(store.AdaptersRoot, name, manifest, skillPath).ConfigureAwait(false);
         store.Invalidate(name);
 
@@ -121,10 +121,12 @@ public static class AdapterToolsCommands
             return ctx.Fail("not_found", $"unknown adapter: {p.Name}");
         if (manifest.Retention?.WriteScript is not { } writeScript)
             return ctx.Fail("unsupported", $"adapter '{p.Name}' does not support editing retention");
+        if (manifest.Retention.Fields.FirstOrDefault() is not { } field)
+            return ctx.Fail("unsupported", $"adapter '{p.Name}' has no retention fields");
 
         var adapterDir = store.ResolveDir(manifest.Name);
         var runner = new MethodRunner();
-        var result = await runner.RunAsync(adapterDir, writeScript, new[] { p.Value ?? "" }, TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+        var result = await runner.RunAsync(adapterDir, writeScript, new[] { $"{field.Key}={p.Value ?? ""}" }, TimeSpan.FromSeconds(5)).ConfigureAwait(false);
         if (result.Error)
             return ctx.Fail("write_failed", string.IsNullOrEmpty(result.Stderr) ? "retention write failed" : result.Stderr.Trim());
 
@@ -176,20 +178,22 @@ public static class AdapterToolsCommands
         var adapterDir = store.ResolveDir(manifest.Name);
         var runner = new MethodRunner();
         var result = await runner.RunAsync(adapterDir, retention.ReadScript, Array.Empty<string>(), TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+        var field = retention.Fields[0];
         string? value = null;
         if (result.Ok)
-            value = ExtractRetentionValue(result);
+            value = ExtractRetentionValue(result, field.Key);
 
         var editable = !string.IsNullOrEmpty(retention.WriteScript);
-        var hidden = RetentionThreshold.IsHidden(value, retention.Recommended);
-        return new ToolsRetentionDto(true, editable, hidden, value, retention.Recommended);
+        var recommended = field.Recommended.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var hidden = RetentionThreshold.IsHidden(value, recommended);
+        return new ToolsRetentionDto(true, editable, hidden, value, recommended);
     }
 
-    private static string? ExtractRetentionValue(MethodResult result)
+    private static string? ExtractRetentionValue(MethodResult result, string fieldKey)
     {
         if (result.Json is { } json)
         {
-            if (json.ValueKind == JsonValueKind.Object && json.TryGetProperty("value", out var v))
+            if (json.ValueKind == JsonValueKind.Object && json.TryGetProperty(fieldKey, out var v))
                 return v.ValueKind == JsonValueKind.String ? v.GetString() : v.GetRawText();
             if (json.ValueKind is JsonValueKind.Number or JsonValueKind.String)
                 return json.ValueKind == JsonValueKind.String ? json.GetString() : json.GetRawText();
@@ -202,7 +206,8 @@ public static class AdapterToolsCommands
     {
         if (manifest.Retention is not { } retention || string.IsNullOrEmpty(retention.ReadScript))
             return new ToolsRetentionDto(false, false, true, null, null);
-        return new ToolsRetentionDto(true, !string.IsNullOrEmpty(retention.WriteScript), false, null, retention.Recommended);
+        var recommended = retention.Fields[0].Recommended.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        return new ToolsRetentionDto(true, !string.IsNullOrEmpty(retention.WriteScript), false, null, recommended);
     }
 
     private static string? LoadIcon(AdapterManifestStore store, AdapterManifest manifest)
@@ -224,8 +229,12 @@ public static class AdapterToolsCommands
 
     private static string InstallHint(AdapterManifest manifest)
     {
-        var platform = OperatingSystem.IsWindows() ? "windows" : OperatingSystem.IsMacOS() ? "macos" : "linux";
-        if (manifest.Install.TryGetValue(platform, out var recipe) && !string.IsNullOrWhiteSpace(recipe.Cmd))
+        var recipe = OperatingSystem.IsWindows()
+            ? manifest.Install?.Windows
+            : OperatingSystem.IsMacOS()
+                ? manifest.Install?.Macos
+                : manifest.Install?.Linux;
+        if (!string.IsNullOrWhiteSpace(recipe?.Cmd))
             return recipe.Cmd;
         return manifest.Name switch
         {

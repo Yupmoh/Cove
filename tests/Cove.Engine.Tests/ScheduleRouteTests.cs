@@ -4,6 +4,9 @@ using Cove.Platform.Ipc;
 using Cove.Protocol;
 using Xunit;
 using Cove.Testing;
+using Cove.Engine.Tasks;
+using Cove.Tasks.Scheduler;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Cove.Engine.Tests;
 
@@ -109,5 +112,58 @@ public sealed class ScheduleRouteTests
 
         var getResp = await SendAsync(ctl, "g", "cove://commands/task.repeat.get", P($"{{\"cardId\":\"{cardId}\"}}"), ct);
         Assert.Equal("Repeat", getResp.Data!.Value.GetProperty("mode").GetString());
+    }
+
+    [Fact]
+    public async Task RepeatSet_DoesNotAcknowledgeBeforeSchedulerConsumesMutation()
+    {
+        var dataDir = TestDirectory.Create("cove-schedule-ack-");
+        var service = new Cove.Tasks.TaskService(dataDir, NullLogger.Instance);
+        try
+        {
+            await service.StartAsync();
+            var card = await service.CreateCardAsync("ws1", "scheduled", "user:test", "", 1, 2, null);
+            var acknowledgement = new BlockingScheduleAcknowledger();
+            var request = new ControlRequest(
+                "set",
+                "cove://commands/task.repeat.set",
+                P($"{{\"cardId\":\"{card.Id}\",\"triggerKind\":\"cron\",\"cron\":\"0 9 * * *\"}}"));
+            var context = new EngineDispatchContext(
+                request,
+                taskService: service,
+                taskScheduler: acknowledgement);
+
+            var command = ScheduleCommands.Set(context);
+            await acknowledgement.Entered.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.False(command.IsCompleted);
+
+            acknowledgement.Release();
+            var response = await command.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.True(response.Ok, response.Error?.Code);
+            Assert.NotNull(service.GetSchedule(card.Id));
+        }
+        finally
+        {
+            await service.DisposeAsync();
+            TestDirectory.Delete(dataDir);
+        }
+    }
+
+    private sealed class BlockingScheduleAcknowledger : IScheduleMutationAcknowledger
+    {
+        private readonly TaskCompletionSource<object?> _entered =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource<object?> _release =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task Entered => _entered.Task;
+
+        public async Task SignalMutationAsync(CancellationToken ct = default)
+        {
+            _entered.TrySetResult(null);
+            await _release.Task.WaitAsync(ct);
+        }
+
+        public void Release() => _release.TrySetResult(null);
     }
 }

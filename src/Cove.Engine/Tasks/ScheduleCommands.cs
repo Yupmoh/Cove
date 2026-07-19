@@ -40,6 +40,7 @@ public static class ScheduleCommands
             NextFireAt = result.NextFireAt,
         };
         await svc.UpsertScheduleAsync(row);
+        await AcknowledgeMutationAsync(ctx);
         return ctx.Ok(new ScheduleValidationResultDto(true, [], result.NextFireAt), CoveJsonContext.Default.ScheduleValidationResultDto);
     }
 
@@ -67,6 +68,7 @@ public static class ScheduleCommands
         if (row is null)
             return ctx.Fail("not_found", "no schedule for card");
         await svc.UpdateScheduleAsync(p.CardId, paused: true, skipNext: null, nextFireAt: null, lastFiredAt: null);
+        await AcknowledgeMutationAsync(ctx);
         return ctx.Ok();
     }
 
@@ -82,6 +84,7 @@ public static class ScheduleCommands
             return ctx.Fail("not_found", "no schedule for card");
         var nextFireAt = Cove.Tasks.Schedules.NextFireAtCalculator.Compute(row.TriggerKind, row.Cron, row.At, row.Tz, CronExpander);
         await svc.UpdateScheduleAsync(p.CardId, paused: false, skipNext: null, nextFireAt: nextFireAt, lastFiredAt: null);
+        await AcknowledgeMutationAsync(ctx);
         return ctx.Ok();
     }
 
@@ -96,6 +99,7 @@ public static class ScheduleCommands
         if (row is null)
             return ctx.Fail("not_found", "no schedule for card");
         await svc.UpdateScheduleAsync(p.CardId, paused: null, skipNext: true, nextFireAt: null, lastFiredAt: null);
+        await AcknowledgeMutationAsync(ctx);
         return ctx.Ok();
     }
 
@@ -107,7 +111,15 @@ public static class ScheduleCommands
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.ScheduleGetParams) is not { } p)
             return ctx.Fail("invalid_params", "repeat stop params required (cardId)");
         await svc.DeleteScheduleAsync(p.CardId);
+        await AcknowledgeMutationAsync(ctx);
         return ctx.Ok();
+    }
+
+    private static System.Threading.Tasks.Task AcknowledgeMutationAsync(
+        EngineDispatchContext ctx)
+    {
+        return ctx.TaskScheduler?.SignalMutationAsync()
+            ?? System.Threading.Tasks.Task.CompletedTask;
     }
 
     private static ScheduleInfo ToInfo(Cove.Tasks.Schedules.ScheduleRow row)

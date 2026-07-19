@@ -17,10 +17,9 @@ public sealed class ShoreWingCommandsTests
     private static async Task<(BayManager Mgr, LayoutService Layout, string BayId)> NewBayAsync()
     {
         int n = 0;
-        var mgr = new BayManager(newId: () => $"id-{++n}");
-        var ws = await mgr.CreateBayAsync("proj", "/tmp/proj");
         var layout = new LayoutService();
-        layout.SetActiveBay(ws.Id);
+        var mgr = new BayManager(newId: () => $"id-{++n}", layout: layout);
+        var ws = await mgr.CreateBayAsync("proj", "/tmp/proj");
         return (mgr, layout, ws.Id);
     }
 

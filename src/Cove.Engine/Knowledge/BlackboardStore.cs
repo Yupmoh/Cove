@@ -1,3 +1,4 @@
+using Cove.Persistence;
 using Cove.Protocol;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
@@ -6,15 +7,20 @@ namespace Cove.Engine.Knowledge;
 
 public sealed class BlackboardStore
 {
-    private readonly string _dbPath;
+    private readonly SqliteConnectionFactory _database;
     private readonly ILogger _logger;
     private readonly TimeProvider _timeProvider;
 
-    public BlackboardStore(string dataDir, ILogger logger, TimeProvider? timeProvider = null)
+    public BlackboardStore(
+        string dataDir,
+        ILogger logger,
+        TimeProvider? timeProvider = null,
+        SqliteConnectionFactory? database = null)
     {
-        _dbPath = System.IO.Path.Combine(dataDir, "memory", "memory.db");
+        var databasePath = System.IO.Path.Combine(dataDir, "memory", "memory.db");
         _logger = logger;
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _database = database ?? new SqliteConnectionFactory(databasePath, logger);
     }
 
     public BlackboardPost Post(string bayId, string kind, string audience, string content, string? refId = null, System.TimeSpan? ttl = null)
@@ -32,8 +38,8 @@ public sealed class BlackboardStore
             ExpiresAt = ttl.HasValue ? now.Add(ttl.Value) : null,
         };
 
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
+
         using var cmd = conn.CreateCommand();
         cmd.CommandText = """
             INSERT INTO blackboard (id, bay_id, kind, audience, content, ref_id, ttl_at, created_at)
@@ -58,8 +64,8 @@ public sealed class BlackboardStore
         SweepExpired(bayId);
 
         var result = new System.Collections.Generic.List<BlackboardPost>();
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
+
         using var cmd = conn.CreateCommand();
         if (audience is null)
         {
@@ -82,8 +88,8 @@ public sealed class BlackboardStore
 
     private void SweepExpired(string bayId)
     {
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
+
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "DELETE FROM blackboard WHERE bay_id = @ws AND ttl_at IS NOT NULL AND ttl_at < @now";
         cmd.Parameters.AddWithValue("@ws", bayId);

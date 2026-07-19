@@ -35,7 +35,7 @@ public sealed record NookInfo(string NookId, string Command, int Cols, int Rows,
 public sealed record NookListResult(NookInfo[] Nooks);
 
 public sealed record SpawnParams(
-    string Command,
+    string? Command,
     string[] Args,
     string? Cwd = null,
     Dictionary<string, string>? Env = null,
@@ -49,7 +49,41 @@ public sealed record SpawnParams(
     string McpAccessScope = "same-tab",
     bool McpVisible = true,
     string? SessionId = null,
-    bool Yolo = false);
+    bool Yolo = false,
+    string? ShellCommand = null);
+
+public sealed record HookEmitParams(
+    string Adapter,
+    string Event,
+    string? NookId,
+    JsonElement Payload);
+
+public sealed record DictationAudioPayload(
+    byte[] Pcm,
+    int SampleRate,
+    int Offset = 0);
+
+public sealed record DictationSessionParams(string SessionId);
+public sealed record DictationPartialParams(
+    string SessionId,
+    DictationAudioPayload Audio);
+public sealed record DictationStopParams(
+    string SessionId,
+    DictationAudioPayload Audio);
+public sealed record DictationStatusResult(
+    string State,
+    bool ModelReady);
+public sealed record DictationEnsureModelResult(bool Started);
+public sealed record DictationModelReadyResult(bool Ready);
+public sealed record DictationBeginResult(string SessionId);
+public sealed record DictationTranscriptionResult(
+    string Text,
+    double AudioSeconds,
+    long TranscribeMs);
+public sealed record DictationPartialResult(string Text);
+public sealed record DictationStateEvent(bool Recording);
+public sealed record DictationProgressEvent(double Percent);
+public sealed record DictationModelEvent(bool Ready);
 
 public sealed record SubscribeParams(string NookId, ulong SinceOffset = 0);
 public sealed record SubscribeResult(ulong StreamId, ulong BaseOffset, int Window, ulong ReplayUntilOffset = 0, string TerminalModePreambleBase64 = "", string TerminalCheckpointBase64 = "", int CheckpointCols = 0, int CheckpointRows = 0);
@@ -173,7 +207,7 @@ public sealed record HandoffNookRecord(
     string? SessionId,
     string? HookStatus,
     HandoffCheckpointDto? Checkpoint,
-    string? NookToken = null);
+    string NookToken);
 public sealed record HandoffBeginResult(int NookCount, string SocketPath);
 
 public sealed record ToolsRetentionDto(bool Present, bool Editable, bool Hidden, string? Value, string? Recommended);
@@ -465,6 +499,16 @@ public sealed record PerfBundleCreateParams(string? TracePath = null);
 public sealed record PerfBundleDeleteParams(string BundlePath);
 public sealed record PerfBundleDto(string Id, string BundlePath, string CreatedAt, long SizeBytes, int SnapshotCount, bool ContainsTrace);
 public sealed record PerfBundleListResult(System.Collections.Generic.IReadOnlyList<PerfBundleDto> Bundles);
+public sealed record DirectoryListParams(string Path, int? Cap = null);
+public sealed record DirectoryEntryDto(string Name, bool IsDir);
+public sealed record DirectoryListResult(System.Collections.Generic.IReadOnlyList<DirectoryEntryDto> Entries, bool Truncated, string? Error);
+public sealed record GitSummaryParams(string Path);
+public sealed record GitSummaryFileDto(string Path, string Status);
+public sealed record GitSummaryResult(bool Ok, string Branch, int Ahead, int Behind, int Dirty, System.Collections.Generic.IReadOnlyList<GitSummaryFileDto> Files, string? Error);
+public sealed record FeedbackSaveParams(string Json, string Slug);
+public sealed record FeedbackSaveResult(string Path);
+public sealed record PerformanceResultSaveParams(string Json, string Markdown);
+public sealed record PerformanceResultSaveResult(string Directory);
 
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
@@ -483,6 +527,20 @@ public sealed record PerfBundleListResult(System.Collections.Generic.IReadOnlyLi
 [JsonSerializable(typeof(NookInfo[]))]
 [JsonSerializable(typeof(NookListResult))]
 [JsonSerializable(typeof(SpawnParams))]
+[JsonSerializable(typeof(HookEmitParams))]
+[JsonSerializable(typeof(DictationAudioPayload))]
+[JsonSerializable(typeof(DictationSessionParams))]
+[JsonSerializable(typeof(DictationPartialParams))]
+[JsonSerializable(typeof(DictationStopParams))]
+[JsonSerializable(typeof(DictationStatusResult))]
+[JsonSerializable(typeof(DictationEnsureModelResult))]
+[JsonSerializable(typeof(DictationModelReadyResult))]
+[JsonSerializable(typeof(DictationBeginResult))]
+[JsonSerializable(typeof(DictationTranscriptionResult))]
+[JsonSerializable(typeof(DictationPartialResult))]
+[JsonSerializable(typeof(DictationStateEvent))]
+[JsonSerializable(typeof(DictationProgressEvent))]
+[JsonSerializable(typeof(DictationModelEvent))]
 [JsonSerializable(typeof(SubscribeParams))]
 [JsonSerializable(typeof(SubscribeResult))]
 [JsonSerializable(typeof(WriteParams))]
@@ -790,5 +848,15 @@ public sealed record PerfBundleListResult(System.Collections.Generic.IReadOnlyLi
 [JsonSerializable(typeof(PerfBundleDeleteParams))]
 [JsonSerializable(typeof(PerfBundleDto))]
 [JsonSerializable(typeof(PerfBundleListResult))]
+[JsonSerializable(typeof(DirectoryListParams))]
+[JsonSerializable(typeof(DirectoryEntryDto))]
+[JsonSerializable(typeof(DirectoryListResult))]
+[JsonSerializable(typeof(GitSummaryParams))]
+[JsonSerializable(typeof(GitSummaryFileDto))]
+[JsonSerializable(typeof(GitSummaryResult))]
+[JsonSerializable(typeof(FeedbackSaveParams))]
+[JsonSerializable(typeof(FeedbackSaveResult))]
+[JsonSerializable(typeof(PerformanceResultSaveParams))]
+[JsonSerializable(typeof(PerformanceResultSaveResult))]
 [JsonSerializable(typeof(JsonElement))]
 public sealed partial class CoveJsonContext : JsonSerializerContext;

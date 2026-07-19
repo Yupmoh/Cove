@@ -220,6 +220,14 @@ public static class KnowledgeCommands
             var subResp = await ctx.Redrive(subReq);
             if (subResp is null)
                 return ctx.Fail("not_found", $"command '{p.Uri}' not found");
+            if (!subResp.Ok)
+            {
+                return new ControlResponse(
+                    ctx.Request.Id,
+                    false,
+                    null,
+                    subResp.Error);
+            }
             return ctx.Ok(new CanvasActionResult(true, null, p.Uri), CoveJsonContext.Default.CanvasActionResult);
         }
 
@@ -368,7 +376,7 @@ public static class KnowledgeCommands
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.MemoryReindexParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "memory reindex params required"));
 
-        store.ReindexFromDisk(p.BayId);
+        store.RefreshFileExports(p.BayId);
         return Task.FromResult(ctx.Ok());
     }
 
@@ -470,12 +478,11 @@ public static class KnowledgeCommands
 
     private static async Task<Cove.Engine.Restart.ResumeCommand?> BuildFreshLaunchAsync(EngineDispatchContext ctx, string adapter, Cove.Engine.Restart.LauncherOverrides overrides)
     {
-        if (ctx.Launcher is not { } orch || ctx.LaunchProfiles is not { } profiles)
+        if (ctx.Launcher is not { } orch || !orch.CanResolveProfiles)
             return null;
-        var profile = profiles.Load(adapter, "default")
-            ?? new Cove.Adapters.LaunchProfile("Default", "default", adapter, true, null, null,
-                System.Array.Empty<string>(), new System.Collections.Generic.Dictionary<string, string>(),
-                new System.Collections.Generic.Dictionary<string, bool>(), System.Array.Empty<string>(), null, 1);
+        var profile = orch.FindProfile(adapter, "default");
+        if (profile is null)
+            return null;
         try
         {
             return await orch.BuildLaunchCommandAsync(profile, overrides).ConfigureAwait(false);

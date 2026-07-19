@@ -21,7 +21,7 @@ internal static class EngineCommands
             return Task.FromResult(ctx.Fail("invalid_params", "spawn params required"));
         string? bayDir = null;
         if (ctx.Bays is { } wm
-            && wm.Registry.FocusedBayId is { } focusedId
+            && wm.ActiveBayId is { } focusedId
             && wm.Get(focusedId) is { } focusedActor
             && !string.IsNullOrEmpty(focusedActor.State.ProjectDir))
             bayDir = focusedActor.State.ProjectDir;
@@ -122,9 +122,7 @@ internal static class EngineCommands
         var resolved = reg.ResolveId(p.NookId);
         var readNookId = resolved.Found ? resolved.Id! : p.NookId;
         byte[] bytes = reg.Read(readNookId, p.Offset, p.MaxBytes);
-        long head = 0;
-        if (reg.TryGet(readNookId, out var nook))
-            head = nook.Ring.Head;
+        long head = reg.GetHead(readNookId);
         long nextOffset = p.Offset + bytes.Length;
         return Task.FromResult(ctx.Ok(new NookReadResult(System.Convert.ToBase64String(bytes), nextOffset, head), CoveJsonContext.Default.NookReadResult));
     }

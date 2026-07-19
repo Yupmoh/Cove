@@ -60,18 +60,18 @@ public sealed class MigrationRunner
         if (!File.Exists(metaPath))
         {
             var initial = new DataDirMeta(DataDirMetaStore.CurrentSchemaVersion, System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), Cove.Platform.CoveBuild.InformationalVersion);
-            AtomicJsonStore.Write(metaPath, initial, CoveJsonContext.Default.DataDirMeta);
+            AtomicJsonStore.Write(metaPath, initial, PlatformJsonContext.Default.DataDirMeta);
             return DataDirMetaStore.CurrentSchemaVersion;
         }
-        var meta = AtomicJsonStore.Read(metaPath, CoveJsonContext.Default.DataDirMeta, _logger);
+        var meta = AtomicJsonStore.Read(metaPath, PlatformJsonContext.Default.DataDirMeta, _logger);
         return meta?.DataDirSchemaVersion ?? DataDirMetaStore.CurrentSchemaVersion;
     }
 
     private void WriteCurrentVersion(int version)
     {
         var metaPath = Path.Combine(_dataDir, "meta.json");
-        var existing = AtomicJsonStore.Read(metaPath, CoveJsonContext.Default.DataDirMeta, _logger);
+        var existing = AtomicJsonStore.Read(metaPath, PlatformJsonContext.Default.DataDirMeta, _logger);
         var updated = new DataDirMeta(version, existing?.CreatedAtUnixMs ?? System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), existing?.CoveVersionAtCreate ?? Cove.Platform.CoveBuild.InformationalVersion);
-        AtomicJsonStore.Write(metaPath, updated, CoveJsonContext.Default.DataDirMeta);
+        AtomicJsonStore.Write(metaPath, updated, PlatformJsonContext.Default.DataDirMeta);
     }
 }

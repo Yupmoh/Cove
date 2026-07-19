@@ -40,7 +40,13 @@ public static class HandoffClient
         try
         {
             var hello = JsonSerializer.SerializeToElement(
-                new HelloParams(ProtocolConstants.SemanticProtocolVersion, "handoff", CoveBuild.InformationalVersion, paths.Channel),
+                new HelloParams(
+                    ProtocolConstants.SemanticProtocolVersion,
+                    "handoff",
+                    CoveBuild.InformationalVersion,
+                    paths.Channel,
+                    ControlToken:
+                        ControlCredential.Read(paths.DataDir)),
                 CoveJsonContext.Default.HelloParams);
             await conn.WriteFrameAsync(FrameType.Request, 0,
                 ControlCodec.Encode(new ControlRequest("1", "cove://sys/hello", hello)), cancellationToken).ConfigureAwait(false);

@@ -52,7 +52,7 @@ public sealed class LoopRouteTests
     }
 
     [PlatformFact(TestOperatingSystem.Unix)]
-    public async Task RepeatContinue_WritesPendingIntent()
+    public async Task RepeatContinue_AcknowledgesConsumedDurableIntent()
     {
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(60));
         CancellationToken ct = cts.Token;
@@ -70,7 +70,7 @@ public sealed class LoopRouteTests
     }
 
     [PlatformFact(TestOperatingSystem.Unix)]
-    public async Task RepeatFinish_WritesPendingIntent()
+    public async Task RepeatFinish_AcknowledgesOnlyAfterScheduleIsRemoved()
     {
         using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(60));
         CancellationToken ct = cts.Token;
@@ -82,6 +82,10 @@ public sealed class LoopRouteTests
 
         var finishResp = await SendAsync(ctl, "fn", "cove://commands/task.repeat.finish", P($"{{\"cardId\":\"{cardId}\"}}"), ct);
         Assert.True(finishResp.Ok, finishResp.Error?.Code);
+
+        var getResp = await SendAsync(ctl, "g", "cove://commands/task.repeat.get", P($"{{\"cardId\":\"{cardId}\"}}"), ct);
+        Assert.False(getResp.Ok);
+        Assert.Equal("not_found", getResp.Error!.Code);
     }
 
     [PlatformFact(TestOperatingSystem.Unix)]

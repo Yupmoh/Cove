@@ -23,7 +23,7 @@ public sealed class NookSpawnYoloTests
         try
         {
             using var nooks = NewNooks();
-            var orch = new LaunchOrchestrator(overrideStore: new LauncherOverrideStore(dir));
+            var orch = LaunchTestFactory.Create(overrides: new LauncherOverrideStore(dir));
             var request = new ControlRequest("1", "cove://commands/nook.spawn", JsonDocument.Parse("""{"command":"/bin/sh","args":["-c","sleep 30"],"adapter":"claude-code","yolo":true}""").RootElement);
 
             var response = await EngineCommandRouter.RouteAsync(request, nooks: nooks, launcher: orch);
@@ -44,7 +44,7 @@ public sealed class NookSpawnYoloTests
         try
         {
             using var nooks = NewNooks();
-            var orch = new LaunchOrchestrator(overrideStore: new LauncherOverrideStore(dir));
+            var orch = LaunchTestFactory.Create(overrides: new LauncherOverrideStore(dir));
             var request = new ControlRequest("1", "cove://commands/nook.spawn", JsonDocument.Parse("""{"command":"/bin/sh","args":["-c","sleep 30"],"adapter":"claude-code"}""").RootElement);
 
             var response = await EngineCommandRouter.RouteAsync(request, nooks: nooks, launcher: orch);
@@ -63,7 +63,7 @@ public sealed class NookSpawnYoloTests
         try
         {
             using var nooks = NewNooks();
-            var orch = new LaunchOrchestrator(overrideStore: new LauncherOverrideStore(dir));
+            var orch = LaunchTestFactory.Create(overrides: new LauncherOverrideStore(dir));
             var request = new ControlRequest("1", "cove://commands/nook.spawn", JsonDocument.Parse("""{"command":"/bin/sh","args":["-c","sleep 30"],"yolo":true}""").RootElement);
 
             var response = await EngineCommandRouter.RouteAsync(request, nooks: nooks, launcher: orch);

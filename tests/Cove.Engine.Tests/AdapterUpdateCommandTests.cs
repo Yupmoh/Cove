@@ -6,8 +6,9 @@ namespace Cove.Engine.Tests;
 
 public sealed class AdapterUpdateCommandTests
 {
-    private static AdapterManifest Manifest(string name, IReadOnlyDictionary<string, InstallRecipe>? install = null) => new()
+    private static AdapterManifest Manifest(string name, PlatformRecipes? install = null) => new()
     {
+        SdkVersion = 2,
         Name = name,
         DisplayName = name,
         Description = "test",
@@ -15,7 +16,7 @@ public sealed class AdapterUpdateCommandTests
         Binary = name,
         Version = "1.0.0",
         Methods = new Dictionary<string, AdapterMethod>(),
-        Install = install ?? new Dictionary<string, InstallRecipe>(),
+        Install = install,
     };
 
     [Fact]
@@ -77,12 +78,7 @@ public sealed class AdapterUpdateCommandTests
     [Fact]
     public void ManifestInstallRecipe_YieldsToDetectedProvenance()
     {
-        var install = new Dictionary<string, InstallRecipe>
-        {
-            ["macos"] = new() { Cmd = "npm install -g opencode-ai@latest" },
-            ["linux"] = new() { Cmd = "npm install -g opencode-ai@latest" },
-            ["windows"] = new() { Cmd = "npm install -g opencode-ai@latest" },
-        };
+        var install = Recipes("npm install -g opencode-ai@latest");
         var cmd = AdapterListCommands.ResolveUpdateCommand(Manifest("opencode", install), "/opt/homebrew/Cellar/opencode/1.18.2/bin/opencode");
         Assert.Equal("brew upgrade opencode", cmd);
     }
@@ -90,12 +86,7 @@ public sealed class AdapterUpdateCommandTests
     [Fact]
     public void ManifestInstallRecipe_CoversUnknownProvenance()
     {
-        var install = new Dictionary<string, InstallRecipe>
-        {
-            ["macos"] = new() { Cmd = "mise upgrade claude" },
-            ["linux"] = new() { Cmd = "mise upgrade claude" },
-            ["windows"] = new() { Cmd = "mise upgrade claude" },
-        };
+        var install = Recipes("mise upgrade claude");
         var cmd = AdapterListCommands.ResolveUpdateCommand(Manifest("claude-code", install), "/Users/x/.claude/local/claude");
         Assert.Equal("mise upgrade claude", cmd);
     }
@@ -103,12 +94,7 @@ public sealed class AdapterUpdateCommandTests
     [Fact]
     public void ExplicitUpdateRecipe_WinsOverProvenance()
     {
-        var update = new Dictionary<string, InstallRecipe>
-        {
-            ["macos"] = new() { Cmd = "hermes update" },
-            ["linux"] = new() { Cmd = "hermes update" },
-            ["windows"] = new() { Cmd = "hermes update" },
-        };
+        var update = Recipes("hermes update");
         var manifest = Manifest("hermes") with { Update = update };
         Assert.Equal("hermes update", AdapterListCommands.ResolveUpdateCommand(manifest, "/opt/homebrew/Cellar/hermes/1.0/bin/hermes"));
     }
@@ -116,12 +102,7 @@ public sealed class AdapterUpdateCommandTests
     [Fact]
     public void ExplicitUninstallRecipe_EnablesRemovalWithoutProvenance()
     {
-        var uninstall = new Dictionary<string, InstallRecipe>
-        {
-            ["macos"] = new() { Cmd = "hermes uninstall" },
-            ["linux"] = new() { Cmd = "hermes uninstall" },
-            ["windows"] = new() { Cmd = "hermes uninstall" },
-        };
+        var uninstall = Recipes("hermes uninstall");
         var manifest = Manifest("hermes") with { Uninstall = uninstall };
         Assert.Equal("hermes uninstall", AdapterListCommands.ResolveUninstallCommand(manifest, "/Users/x/.local/bin/hermes"));
     }
@@ -129,18 +110,8 @@ public sealed class AdapterUpdateCommandTests
     [Fact]
     public void InstallCommand_UsesRecipeNotSelfUpdater()
     {
-        var install = new Dictionary<string, InstallRecipe>
-        {
-            ["macos"] = new() { Cmd = "curl https://cursor.com/install -fsS | bash" },
-            ["linux"] = new() { Cmd = "curl https://cursor.com/install -fsS | bash" },
-            ["windows"] = new() { Cmd = "curl https://cursor.com/install -fsS | bash" },
-        };
-        var update = new Dictionary<string, InstallRecipe>
-        {
-            ["macos"] = new() { Cmd = "agent update" },
-            ["linux"] = new() { Cmd = "agent update" },
-            ["windows"] = new() { Cmd = "agent update" },
-        };
+        var install = Recipes("curl https://cursor.com/install -fsS | bash");
+        var update = Recipes("agent update");
         var manifest = Manifest("cursor-agent") with { Install = install, Update = update };
         Assert.Equal("curl https://cursor.com/install -fsS | bash", AdapterListCommands.ResolveInstallCommand(manifest));
         Assert.Equal("agent update", AdapterListCommands.ResolveUpdateCommand(manifest, null));
@@ -198,4 +169,11 @@ public sealed class AdapterUpdateCommandTests
     {
         Assert.Null(AdapterListCommands.ResolveUninstallCommand(Manifest("claude-code"), "/Users/x/.claude/local/claude"));
     }
+
+    private static PlatformRecipes Recipes(string command) => new()
+    {
+        Macos = new InstallRecipe { Cmd = command },
+        Linux = new InstallRecipe { Cmd = command },
+        Windows = new InstallRecipe { Cmd = command },
+    };
 }

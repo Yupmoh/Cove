@@ -41,9 +41,9 @@ public sealed class AdapterUpdatesCheckCommandTests
           "binary": "{{binary}}",
           "version": "1.0.0",
           "author": "test",
-          "wellKnownPaths": ["{{binDir}}"],
           "binaryDiscovery": {
             "commands": ["{{binary}}"],
+            "wellKnownPaths": ["{{binDir}}"],
             "versionFlag": "--version",
             "versionRegex": "(\\d+\\.\\d+\\.\\d+)"
           },
@@ -56,7 +56,7 @@ public sealed class AdapterUpdatesCheckCommandTests
     private static void ConfigureChecker(Func<string, string?> latestByPackage, List<string> fetched)
     {
         AdapterUpdateCommands.Configure(new HarnessUpdateChecker(
-            (pkg, _) => { fetched.Add(pkg); return Task.FromResult(latestByPackage(pkg)); },
+            new TestHarnessRegistryClient((pkg, _) => { fetched.Add(pkg); return Task.FromResult(latestByPackage(pkg)); }),
             cacheTtl: TimeSpan.Zero));
     }
 
@@ -67,7 +67,7 @@ public sealed class AdapterUpdatesCheckCommandTests
         var binDir = WriteFakeBinary(root, "cove-fake-codex", "0.0.1");
         WriteAdapter(root, "codex", "cove-fake-codex", binDir);
         var store = new AdapterManifestStore(root);
-        var orch = new LaunchOrchestrator(store, new MethodRunner(), new BinaryDiscoveryService());
+        var orch = LaunchTestFactory.Create(store, new MethodRunner(), new BinaryDiscoveryService());
         var fetched = new List<string>();
         ConfigureChecker(_ => "9.9.9", fetched);
 
@@ -93,7 +93,7 @@ public sealed class AdapterUpdatesCheckCommandTests
         var binDir = WriteFakeBinary(root, "cove-fake-codex", "0.0.1");
         WriteAdapter(root, "codex", "cove-fake-codex", binDir);
         var store = new AdapterManifestStore(root);
-        var orch = new LaunchOrchestrator(store, new MethodRunner(), new BinaryDiscoveryService());
+        var orch = LaunchTestFactory.Create(store, new MethodRunner(), new BinaryDiscoveryService());
         ConfigureChecker(_ => "0.0.1", []);
 
         var request = new ControlRequest("1", "cove://commands/adapter.updates-check");
@@ -111,7 +111,7 @@ public sealed class AdapterUpdatesCheckCommandTests
         WriteAdapter(root, "mystery-tool", "cove-fake-tool", binDir);
         WriteAdapter(root, "opencode", "cove-absent-binary", binDir);
         var store = new AdapterManifestStore(root);
-        var orch = new LaunchOrchestrator(store, new MethodRunner(), new BinaryDiscoveryService());
+        var orch = LaunchTestFactory.Create(store, new MethodRunner(), new BinaryDiscoveryService());
         var fetched = new List<string>();
         ConfigureChecker(_ => "9.9.9", fetched);
 
@@ -135,5 +135,12 @@ public sealed class AdapterUpdatesCheckCommandTests
         Assert.NotNull(response);
         Assert.False(response!.Ok);
         Assert.Equal("not_ready", response.Error!.Code);
+    }
+
+    private sealed class TestHarnessRegistryClient(
+        Func<string, CancellationToken, Task<string?>> fetch) : IHarnessRegistryClient
+    {
+        public Task<string?> GetLatestVersionAsync(string package, CancellationToken cancellationToken = default)
+            => fetch(package, cancellationToken);
     }
 }

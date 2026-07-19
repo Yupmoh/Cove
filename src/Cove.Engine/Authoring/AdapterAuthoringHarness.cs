@@ -97,7 +97,7 @@ public static class AdapterTestFixture
         {
             ["sessionStartManifest"] = new() { Kind = HookEnvelopeKind.Identity },
             ["userPromptSubmit"] = new() { Kind = HookEnvelopeKind.HookSpecificOutput, IncludeSystemMessage = true },
-            ["preToolUse"] = new() { Kind = HookEnvelopeKind.FlatAdditionalContext },
+            ["preToolUse"] = new() { Kind = HookEnvelopeKind.HookSpecificOutput, HookEventName = "PreToolUse" },
         },
     };
 

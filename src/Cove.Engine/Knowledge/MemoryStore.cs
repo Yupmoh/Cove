@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Cove.Persistence;
 using Cove.Protocol;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
@@ -8,15 +9,19 @@ namespace Cove.Engine.Knowledge;
 
 public sealed class MemoryStore
 {
-    private readonly string _dbPath;
+    private readonly SqliteConnectionFactory _database;
     private readonly string _factsDir;
     private readonly ILogger _logger;
 
-    public MemoryStore(string dataDir, ILogger logger)
+    public MemoryStore(
+        string dataDir,
+        ILogger logger,
+        SqliteConnectionFactory? database = null)
     {
-        _dbPath = System.IO.Path.Combine(dataDir, "memory", "memory.db");
+        var databasePath = System.IO.Path.Combine(dataDir, "memory", "memory.db");
         _factsDir = System.IO.Path.Combine(dataDir, "memory", "facts");
         _logger = logger;
+        _database = database ?? new SqliteConnectionFactory(databasePath, logger);
     }
 
     public Fact AddFact(Fact fact)
@@ -28,8 +33,8 @@ public sealed class MemoryStore
         if (fact.CreatedAt == default) fact = fact with { CreatedAt = now };
         fact = fact with { UpdatedAt = now };
 
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
+
         using var cmd = conn.CreateCommand();
         cmd.CommandText = """
             INSERT INTO facts (id, bay_id, kind, content, confidence, access_count, audience, locus, file_path, superseded_by, created_at, updated_at)
@@ -47,7 +52,7 @@ public sealed class MemoryStore
         cmd.Parameters.AddWithValue("@updated", fact.UpdatedAt.ToString("o"));
         cmd.ExecuteNonQuery();
 
-        OffloadFactToFile(fact);
+        WriteFactExport(fact);
 
         _logger.LogWarning("memory: added fact {id} ({kind}) in {ws}", fact.Id, fact.Kind, fact.BayId);
         return fact;
@@ -55,8 +60,8 @@ public sealed class MemoryStore
 
     public Fact? GetFact(string bayId, string id)
     {
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
+
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT id, bay_id, kind, content, confidence, access_count, audience, locus, file_path, superseded_by, created_at, updated_at FROM facts WHERE bay_id = @ws AND id = @id";
         cmd.Parameters.AddWithValue("@ws", bayId);
@@ -69,8 +74,8 @@ public sealed class MemoryStore
     public System.Collections.Generic.IReadOnlyList<Fact> ListFacts(string bayId, string? kind = null, string? audience = null)
     {
         var result = new System.Collections.Generic.List<Fact>();
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
+
         using var cmd = conn.CreateCommand();
         var sql = "SELECT id, bay_id, kind, content, confidence, access_count, audience, locus, file_path, superseded_by, created_at, updated_at FROM facts WHERE bay_id = @ws";
         if (kind is not null) sql += " AND kind = @kind";
@@ -89,8 +94,8 @@ public sealed class MemoryStore
     public System.Collections.Generic.IReadOnlyList<Fact> SearchFacts(string bayId, string query, int limit = 20)
     {
         var result = new System.Collections.Generic.List<Fact>();
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
+
         using var cmd = conn.CreateCommand();
         cmd.CommandText = """
             SELECT f.id, f.bay_id, f.kind, f.content, f.confidence, f.access_count, f.audience, f.locus, f.file_path, f.superseded_by, f.created_at, f.updated_at
@@ -120,14 +125,17 @@ public sealed class MemoryStore
 
         var created = AddFact(newFact);
 
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
+
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "UPDATE facts SET superseded_by = @newId, updated_at = @ts WHERE id = @oldId";
         cmd.Parameters.AddWithValue("@newId", created.Id);
         cmd.Parameters.AddWithValue("@oldId", oldFactId);
         cmd.Parameters.AddWithValue("@ts", System.DateTimeOffset.UtcNow.ToString("o"));
         cmd.ExecuteNonQuery();
+        var updatedOldFact = GetFact(bayId, oldFactId);
+        if (updatedOldFact is not null)
+            WriteFactExport(updatedOldFact);
 
         var chain = GetSupersedeChain(bayId, oldFactId);
         _logger.LogWarning("memory: superseded {oldId} → {newId} (chain length: {len})", oldFactId, created.Id, chain.Count);
@@ -153,74 +161,60 @@ public sealed class MemoryStore
         return chain;
     }
 
-    public void ReindexFromDisk(string bayId)
+    public void RefreshFileExports(string bayId)
     {
-        System.IO.Directory.CreateDirectory(_factsDir);
         var wsDir = System.IO.Path.Combine(_factsDir, bayId);
-        if (!System.IO.Directory.Exists(wsDir)) return;
-
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
-        using var clearCmd = conn.CreateCommand();
-        clearCmd.CommandText = "DELETE FROM facts WHERE bay_id = @ws";
-        clearCmd.Parameters.AddWithValue("@ws", bayId);
-        clearCmd.ExecuteNonQuery();
-
-        int count = 0;
-        foreach (var file in System.IO.Directory.GetFiles(wsDir, "*.json"))
+        System.IO.Directory.CreateDirectory(wsDir);
+        using var conn = _database.Open();
+        using var command = conn.CreateCommand();
+        command.CommandText = """
+            SELECT id, bay_id, kind, content, confidence, access_count, audience, locus, file_path, superseded_by, created_at, updated_at
+            FROM facts
+            WHERE bay_id = @ws
+            """;
+        command.Parameters.AddWithValue("@ws", bayId);
+        var facts = new System.Collections.Generic.List<Fact>();
+        using (var reader = command.ExecuteReader())
         {
-            try
-            {
-                var fact = JsonSerializer.Deserialize(System.IO.File.ReadAllText(file), CoveJsonContext.Default.Fact);
-                if (fact is null) continue;
-                using var cmd = conn.CreateCommand();
-                cmd.CommandText = """
-                    INSERT INTO facts (id, bay_id, kind, content, confidence, access_count, audience, locus, file_path, superseded_by, created_at, updated_at)
-                    VALUES (@id, @ws, @kind, @content, @conf, @ac, @aud, @locus, @fp, @sb, @created, @updated);
-                    """;
-                cmd.Parameters.AddWithValue("@id", fact.Id);
-                cmd.Parameters.AddWithValue("@ws", fact.BayId);
-                cmd.Parameters.AddWithValue("@kind", fact.Kind);
-                cmd.Parameters.AddWithValue("@content", fact.Content);
-                cmd.Parameters.AddWithValue("@conf", fact.Confidence);
-                cmd.Parameters.AddWithValue("@ac", fact.AccessCount);
-                cmd.Parameters.AddWithValue("@aud", (object?)fact.Audience ?? System.DBNull.Value);
-                cmd.Parameters.AddWithValue("@locus", (object?)fact.Locus ?? System.DBNull.Value);
-                cmd.Parameters.AddWithValue("@fp", (object?)fact.FilePath ?? System.DBNull.Value);
-                cmd.Parameters.AddWithValue("@sb", (object?)fact.SupersededBy ?? System.DBNull.Value);
-                cmd.Parameters.AddWithValue("@created", fact.CreatedAt.ToString("o"));
-                cmd.Parameters.AddWithValue("@updated", fact.UpdatedAt.ToString("o"));
-                cmd.ExecuteNonQuery();
-                count++;
-            }
-            catch (System.Exception ex)
-            {
-                _logger.LogWarning("memory: reindex failed for {file}: {err}", file, ex.Message);
-            }
+            while (reader.Read())
+                facts.Add(ReadFact(reader));
         }
 
-        _logger.LogWarning("memory: reindexed {count} facts from disk for {ws}", count, bayId);
+        var expectedFiles = new System.Collections.Generic.HashSet<string>(
+            facts.Select(fact => fact.Id + ".json"),
+            System.StringComparer.Ordinal);
+        foreach (var file in System.IO.Directory.GetFiles(wsDir, "*.json"))
+        {
+            if (!expectedFiles.Contains(System.IO.Path.GetFileName(file)))
+                System.IO.File.Delete(file);
+        }
+        foreach (var fact in facts)
+            WriteFactExport(fact);
+
+        _logger.LogWarning("memory: refreshed {count} fact exports for {ws}", facts.Count, bayId);
     }
 
     public void IncrementAccessCount(string bayId, string factId)
     {
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
+
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "UPDATE facts SET access_count = access_count + 1, updated_at = @ts WHERE id = @id AND bay_id = @ws";
         cmd.Parameters.AddWithValue("@id", factId);
         cmd.Parameters.AddWithValue("@ws", bayId);
         cmd.Parameters.AddWithValue("@ts", System.DateTimeOffset.UtcNow.ToString("o"));
         cmd.ExecuteNonQuery();
+        var updated = GetFact(bayId, factId);
+        if (updated is not null)
+            WriteFactExport(updated);
     }
 
-    private void OffloadFactToFile(Fact fact)
+    private void WriteFactExport(Fact fact)
     {
         var wsDir = System.IO.Path.Combine(_factsDir, fact.BayId);
         System.IO.Directory.CreateDirectory(wsDir);
         var path = System.IO.Path.Combine(wsDir, fact.Id + ".json");
-        fact = fact with { FilePath = path };
-        System.IO.File.WriteAllText(path, JsonSerializer.Serialize(fact, CoveJsonContext.Default.Fact));
+        System.IO.File.WriteAllText(path, JsonSerializer.Serialize(fact, Cove.Protocol.CoveJsonContext.Default.Fact));
     }
 
 

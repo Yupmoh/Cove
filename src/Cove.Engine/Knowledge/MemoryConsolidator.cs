@@ -1,4 +1,5 @@
 using System.Threading;
+using Cove.Persistence;
 using Cove.Protocol;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
@@ -8,13 +9,17 @@ namespace Cove.Engine.Knowledge;
 
 public sealed class ProposalStore
 {
-    private readonly string _dbPath;
+    private readonly SqliteConnectionFactory _database;
     private readonly ILogger _logger;
 
-    public ProposalStore(string dataDir, ILogger logger)
+    public ProposalStore(
+        string dataDir,
+        ILogger logger,
+        SqliteConnectionFactory? database = null)
     {
-        _dbPath = System.IO.Path.Combine(dataDir, "memory", "memory.db");
+        var databasePath = System.IO.Path.Combine(dataDir, "memory", "memory.db");
         _logger = logger;
+        _database = database ?? new SqliteConnectionFactory(databasePath, logger);
     }
 
     public Proposal Create(string bayId, string kind, string content)
@@ -28,8 +33,8 @@ public sealed class ProposalStore
             System.DateTimeOffset.UtcNow
         );
 
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
+
         EnsureTable(conn);
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "INSERT INTO proposals (id, bay_id, kind, content, state, created_at) VALUES (@id, @ws, @kind, @content, @state, @ts)";
@@ -47,8 +52,8 @@ public sealed class ProposalStore
 
     public Proposal? Get(string id)
     {
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
+
         EnsureTable(conn);
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT id, bay_id, kind, content, state, created_at FROM proposals WHERE id = @id";
@@ -61,8 +66,8 @@ public sealed class ProposalStore
     public System.Collections.Generic.IReadOnlyList<Proposal> ListByBay(string bayId, string? state = null)
     {
         var result = new System.Collections.Generic.List<Proposal>();
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
+
         EnsureTable(conn);
         using var cmd = conn.CreateCommand();
         if (state is null)
@@ -84,8 +89,8 @@ public sealed class ProposalStore
 
     public bool Transition(string id, string newState)
     {
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
+
         EnsureTable(conn);
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "UPDATE proposals SET state = @state WHERE id = @id AND state != @state";

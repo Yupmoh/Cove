@@ -25,7 +25,7 @@ public sealed class LaunchOrchestratorTests
     [Fact]
     public void BuildLaunchCommand_AppliesYoloOverride()
     {
-        var orch = new LaunchOrchestrator();
+        var orch = LaunchTestFactory.Create();
         var profile = NewProfile();
         var overrides = new LauncherOverrides { Yolo = true, WorkingDir = "/tmp" };
 
@@ -39,7 +39,7 @@ public sealed class LaunchOrchestratorTests
     [Fact]
     public void BuildLaunchCommand_BinaryNotDuplicatedInArgs()
     {
-        var orch = new LaunchOrchestrator();
+        var orch = LaunchTestFactory.Create();
         var profile = NewProfile();
         var overrides = new LauncherOverrides();
 
@@ -53,7 +53,7 @@ public sealed class LaunchOrchestratorTests
     [Fact]
     public void BuildLaunchCommand_CustomFlagsApplied()
     {
-        var orch = new LaunchOrchestrator();
+        var orch = LaunchTestFactory.Create();
         var profile = NewProfile();
         var overrides = new LauncherOverrides { ExtraFlags = new[] { "--verbose", "--model=opus" } };
 
@@ -66,7 +66,7 @@ public sealed class LaunchOrchestratorTests
     [Fact]
     public void BuildLaunchCommand_EnvVarsApplied()
     {
-        var orch = new LaunchOrchestrator();
+        var orch = LaunchTestFactory.Create();
         var profile = NewProfile();
         var overrides = new LauncherOverrides { Env = new Dictionary<string, string> { ["FOO"] = "bar" } };
 
@@ -78,7 +78,7 @@ public sealed class LaunchOrchestratorTests
     [Fact]
     public async Task ResumeAsync_WithoutAdapterService_FallsBackToLaunchCommand()
     {
-        var orch = new LaunchOrchestrator();
+        var orch = LaunchTestFactory.Create();
         var profile = NewProfile();
         var overrides = new LauncherOverrides { Yolo = true };
 
@@ -94,7 +94,7 @@ public sealed class LaunchOrchestratorTests
     {
         var stubAdapter = new StubResumeAdapter();
         var resumeService = new AgentResumeService(stubAdapter);
-        var orch = new LaunchOrchestrator(resumeService);
+        var orch = LaunchTestFactory.Create(resume: resumeService);
         var profile = NewProfile();
         var overrides = new LauncherOverrides { Yolo = true };
 
@@ -108,7 +108,7 @@ public sealed class LaunchOrchestratorTests
     [Fact]
     public void PersistOverrides_StoreAndRetrieve()
     {
-        var orch = new LaunchOrchestrator();
+        var orch = LaunchTestFactory.Create();
         var overrides = new LauncherOverrides { Yolo = true, ExtraFlags = new[] { "--verbose" } };
 
         orch.PersistOverrides("p1", overrides);
@@ -122,14 +122,14 @@ public sealed class LaunchOrchestratorTests
     [Fact]
     public void PersistOverrides_UnknownNook_ReturnsNull()
     {
-        var orch = new LaunchOrchestrator();
+        var orch = LaunchTestFactory.Create();
         Assert.Null(orch.GetOverrides("nonexistent"));
     }
 
     [Fact]
     public void ClearOverrides_RemovesEntry()
     {
-        var orch = new LaunchOrchestrator();
+        var orch = LaunchTestFactory.Create();
         orch.PersistOverrides("p1", new LauncherOverrides { Yolo = true });
         orch.ClearOverrides("p1");
         Assert.Null(orch.GetOverrides("p1"));

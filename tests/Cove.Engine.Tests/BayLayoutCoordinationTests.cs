@@ -24,8 +24,8 @@ public sealed class BayLayoutCoordinationTests
     public async Task Create_MakesBayActiveInLayout_AndEmpty()
     {
         int n = 0;
-        await using var mgr = new BayManager(newId: () => $"id-{++n}");
         var layout = new LayoutService();
+        await using var mgr = new BayManager(newId: () => $"id-{++n}", layout: layout);
 
         var created = await Route(mgr, layout, "cove://commands/bay.create", Create("proj", "/tmp/a"));
         var id = created!.Data!.Value.GetProperty("id").GetString()!;
@@ -39,8 +39,8 @@ public sealed class BayLayoutCoordinationTests
     public async Task Switch_SwapsActiveLayoutBay()
     {
         int n = 0;
-        await using var mgr = new BayManager(newId: () => $"id-{++n}");
         var layout = new LayoutService();
+        await using var mgr = new BayManager(newId: () => $"id-{++n}", layout: layout);
 
         var a = (await Route(mgr, layout, "cove://commands/bay.create", Create("A", "/tmp/a")))!.Data!.Value.GetProperty("id").GetString()!;
         var b = (await Route(mgr, layout, "cove://commands/bay.create", Create("B", "/tmp/b")))!.Data!.Value.GetProperty("id").GetString()!;
@@ -55,8 +55,8 @@ public sealed class BayLayoutCoordinationTests
     public async Task LayoutGet_ReflectsActiveBayIdentity()
     {
         int n = 0;
-        await using var mgr = new BayManager(newId: () => $"id-{++n}");
         var layout = new LayoutService();
+        await using var mgr = new BayManager(newId: () => $"id-{++n}", layout: layout);
 
         var a = (await Route(mgr, layout, "cove://commands/bay.create", Create("Alpha", "/tmp/alpha")))!.Data!.Value.GetProperty("id").GetString()!;
 
@@ -71,8 +71,8 @@ public sealed class BayLayoutCoordinationTests
     public async Task Delete_RemovesLayoutBay()
     {
         int n = 0;
-        await using var mgr = new BayManager(newId: () => $"id-{++n}");
         var layout = new LayoutService();
+        await using var mgr = new BayManager(newId: () => $"id-{++n}", layout: layout);
 
         var a = (await Route(mgr, layout, "cove://commands/bay.create", Create("A", "/tmp/a")))!.Data!.Value.GetProperty("id").GetString()!;
         layout.CreateShore("Terminal 1", new NookLeaf { NookId = "p1", Subtabs = new[] { new Subtab("p1", NookType.Terminal) } });

@@ -15,7 +15,7 @@ public sealed class LauncherOverridePersistenceTests
         try
         {
             var store = new LauncherOverrideStore(dir);
-            var orch = new LaunchOrchestrator(overrideStore: store);
+            var orch = LaunchTestFactory.Create(overrides: store);
             var overrides = new LauncherOverrides { Yolo = true, ExtraFlags = new[] { "--verbose" }, WorkingDir = "/tmp" };
 
             orch.PersistOverrides("nook-1", overrides);
@@ -38,7 +38,7 @@ public sealed class LauncherOverridePersistenceTests
             var store = new LauncherOverrideStore(dir);
             store.Save("nook-2", new LauncherOverrides { Yolo = false, ExtraFlags = new[] { "--model", "x" } });
 
-            var orch = new LaunchOrchestrator(overrideStore: store);
+            var orch = LaunchTestFactory.Create(overrides: store);
             var retrieved = orch.GetOverrides("nook-2");
 
             Assert.NotNull(retrieved);
@@ -55,7 +55,7 @@ public sealed class LauncherOverridePersistenceTests
         try
         {
             var store = new LauncherOverrideStore(dir);
-            var orch = new LaunchOrchestrator(overrideStore: store);
+            var orch = LaunchTestFactory.Create(overrides: store);
             orch.PersistOverrides("nook-3", new LauncherOverrides { Yolo = true });
 
             orch.ClearOverrides("nook-3");

@@ -83,6 +83,18 @@ internal sealed class EngineEventRouter
             _ = gui.WriteFrameAsync(FrameType.Event, 0, frame, _shutdownToken);
     }
 
+    public void BroadcastDictation(string channel, JsonElement payload)
+    {
+        FrameConnection[] guis;
+        lock (_guiLock)
+            guis = _guiConnections.ToArray();
+        if (guis.Length == 0)
+            return;
+        var frame = ControlCodec.Encode(new ControlEvent(channel, payload));
+        foreach (var gui in guis)
+            _ = gui.WriteFrameAsync(FrameType.Event, 0, frame, _shutdownToken);
+    }
+
     private static bool IsMutatingVerb(string uri)
     {
         return uri.StartsWith("cove://commands/bay.", StringComparison.Ordinal)

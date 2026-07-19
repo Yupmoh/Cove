@@ -4,6 +4,7 @@ using Cove.Engine.Launch;
 using Cove.Engine.Layout;
 using Cove.Engine.Pty;
 using Cove.Engine.Sessions;
+using Cove.Persistence;
 using Microsoft.Extensions.Logging;
 
 namespace Cove.Engine.Daemon;
@@ -44,6 +45,8 @@ internal sealed class PersistenceCoordinator : IDisposable
         LaunchOrchestrator launcher,
         HookEventRouter hookRouter)
     {
+        if (!ReferenceEquals(_layout, bays.Layout))
+            throw new InvalidOperationException("persistence coordinator and bay manager must share one workspace aggregate");
         if (Interlocked.Exchange(ref _attached, 1) != 0)
             throw new InvalidOperationException("persistence coordinator already attached");
         _bays = bays;
@@ -73,8 +76,21 @@ internal sealed class PersistenceCoordinator : IDisposable
 
     public void HandleBayChange(BayChange change)
     {
-        if (change.Kind == BayChangeKind.Updated)
-            PersistBay(change.BayId);
+        switch (change.Kind)
+        {
+            case BayChangeKind.Created:
+            case BayChangeKind.Updated:
+                PersistBay(change.BayId);
+                break;
+            case BayChangeKind.Deleted:
+                BayPersistence.Delete(change.BayId, _baysRoot, _logger);
+                break;
+            case BayChangeKind.Switched:
+            case BayChangeKind.Reordered:
+                break;
+        }
+        PersistBayOrder(change.OpenBayIds);
+        PersistWorkspaceState(change);
     }
 
     public void PersistBayOrder(IReadOnlyList<string> ids)
@@ -82,8 +98,10 @@ internal sealed class PersistenceCoordinator : IDisposable
         var orderPath = Path.Combine(_baysRoot, BayStartup.OrderFileName);
         try
         {
-            Directory.CreateDirectory(_baysRoot);
-            File.WriteAllLines(orderPath, ids);
+            var content = ids.Count == 0
+                ? string.Empty
+                : string.Join(Environment.NewLine, ids) + Environment.NewLine;
+            AtomicJsonStore.WriteRawText(orderPath, content, _logger);
         }
         catch (IOException ex)
         {
@@ -94,6 +112,31 @@ internal sealed class PersistenceCoordinator : IDisposable
     public void PersistActiveBay()
     {
         PersistBay(_layout.ActiveBayId);
+    }
+
+    private void PersistWorkspaceState(BayChange change)
+    {
+        var path = Path.Combine(Path.GetDirectoryName(_baysRoot)!, "state.json");
+        try
+        {
+            var current = AtomicJsonStore.Read(
+                    path,
+                    CoveJsonContext.Default.CoveState,
+                    _logger)
+                ?? new CoveState();
+            AtomicJsonStore.Write(
+                path,
+                current with
+                {
+                    FocusedBay = change.ActiveBayId,
+                    OpenBays = change.OpenBayIds,
+                },
+                CoveJsonContext.Default.CoveState);
+        }
+        catch (Exception ex)
+        {
+            _logger.BayPersistenceFailed($"workspace state path={path} error={ex.Message}");
+        }
     }
 
     public void MarkNookBayDirty(string nookId)

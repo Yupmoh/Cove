@@ -24,7 +24,7 @@ public sealed class AdapterListStatusTests
     {
         var root = WriteFixture("test-v2");
         var store = new AdapterManifestStore(root);
-        var orch = new LaunchOrchestrator(store, new MethodRunner(), new BinaryDiscoveryService());
+        var orch = LaunchTestFactory.Create(store, new MethodRunner(), new BinaryDiscoveryService());
 
         var request = new ControlRequest("1", "cove://commands/adapter.list");
         var response = await EngineCommandRouter.RouteAsync(request, manifestStore: store, launcher: orch);

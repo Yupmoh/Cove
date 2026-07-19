@@ -14,21 +14,22 @@ internal sealed class NookRegistryEnvTarget : IEnvPropagationTarget
         foreach (var desc in _nooks.Descriptors())
         {
             if (string.Equals(desc.Command, binary, StringComparison.OrdinalIgnoreCase))
-            {
-                if (_nooks.TryGet(desc.NookId, out var session))
-                    matches.Add(new NookSignalAdapter(session));
-            }
+                matches.Add(new NookSignalAdapter(_nooks, desc.NookId));
         }
         return matches;
     }
 
     private sealed class NookSignalAdapter : ISignalableNook
     {
-        private readonly NookSession _session;
-        public string NookId => _session.NookId;
+        private readonly NookRegistry _registry;
+        public string NookId { get; }
 
-        public NookSignalAdapter(NookSession session) => _session = session;
+        public NookSignalAdapter(NookRegistry registry, string nookId)
+        {
+            _registry = registry;
+            NookId = nookId;
+        }
 
-        public bool Signal(int signum) => _session.Session.Signal(signum);
+        public bool Signal(int signum) => _registry.Signal(NookId, signum);
     }
 }

@@ -45,16 +45,14 @@ public sealed class BayModelTests
     [Fact]
     public void RegistryModel_StateJson_RoundTrips()
     {
-        var reg = new RegistryModel
+        var model = new RegistryModel
         {
-            FocusedBayId = "ws1",
             OpenBays = ["ws1", "ws2"],
             Collections = [new Collection { Id = "c1", Name = "client-a" }],
             ActiveCollectionId = "c1",
         };
-        var json = JsonSerializer.Serialize(reg, BaysJsonContext.Default.RegistryModel);
+        var json = JsonSerializer.Serialize(model, BaysJsonContext.Default.RegistryModel);
         var back = JsonSerializer.Deserialize(json, BaysJsonContext.Default.RegistryModel)!;
-        Assert.Equal("ws1", back.FocusedBayId);
         Assert.Equal(2, back.OpenBays.Count);
         Assert.Single(back.Collections);
         Assert.Equal("client-a", back.Collections[0].Name);

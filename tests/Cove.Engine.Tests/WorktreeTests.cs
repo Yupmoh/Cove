@@ -53,12 +53,12 @@ public sealed class WorktreeTests
         Assert.Equal(wt.Id, list[0].Id);
 
         await m.SwitchBayAsync(wt.Id);
-        Assert.Equal(wt.Id, m.Registry.FocusedBayId);
+        Assert.Equal(wt.Id, m.ActiveBayId);
 
         var removed = await m.RemoveWorktreeAsync(wt.Id);
         Assert.True(removed);
         Assert.Empty(m.ListWorktrees(parent.Id));
-        Assert.Equal(parent.Id, m.Registry.FocusedBayId);
+        Assert.Equal(parent.Id, m.ActiveBayId);
         Assert.Contains(git.Calls, c => c.StartsWith("worktree remove", StringComparison.Ordinal));
     }
 

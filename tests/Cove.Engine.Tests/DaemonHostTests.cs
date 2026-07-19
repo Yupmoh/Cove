@@ -10,6 +10,20 @@ namespace Cove.Engine.Tests;
 public sealed class DaemonHostTests
 {
     [Fact]
+    public void CommandNamespaceSessionRoutes_AreGenerated()
+    {
+        Assert.Contains(
+            "cove://commands/window.focus",
+            EngineCommandCatalogue.RegisteredRoutes);
+        Assert.Contains(
+            "cove://commands/restore.summary.get",
+            EngineCommandCatalogue.RegisteredRoutes);
+        Assert.DoesNotContain(
+            "cove://commands/nook.subscribe",
+            EngineCommandCatalogue.RegisteredRoutes);
+    }
+
+    [Fact]
     public async Task Hello_Then_Ping_Succeeds()
     {
         await using var h = await DaemonTestHarness.StartAsync();

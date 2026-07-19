@@ -4,6 +4,23 @@ using Microsoft.Extensions.Logging;
 
 namespace Cove.Engine.Knowledge;
 
+public enum KnowledgeCorpusTruth
+{
+    Files,
+    Sqlite,
+}
+
+public static class KnowledgeCorpusPolicy
+{
+    public const KnowledgeCorpusTruth Notes = KnowledgeCorpusTruth.Files;
+    public const KnowledgeCorpusTruth Timeline = KnowledgeCorpusTruth.Sqlite;
+    public const KnowledgeCorpusTruth Memory = KnowledgeCorpusTruth.Sqlite;
+    public const KnowledgeCorpusTruth Sessions = KnowledgeCorpusTruth.Sqlite;
+    public const KnowledgeCorpusTruth Library = KnowledgeCorpusTruth.Sqlite;
+    public const KnowledgeCorpusTruth Reviews = KnowledgeCorpusTruth.Sqlite;
+    public const KnowledgeCorpusTruth Attribution = KnowledgeCorpusTruth.Sqlite;
+}
+
 public sealed class KnowledgePersistenceKernel
 {
     private readonly string _timelinePath;
@@ -28,6 +45,11 @@ public sealed class KnowledgePersistenceKernel
         _ftsIndexDatabase = new SqliteConnectionFactory(_ftsIndexPath, logger);
         _notesIndexDatabase = new SqliteConnectionFactory(_notesIndexPath, logger);
     }
+
+    public SqliteConnectionFactory TimelineDatabase => _timelineDatabase;
+    public SqliteConnectionFactory MemoryDatabase => _memoryDatabase;
+    public SqliteConnectionFactory SessionIndexDatabase => _ftsIndexDatabase;
+    public SqliteConnectionFactory NotesIndexDatabase => _notesIndexDatabase;
 
     public void EnsureAllSchemas()
     {
@@ -128,6 +150,17 @@ public sealed class KnowledgePersistenceKernel
                 INSERT INTO facts_fts(rowid, content) VALUES (new.rowid, new.content);
             END;
             CREATE VIRTUAL TABLE IF NOT EXISTS episodes_fts USING fts5(summary_l0, content='episodes', content_rowid='rowid', tokenize='porter unicode61 remove_diacritics 1');
+            CREATE TRIGGER IF NOT EXISTS episodes_ai AFTER INSERT ON episodes BEGIN
+                INSERT INTO episodes_fts(rowid, summary_l0) VALUES (new.rowid, new.summary_l0);
+            END;
+            CREATE TRIGGER IF NOT EXISTS episodes_ad AFTER DELETE ON episodes BEGIN
+                INSERT INTO episodes_fts(episodes_fts, rowid, summary_l0) VALUES('delete', old.rowid, old.summary_l0);
+            END;
+            CREATE TRIGGER IF NOT EXISTS episodes_au AFTER UPDATE ON episodes BEGIN
+                INSERT INTO episodes_fts(episodes_fts, rowid, summary_l0) VALUES('delete', old.rowid, old.summary_l0);
+                INSERT INTO episodes_fts(rowid, summary_l0) VALUES (new.rowid, new.summary_l0);
+            END;
+            INSERT INTO episodes_fts(episodes_fts) VALUES('rebuild');
             """;
         cmd.ExecuteNonQuery();
         _logger.LogWarning("knowledge: memory.db schema ensured at {path}", _memoryPath);
@@ -143,6 +176,7 @@ public sealed class KnowledgePersistenceKernel
                 id TEXT PRIMARY KEY,
                 bay_id TEXT NOT NULL,
                 adapter TEXT NOT NULL,
+                corpus TEXT NOT NULL DEFAULT '',
                 started_at TEXT NOT NULL,
                 ended_at TEXT,
                 extractor_version TEXT
@@ -159,11 +193,66 @@ public sealed class KnowledgePersistenceKernel
             );
             CREATE INDEX IF NOT EXISTS idx_edits_file ON agent_edits (file_path, occurred_at);
             CREATE INDEX IF NOT EXISTS idx_edits_session ON agent_edits (session_id);
-            CREATE VIRTUAL TABLE IF NOT EXISTS sessions_fts USING fts5(adapter, content='sessions', content_rowid='rowid');
-            CREATE VIRTUAL TABLE IF NOT EXISTS sessions_fts_trigram USING fts5(adapter, content='sessions', content_rowid='rowid', tokenize='trigram');
             """;
         cmd.ExecuteNonQuery();
+        EnsureSessionCorpusColumn(conn);
+        EnsureSessionFtsSchema(conn);
         _logger.LogWarning("knowledge: fts/index.db schema ensured at {path}", _ftsIndexPath);
+    }
+
+    private static void EnsureSessionCorpusColumn(SqliteConnection connection)
+    {
+        using var check = connection.CreateCommand();
+        check.CommandText = "SELECT COUNT(*) FROM pragma_table_info('sessions') WHERE name = 'corpus'";
+        if ((long)check.ExecuteScalar()! != 0)
+            return;
+
+        using var alter = connection.CreateCommand();
+        alter.CommandText = "ALTER TABLE sessions ADD COLUMN corpus TEXT NOT NULL DEFAULT ''";
+        alter.ExecuteNonQuery();
+    }
+
+    private static void EnsureSessionFtsSchema(SqliteConnection connection)
+    {
+        using var check = connection.CreateCommand();
+        check.CommandText = "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'sessions_fts'";
+        var existingDefinition = check.ExecuteScalar() as string;
+        if (existingDefinition is not null &&
+            !existingDefinition.Contains("fts5(corpus,", System.StringComparison.OrdinalIgnoreCase))
+        {
+            using var remove = connection.CreateCommand();
+            remove.CommandText = """
+                DROP TRIGGER IF EXISTS sessions_ai;
+                DROP TRIGGER IF EXISTS sessions_ad;
+                DROP TRIGGER IF EXISTS sessions_au;
+                DROP TABLE IF EXISTS sessions_fts;
+                DROP TABLE IF EXISTS sessions_fts_trigram;
+                """;
+            remove.ExecuteNonQuery();
+        }
+
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            CREATE VIRTUAL TABLE IF NOT EXISTS sessions_fts USING fts5(corpus, content='sessions', content_rowid='rowid');
+            CREATE VIRTUAL TABLE IF NOT EXISTS sessions_fts_trigram USING fts5(corpus, content='sessions', content_rowid='rowid', tokenize='trigram');
+            CREATE TRIGGER IF NOT EXISTS sessions_ai AFTER INSERT ON sessions BEGIN
+                INSERT INTO sessions_fts(rowid, corpus) VALUES (new.rowid, new.corpus);
+                INSERT INTO sessions_fts_trigram(rowid, corpus) VALUES (new.rowid, new.corpus);
+            END;
+            CREATE TRIGGER IF NOT EXISTS sessions_ad AFTER DELETE ON sessions BEGIN
+                INSERT INTO sessions_fts(sessions_fts, rowid, corpus) VALUES('delete', old.rowid, old.corpus);
+                INSERT INTO sessions_fts_trigram(sessions_fts_trigram, rowid, corpus) VALUES('delete', old.rowid, old.corpus);
+            END;
+            CREATE TRIGGER IF NOT EXISTS sessions_au AFTER UPDATE ON sessions BEGIN
+                INSERT INTO sessions_fts(sessions_fts, rowid, corpus) VALUES('delete', old.rowid, old.corpus);
+                INSERT INTO sessions_fts(rowid, corpus) VALUES (new.rowid, new.corpus);
+                INSERT INTO sessions_fts_trigram(sessions_fts_trigram, rowid, corpus) VALUES('delete', old.rowid, old.corpus);
+                INSERT INTO sessions_fts_trigram(rowid, corpus) VALUES (new.rowid, new.corpus);
+            END;
+            INSERT INTO sessions_fts(sessions_fts) VALUES('rebuild');
+            INSERT INTO sessions_fts_trigram(sessions_fts_trigram) VALUES('rebuild');
+            """;
+        command.ExecuteNonQuery();
     }
 
     private void EnsureNotesIndexDb()

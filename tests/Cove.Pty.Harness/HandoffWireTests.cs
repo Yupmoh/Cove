@@ -10,7 +10,7 @@ namespace Cove.Pty.Harness;
 public sealed class HandoffWireTests
 {
     private static HandoffNookRecord Record(string id, int ringLength) =>
-        new(id, 4242, "/bin/zsh", new[] { "-i" }, "/repo", null, 80, 24, null, "omp", "omp", 1000 + ringLength, ringLength, "sess-1", "idle", null);
+        new(id, 4242, "/bin/zsh", new[] { "-i" }, "/repo", null, 80, 24, null, "omp", "omp", 1000 + ringLength, ringLength, "sess-1", "idle", null, "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
 
     [PlatformFact(TestOperatingSystem.Unix)]
     public async Task Records_RoundTripWithFdsAndRingPayloads()
@@ -71,7 +71,7 @@ public sealed class HandoffWireTests
             var data = new byte[3 << 20];
             new Random(3).NextBytes(data);
             var checkpoint = new HandoffCheckpointDto(Convert.ToBase64String(data), 123, 80, 24, 10000, "");
-            var record = new HandoffNookRecord("nook-cp", 4242, "/bin/zsh", new[] { "-i" }, "/repo", null, 80, 24, null, "omp", "omp", 5, 4, "sess-1", "idle", checkpoint);
+            var record = new HandoffNookRecord("nook-cp", 4242, "/bin/zsh", new[] { "-i" }, "/repo", null, 80, 24, null, "omp", "omp", 5, 4, "sess-1", "idle", checkpoint, "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
             var ring = Encoding.UTF8.GetBytes("tail");
             writer = Task.Run(() => HandoffWire.WriteRecord(a, record, -1, ring));
 

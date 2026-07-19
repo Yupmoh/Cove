@@ -14,7 +14,8 @@ public sealed class HandoffManifestTests
             "nook-1", 4242, "/bin/zsh", new[] { "-i" }, "/repo", "/repo/sub", 120, 40,
             "build", "claude-code", "Claude Code", 987654321L, 4096,
             "sess-abc", "idle",
-            new HandoffCheckpointDto("QUJD", 987650000L, 120, 40, 10000, "?25h"));
+            new HandoffCheckpointDto("AQID", 987654000L, 120, 40, 10000, "G0"),
+            "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
 
         var json = JsonSerializer.SerializeToUtf8Bytes(record, CoveJsonContext.Default.HandoffNookRecord);
         var back = JsonSerializer.Deserialize(json, CoveJsonContext.Default.HandoffNookRecord);
@@ -22,7 +23,7 @@ public sealed class HandoffManifestTests
         Assert.Equal(record, back! with { Args = record.Args });
         Assert.Equal(record.Args, back.Args);
         Assert.Equal(987654321L, back.RingHead);
-        Assert.Equal("QUJD", back.Checkpoint!.DataBase64);
+        Assert.Equal("AQID", back.Checkpoint!.DataBase64);
     }
 
     [Fact]

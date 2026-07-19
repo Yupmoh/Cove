@@ -41,66 +41,122 @@ public sealed class LayoutService
         public string? FocusedNookId;
     }
 
-    private readonly Dictionary<string, Bucket> _buckets = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, string> _shoreToBay = new(StringComparer.Ordinal);
-    private string _activeBayId = DefaultBayId;
+    private sealed class WorkspaceAggregate
+    {
+        public readonly Dictionary<string, Bucket> Bays = new(StringComparer.Ordinal);
+        public readonly Dictionary<string, string> ShoreOwners = new(StringComparer.Ordinal);
+        public readonly List<string> OpenBayIds = new();
+        public string ActiveBayId = DefaultBayId;
+    }
+
+    private readonly WorkspaceAggregate _workspace = new();
     private readonly object _sync = new();
     public Action? OnChanged { get; set; }
     public Action<string>? OnBayChanged { get; set; }
 
     public LayoutService()
     {
-        _buckets[DefaultBayId] = new Bucket();
+        _workspace.Bays[DefaultBayId] = new Bucket();
     }
 
     public string ActiveBayId
     {
-        get { lock (_sync) return _activeBayId; }
+        get { lock (_sync) return _workspace.ActiveBayId; }
     }
 
     public IReadOnlyList<string> BayIds
     {
-        get { lock (_sync) return _buckets.Keys.ToList(); }
+        get { lock (_sync) return _workspace.OpenBayIds.ToArray(); }
     }
 
     public void SetActiveBay(string bayId)
+        => SetActiveBay(bayId, true);
+
+    internal void SetActiveBay(string bayId, bool notify)
     {
         lock (_sync)
         {
             EnsureBucket(bayId);
-            _activeBayId = bayId;
+            AppendOpenBay(bayId);
+            _workspace.ActiveBayId = bayId;
         }
-        OnChanged?.Invoke();
+        if (notify)
+            OnChanged?.Invoke();
     }
 
     public void EnsureBay(string bayId)
     {
         lock (_sync)
+        {
             EnsureBucket(bayId);
+            AppendOpenBay(bayId);
+        }
     }
 
     public IReadOnlyList<string> RemoveBay(string bayId)
+        => RemoveBay(bayId, true);
+
+    internal IReadOnlyList<string> RemoveBay(string bayId, bool notify)
     {
         var nookIds = new List<string>();
         lock (_sync)
         {
-            if (!_buckets.TryGetValue(bayId, out var bucket))
+            if (!_workspace.Bays.TryGetValue(bayId, out var bucket))
                 return nookIds;
             foreach (var shoreId in bucket.Order)
             {
-                _shoreToBay.Remove(shoreId);
+                _workspace.ShoreOwners.Remove(shoreId);
                 if (bucket.Shores.TryGetValue(shoreId, out var rs))
                     foreach (var leaf in MosaicOps.Leaves(rs.Root))
                         if (!IsEmptyLeaf(leaf))
                             nookIds.Add(leaf.NookId);
             }
-            _buckets.Remove(bayId);
-            if (_activeBayId == bayId)
-                _activeBayId = _buckets.Keys.FirstOrDefault() ?? DefaultBayId;
-            EnsureBucket(_activeBayId);
+            _workspace.Bays.Remove(bayId);
+            _workspace.OpenBayIds.Remove(bayId);
+            if (_workspace.ActiveBayId == bayId)
+                _workspace.ActiveBayId = _workspace.OpenBayIds.FirstOrDefault() ?? DefaultBayId;
+            EnsureBucket(_workspace.ActiveBayId);
         }
-        OnChanged?.Invoke();
+        if (notify)
+            OnChanged?.Invoke();
         return nookIds;
+    }
+
+    internal IReadOnlyList<string> OpenBayIds
+    {
+        get
+        {
+            lock (_sync)
+                return _workspace.OpenBayIds.ToArray();
+        }
+    }
+
+    internal void RegisterBay(string bayId, bool activate)
+    {
+        lock (_sync)
+        {
+            EnsureBucket(bayId);
+            AppendOpenBay(bayId);
+            if (activate || _workspace.OpenBayIds.Count == 1)
+                _workspace.ActiveBayId = bayId;
+        }
+    }
+
+    internal void ReorderBays(IReadOnlyList<string> orderedIds)
+    {
+        lock (_sync)
+        {
+            var known = new HashSet<string>(_workspace.OpenBayIds, StringComparer.Ordinal);
+            var next = new List<string>(_workspace.OpenBayIds.Count);
+            foreach (var id in orderedIds)
+                if (known.Contains(id) && !next.Contains(id, StringComparer.Ordinal))
+                    next.Add(id);
+            foreach (var id in _workspace.OpenBayIds)
+                if (!next.Contains(id, StringComparer.Ordinal))
+                    next.Add(id);
+            _workspace.OpenBayIds.Clear();
+            _workspace.OpenBayIds.AddRange(next);
+        }
     }
 
     public string CreateShore(string name, NookLeaf firstLeaf)
@@ -109,6 +165,7 @@ public sealed class LayoutService
         lock (_sync)
         {
             var bucket = ActiveBucket();
+            AppendOpenBay(_workspace.ActiveBayId);
             shoreId = Guid.NewGuid().ToString("N");
             bucket.Shores[shoreId] = new ShoreState
             {
@@ -120,7 +177,7 @@ public sealed class LayoutService
             };
             bucket.Order.Add(shoreId);
             bucket.ActiveShoreId = shoreId;
-            _shoreToBay[shoreId] = _activeBayId;
+            _workspace.ShoreOwners[shoreId] = _workspace.ActiveBayId;
         }
         OnChanged?.Invoke();
         return shoreId;
@@ -282,7 +339,7 @@ public sealed class LayoutService
         {
             var (_, targetShore) = GetShoreOrThrow(targetShoreId);
             ShoreState? sourceShore = null;
-            foreach (var bucket in _buckets.Values)
+            foreach (var bucket in _workspace.Bays.Values)
             {
                 foreach (var rs in bucket.Shores.Values)
                 {
@@ -336,7 +393,7 @@ public sealed class LayoutService
             {
                 bucket.Shores.Remove(shoreId);
                 bucket.Order.Remove(shoreId);
-                _shoreToBay.Remove(shoreId);
+                _workspace.ShoreOwners.Remove(shoreId);
                 if (bucket.ActiveShoreId == shoreId)
                     bucket.ActiveShoreId = bucket.Order.Count > 0 ? bucket.Order[0] : null;
             }
@@ -359,7 +416,7 @@ public sealed class LayoutService
         string? ownerBay = null;
         lock (_sync)
         {
-            if (!_shoreToBay.TryGetValue(shoreId, out var wsId) || !_buckets.TryGetValue(wsId, out var bucket))
+            if (!_workspace.ShoreOwners.TryGetValue(shoreId, out var wsId) || !_workspace.Bays.TryGetValue(wsId, out var bucket))
                 return nookIds;
             ownerBay = wsId;
             if (bucket.Shores.TryGetValue(shoreId, out var rs))
@@ -368,7 +425,7 @@ public sealed class LayoutService
                         nookIds.Add(leaf.NookId);
             bucket.Shores.Remove(shoreId);
             bucket.Order.Remove(shoreId);
-            _shoreToBay.Remove(shoreId);
+            _workspace.ShoreOwners.Remove(shoreId);
             if (bucket.ActiveShoreId == shoreId)
                 bucket.ActiveShoreId = bucket.Order.Count > 0 ? bucket.Order[0] : null;
         }
@@ -388,7 +445,7 @@ public sealed class LayoutService
             shore.ActiveNookId = nookId;
             bucket.ActiveShoreId = shoreId;
             bucket.FocusedNookId = nookId;
-            ownerBay = _shoreToBay.TryGetValue(shoreId, out var wsId) ? wsId : null;
+            ownerBay = _workspace.ShoreOwners.TryGetValue(shoreId, out var wsId) ? wsId : null;
         }
         if (ownerBay is not null)
             OnBayChanged?.Invoke(ownerBay);
@@ -427,7 +484,7 @@ public sealed class LayoutService
         {
             var (_, shore) = GetShoreOrThrow(shoreId);
             shore.Name = name;
-            ownerBay = _shoreToBay.TryGetValue(shoreId, out var wsId) ? wsId : null;
+            ownerBay = _workspace.ShoreOwners.TryGetValue(shoreId, out var wsId) ? wsId : null;
         }
         if (ownerBay is not null)
             OnBayChanged?.Invoke(ownerBay);
@@ -458,7 +515,7 @@ public sealed class LayoutService
         OnChanged?.Invoke();
     }
 
-    private Bucket? BucketFor(string bayId) => _buckets.TryGetValue(bayId, out var b) ? b : null;
+    private Bucket? BucketFor(string bayId) => _workspace.Bays.TryGetValue(bayId, out var b) ? b : null;
 
     public string CreateWing(string bayId, string name)
     {
@@ -596,7 +653,7 @@ public sealed class LayoutService
                     nookIds.Add(leaf.NookId);
             bucket.Shores.Remove(shoreId);
             bucket.Order.Remove(shoreId);
-            _shoreToBay.Remove(shoreId);
+            _workspace.ShoreOwners.Remove(shoreId);
             if (bucket.ActiveShoreId == shoreId)
                 bucket.ActiveShoreId = bucket.Order.Count > 0 ? bucket.Order[0] : null;
         }
@@ -632,7 +689,7 @@ public sealed class LayoutService
             };
             bucket.Order.Add(shoreId);
             bucket.ActiveShoreId = shoreId;
-            _shoreToBay[shoreId] = bayId;
+            _workspace.ShoreOwners[shoreId] = bayId;
         }
         OnBayChanged?.Invoke(bayId);
         return shoreId;
@@ -680,7 +737,7 @@ public sealed class LayoutService
             return (null, null);
         lock (_sync)
         {
-            foreach (var (bayId, bucket) in _buckets)
+            foreach (var (bayId, bucket) in _workspace.Bays)
                 foreach (var (shoreId, shore) in bucket.Shores)
                     foreach (var leaf in MosaicOps.Leaves(shore.Root))
                         if (leaf.NookId == nookId)
@@ -705,7 +762,7 @@ public sealed class LayoutService
             to.Shores[shoreId] = shore;
             to.Order.Add(shoreId);
             to.ActiveShoreId = shoreId;
-            _shoreToBay[shoreId] = toBayId;
+            _workspace.ShoreOwners[shoreId] = toBayId;
         }
         OnBayChanged?.Invoke(fromBayId);
         OnBayChanged?.Invoke(toBayId);
@@ -716,7 +773,11 @@ public sealed class LayoutService
     {
         lock (_sync)
         {
-            var bucket = _buckets.TryGetValue(id, out var b) ? b : ActiveBucket();
+            var bucket = _workspace.Bays.TryGetValue(id, out var b)
+                ? b
+                : _workspace.Bays.Count == 1 && _workspace.Bays.TryGetValue(DefaultBayId, out var legacy)
+                    ? legacy
+                    : new Bucket();
             var shores = new List<ShoreSnapshot>(bucket.Shores.Count);
             foreach (var shoreId in bucket.Order)
             {
@@ -777,13 +838,22 @@ public sealed class LayoutService
                     Pinned = rs.Pinned,
                 };
                 bucket.Order.Add(rs.Id);
-                _shoreToBay[rs.Id] = ws.Id;
             }
             bucket.ActiveShoreId = ws.ActiveShoreId ?? (bucket.Order.Count > 0 ? bucket.Order[0] : null);
             bucket.ActiveWingId = ws.ActiveWingId is { } aw && bucket.Wings.Any(w => w.Id == aw) ? aw : MainWingId;
             bucket.FocusedNookId = ws.FocusedNookId;
-            _buckets[ws.Id] = bucket;
-            _activeBayId = ws.Id;
+            foreach (var shoreId in _workspace.ShoreOwners
+                         .Where(pair => pair.Value == ws.Id)
+                         .Select(pair => pair.Key)
+                         .ToArray())
+            {
+                _workspace.ShoreOwners.Remove(shoreId);
+            }
+            foreach (var shoreId in bucket.Order)
+                _workspace.ShoreOwners[shoreId] = ws.Id;
+            _workspace.Bays[ws.Id] = bucket;
+            AppendOpenBay(ws.Id);
+            _workspace.ActiveBayId = ws.Id;
         }
     }
 
@@ -791,7 +861,7 @@ public sealed class LayoutService
     {
         lock (_sync)
         {
-            if (!_shoreToBay.TryGetValue(shoreId, out var wsId) || !_buckets.TryGetValue(wsId, out var bucket))
+            if (!_workspace.ShoreOwners.TryGetValue(shoreId, out var wsId) || !_workspace.Bays.TryGetValue(wsId, out var bucket))
                 return null;
             return bucket.Shores.TryGetValue(shoreId, out var shore) ? shore.Root : null;
         }
@@ -801,7 +871,7 @@ public sealed class LayoutService
     {
         lock (_sync)
         {
-            if (!_shoreToBay.TryGetValue(shoreId, out var wsId) || !_buckets.TryGetValue(wsId, out var bucket))
+            if (!_workspace.ShoreOwners.TryGetValue(shoreId, out var wsId) || !_workspace.Bays.TryGetValue(wsId, out var bucket))
                 return null;
             return bucket.Shores.TryGetValue(shoreId, out var shore) ? shore.ActiveNookId : null;
         }
@@ -824,7 +894,7 @@ public sealed class LayoutService
         var ids = new List<string>();
         lock (_sync)
         {
-            if (!_buckets.TryGetValue(bayId, out var bucket))
+            if (!_workspace.Bays.TryGetValue(bayId, out var bucket))
                 return ids;
             foreach (var shoreId in bucket.Order)
                 if (bucket.Shores.TryGetValue(shoreId, out var rs))
@@ -846,22 +916,35 @@ public sealed class LayoutService
         return new NookLeaf { NookId = id, Subtabs = new[] { new Subtab(id, NookType.Empty) } };
     }
 
-    private Bucket ActiveBucket() => EnsureBucket(_activeBayId);
+    private Bucket ActiveBucket() => EnsureBucket(_workspace.ActiveBayId);
 
     private Bucket EnsureBucket(string bayId)
     {
-        if (!_buckets.TryGetValue(bayId, out var bucket))
+        if (!_workspace.Bays.TryGetValue(bayId, out var bucket))
         {
             bucket = new Bucket();
-            _buckets[bayId] = bucket;
+            _workspace.Bays[bayId] = bucket;
         }
         return bucket;
     }
 
     private (Bucket Bucket, ShoreState Shore) GetShoreOrThrow(string shoreId)
     {
-        if (!_shoreToBay.TryGetValue(shoreId, out var wsId) || !_buckets.TryGetValue(wsId, out var bucket) || !bucket.Shores.TryGetValue(shoreId, out var shore))
+        if (!_workspace.ShoreOwners.TryGetValue(shoreId, out var wsId) || !_workspace.Bays.TryGetValue(wsId, out var bucket) || !bucket.Shores.TryGetValue(shoreId, out var shore))
             throw new KeyNotFoundException($"Unknown shore '{shoreId}'.");
         return (bucket, shore);
+    }
+
+    private void AppendOpenBay(string bayId)
+    {
+        if (_workspace.OpenBayIds.Count == 0
+            && bayId != DefaultBayId
+            && _workspace.Bays.TryGetValue(DefaultBayId, out var defaultBay)
+            && defaultBay.Shores.Count == 0)
+        {
+            _workspace.Bays.Remove(DefaultBayId);
+        }
+        if (!_workspace.OpenBayIds.Contains(bayId, StringComparer.Ordinal))
+            _workspace.OpenBayIds.Add(bayId);
     }
 }

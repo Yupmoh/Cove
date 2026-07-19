@@ -58,7 +58,7 @@ public sealed class NoteFileStoreTests
     }
 
     [Fact]
-    public void RebuildIndexFromDisk_RestoresFtsAfterWipe()
+    public void Search_ReconcilesIndexFromFilesAfterDatabaseDiverges()
     {
         var (dir, store) = NewStore();
         store.Create(new Note { Title = "Rebuildable", BayId = "ws1", Content = "unique searchable term", Source = "manual", Kind = "markdown" });
@@ -71,13 +71,26 @@ public sealed class NoteFileStoreTests
             cmd.ExecuteNonQuery();
         }
 
-        var beforeRebuild = store.Search("ws1", "unique");
-        Assert.Empty(beforeRebuild);
+        Assert.Single(store.Search("ws1", "unique"));
+    }
 
-        store.RebuildIndexFromDisk();
+    [Fact]
+    public void Search_ReconcilesExternalFileUpdateAndDeletion()
+    {
+        var (dir, store) = NewStore();
+        var updated = store.Create(new Note { Title = "Updated externally", BayId = "ws1", Content = "original corpus", Source = "manual", Kind = "markdown" });
+        var deleted = store.Create(new Note { Title = "Deleted externally", BayId = "ws1", Content = "vanishing corpus", Source = "manual", Kind = "markdown" });
 
-        var afterRebuild = store.Search("ws1", "unique");
-        Assert.Single(afterRebuild);
+        var updatedBody = System.IO.Path.Combine(dir, "notes", "ws1", updated.Id, "note.md");
+        System.IO.File.WriteAllText(updatedBody, "reconciled corpus");
+        var deletedDirectory = System.IO.Path.Combine(dir, "notes", "ws1", deleted.Id);
+        System.IO.Directory.Delete(deletedDirectory, recursive: true);
+
+        var reconciled = store.Search("ws1", "reconciled");
+        Assert.Single(reconciled);
+        Assert.Equal(updated.Id, reconciled[0].Id);
+        Assert.Empty(store.Search("ws1", "original"));
+        Assert.Empty(store.Search("ws1", "vanishing"));
     }
 
     [Fact]

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Cove.Engine.Bays;
 using Cove.Engine.Layout;
 using Cove.Engine.Pty;
 using Cove.Persistence;
@@ -39,8 +40,8 @@ public static class RestoreChooserCommands
             return ctx.Fail("not_ready", "restoration service unavailable");
         if (ctx.Nooks is not { } nooks)
             return ctx.Fail("not_ready", "nook registry unavailable");
-        if (ctx.Layout is not { } layout)
-            return ctx.Fail("not_ready", "layout service unavailable");
+        if (ctx.Bays is not { } bays)
+            return ctx.Fail("not_ready", "bay manager unavailable");
         if (ctx.Request.Params is not JsonElement el
             || el.Deserialize(RestoreChooserVerbJsonContext.Default.RestoreConfirmParams) is not { } p)
             return ctx.Fail("bad_params", "selectedNookIds required");
@@ -55,7 +56,7 @@ public static class RestoreChooserCommands
 
         foreach (var entry in BayStartup.Enumerate(baysRoot, restoration.Logger))
         {
-            layout.LoadSnapshot(entry.Snapshot);
+            await RestoreBayAsync(bays, entry.Snapshot).ConfigureAwait(false);
             foreach (var shore in entry.Snapshot.Shores)
                 foreach (var leaf in MosaicOps.Leaves(shore.LayoutTree))
                     if (entry.Sessions.TryGetValue(leaf.NookId, out var d) && selected.Contains(d.NookId))
@@ -80,8 +81,8 @@ public static class RestoreChooserCommands
             return ctx.Fail("not_ready", "restoration service unavailable");
         if (ctx.Nooks is not { } nooks)
             return ctx.Fail("not_ready", "nook registry unavailable");
-        if (ctx.Layout is not { } layout)
-            return ctx.Fail("not_ready", "layout service unavailable");
+        if (ctx.Bays is not { } bays)
+            return ctx.Fail("not_ready", "bay manager unavailable");
 
         var baysRoot = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(restoration.StatePath)!, "bays");
         foreach (var entry in BayStartup.Enumerate(baysRoot, restoration.Logger))
@@ -93,7 +94,7 @@ public static class RestoreChooserCommands
                         try { RespawnPersistent(nooks, d, entry.BayDir, restoration.Logger); }
                         catch (System.Exception ex) { restoration.Logger.UndoNookRestoreFailed(d.NookId, ex.Message); }
                     }
-            layout.LoadSnapshot(entry.Snapshot);
+            await RestoreBayAsync(bays, entry.Snapshot).ConfigureAwait(false);
         }
         restoration.MarkLaunching();
         return await Task.FromResult(ctx.Ok());
@@ -110,7 +111,19 @@ public static class RestoreChooserCommands
     }
 
     private static bool WasRunning(NookRegistry nooks, string nookId)
-        => nooks.TryGet(nookId, out _);
+        => nooks.Contains(nookId);
+
+    private static Task<BayModel> RestoreBayAsync(BayManager bays, BaySnapshot snapshot)
+    {
+        var name = BayStartup.DisplayName(snapshot, Environment.CurrentDirectory);
+        var projectDir = string.IsNullOrWhiteSpace(snapshot.ProjectDir)
+            ? Environment.CurrentDirectory
+            : snapshot.ProjectDir;
+        var icon = string.IsNullOrWhiteSpace(snapshot.IconKind)
+            ? null
+            : new BayIcon(snapshot.IconKind, snapshot.IconValue ?? "");
+        return bays.RestoreBayAsync(snapshot, name, projectDir, icon: icon);
+    }
 }
 
 internal static partial class RestoreChooserLog

@@ -2,7 +2,10 @@ using System.IO;
 using System.Text.Json;
 using Cove.Engine;
 using Cove.Engine.Bays;
+using Cove.Engine.Daemon;
 using Cove.Engine.Layout;
+using Cove.Engine.Pty;
+using Cove.Platform.Pty;
 using Cove.Persistence;
 using Cove.Protocol;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -15,7 +18,8 @@ public sealed class BayDeletePersistenceTests
     [Fact]
     public async Task Delete_RemovesPersistedBayAndPreventsStartupResurrection()
     {
-        var root = Path.Combine(Path.GetTempPath(), "cove-bay-delete-" + System.Guid.NewGuid().ToString("N"));
+        var dataRoot = Path.Combine(Path.GetTempPath(), "cove-bay-delete-" + System.Guid.NewGuid().ToString("N"));
+        var root = Path.Combine(dataRoot, "bays");
         var bayId = "deleted-bay";
         var bayDir = Path.Combine(root, bayId);
         try
@@ -32,9 +36,21 @@ public sealed class BayDeletePersistenceTests
             Assert.True(File.Exists(Path.Combine(bayDir, "bay.json")));
             Assert.True(File.Exists(Path.Combine(bayDir, "nooks", "nook-1", "session.json")));
 
+            var layout = new LayoutService();
+            layout.LoadSnapshot(snapshot);
+            using var nookRegistry = new NookRegistry(
+                PtyHostFactory.Create(NullLogger.Instance),
+                NullLogger.Instance);
+            using var coordinator = new PersistenceCoordinator(
+                layout,
+                nookRegistry,
+                root,
+                NullLogger.Instance);
             await using var manager = new BayManager(
-                registry: new RegistryModel { OpenBays = [bayId], FocusedBayId = bayId },
-                bays: [new BayModel { Id = bayId, Name = snapshot.Name, ProjectDir = snapshot.ProjectDir }]);
+                registry: new RegistryModel { OpenBays = [bayId] },
+                bays: [new BayModel { Id = bayId, Name = snapshot.Name, ProjectDir = snapshot.ProjectDir }],
+                emit: coordinator.HandleBayChange,
+                layout: layout);
             var requestParams = JsonSerializer.SerializeToElement(
                 new BayIdParams(bayId),
                 BaysJsonContext.Default.BayIdParams);
@@ -47,10 +63,17 @@ public sealed class BayDeletePersistenceTests
 
             Assert.False(Directory.Exists(bayDir));
             Assert.Empty(BayStartup.Enumerate(root, NullLogger.Instance));
+            var persistedState = AtomicJsonStore.Read(
+                Path.Combine(dataRoot, "state.json"),
+                Cove.Persistence.CoveJsonContext.Default.CoveState,
+                NullLogger.Instance);
+            Assert.NotNull(persistedState);
+            Assert.Equal(manager.ActiveBayId, persistedState!.FocusedBay);
+            Assert.Equal(manager.Registry.OpenBays.ToArray(), persistedState.OpenBays.ToArray());
         }
         finally
         {
-            Cove.Testing.TestDirectory.Delete(root);
+            Cove.Testing.TestDirectory.Delete(dataRoot);
         }
     }
 

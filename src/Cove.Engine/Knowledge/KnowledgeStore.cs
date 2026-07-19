@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Cove.Persistence;
 using Cove.Protocol;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
@@ -8,14 +9,18 @@ namespace Cove.Engine.Knowledge;
 
 public sealed class TimelineStore
 {
-    private readonly string _dbPath;
+    private readonly SqliteConnectionFactory _database;
     private readonly ILogger _logger;
     private readonly TimelineValidator _validator = new();
 
-    public TimelineStore(string dataDir, ILogger logger)
+    public TimelineStore(
+        string dataDir,
+        ILogger logger,
+        SqliteConnectionFactory? database = null)
     {
-        _dbPath = System.IO.Path.Combine(dataDir, "timeline.db");
+        var databasePath = System.IO.Path.Combine(dataDir, "timeline.db");
         _logger = logger;
+        _database = database ?? new SqliteConnectionFactory(databasePath, logger);
     }
 
     public TimelineEntry Append(TimelineEntry entry)
@@ -32,8 +37,8 @@ public sealed class TimelineStore
             ? JsonSerializer.Serialize(new System.Collections.Generic.List<string>(tags), KnowledgeJsonContext.Default.ListString)
             : null;
 
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
+
         using var cmd = conn.CreateCommand();
         cmd.CommandText = """
             INSERT INTO timeline (id, bay_id, kind, scope, title, body, metadata_json, tags_json, nook_id, created_at, backfill_key)
@@ -59,8 +64,8 @@ public sealed class TimelineStore
     public System.Collections.Generic.IReadOnlyList<TimelineEntry> ListByBay(string bayId, int limit = 100)
     {
         var result = new System.Collections.Generic.List<TimelineEntry>();
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
+
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT id, bay_id, kind, scope, title, body, metadata_json, tags_json, created_at FROM timeline WHERE bay_id = @ws ORDER BY created_at DESC LIMIT @limit";
         cmd.Parameters.AddWithValue("@ws", bayId);
@@ -76,8 +81,8 @@ public sealed class TimelineStore
     public System.Collections.Generic.IReadOnlyList<TimelineEntry> Search(string bayId, string query, int limit = 20)
     {
         var result = new System.Collections.Generic.List<TimelineEntry>();
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
+
         using var cmd = conn.CreateCommand();
         cmd.CommandText = """
             SELECT t.id, t.bay_id, t.kind, t.scope, t.title, t.body, t.metadata_json, t.tags_json, t.created_at

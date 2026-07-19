@@ -115,7 +115,7 @@ public sealed class DaemonTestHarness : IAsyncDisposable
     {
         Stream s = await Endpoint.ConnectAsync(5000, CancellationToken.None);
         var conn = new FrameConnection(s);
-        var controlToken = clientKind == "gui" ? ReadControlToken() : null;
+        var controlToken = ReadControlToken();
         JsonElement hp = JsonSerializer.SerializeToElement(
             new HelloParams(1, clientKind, "0.1.0", "dev", ControlToken: controlToken), CoveJsonContext.Default.HelloParams);
         await conn.WriteFrameAsync(FrameType.Request, 0,

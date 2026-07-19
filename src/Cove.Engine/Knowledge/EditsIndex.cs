@@ -1,3 +1,4 @@
+using Cove.Persistence;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 
@@ -7,21 +8,26 @@ public sealed record EditRecord(string Id, string SessionId, string FilePath, st
 
 public sealed class EditsIndex
 {
-    private readonly string _dbPath;
+    private readonly SqliteConnectionFactory _database;
     private readonly ILogger _logger;
     private readonly TimeProvider _timeProvider;
 
-    public EditsIndex(string dataDir, ILogger logger, TimeProvider? timeProvider = null)
+    public EditsIndex(
+        string dataDir,
+        ILogger logger,
+        TimeProvider? timeProvider = null,
+        SqliteConnectionFactory? database = null)
     {
-        _dbPath = System.IO.Path.Combine(dataDir, "fts", "index.db");
+        var databasePath = System.IO.Path.Combine(dataDir, "fts", "index.db");
         _logger = logger;
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _database = database ?? new SqliteConnectionFactory(databasePath, logger);
     }
 
     public void RecordEdit(string sessionId, string filePath, string? tool, string? op, string? editSummary)
     {
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
+
         using var cmd = conn.CreateCommand();
         cmd.CommandText = """
             INSERT INTO agent_edits (id, session_id, file_path, tool, op, occurred_at, edit_summary)
@@ -42,8 +48,8 @@ public sealed class EditsIndex
     public System.Collections.Generic.IReadOnlyList<EditRecord> FindByFile(string filePath, int limit = 20)
     {
         var result = new System.Collections.Generic.List<EditRecord>();
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
+
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT id, session_id, file_path, tool, op, occurred_at, edit_summary FROM agent_edits WHERE file_path = @fp ORDER BY occurred_at DESC LIMIT @limit";
         cmd.Parameters.AddWithValue("@fp", filePath);
@@ -70,8 +76,8 @@ public sealed class EditsIndex
     public System.Collections.Generic.IReadOnlyList<EditRecord> FindBySession(string sessionId, int limit = 50)
     {
         var result = new System.Collections.Generic.List<EditRecord>();
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
+
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT id, session_id, file_path, tool, op, occurred_at, edit_summary FROM agent_edits WHERE session_id = @sid ORDER BY occurred_at DESC LIMIT @limit";
         cmd.Parameters.AddWithValue("@sid", sessionId);

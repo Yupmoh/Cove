@@ -7,6 +7,9 @@ using Cove.Engine.Browser;
 using Cove.Engine.Captures;
 using Cove.Engine.Config;
 using Cove.Engine.Diagnostics;
+using Cove.Engine.Dictation;
+using Cove.Engine.Feedback;
+using Cove.Engine.Filesystem;
 using Cove.Engine.Hooks;
 using Cove.Engine.Keybindings;
 using Cove.Engine.Knowledge;
@@ -79,6 +82,8 @@ internal sealed class EngineRuntime : IAsyncDisposable
 
     public StateBus StateBus => _components.StateBus;
 
+    public NookScopeStore NookScopes => _components.NookScopes;
+
     public NookStreamRouter Streams => _components.Streams;
 
     public PersistenceCoordinator Persistence => _components.Persistence;
@@ -92,6 +97,10 @@ internal sealed class EngineRuntime : IAsyncDisposable
     {
         var dataDir = paths.DataDir.Root;
         var baysRoot = Path.Combine(dataDir, "bays");
+        var dictation = DictationTranscriptionRuntime.CreateNative(
+            Path.Combine(dataDir, "models"),
+            events.BroadcastDictation,
+            logger);
         var ptyHost = PtyHostFactory.Create(logger);
         var probedPath = LoginShellPath.Probe(logger);
         var cliPath = CliBinLink.LinkPath(dataDir);
@@ -115,7 +124,7 @@ internal sealed class EngineRuntime : IAsyncDisposable
         var bays = new BayManager(
             emit: persistence.HandleBayChange,
             logger: logger,
-            persistOrder: persistence.PersistBayOrder);
+            layout: layout);
         var runCommands = new RunCommandService(
             new RunCommandStore(
                 Path.Combine(dataDir, "run-commands"),
@@ -202,18 +211,31 @@ internal sealed class EngineRuntime : IAsyncDisposable
             new MethodRunner(logger: logger),
             logger);
         var resumeService = new AgentResumeService(resumeProtocol);
+        var launchAdapterLookup =
+            new LaunchAdapterLookup(manifestStore);
+        var launchProcessAcquirer =
+            new LaunchProcessAcquirer(
+                new MethodRunner(logger: logger),
+                new BinaryDiscoveryService(logger),
+                probedPath,
+                logger);
         var launcher = new LaunchOrchestrator(
-            manifestStore,
-            new MethodRunner(logger: logger),
-            new BinaryDiscoveryService(logger),
-            probedPath,
+            new LaunchCommandComposer(),
+            launchAdapterLookup,
+            launchProcessAcquirer,
+            new LauncherOptionsResolver(
+                launchAdapterLookup,
+                launchProcessAcquirer,
+                new LauncherOptionsParser(),
+                logger),
+            new LaunchProfileLookup(launchProfiles),
             resumeService,
             new LauncherOverrideStore(
                 Path.Combine(dataDir, "launcher-overrides"),
                 logger),
             logger);
         var taskService = new Cove.Tasks.TaskService(dataDir, logger);
-        _ = taskService.StartAsync();
+        await taskService.StartAsync();
         var knowledgeKernel = new KnowledgePersistenceKernel(
             dataDir,
             logger);
@@ -230,7 +252,7 @@ internal sealed class EngineRuntime : IAsyncDisposable
             new Cove.Tasks.Schedules.CronosCronExpander(logger),
             new Cove.Tasks.Scheduler.SystemClock(),
             logger);
-        _ = scheduler.StartAsync(shutdownToken);
+        var schedulerLoop = scheduler.StartAsync(shutdownToken);
         var stateBus = new StateBus(dataDir, logger);
         var extensions = new ExtensionRegistry(manifestStore);
         extensions.Index();
@@ -239,21 +261,42 @@ internal sealed class EngineRuntime : IAsyncDisposable
         var noteFiles = new NoteFileStore(
             dataDir,
             logger,
-            noteSnapshots);
-        var timeline = new TimelineStore(dataDir, logger);
-        var blackboard = new BlackboardStore(dataDir, logger);
-        var memory = new MemoryStore(dataDir, logger);
+            noteSnapshots,
+            knowledgeKernel.NotesIndexDatabase);
+        noteFiles.RebuildIndexFromDisk();
+        var timeline = new TimelineStore(
+            dataDir,
+            logger,
+            knowledgeKernel.TimelineDatabase);
+        var blackboard = new BlackboardStore(
+            dataDir,
+            logger,
+            database: knowledgeKernel.MemoryDatabase);
+        var memory = new MemoryStore(
+            dataDir,
+            logger,
+            knowledgeKernel.MemoryDatabase);
         var memoryRanker = new MemoryRanker(
             memory,
             dataDir,
-            logger);
-        var proposals = new ProposalStore(dataDir, logger);
+            logger,
+            knowledgeKernel.MemoryDatabase);
+        var proposals = new ProposalStore(
+            dataDir,
+            logger,
+            knowledgeKernel.MemoryDatabase);
         var consolidator = new MemoryConsolidator(
             memory,
             proposals,
             logger);
-        var edits = new EditsIndex(dataDir, logger);
-        var corpus = new SessionCorpusIndexer(dataDir, logger);
+        var edits = new EditsIndex(
+            dataDir,
+            logger,
+            database: knowledgeKernel.SessionIndexDatabase);
+        var corpus = new SessionCorpusIndexer(
+            dataDir,
+            logger,
+            knowledgeKernel.SessionIndexDatabase);
         var vaultSettings = new VaultSettingsStore(dataDir, logger);
         var library = new LibraryStore(dataDir, logger);
         library.EnsureSchema();
@@ -290,6 +333,22 @@ internal sealed class EngineRuntime : IAsyncDisposable
             diagnostics,
             Path.Combine(dataDir, "perf-bundles"),
             logger);
+        var platformFileSystem = SystemPlatformFileSystem.Instance;
+        var directoryListing = new DirectoryListingService(
+            platformFileSystem,
+            logger);
+        var gitSummary = new GitSummaryService(
+            platformFileSystem,
+            new SystemProcessRunner(),
+            logger);
+        var feedbackStore = new FeedbackStore(
+            Path.Combine(dataDir, "feedback"),
+            platformFileSystem,
+            logger: logger);
+        var performanceResults = new PerformanceResultStore(
+            Path.Combine(dataDir, "cache", "perf"),
+            platformFileSystem,
+            logger: logger);
         var gitReadModel = new GitReadModel(
             new ProcessGitRunner(),
             logger);
@@ -400,6 +459,7 @@ internal sealed class EngineRuntime : IAsyncDisposable
             TaskService = taskService,
             ResumeProtocol = resumeProtocol,
             Scheduler = scheduler,
+            SchedulerLoop = schedulerLoop,
             Timeline = timeline,
             Blackboard = blackboard,
             NoteFiles = noteFiles,
@@ -421,6 +481,11 @@ internal sealed class EngineRuntime : IAsyncDisposable
             Captures = captures,
             Diagnostics = diagnostics,
             PerformanceBundles = performanceBundles,
+            DirectoryListing = directoryListing,
+            GitSummary = gitSummary,
+            FeedbackStore = feedbackStore,
+            PerformanceResults = performanceResults,
+            Dictation = dictation,
             GitReadModel = gitReadModel,
             SearchService = searchService,
             Themes = themes,
@@ -460,7 +525,8 @@ internal sealed class EngineRuntime : IAsyncDisposable
         HandoffTakeover? takeover)
     {
         var restoration = _components.Restoration;
-        var wasClean = restoration.WasCleanShutdown();
+        var savedState = restoration.LoadState();
+        var wasClean = savedState.CleanShutdown;
         restoration.MarkLaunching();
         restoration.EmitProgress(
             "default",
@@ -538,7 +604,6 @@ internal sealed class EngineRuntime : IAsyncDisposable
                 restoreTotals.Restored + summary.Restored,
                 restoreTotals.Fresh + summary.Fresh,
                 restoreTotals.Skipped + summary.Skipped);
-            _components.Layout.LoadSnapshot(snapshot);
             var displayName = BayStartup.DisplayName(
                 snapshot,
                 fallbackProjectDirectory);
@@ -551,8 +616,8 @@ internal sealed class EngineRuntime : IAsyncDisposable
                 : new BayIcon(
                     snapshot.IconKind,
                     snapshot.IconValue ?? "");
-            await _components.Bays.AdoptExistingAsync(
-                snapshot.Id,
+            await _components.Bays.RestoreBayAsync(
+                snapshot,
                 displayName,
                 projectDirectory,
                 icon: icon).ConfigureAwait(false);
@@ -574,16 +639,16 @@ internal sealed class EngineRuntime : IAsyncDisposable
             var seeded = await _components.Bays.CreateBayAsync(
                 seedName,
                 seedDirectory).ConfigureAwait(false);
-            _components.Layout.SetActiveBay(seeded.Id);
             _logger.BayStartupSeeded(
                 seeded.Id,
                 seedName,
                 seedDirectory);
         }
-        else if (_components.Bays.Registry.FocusedBayId
-                 is { } focusedBayId)
+        else
         {
-            _components.Layout.SetActiveBay(focusedBayId);
+            if (!string.IsNullOrWhiteSpace(savedState.FocusedBay))
+                _components.Bays.RestoreActiveBay(savedState.FocusedBay);
+            var focusedBayId = _components.Bays.ActiveBayId;
             var focusedBay = _components.Bays.Get(focusedBayId);
             if (focusedBay is not null
                 && !string.IsNullOrEmpty(
@@ -717,7 +782,16 @@ internal sealed class EngineRuntime : IAsyncDisposable
             _components.LspService,
             _components.SessionService,
             _components.Persistence.BaysRoot,
-            cancellationToken);
+            _components.Scheduler,
+            _components.DirectoryListing,
+            _components.GitSummary,
+            _components.FeedbackStore,
+            _components.PerformanceResults,
+            _components.Dictation,
+            cancellationToken,
+            Events.TryForwardFocus,
+            () => Events.RestorationSummary,
+            StartedAtUtc);
     }
 
     public Task ShutdownAsync()
@@ -911,6 +985,25 @@ internal sealed class EngineRuntime : IAsyncDisposable
             return;
         Unwire();
         _components.Scheduler.Stop();
+        try
+        {
+            await _components.SchedulerLoop.ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception exception)
+        {
+            _logger.RuntimeComponentDisposeFailed(
+                nameof(Cove.Tasks.Scheduler.TaskSchedulerEngine),
+                exception.Message);
+        }
+        await TryDisposeAsync(
+            _components.TaskService,
+            nameof(Cove.Tasks.TaskService)).ConfigureAwait(false);
+        await TryDisposeAsync(
+            _components.Dictation,
+            nameof(DictationTranscriptionRuntime)).ConfigureAwait(false);
         TryDispose(
             _components.ScreenScanner,
             nameof(ScreenStateScanner));
@@ -1009,6 +1102,7 @@ internal sealed class EngineRuntimeComponents
     public required Cove.Tasks.TaskService TaskService { get; init; }
     public required AdapterResumeProtocol ResumeProtocol { get; init; }
     public required Cove.Tasks.Scheduler.TaskSchedulerEngine Scheduler { get; init; }
+    public required Task SchedulerLoop { get; init; }
     public required TimelineStore Timeline { get; init; }
     public required BlackboardStore Blackboard { get; init; }
     public required NoteFileStore NoteFiles { get; init; }
@@ -1030,6 +1124,11 @@ internal sealed class EngineRuntimeComponents
     public required CaptureStore Captures { get; init; }
     public required DiagnosticsHub Diagnostics { get; init; }
     public required PerformanceBundleService PerformanceBundles { get; init; }
+    public required DirectoryListingService DirectoryListing { get; init; }
+    public required GitSummaryService GitSummary { get; init; }
+    public required FeedbackStore FeedbackStore { get; init; }
+    public required PerformanceResultStore PerformanceResults { get; init; }
+    public required DictationTranscriptionRuntime Dictation { get; init; }
     public required GitReadModel GitReadModel { get; init; }
     public required SearchService SearchService { get; init; }
     public required ThemeService Themes { get; init; }

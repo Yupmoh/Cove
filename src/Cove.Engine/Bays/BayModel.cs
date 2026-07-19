@@ -50,7 +50,6 @@ public sealed record RegistryModel
 {
     private readonly int _schemaVersion = 1;
     public int SchemaVersion { get => _schemaVersion == 0 ? 1 : _schemaVersion; init => _schemaVersion = value; }
-    public string? FocusedBayId { get; init; }
     private readonly IReadOnlyList<string>? _openBays;
     public IReadOnlyList<string> OpenBays { get => _openBays ?? []; init => _openBays = value; }
     private readonly IReadOnlyList<Collection>? _collections;

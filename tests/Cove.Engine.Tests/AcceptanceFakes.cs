@@ -21,16 +21,24 @@ public sealed class AcceptanceFakeNookHost : INookHost
     public NookCreationResult? CreateNook(string? adapter, int cols, int rows) => new("nook-1");
     public bool InjectEnv(string nookId, IReadOnlyDictionary<string, string> env) { InjectedEnvs[nookId] = new Dictionary<string, string>(env); return true; }
     public bool BindTaskCard(string nookId, string cardId) { BoundCards[nookId] = cardId; return true; }
+    public bool RemoveNook(string nookId)
+    {
+        InjectedEnvs.Remove(nookId);
+        BoundCards.Remove(nookId);
+        return true;
+    }
 }
 
 public sealed class AcceptanceFakeShoreService : IShoreService
 {
     public ShoreCreationResult? CreateShore(string ws, string name, string? parent) => new("shore-1");
+    public bool RemoveShore(string bayId, string shoreId) => true;
 }
 
 public sealed class AcceptanceFakeAgentLauncher : IAgentLauncher
 {
     public AdapterLaunchResult Launch(string nookId, string adapter, string cmd, IReadOnlyDictionary<string, string> env, string prompt) => new("session-1", true, null);
+    public bool Stop(string adapterSessionId) => true;
 }
 
 public sealed class AcceptanceFakeResumeLauncher : IAdapterResumeLauncher

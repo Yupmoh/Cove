@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Cove.Persistence;
 using Cove.Protocol;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
@@ -9,34 +10,37 @@ public sealed record SessionCorpusEntry(string Id, string BayId, string Adapter,
 
 public sealed class SessionCorpusIndexer
 {
-    private readonly string _dbPath;
+    private readonly SqliteConnectionFactory _database;
     private readonly ILogger _logger;
 
-    public SessionCorpusIndexer(string dataDir, ILogger logger)
+    public SessionCorpusIndexer(
+        string dataDir,
+        ILogger logger,
+        SqliteConnectionFactory? database = null)
     {
-        _dbPath = System.IO.Path.Combine(dataDir, "fts", "index.db");
+        var databasePath = System.IO.Path.Combine(dataDir, "fts", "index.db");
         _logger = logger;
+        _database = database ?? new SqliteConnectionFactory(databasePath, logger);
     }
 
     public string IndexSession(string bayId, string adapter, string startedAt, string corpus, string extractorVersion)
     {
         var sessionId = System.Guid.NewGuid().ToString("N");
 
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
+
         using var cmd = conn.CreateCommand();
         cmd.CommandText = """
-            INSERT INTO sessions (id, bay_id, adapter, started_at, ended_at, extractor_version)
-            VALUES (@id, @ws, @adapter, @started, NULL, @ver);
+            INSERT INTO sessions (id, bay_id, adapter, corpus, started_at, ended_at, extractor_version)
+            VALUES (@id, @ws, @adapter, @corpus, @started, NULL, @ver);
             """;
         cmd.Parameters.AddWithValue("@id", sessionId);
         cmd.Parameters.AddWithValue("@ws", bayId);
         cmd.Parameters.AddWithValue("@adapter", adapter);
+        cmd.Parameters.AddWithValue("@corpus", corpus);
         cmd.Parameters.AddWithValue("@started", startedAt);
         cmd.Parameters.AddWithValue("@ver", extractorVersion);
         cmd.ExecuteNonQuery();
-
-        IndexCorpusEvents(conn, sessionId, corpus);
 
         _logger.LogWarning("vault: indexed session {id} ({adapter}) in {ws} with extractor v{ver}", sessionId, adapter, bayId, extractorVersion);
         return sessionId;
@@ -44,8 +48,8 @@ public sealed class SessionCorpusIndexer
 
     public void SetSessionEnded(string sessionId, string endedAt)
     {
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
+
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "UPDATE sessions SET ended_at = @ended WHERE id = @id";
         cmd.Parameters.AddWithValue("@id", sessionId);
@@ -56,8 +60,8 @@ public sealed class SessionCorpusIndexer
     public System.Collections.Generic.IReadOnlyList<SessionCorpusEntry> SearchSessions(string bayId, string query, int limit = 20)
     {
         var result = new System.Collections.Generic.List<SessionCorpusEntry>();
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
+
         using var cmd = conn.CreateCommand();
         cmd.CommandText = """
             SELECT s.id, s.bay_id, s.adapter, s.started_at, s.ended_at, s.extractor_version
@@ -79,8 +83,8 @@ public sealed class SessionCorpusIndexer
     public System.Collections.Generic.IReadOnlyList<SessionCorpusEntry> SearchSessionsTrigram(string bayId, string query, int limit = 20)
     {
         var result = new System.Collections.Generic.List<SessionCorpusEntry>();
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
+
         using var cmd = conn.CreateCommand();
         cmd.CommandText = """
             SELECT s.id, s.bay_id, s.adapter, s.started_at, s.ended_at, s.extractor_version
@@ -101,8 +105,8 @@ public sealed class SessionCorpusIndexer
 
     public int ReindexIfVersionChanged(string bayId, string newVersion)
     {
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
+
 
         using var checkCmd = conn.CreateCommand();
         checkCmd.CommandText = "SELECT DISTINCT extractor_version FROM sessions WHERE bay_id = @ws AND extractor_version != @ver";
@@ -135,8 +139,8 @@ public sealed class SessionCorpusIndexer
     public System.Collections.Generic.IReadOnlyList<SessionCorpusEntry> ListSessions(string bayId, int limit = 50)
     {
         var result = new System.Collections.Generic.List<SessionCorpusEntry>();
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
+
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT id, bay_id, adapter, started_at, ended_at, extractor_version FROM sessions WHERE bay_id = @ws ORDER BY started_at DESC LIMIT @limit";
         cmd.Parameters.AddWithValue("@ws", bayId);
@@ -145,23 +149,6 @@ public sealed class SessionCorpusIndexer
         while (reader.Read())
             result.Add(ReadEntry(reader));
         return result;
-    }
-
-    private static void IndexCorpusEvents(SqliteConnection conn, string sessionId, string corpus)
-    {
-        using var conn2 = new SqliteConnection($"Data Source={conn.DataSource}");
-        conn2.Open();
-        using var ftsCmd = conn2.CreateCommand();
-        ftsCmd.CommandText = "INSERT INTO sessions_fts (rowid, adapter) VALUES ((SELECT rowid FROM sessions WHERE id = @id), @adapter)";
-        ftsCmd.Parameters.AddWithValue("@id", sessionId);
-        ftsCmd.Parameters.AddWithValue("@adapter", corpus);
-        ftsCmd.ExecuteNonQuery();
-
-        using var triCmd = conn2.CreateCommand();
-        triCmd.CommandText = "INSERT INTO sessions_fts_trigram (rowid, adapter) VALUES ((SELECT rowid FROM sessions WHERE id = @id), @adapter)";
-        triCmd.Parameters.AddWithValue("@id", sessionId);
-        triCmd.Parameters.AddWithValue("@adapter", corpus);
-        triCmd.ExecuteNonQuery();
     }
 
     private static SessionCorpusEntry ReadEntry(SqliteDataReader reader)

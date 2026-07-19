@@ -37,6 +37,9 @@ public static class HandoffWire
             return null;
         var record = JsonSerializer.Deserialize(json, CoveJsonContext.Default.HandoffNookRecord)
             ?? throw new InvalidOperationException("handoff record decoded to null.");
+        if (string.IsNullOrEmpty(record.NookToken))
+            throw new InvalidOperationException(
+                "handoff record nook credential is missing.");
         if (record.RingLength < 0)
             throw new InvalidOperationException($"handoff record ring length rejected ({record.RingLength}).");
         var ring = new byte[record.RingLength];

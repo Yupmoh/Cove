@@ -54,11 +54,17 @@ public sealed class BayExtraCommandsTests
     }
 
     [Fact]
-    public async Task Reorder_InvokesOrderPersistence()
+    public async Task Reorder_EmitsCompleteWorkspaceMutation()
     {
         int n = 0;
         System.Collections.Generic.IReadOnlyList<string>? persisted = null;
-        await using var m = new BayManager(newId: () => $"id-{++n}", persistOrder: ids => persisted = ids);
+        await using var m = new BayManager(
+            newId: () => $"id-{++n}",
+            emit: change =>
+            {
+                if (change.Kind == BayChangeKind.Reordered)
+                    persisted = change.OpenBayIds;
+            });
         var a = await m.CreateBayAsync("a", "/a");
         var b = await m.CreateBayAsync("b", "/b");
 
@@ -70,12 +76,10 @@ public sealed class BayExtraCommandsTests
     public async Task MoveShore_MovesBetweenBays()
     {
         int n = 0;
-        await using var m = new BayManager(newId: () => $"id-{++n}");
+        var layout = new LayoutService();
+        await using var m = new BayManager(newId: () => $"id-{++n}", layout: layout);
         var a = await m.CreateBayAsync("a", "/a");
         var b = await m.CreateBayAsync("b", "/b");
-        var layout = new LayoutService();
-        layout.EnsureBay(a.Id);
-        layout.EnsureBay(b.Id);
 
         var created = await RouteL(m, layout, "cove://commands/shore.create",
             El(new ShoreCreateParams(a.Id, null, "extra"), ShoreWingJsonContext.Default.ShoreCreateParams));

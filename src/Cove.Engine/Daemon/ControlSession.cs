@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using Cove.Engine.Protocol;
 using Cove.Engine.Pty;
 using Cove.Protocol;
 using Microsoft.Extensions.Logging;
@@ -16,9 +17,8 @@ internal sealed class ControlSession
     private readonly ILogger _logger;
     private readonly Action _requestShutdown;
     private readonly Func<int> _totalConnections;
-    private bool _helloDone;
-    private bool _isGui;
-    private string? _principalNookId;
+    private ConnectionPrincipal _principal =
+        ConnectionPrincipal.Unauthenticated;
 
     public ControlSession(
         DaemonPaths paths,
@@ -103,7 +103,8 @@ internal sealed class ControlSession
         }
         finally
         {
-            if (_isGui)
+            if (_principal.Kind == ConnectionPrincipalKind.Control
+                && _principal.ClientKind == "gui")
                 _runtime.Events.UnregisterGui(connection);
             try
             {
@@ -124,6 +125,21 @@ internal sealed class ControlSession
     {
         if (request.Uri == "cove://sys/hello")
         {
+            if (_principal.Kind
+                != ConnectionPrincipalKind.Unauthenticated)
+            {
+                _logger.ConnectionAuthorizationDenied(
+                    _principal.NookId ?? _principal.ClientKind,
+                    request.Uri);
+                await WriteResponseAsync(
+                    connection,
+                    Fail(
+                        request.Id,
+                        "already_authenticated",
+                        "connection principal is immutable"),
+                    cancellationToken).ConfigureAwait(false);
+                return false;
+            }
             return await HandleHelloAsync(
                 connection,
                 request,
@@ -132,14 +148,33 @@ internal sealed class ControlSession
 
         if (request.Uri == "cove://handoff/begin")
         {
-            if (!_helloDone)
+            if (_principal.Kind
+                == ConnectionPrincipalKind.Unauthenticated)
             {
+                _logger.ConnectionAuthorizationDenied(
+                    "",
+                    request.Uri);
                 await WriteResponseAsync(
                     connection,
                     Fail(
                         request.Id,
                         "not_ready",
                         "sys/hello required before handoff"),
+                    cancellationToken).ConfigureAwait(false);
+                return false;
+            }
+            if (_principal.Kind
+                != ConnectionPrincipalKind.Control)
+            {
+                _logger.ConnectionAuthorizationDenied(
+                    _principal.NookId ?? _principal.ClientKind,
+                    request.Uri);
+                await WriteResponseAsync(
+                    connection,
+                    Fail(
+                        request.Id,
+                        "access_denied",
+                        "handoff requires the daemon control capability"),
                     cancellationToken).ConfigureAwait(false);
                 return false;
             }
@@ -150,8 +185,12 @@ internal sealed class ControlSession
             return false;
         }
 
-        if (!_helloDone)
+        if (_principal.Kind
+            == ConnectionPrincipalKind.Unauthenticated)
         {
+            _logger.ConnectionAuthorizationDenied(
+                "",
+                request.Uri);
             await WriteResponseAsync(
                 connection,
                 Fail(
@@ -163,16 +202,21 @@ internal sealed class ControlSession
         }
 
         request = SanitizeCallerIdentity(request);
-        if (request.Uri == "cove://commands/nook.scope.set"
-            && !_isGui)
+        var denied = ScopeEnforcement.Authorize(
+            _principal,
+            request,
+            _runtime.NookScopes,
+            _runtime.Bays,
+            _runtime.Layout,
+            _runtime.AgentRouter);
+        if (denied is not null)
         {
-            _logger.ScopeMutationDenied(_principalNookId ?? "");
+            _logger.ConnectionAuthorizationDenied(
+                _principal.NookId ?? _principal.ClientKind,
+                request.Uri);
             await WriteResponseAsync(
                 connection,
-                Fail(
-                    request.Id,
-                    "access_denied",
-                    "scope mutation requires the gui client"),
+                denied,
                 cancellationToken).ConfigureAwait(false);
             return false;
         }
@@ -263,58 +307,12 @@ internal sealed class ControlSession
                 _requestShutdown();
                 return true;
 
-            case "cove://commands/window.focus":
-                var focused = _runtime.Events.TryForwardFocus(
-                    cancellationToken);
-                if (focused
-                    && _runtime.Bays.Registry.FocusedBayId
-                    is { } focusedBay)
-                {
-                    _ = _runtime.Bays.RefreshWorktreesAsync(
-                        focusedBay);
-                }
-                var focusResult = focused
-                    ? Parse("{\"focused\":true}")
-                    : Parse(
-                        "{\"focused\":false,\"reason\":\"no_render_client\"}");
-                await WriteResponseAsync(
-                    connection,
-                    new ControlResponse(
-                        request.Id,
-                        true,
-                        focusResult),
-                    cancellationToken).ConfigureAwait(false);
-                return false;
-
-            case "cove://commands/restore.summary.get":
-                var summary = _runtime.Events.RestorationSummary;
-                var pullResult =
-                    new Cove.Engine.Restart.RestoreSummaryPullResult(
-                        summary is not null,
-                        summary?.Restored ?? 0,
-                        summary?.Fresh ?? 0,
-                        summary?.Skipped ?? 0,
-                        summary?.BootedAt
-                            ?? _runtime.StartedAtUtc.ToString("o"));
-                await WriteResponseAsync(
-                    connection,
-                    new ControlResponse(
-                        request.Id,
-                        true,
-                        JsonSerializer.SerializeToElement(
-                            pullResult,
-                            Cove.Engine.Restart
-                                .RestorationSummaryJsonContext
-                                .Default
-                                .RestoreSummaryPullResult)),
-                    cancellationToken).ConfigureAwait(false);
-                return false;
-
-            case "cove://commands/nook.subscribe":
+            case ControlProtocolRoutes.NookSubscribe:
                 await _runtime.Streams.StreamAsync(
                     connection,
                     stream,
                     request,
+                    _principal,
                     cancellationToken).ConfigureAwait(false);
                 return true;
 
@@ -374,25 +372,39 @@ internal sealed class ControlSession
                 cancellationToken).ConfigureAwait(false);
             return true;
         }
-        if (parameters.ClientKind == "gui"
-            && !ControlTokenMatches(parameters.ControlToken))
+        if (string.IsNullOrWhiteSpace(parameters.ClientKind))
         {
-            _logger.GuiControlAuthRejected(parameters.ClientKind);
+            _logger.ControlAuthRejected(parameters.ClientKind);
             await WriteResponseAsync(
                 connection,
                 Fail(
                     request.Id,
                     "control_auth_failed",
-                    "gui client requires the daemon control token"),
+                    "client kind is required"),
                 cancellationToken).ConfigureAwait(false);
             return true;
         }
-        if (!string.IsNullOrEmpty(parameters.NookId))
+        if (!string.IsNullOrEmpty(parameters.NookId)
+            || !string.IsNullOrEmpty(parameters.NookToken))
         {
+            if (string.IsNullOrEmpty(parameters.NookId)
+                || string.IsNullOrEmpty(parameters.NookToken))
+            {
+                _logger.NookAuthRejected(
+                    parameters.NookId ?? "");
+                await WriteResponseAsync(
+                    connection,
+                    Fail(
+                        request.Id,
+                        "nook_auth_failed",
+                        "nook id and credential are both required"),
+                    cancellationToken).ConfigureAwait(false);
+                return true;
+            }
             var authentication = _runtime.Nooks.Authenticate(
                 parameters.NookId,
                 parameters.NookToken);
-            if (authentication == NookAuthResult.Rejected)
+            if (authentication != NookAuthResult.Bound)
             {
                 _logger.NookAuthRejected(parameters.NookId);
                 await WriteResponseAsync(
@@ -404,27 +416,31 @@ internal sealed class ControlSession
                     cancellationToken).ConfigureAwait(false);
                 return true;
             }
-            if (authentication
-                is NookAuthResult.Bound
-                or NookAuthResult.LegacyBound)
-            {
-                _principalNookId = parameters.NookId;
-                if (authentication
-                    == NookAuthResult.LegacyBound)
-                {
-                    _logger.NookAuthLegacyBound(
-                        parameters.NookId);
-                }
-            }
-            else
-            {
-                _logger.NookAuthUnknown(parameters.NookId);
-            }
+            _principal = ConnectionPrincipal.Nook(
+                parameters.ClientKind,
+                parameters.NookId);
         }
-        _helloDone = true;
-        if (parameters.ClientKind == "gui")
+        else
         {
-            _isGui = true;
+            if (!ControlTokenMatches(parameters.ControlToken))
+            {
+                _logger.ControlAuthRejected(
+                    parameters.ClientKind);
+                await WriteResponseAsync(
+                    connection,
+                    Fail(
+                        request.Id,
+                        "control_auth_failed",
+                        "client requires the daemon control token"),
+                    cancellationToken).ConfigureAwait(false);
+                return true;
+            }
+            _principal = ConnectionPrincipal.Control(
+                parameters.ClientKind);
+        }
+        if (_principal.Kind == ConnectionPrincipalKind.Control
+            && _principal.ClientKind == "gui")
+        {
             _runtime.Events.RegisterGui(connection);
         }
         var result = new HelloResult(
@@ -447,7 +463,8 @@ internal sealed class ControlSession
     private ControlRequest SanitizeCallerIdentity(
         ControlRequest request)
     {
-        if (_principalNookId is { } principal)
+        if (_principal.Kind == ConnectionPrincipalKind.Nook
+            && _principal.NookId is { } principal)
         {
             if (string.Equals(
                     request.CallerNookId,
@@ -465,8 +482,7 @@ internal sealed class ControlSession
             }
             return request with { CallerNookId = principal };
         }
-        if (!_isGui
-            && !string.IsNullOrEmpty(request.CallerNookId))
+        if (!string.IsNullOrEmpty(request.CallerNookId))
         {
             _logger.CallerClaimStripped(
                 request.CallerNookId,

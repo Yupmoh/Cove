@@ -30,7 +30,10 @@ public static class LoopCommands
         var schedule = svc.GetSchedule(p.CardId);
         if (schedule is null)
             return ctx.Fail("not_found", "no schedule for card");
+        if (ctx.TaskScheduler is not { } scheduler)
+            return ctx.Fail("not_ready", "task scheduler not available");
         await svc.UpdateScheduleAsync(p.CardId, paused: null, skipNext: null, nextFireAt: null, lastFiredAt: null, pendingIntent: "continue");
+        await scheduler.SignalMutationAsync();
         return ctx.Ok();
     }
 
@@ -44,7 +47,10 @@ public static class LoopCommands
         var schedule = svc.GetSchedule(p.CardId);
         if (schedule is null)
             return ctx.Fail("not_found", "no schedule for card");
+        if (ctx.TaskScheduler is not { } scheduler)
+            return ctx.Fail("not_ready", "task scheduler not available");
         await svc.UpdateScheduleAsync(p.CardId, paused: null, skipNext: null, nextFireAt: null, lastFiredAt: null, pendingIntent: "finish");
+        await scheduler.SignalMutationAsync();
         return ctx.Ok();
     }
 }

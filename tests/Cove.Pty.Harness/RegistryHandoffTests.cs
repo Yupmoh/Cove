@@ -68,7 +68,7 @@ public sealed class RegistryHandoffTests
     {
         var logger = NullLogger.Instance;
         using var successor = new NookRegistry(PtyHostFactory.Create(logger), logger);
-        var record = new HandoffNookRecord("nook-dead", 99999999, "/bin/zsh", new[] { "-i" }, "/tmp", null, 80, 24, null, null, null, 0, 0, null, null, null);
+        var record = new HandoffNookRecord("nook-dead", 99999999, "/bin/zsh", new[] { "-i" }, "/tmp", null, 80, 24, null, null, null, 0, 0, null, null, null, "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
         var (a, b) = Cove.Platform.Pty.Unix.UnixFdChannel.CreateSocketPair();
         try
         {

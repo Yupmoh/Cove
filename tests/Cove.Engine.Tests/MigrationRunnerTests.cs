@@ -14,7 +14,7 @@ public sealed class MigrationRunnerTests
     {
         Directory.CreateDirectory(dir);
         var meta = new DataDirMeta(version, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), "test");
-        AtomicJsonStore.Write(Path.Combine(dir, "meta.json"), meta, CoveJsonContext.Default.DataDirMeta);
+        AtomicJsonStore.Write(Path.Combine(dir, "meta.json"), meta, PlatformJsonContext.Default.DataDirMeta);
     }
 
     [Fact]

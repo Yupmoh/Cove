@@ -1,4 +1,5 @@
 using Cove.Engine.Knowledge;
+using Cove.Protocol;
 using Cove.Testing;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
@@ -9,6 +10,17 @@ public sealed class NoteReconciliationServiceTests
 {
     private static string NewDir() => System.IO.Path.Combine(System.IO.Path.GetTempPath(), "cove-reconcile-" + System.Guid.NewGuid().ToString("N"));
 
+    private static NoteReconciliationService CreateService(
+        string dataDir,
+        System.TimeSpan? debounceDelay = null)
+    {
+        System.IO.Directory.CreateDirectory(dataDir);
+        var kernel = new KnowledgePersistenceKernel(dataDir, NullLogger.Instance);
+        kernel.EnsureAllSchemas();
+        var store = new NoteFileStore(dataDir, NullLogger.Instance);
+        return new NoteReconciliationService(store, NullLogger.Instance, debounceDelay);
+    }
+
     [Fact]
     public async Task FileEdit_FiresExactlyOneDebouncedReconcileEvent()
     {
@@ -17,7 +29,7 @@ public sealed class NoteReconciliationServiceTests
         var notesRoot = System.IO.Path.Combine(dir, "notes", "ws1");
         System.IO.Directory.CreateDirectory(notesRoot);
 
-        using var svc = new NoteReconciliationService(NullLogger.Instance, System.TimeSpan.FromMilliseconds(100));
+        using var svc = CreateService(dir, System.TimeSpan.FromMilliseconds(100));
         var events = new System.Collections.Generic.List<FileReconcileEvent>();
         var reconciled = new TaskCompletionSource<FileReconcileEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
         svc.ReconcileNeeded += (_, e) =>
@@ -46,14 +58,55 @@ public sealed class NoteReconciliationServiceTests
     [Fact]
     public void NonExistentRoot_DoesNotCrash()
     {
-        using var svc = new NoteReconciliationService(NullLogger.Instance);
+        using var svc = CreateService(NewDir());
         svc.StartWatching("/nonexistent/path/xyz", "ws1");
+    }
+
+    [Fact]
+    public void StartWatching_RepairsIndexDivergenceFromCanonicalFiles()
+    {
+        var dir = NewDir();
+        System.IO.Directory.CreateDirectory(dir);
+        var kernel = new KnowledgePersistenceKernel(dir, NullLogger.Instance);
+        kernel.EnsureAllSchemas();
+        var store = new NoteFileStore(dir, NullLogger.Instance);
+        var note = store.Create(new Note
+        {
+            Title = "Reconciled",
+            BayId = "ws1",
+            Content = "canonical file corpus",
+            Source = "manual",
+            Kind = "markdown",
+        });
+        var indexPath = System.IO.Path.Combine(dir, "notes", "index.db");
+        using (var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={indexPath}"))
+        {
+            connection.Open();
+            using var delete = connection.CreateCommand();
+            delete.CommandText = "DELETE FROM notes_index WHERE note_id = @id";
+            delete.Parameters.AddWithValue("@id", note.Id);
+            delete.ExecuteNonQuery();
+        }
+
+        using (var service = new NoteReconciliationService(store, NullLogger.Instance))
+            service.StartWatching(System.IO.Path.Combine(dir, "notes", "ws1"), "ws1");
+
+        using (var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={indexPath}"))
+        {
+            connection.Open();
+            using var count = connection.CreateCommand();
+            count.CommandText = "SELECT COUNT(*) FROM notes_fts WHERE notes_fts MATCH 'canonical'";
+            Assert.Equal(1L, count.ExecuteScalar());
+        }
+
+        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+        TestDirectory.Delete(dir);
     }
 
     [Fact]
     public void StopWatchingAndDispose_AreIdempotent()
     {
-        var svc = new NoteReconciliationService(NullLogger.Instance);
+        var svc = CreateService(NewDir());
 
         svc.StopWatching();
         svc.StopWatching();
@@ -71,7 +124,7 @@ public sealed class NoteReconciliationServiceTests
         System.IO.Directory.CreateDirectory(notesRoot);
         System.IO.Directory.CreateDirectory(System.IO.Path.Combine(notesRoot, ".git"));
 
-        using var svc = new NoteReconciliationService(NullLogger.Instance, System.TimeSpan.FromMilliseconds(100));
+        using var svc = CreateService(dir, System.TimeSpan.FromMilliseconds(100));
         var events = new System.Collections.Generic.List<FileReconcileEvent>();
         var barrier = new TaskCompletionSource<FileReconcileEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
         svc.ReconcileNeeded += (_, e) =>
@@ -104,7 +157,7 @@ public sealed class NoteReconciliationServiceTests
         var notesRoot = System.IO.Path.Combine(dir, "notes", "ws1");
         System.IO.Directory.CreateDirectory(notesRoot);
 
-        var svc = new NoteReconciliationService(NullLogger.Instance, System.TimeSpan.FromMilliseconds(50));
+        var svc = CreateService(dir, System.TimeSpan.FromMilliseconds(50));
         using var callbackEntered = new ManualResetEventSlim();
         using var releaseCallback = new ManualResetEventSlim();
         using var disposeStarted = new ManualResetEventSlim();
@@ -191,7 +244,7 @@ public sealed class NoteReconciliationServiceTests
         var notesRoot = System.IO.Path.Combine(dir, "notes", "ws1");
         System.IO.Directory.CreateDirectory(notesRoot);
 
-        var svc = new NoteReconciliationService(NullLogger.Instance, System.TimeSpan.FromMilliseconds(50));
+        var svc = CreateService(dir, System.TimeSpan.FromMilliseconds(50));
         var disposeReturned = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var unexpectedNotification = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var notificationCount = 0;

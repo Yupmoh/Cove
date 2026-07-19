@@ -25,7 +25,7 @@ public sealed class LauncherOptionsCommandTests
     {
         var root = WriteFixture("test-v2");
         var store = new AdapterManifestStore(root);
-        var orch = new LaunchOrchestrator(store, new MethodRunner(), new BinaryDiscoveryService());
+        var orch = LaunchTestFactory.Create(store, new MethodRunner(), new BinaryDiscoveryService());
         var prm = JsonSerializer.SerializeToElement(new LauncherOptionsParams("test-v2"), CoveJsonContext.Default.LauncherOptionsParams);
 
         var request = new ControlRequest("1", "cove://commands/launcher.options", prm);
@@ -57,7 +57,7 @@ public sealed class LauncherOptionsCommandTests
     {
         var root = WriteFixture("test-v1");
         var store = new AdapterManifestStore(root);
-        var orch = new LaunchOrchestrator(store, new MethodRunner(), new BinaryDiscoveryService());
+        var orch = LaunchTestFactory.Create(store, new MethodRunner(), new BinaryDiscoveryService());
         var prm = JsonSerializer.SerializeToElement(new LauncherOptionsParams("test-v1"), CoveJsonContext.Default.LauncherOptionsParams);
 
         var request = new ControlRequest("1", "cove://commands/launcher.options", prm);
@@ -73,7 +73,7 @@ public sealed class LauncherOptionsCommandTests
     {
         var root = WriteFixture("test-v2");
         var store = new AdapterManifestStore(root);
-        var orch = new LaunchOrchestrator(store, new MethodRunner(), new BinaryDiscoveryService());
+        var orch = LaunchTestFactory.Create(store, new MethodRunner(), new BinaryDiscoveryService());
 
         var request = new ControlRequest("1", "cove://commands/launcher.options");
         var response = await EngineCommandRouter.RouteAsync(request, launcher: orch);

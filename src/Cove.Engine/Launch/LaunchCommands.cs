@@ -12,16 +12,12 @@ public static class LaunchCommands
     {
         if (ctx.Launcher is not { } orch)
             return ctx.Fail("not_ready", "launch orchestrator not available");
-        if (ctx.LaunchProfiles is not { } profiles)
+        if (!orch.CanResolveProfiles)
             return ctx.Fail("not_ready", "launch profile store not available");
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.LaunchBuildParams) is not { } p)
             return ctx.Fail("invalid_params", "launch build params required");
 
-        var profile = profiles.Load(p.Adapter, p.ProfileSlug);
-        if (profile is null && p.ProfileSlug == "default")
-            profile = new Cove.Adapters.LaunchProfile("Default", "default", p.Adapter, true, null, null,
-                System.Array.Empty<string>(), new System.Collections.Generic.Dictionary<string, string>(),
-                new System.Collections.Generic.Dictionary<string, bool>(), System.Array.Empty<string>(), null, 1);
+        var profile = orch.FindProfile(p.Adapter, p.ProfileSlug);
         if (profile is null)
             return ctx.Fail("not_found", $"profile '{p.Adapter}/{p.ProfileSlug}' not found");
 

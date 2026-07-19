@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using System.Text;
 using System.Text.Json;
+using Cove.Engine.Protocol;
 using Cove.Engine.Pty;
 using Cove.Protocol;
 using Microsoft.Extensions.Logging;
@@ -27,18 +28,58 @@ internal sealed class NookStreamRouter
         FrameConnection connection,
         Stream stream,
         ControlRequest request,
+        ConnectionPrincipal principal,
         CancellationToken cancellationToken)
     {
         if (request.Params is not JsonElement element
             || element.Deserialize(CoveJsonContext.Default.SubscribeParams) is not { } parameters)
         {
+            _logger.ControlDispatchFailed(
+                request.Uri,
+                "invalid_params",
+                "subscribe params required");
             await WriteResponseAsync(
                 connection,
                 Fail(request.Id, "invalid_params", "subscribe params required"),
                 cancellationToken).ConfigureAwait(false);
             return;
         }
-        if (!_nooks.TryGet(parameters.NookId, out var nook))
+        if (principal.Kind == ConnectionPrincipalKind.Nook
+            && !string.Equals(
+                principal.NookId,
+                parameters.NookId,
+                StringComparison.Ordinal))
+        {
+            _logger.ControlDispatchFailed(
+                request.Uri,
+                "access_denied",
+                "nook connection attempted cross-nook subscription");
+            await WriteResponseAsync(
+                connection,
+                Fail(
+                    request.Id,
+                    "access_denied",
+                    "nook connection may subscribe only to its bound nook"),
+                cancellationToken).ConfigureAwait(false);
+            return;
+        }
+        if (principal.Kind
+            == ConnectionPrincipalKind.Unauthenticated)
+        {
+            _logger.ControlDispatchFailed(
+                request.Uri,
+                "access_denied",
+                "unauthenticated subscription");
+            await WriteResponseAsync(
+                connection,
+                Fail(
+                    request.Id,
+                    "access_denied",
+                    "subscription requires an authenticated connection"),
+                cancellationToken).ConfigureAwait(false);
+            return;
+        }
+        if (!_nooks.TryGetStreamState(parameters.NookId, out var streamState))
         {
             _logger.SubscribeUnknownNook(parameters.NookId);
             await WriteResponseAsync(
@@ -49,8 +90,8 @@ internal sealed class NookStreamRouter
         }
 
         const ulong streamId = 1;
-        var head = nook.Ring.Head;
-        var tail = nook.Ring.Tail;
+        var head = streamState.Ring.Head;
+        var tail = streamState.Ring.Tail;
         var checkpoint = _nooks.GetTerminalCheckpoint(parameters.NookId);
         var useCheckpoint = checkpoint is not null
             && ((long)parameters.SinceOffset < checkpoint.Offset
@@ -68,7 +109,7 @@ internal sealed class NookStreamRouter
                 Encoding.ASCII.GetBytes(
                     useCheckpoint
                         ? checkpoint!.ModeSupplement
-                        : nook.Reader.TerminalModePreamble)),
+                        : streamState.ModePreamble())),
             useCheckpoint ? Convert.ToBase64String(checkpoint!.Data) : "",
             useCheckpoint ? checkpoint!.Cols : 0,
             useCheckpoint ? checkpoint!.Rows : 0);
@@ -84,8 +125,8 @@ internal sealed class NookStreamRouter
 
         if (_nooks.ConsumePendingRepaint(parameters.NookId))
         {
-            var repaintCols = nook.Cols;
-            var repaintRows = nook.Rows;
+            var repaintCols = streamState.Cols;
+            var repaintRows = streamState.Rows;
             _ = Task.Run(async () =>
             {
                 try
@@ -112,13 +153,13 @@ internal sealed class NookStreamRouter
         var sink = new SocketByteStreamSink(stream);
         var sender = new PtyStreamSender(
             streamId,
-            nook.Session.SessionId,
-            nook.Ring,
+            streamState.SessionId,
+            streamState.Ring,
             baseOffset,
             sink,
             parameters.NookId,
             _logger,
-            () => nook.Reader.TerminalModePreamble,
+            streamState.ModePreamble,
             () =>
             {
                 var currentCheckpoint = _nooks.GetTerminalCheckpoint(parameters.NookId);
@@ -155,7 +196,7 @@ internal sealed class NookStreamRouter
                         lock (gate)
                             sender.OnCredit(acknowledged);
                     }
-                    nook.Signal.Set();
+                    streamState.Signal.Set();
                 }
             }
             catch (Exception ex)
@@ -165,7 +206,7 @@ internal sealed class NookStreamRouter
             finally
             {
                 streamCancellation.Cancel();
-                nook.Signal.Set();
+                streamState.Signal.Set();
             }
         });
 
@@ -173,12 +214,12 @@ internal sealed class NookStreamRouter
         {
             while (!streamCancellation.IsCancellationRequested)
             {
-                var wait = nook.Signal.WaitAsync();
+                var wait = streamState.Signal.WaitAsync();
                 lock (gate)
                 {
-                    if (!childMarked && nook.Reader.HasCompleted)
+                    if (!childMarked && streamState.HasCompleted())
                     {
-                        sender.MarkChildExited(nook.Reader.ExitCode);
+                        sender.MarkChildExited(streamState.ExitCode());
                         childMarked = true;
                     }
                     sender.PumpAvailable();

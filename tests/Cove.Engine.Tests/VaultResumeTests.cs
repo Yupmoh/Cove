@@ -36,8 +36,13 @@ public sealed class VaultResumeTests
         var manifestStore = new AdapterManifestStore(adaptersRoot);
         var methodRunner = new MethodRunner();
         var resumeService = new AgentResumeService(new AdapterResumeProtocol(manifestStore, methodRunner));
-        var launcher = new LaunchOrchestrator(manifestStore, methodRunner, new BinaryDiscoveryService(), null, resumeService);
         var launchProfiles = new LaunchProfileStore(Path.Combine(adaptersRoot, "profiles"));
+        var launcher = LaunchTestFactory.Create(
+            manifestStore,
+            methodRunner,
+            new BinaryDiscoveryService(),
+            profiles: launchProfiles,
+            resume: resumeService);
         var el = JsonSerializer.SerializeToElement(p, CoveJsonContext.Default.VaultResumeParams);
         var request = new ControlRequest("1", "cove://commands/vault.resume", el);
         return new EngineDispatchContext(request, manifestStore: manifestStore, launcher: launcher, launchProfiles: launchProfiles);

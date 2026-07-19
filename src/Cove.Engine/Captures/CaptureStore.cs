@@ -1,4 +1,5 @@
 using System.Data;
+using Cove.Persistence;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 
@@ -20,18 +21,23 @@ public sealed record Capture(
 public sealed class CaptureStore
 {
     private readonly string _capturesDir;
-    private readonly string _dbPath;
+    private readonly SqliteConnectionFactory _database;
     private readonly ILogger _logger;
     private readonly TimeProvider _timeProvider;
     private int _nextNumber = 1;
 
-    public CaptureStore(string dataDir, ILogger logger, TimeProvider? timeProvider = null)
+    public CaptureStore(
+        string dataDir,
+        ILogger logger,
+        TimeProvider? timeProvider = null,
+        SqliteConnectionFactory? database = null)
     {
         _capturesDir = System.IO.Path.Combine(dataDir, "captures");
-        _dbPath = System.IO.Path.Combine(dataDir, "captures.db");
+        var databasePath = System.IO.Path.Combine(dataDir, "captures.db");
         System.IO.Directory.CreateDirectory(_capturesDir);
         _logger = logger;
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _database = database ?? new SqliteConnectionFactory(databasePath, logger);
         EnsureSchema();
         _nextNumber = GetMaxNumber() + 1;
     }
@@ -48,8 +54,8 @@ public sealed class CaptureStore
 
         WriteMetaJson(capture);
 
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
+
         using var cmd = conn.CreateCommand();
         cmd.CommandText = """
             INSERT INTO captures (id, number, bundle_dir, bay_id, region, audio, mic, cursor, created_at, duration_ms, status)
@@ -78,8 +84,8 @@ public sealed class CaptureStore
         var duration = stoppedAt - cap.CreatedAt;
         var updated = cap with { Duration = duration, Status = "stopped" };
 
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
+
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "UPDATE captures SET duration_ms = @dur, status = 'stopped' WHERE id = @id";
         cmd.Parameters.AddWithValue("@dur", (long)duration.TotalMilliseconds);
@@ -91,8 +97,8 @@ public sealed class CaptureStore
 
     public Capture? GetCapture(string id)
     {
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
+
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT id, number, bundle_dir, bay_id, region, audio, mic, cursor, created_at, duration_ms, status FROM captures WHERE id = @id";
         cmd.Parameters.AddWithValue("@id", id);
@@ -104,8 +110,8 @@ public sealed class CaptureStore
     public System.Collections.Generic.IReadOnlyList<Capture> ListCaptures()
     {
         var result = new System.Collections.Generic.List<Capture>();
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
+
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT id, number, bundle_dir, bay_id, region, audio, mic, cursor, created_at, duration_ms, status FROM captures ORDER BY number ASC";
         using var reader = cmd.ExecuteReader();
@@ -119,8 +125,8 @@ public sealed class CaptureStore
         var cap = GetCapture(id);
         if (cap is null) return false;
 
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
+
         using var delCmd = conn.CreateCommand();
         delCmd.CommandText = "DELETE FROM captures WHERE id = @id; DELETE FROM capture_attachments WHERE capture_id = @id";
         delCmd.Parameters.AddWithValue("@id", id);
@@ -141,8 +147,8 @@ public sealed class CaptureStore
 
     public void AttachToTask(string captureId, string taskId)
     {
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
+
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "INSERT OR IGNORE INTO capture_attachments (capture_id, task_id) VALUES (@cap, @task)";
         cmd.Parameters.AddWithValue("@cap", captureId);
@@ -153,8 +159,8 @@ public sealed class CaptureStore
     public System.Collections.Generic.IReadOnlyList<string> GetTaskAttachments(string taskId)
     {
         var result = new System.Collections.Generic.List<string>();
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
+
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT capture_id FROM capture_attachments WHERE task_id = @task ORDER BY rowid";
         cmd.Parameters.AddWithValue("@task", taskId);
@@ -224,8 +230,8 @@ public sealed class CaptureStore
 
     private int GetMaxNumber()
     {
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
+
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT COALESCE(MAX(number), 0) FROM captures";
         var result = cmd.ExecuteScalar();
@@ -236,8 +242,8 @@ public sealed class CaptureStore
 
     private void EnsureSchema()
     {
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
+
         using var cmd = conn.CreateCommand();
         cmd.CommandText = """
             CREATE TABLE IF NOT EXISTS captures (

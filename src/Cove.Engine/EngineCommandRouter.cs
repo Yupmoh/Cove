@@ -1,6 +1,7 @@
 using Cove.Adapters;
 using Cove.Engine.Browser;
 using Cove.Engine.Config;
+using Cove.Engine.Dictation;
 using Cove.Engine.Hooks;
 using Cove.Engine.Knowledge;
 using Cove.Engine.Launch;
@@ -74,7 +75,16 @@ public static class EngineCommandRouter
         Cove.Engine.Lsp.LspService? lspService = null,
         Cove.Adapters.SessionService? sessionService = null,
         string? baysDir = null,
-        System.Threading.CancellationToken cancellationToken = default)
+        Cove.Tasks.Scheduler.IScheduleMutationAcknowledger? taskScheduler = null,
+        Cove.Engine.Filesystem.DirectoryListingService? directoryListing = null,
+        Cove.Engine.Bays.GitSummaryService? gitSummary = null,
+        Cove.Engine.Feedback.FeedbackStore? feedbackStore = null,
+        Cove.Engine.Diagnostics.PerformanceResultStore? performanceResults = null,
+        DictationTranscriptionRuntime? dictation = null,
+        System.Threading.CancellationToken cancellationToken = default,
+        System.Func<System.Threading.CancellationToken, bool>? forwardWindowFocus = null,
+        System.Func<Cove.Engine.Restart.RestorationSummaryEvent?>? getRestorationSummary = null,
+        System.DateTimeOffset? engineStartedAtUtc = null)
     {
         System.Func<EngineDispatchContext, System.Threading.Tasks.Task<ControlResponse>> typed;
         try
@@ -89,14 +99,20 @@ public static class EngineCommandRouter
         }
         try
         {
-            if (nookScopes is not null && ScopeEnforcement.IsNookTargetingVerb(request.Uri))
+            if (nookScopes is not null)
             {
-                var denied = ScopeEnforcement.Check(request, nookScopes!, bays, layout, agentRouter);
+                var denied =
+                    ScopeEnforcement.AuthorizeAttributedNook(
+                        request,
+                        nookScopes,
+                        bays,
+                        layout,
+                        agentRouter);
                 if (denied is not null)
                     return denied;
             }
-            var dispatchCtx = new EngineDispatchContext(request, nooks, layout, bays, runCommands, restoration, snapshots, skills, agents, launchProfiles, adapterEnv, hookServer, hookRouter, agentRouter, activity, sessions, lifecycle, launcher, taskService, dispatchSaga, resumeSaga, timeline, blackboard, noteFiles, memory, memoryRanker, proposals, consolidator, edits, corpus, vaultSettings, library, reviews, attribution, reviewDispatcher, nookTypes, browser, config, manifestStore, registry, omniChat, nookScopes, stateBus, extensions, captures, gitReadModel, searchService, themes, keybindings, browserAutomation, diagnostics, perfBundles, recentSessions, lspService, sessionService, baysDir);
-            dispatchCtx.Redrive = subReq => RouteAsync(subReq, nooks, layout, bays, runCommands, restoration, snapshots, skills, agents, launchProfiles, adapterEnv, hookServer, hookRouter, agentRouter, activity, sessions, lifecycle, launcher, taskService, dispatchSaga, resumeSaga, timeline, blackboard, noteFiles, memory, memoryRanker, proposals, consolidator, edits, corpus, vaultSettings, library, reviews, attribution, reviewDispatcher, nookTypes, browser, config, manifestStore, registry, omniChat, nookScopes, stateBus, extensions, captures, gitReadModel, searchService, themes, keybindings, browserAutomation, diagnostics, perfBundles, recentSessions, lspService, sessionService, baysDir, cancellationToken);
+            var dispatchCtx = new EngineDispatchContext(request, nooks, layout, bays, runCommands, restoration, snapshots, skills, agents, launchProfiles, adapterEnv, hookServer, hookRouter, agentRouter, activity, sessions, lifecycle, launcher, taskService, dispatchSaga, resumeSaga, timeline, blackboard, noteFiles, memory, memoryRanker, proposals, consolidator, edits, corpus, vaultSettings, library, reviews, attribution, reviewDispatcher, nookTypes, browser, config, manifestStore, registry, omniChat, nookScopes, stateBus, extensions, captures, gitReadModel, searchService, themes, keybindings, browserAutomation, diagnostics, perfBundles, recentSessions, lspService, sessionService, baysDir, taskScheduler, directoryListing, gitSummary, feedbackStore, performanceResults, dictation, cancellationToken, forwardWindowFocus, getRestorationSummary, engineStartedAtUtc);
+            dispatchCtx.Redrive = subReq => RouteAsync(subReq, nooks, layout, bays, runCommands, restoration, snapshots, skills, agents, launchProfiles, adapterEnv, hookServer, hookRouter, agentRouter, activity, sessions, lifecycle, launcher, taskService, dispatchSaga, resumeSaga, timeline, blackboard, noteFiles, memory, memoryRanker, proposals, consolidator, edits, corpus, vaultSettings, library, reviews, attribution, reviewDispatcher, nookTypes, browser, config, manifestStore, registry, omniChat, nookScopes, stateBus, extensions, captures, gitReadModel, searchService, themes, keybindings, browserAutomation, diagnostics, perfBundles, recentSessions, lspService, sessionService, baysDir, taskScheduler, directoryListing, gitSummary, feedbackStore, performanceResults, dictation, cancellationToken, forwardWindowFocus, getRestorationSummary, engineStartedAtUtc);
             return await typed(dispatchCtx);
         }
         catch (System.Exception ex)

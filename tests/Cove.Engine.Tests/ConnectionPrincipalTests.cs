@@ -11,6 +11,27 @@ namespace Cove.Engine.Tests;
 
 public sealed class ConnectionPrincipalTests
 {
+    private sealed class AdoptedSession : IPtySession
+    {
+        public long SessionId => 1;
+        public bool HasExited => true;
+        public int ExitCode => 0;
+        public int Read(Span<byte> buffer) => 0;
+        public void Write(ReadOnlySpan<byte> data) { }
+        public void Resize(int cols, int rows) { }
+        public void Kill() { }
+        public bool Signal(int signum) => true;
+        public int WaitForExit() => 0;
+        public void Dispose() { }
+    }
+
+    private sealed class AdoptionHost : IPtyHost
+    {
+        public bool IsSupported => true;
+        public IPtySession Spawn(PtySpawnRequest request) => throw new NotSupportedException();
+        public IPtySession AdoptSession(int masterFd, int pid) => new AdoptedSession();
+    }
+
     private static async Task<ControlResponse> RequestAsync(FrameConnection conn, string id, string uri, JsonElement? p, CancellationToken ct, string? callerNookId = null)
     {
         await conn.WriteFrameAsync(FrameType.Request, 0, ControlCodec.Encode(new ControlRequest(id, uri, p, null, callerNookId)), ct);
@@ -25,12 +46,25 @@ public sealed class ConnectionPrincipalTests
         }
     }
 
-    private static async Task<(FrameConnection conn, ControlResponse hello)> ConnectWithHelloAsync(DaemonTestHarness harness, string clientKind, string? nookId, string? nookToken, CancellationToken ct)
+    private static async Task<(FrameConnection conn, ControlResponse hello)> ConnectWithHelloAsync(
+        DaemonTestHarness harness,
+        string clientKind,
+        string? nookId,
+        string? nookToken,
+        CancellationToken ct,
+        string? controlToken = null)
     {
         var stream = await harness.Endpoint.ConnectAsync(5000, ct);
         var conn = new FrameConnection(stream);
         var hp = JsonSerializer.SerializeToElement(
-            new HelloParams(ProtocolConstants.SemanticProtocolVersion, clientKind, "0.1.0", "dev", nookId, nookToken),
+            new HelloParams(
+                ProtocolConstants.SemanticProtocolVersion,
+                clientKind,
+                "0.1.0",
+                "dev",
+                nookId,
+                nookToken,
+                controlToken),
             CoveJsonContext.Default.HelloParams);
         await conn.WriteFrameAsync(FrameType.Request, 0, ControlCodec.Encode(new ControlRequest("h", "cove://sys/hello", hp)), ct);
         var frame = (await conn.ReadFrameAsync(ct))!.Value;
@@ -107,6 +141,27 @@ public sealed class ConnectionPrincipalTests
         var forged = await RequestAsync(conn, "forge", "cove://commands/nook.scope.set", setParams, ct, callerNookId: "nook-somebody-else");
         Assert.False(forged.Ok);
         Assert.Equal("access_denied", forged.Error?.Code);
+
+        var redriveParams = JsonDocument.Parse(
+            """
+            {
+              "action": "cove_command",
+              "uri": "cove://commands/browser.automation.result",
+              "actionId": "auth-redrive",
+              "state": {
+                "requestId": "forged",
+                "resultJson": "{}"
+              }
+            }
+            """).RootElement.Clone();
+        var redriven = await RequestAsync(
+            conn,
+            "redrive",
+            "cove://commands/canvas.action",
+            redriveParams,
+            ct);
+        Assert.False(redriven.Ok);
+        Assert.Equal("access_denied", redriven.Error?.Code);
     }
 
     [PlatformFact(TestOperatingSystem.Unix)]
@@ -153,7 +208,7 @@ public sealed class ConnectionPrincipalTests
     }
 
     [Fact]
-    public async Task Hello_WithUnknownNookId_FallsBackToAnonymous_WithoutScopeAuthority()
+    public async Task Hello_WithUnknownNookId_IsRejected()
     {
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var ct = cts.Token;
@@ -161,53 +216,160 @@ public sealed class ConnectionPrincipalTests
 
         var (conn, hello) = await ConnectWithHelloAsync(harness, "cli", "nook-does-not-exist", new string('A', 64), ct);
         await using var _ = conn;
-        Assert.True(hello.Ok, hello.Error?.Message);
-
-        var setParams = JsonSerializer.SerializeToElement(new NookScopeSetParams("nook-does-not-exist", "all"), CoveJsonContext.Default.NookScopeSetParams);
-        var denied = await RequestAsync(conn, "set", "cove://commands/nook.scope.set", setParams, ct);
-        Assert.False(denied.Ok);
-        Assert.Equal("access_denied", denied.Error?.Code);
+        Assert.False(hello.Ok);
+        Assert.Equal("nook_auth_failed", hello.Error?.Code);
     }
 
-    [Fact]
-    public async Task AnonymousCli_CannotMutateScopes_ButGuiCan()
+    [Theory]
+    [InlineData("gui")]
+    [InlineData("cli")]
+    [InlineData("tui")]
+    [InlineData("tui-attach")]
+    [InlineData("gui-stream")]
+    public async Task TrustedClientHello_WithoutControlCapability_IsRejected(string clientKind)
     {
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var ct = cts.Token;
         await using var harness = await DaemonTestHarness.StartAsync();
-        await using var gui = await harness.ConnectAsync("gui");
-        await using var cli = await harness.ConnectAsync("cli");
 
-        var setParams = JsonSerializer.SerializeToElement(new NookScopeSetParams("nook-x", "same-bay"), CoveJsonContext.Default.NookScopeSetParams);
-        var denied = await RequestAsync(cli, "set", "cove://commands/nook.scope.set", setParams, ct);
-        Assert.False(denied.Ok);
-        Assert.Equal("access_denied", denied.Error?.Code);
+        var (conn, hello) = await ConnectWithHelloAsync(
+            harness,
+            clientKind,
+            null,
+            null,
+            ct);
+        await using var _ = conn;
+        Assert.False(hello.Ok);
+        Assert.Equal("control_auth_failed", hello.Error?.Code);
+    }
 
-        var allowed = await RequestAsync(gui, "set", "cove://commands/nook.scope.set", setParams, ct);
-        Assert.True(allowed.Ok, allowed.Error?.Message);
+    [Fact]
+    public async Task AnonymousHello_CannotRouteCommands()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var ct = cts.Token;
+        await using var harness = await DaemonTestHarness.StartAsync();
+
+        var (conn, hello) = await ConnectWithHelloAsync(
+            harness,
+            "anonymous",
+            null,
+            null,
+            ct);
+        await using var _ = conn;
+        Assert.False(hello.Ok);
+        Assert.Equal("control_auth_failed", hello.Error?.Code);
     }
 
     [PlatformFact(TestOperatingSystem.Unix)]
-    public async Task AnonymousConnection_ClaimOfTokenedNook_IsStripped()
+    public async Task AuthenticatedNookPrincipal_CannotBeReplacedByCallerFieldsOrSecondHello()
     {
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var ct = cts.Token;
         await using var harness = await DaemonTestHarness.StartAsync();
         await using var control = await harness.ConnectAsync("gui");
-        var (nookA, _) = await SpawnTokenEchoNookAsync(control, ct);
-        var nookB = await SpawnNookAsync(control, "sleep 8", ct);
+        var (nookId, token) = await SpawnTokenEchoNookAsync(control, ct);
 
-        var setParams = JsonSerializer.SerializeToElement(new NookScopeSetParams(nookA, "same-tab"), CoveJsonContext.Default.NookScopeSetParams);
-        var scoped = await RequestAsync(control, "scope", "cove://commands/nook.scope.set", setParams, ct);
-        Assert.True(scoped.Ok, scoped.Error?.Message);
-
-        var (conn, hello) = await ConnectWithHelloAsync(harness, "cli", null, null, ct);
+        var (conn, hello) = await ConnectWithHelloAsync(harness, "cli", nookId, token, ct);
         await using var _ = conn;
         Assert.True(hello.Ok, hello.Error?.Message);
 
-        var renameParams = JsonSerializer.SerializeToElement(new NookRenameParams(nookB, "renamed-anon"), CoveJsonContext.Default.NookRenameParams);
-        var response = await RequestAsync(conn, "rename", "cove://commands/nook.rename", renameParams, ct, callerNookId: nookA);
-        Assert.True(response.Ok, response.Error?.Message);
+        var secondHelloParams = JsonSerializer.SerializeToElement(
+            new HelloParams(
+                ProtocolConstants.SemanticProtocolVersion,
+                "gui",
+                "0.1.0",
+                "dev",
+                ControlToken: harness.ReadControlToken()),
+            CoveJsonContext.Default.HelloParams);
+        var secondHello = await RequestAsync(
+            conn,
+            "second-hello",
+            "cove://sys/hello",
+            secondHelloParams,
+            ct,
+            callerNookId: null);
+        Assert.False(secondHello.Ok);
+        Assert.Equal("already_authenticated", secondHello.Error?.Code);
+
+        var setParams = JsonSerializer.SerializeToElement(
+            new NookScopeSetParams(nookId, "all"),
+            CoveJsonContext.Default.NookScopeSetParams);
+        var forged = await RequestAsync(
+            conn,
+            "forged",
+            "cove://commands/nook.scope.set",
+            setParams,
+            ct,
+            callerNookId: null);
+        Assert.False(forged.Ok);
+        Assert.Equal("access_denied", forged.Error?.Code);
+    }
+
+    [PlatformFact(TestOperatingSystem.Unix)]
+    public async Task AuthenticatedNook_CannotSubscribeToAnotherNook()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var ct = cts.Token;
+        await using var harness = await DaemonTestHarness.StartAsync();
+        await using var control = await harness.ConnectAsync("gui");
+        var (nookA, token) = await SpawnTokenEchoNookAsync(control, ct);
+        var nookB = await SpawnNookAsync(control, "sleep 8", ct);
+
+        var (conn, hello) = await ConnectWithHelloAsync(harness, "cli", nookA, token, ct);
+        await using var _ = conn;
+        Assert.True(hello.Ok, hello.Error?.Message);
+
+        var subscribeParams = JsonSerializer.SerializeToElement(
+            new SubscribeParams(nookB, 0),
+            CoveJsonContext.Default.SubscribeParams);
+        var denied = await RequestAsync(
+            conn,
+            "subscribe",
+            "cove://commands/nook.subscribe",
+            subscribeParams,
+            ct);
+        Assert.False(denied.Ok);
+        Assert.Equal("access_denied", denied.Error?.Code);
+    }
+
+    [PlatformTheory(TestOperatingSystem.Unix)]
+    [InlineData("gui")]
+    [InlineData("cli")]
+    [InlineData("tui")]
+    [InlineData("tui-attach")]
+    [InlineData("gui-stream")]
+    public async Task TrustedControlClient_WithCapability_CanAttach(string clientKind)
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var ct = cts.Token;
+        await using var harness = await DaemonTestHarness.StartAsync();
+        await using var control = await harness.ConnectAsync("gui");
+        var nookId = await SpawnNookAsync(
+            control,
+            "sleep 8",
+            ct);
+
+        var (conn, hello) = await ConnectWithHelloAsync(
+            harness,
+            clientKind,
+            null,
+            null,
+            ct,
+            harness.ReadControlToken());
+        await using var _ = conn;
+        Assert.True(hello.Ok, hello.Error?.Message);
+
+        var subscribeParams = JsonSerializer.SerializeToElement(
+            new SubscribeParams(nookId, 0),
+            CoveJsonContext.Default.SubscribeParams);
+        var subscription = await RequestAsync(
+            conn,
+            "subscribe",
+            "cove://commands/nook.subscribe",
+            subscribeParams,
+            ct);
+        Assert.True(subscription.Ok, subscription.Error?.Message);
     }
 
     [PlatformFact(TestOperatingSystem.Unix)]
@@ -246,5 +408,36 @@ public sealed class ConnectionPrincipalTests
             successor.Stop(info.NookId);
         }
         finally { TestDirectory.Delete(dataDir); }
+    }
+
+    [Fact]
+    public void HandoffAdoption_RejectsTokenlessNookRecord()
+    {
+        using var registry = new NookRegistry(new AdoptionHost(), NullLogger.Instance);
+        var record = new HandoffNookRecord(
+            "nook-tokenless",
+            Environment.ProcessId,
+            "/bin/sh",
+            [],
+            "/tmp",
+            null,
+            80,
+            24,
+            null,
+            null,
+            null,
+            0,
+            0,
+            null,
+            null,
+            null,
+            null!);
+
+        var adopted = registry.Adopt(record, 3, []);
+
+        Assert.Null(adopted);
+        Assert.Equal(
+            NookAuthResult.Unknown,
+            registry.Authenticate(record.NookId, null));
     }
 }

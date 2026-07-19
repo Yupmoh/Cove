@@ -1,3 +1,4 @@
+using Cove.Persistence;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 
@@ -14,16 +15,21 @@ public sealed record AttributionEntry(
 
 public sealed class AttributionIndex
 {
-    private readonly string _dbPath;
+    private readonly SqliteConnectionFactory _database;
     private readonly ILogger _logger;
     private readonly TimeProvider _timeProvider;
 
-    public AttributionIndex(string dataDir, ILogger logger, TimeProvider? timeProvider = null)
+    public AttributionIndex(
+        string dataDir,
+        ILogger logger,
+        TimeProvider? timeProvider = null,
+        SqliteConnectionFactory? database = null)
     {
-        _dbPath = System.IO.Path.Combine(dataDir, "attribution", "index.db");
-        System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(_dbPath)!);
+        var databasePath = System.IO.Path.Combine(dataDir, "attribution", "index.db");
+        System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(databasePath)!);
         _logger = logger;
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _database = database ?? new SqliteConnectionFactory(databasePath, logger);
         EnsureSchema();
     }
 
@@ -31,8 +37,8 @@ public sealed class AttributionIndex
     {
         var id = System.Guid.NewGuid().ToString("N");
         var at = _timeProvider.GetUtcNow();
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
+
         using var cmd = conn.CreateCommand();
         cmd.CommandText = """
             INSERT INTO attribution (id, session_id, tool_use_id, file_path, start_line, end_line, at)
@@ -52,8 +58,8 @@ public sealed class AttributionIndex
 
     public AttributionEntry? FindByLine(string filePath, int line)
     {
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
+
         using var cmd = conn.CreateCommand();
         cmd.CommandText = """
             SELECT id, session_id, tool_use_id, file_path, start_line, end_line, at
@@ -73,8 +79,8 @@ public sealed class AttributionIndex
     public System.Collections.Generic.IReadOnlyList<AttributionEntry> FindByRange(string filePath, int startLine, int endLine)
     {
         var result = new System.Collections.Generic.List<AttributionEntry>();
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
+
         using var cmd = conn.CreateCommand();
         cmd.CommandText = """
             SELECT id, session_id, tool_use_id, file_path, start_line, end_line, at
@@ -95,8 +101,8 @@ public sealed class AttributionIndex
     public System.Collections.Generic.IReadOnlyList<AttributionEntry> FindByToolUse(string toolUseId)
     {
         var result = new System.Collections.Generic.List<AttributionEntry>();
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
+
         using var cmd = conn.CreateCommand();
         cmd.CommandText = """
             SELECT id, session_id, tool_use_id, file_path, start_line, end_line, at
@@ -126,8 +132,8 @@ public sealed class AttributionIndex
 
     private void EnsureSchema()
     {
-        using var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        using var conn = _database.Open();
+
         using var cmd = conn.CreateCommand();
         cmd.CommandText = """
             CREATE TABLE IF NOT EXISTS attribution (

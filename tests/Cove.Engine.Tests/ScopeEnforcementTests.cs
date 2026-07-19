@@ -21,6 +21,112 @@ public sealed class ScopeEnforcementTests
         return resp!.Data!.Value.GetProperty("nookId").GetString()!;
     }
 
+    public static TheoryData<string> ScopedCommandUris => new()
+    {
+        "cove://commands/nook.write",
+        "cove://commands/nook.resize",
+        "cove://commands/nook.kill",
+        "cove://commands/nook.rename",
+        "cove://commands/nook.search",
+        "cove://commands/nook.read",
+        "cove://commands/nook.checkpoint",
+        "cove://commands/nook.subscribe",
+        "cove://commands/nook.scope.get",
+        "cove://commands/send_to_agent",
+        "cove://commands/agent.message",
+        "cove://commands/canvas.action",
+        "cove://commands/browser.open",
+        "cove://commands/browser.navigate",
+        "cove://commands/browser.back",
+        "cove://commands/browser.forward",
+        "cove://commands/browser.reload",
+        "cove://commands/browser.close",
+        "cove://commands/browser.snapshot",
+        "cove://commands/browser.click",
+        "cove://commands/browser.fill",
+        "cove://commands/browser.eval",
+        "cove://commands/browser.screenshot",
+        "cove://commands/browser.setUserAgent",
+        "cove://commands/browser.clear",
+        "cove://commands/browser.type",
+        "cove://commands/browser.press",
+        "cove://commands/browser.select",
+        "cove://commands/browser.scroll",
+        "cove://commands/browser.wait",
+        "cove://commands/browser.get",
+        "cove://commands/browser.is"
+    };
+
+    public static TheoryData<string> ExplicitDomainCommandUris => new()
+    {
+        "cove://commands/nook.list",
+        "cove://commands/nook.spawn",
+        "cove://commands/nook.scope.set",
+        "cove://commands/browser.create",
+        "cove://commands/browser.automation.result",
+        "cove://commands/knowledge.ping",
+        "cove://commands/note.create",
+        "cove://commands/note.get",
+        "cove://commands/note.list",
+        "cove://commands/note.update",
+        "cove://commands/note.delete",
+        "cove://commands/note.search",
+        "cove://commands/note.read",
+        "cove://commands/note.write",
+        "cove://commands/note.history",
+        "cove://commands/note.media.save",
+        "cove://commands/note.get-state",
+        "cove://commands/note.save-state",
+        "cove://commands/timeline.append",
+        "cove://commands/timeline.list",
+        "cove://commands/blackboard.post",
+        "cove://commands/blackboard.show",
+        "cove://commands/memory.add",
+        "cove://commands/memory.search",
+        "cove://commands/memory.recall",
+        "cove://commands/memory.show",
+        "cove://commands/memory.supersede",
+        "cove://commands/memory.reindex",
+        "cove://commands/memory.consolidate",
+        "cove://commands/memory.propose",
+        "cove://commands/memory.proposal.transition",
+        "cove://commands/edits.find",
+        "cove://commands/vault.search",
+        "cove://commands/vault.resume",
+        "cove://commands/vault.set-setting",
+        "cove://commands/vault.reindex",
+        "cove://commands/library.list",
+        "cove://commands/library.materialize",
+        "cove://commands/review.add-comment",
+        "cove://commands/review.list-comments",
+        "cove://commands/review.resolve",
+        "cove://commands/review.reopen",
+        "cove://commands/review.close",
+        "cove://commands/review.re-anchor",
+        "cove://commands/review.audit",
+        "cove://commands/review.telemetry",
+        "cove://commands/attribution.record",
+        "cove://commands/attribution.find-by-line",
+        "cove://commands/attribution.find-by-range",
+        "cove://commands/attribution.find-by-tool-use",
+        "cove://commands/review.dispatch"
+    };
+
+    [Theory]
+    [MemberData(nameof(ScopedCommandUris))]
+    public void ScopedCommands_AreRepresentedByTheAuthorizationPolicy(string uri)
+    {
+        Assert.True(ScopeEnforcement.IsNookTargetingVerb(uri), uri);
+    }
+
+    [Theory]
+    [MemberData(nameof(ScopedCommandUris))]
+    [MemberData(nameof(ExplicitDomainCommandUris))]
+    public void SecurityDomainCommands_AreExplicitlyRepresented(string uri)
+    {
+        Assert.True(ScopeEnforcement.IsRepresentedVerb(uri), uri);
+    }
+
     [PlatformFact(TestOperatingSystem.Unix)]
     public async Task NookWrite_CrossNook_SameTabScope_ReturnsAccessDenied()
     {

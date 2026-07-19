@@ -90,26 +90,26 @@ public sealed class MemoryStoreTests
     }
 
     [Fact]
-    public void ReindexFromDisk_RebuildsFactsFromFiles()
+    public void RefreshFileExports_UsesSqliteAsCanonicalTruth()
     {
         var (dir, store) = NewStore();
-        store.AddFact(new Fact { BayId = "ws1", Kind = "decision", Content = "rebuildable fact", Confidence = 0.7 });
-        store.AddFact(new Fact { BayId = "ws1", Kind = "preference", Content = "another fact", Confidence = 0.5 });
+        var first = store.AddFact(new Fact { BayId = "ws1", Kind = "decision", Content = "database fact", Confidence = 0.7 });
+        var second = store.AddFact(new Fact { BayId = "ws1", Kind = "preference", Content = "another database fact", Confidence = 0.5 });
 
-        using (var conn = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={System.IO.Path.Combine(dir, "memory", "memory.db")}"))
-        {
-            conn.Open();
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = "DELETE FROM facts;";
-            cmd.ExecuteNonQuery();
-        }
+        var factsDirectory = System.IO.Path.Combine(dir, "memory", "facts", "ws1");
+        System.IO.File.WriteAllText(
+            System.IO.Path.Combine(factsDirectory, first.Id + ".json"),
+            """{"id":"tampered","bayId":"ws1","kind":"decision","content":"file mutation","confidence":1}""");
+        System.IO.File.Delete(System.IO.Path.Combine(factsDirectory, second.Id + ".json"));
 
-        Assert.Empty(store.ListFacts("ws1"));
-
-        store.ReindexFromDisk("ws1");
+        store.RefreshFileExports("ws1");
 
         var facts = store.ListFacts("ws1");
         Assert.Equal(2, facts.Count);
+        Assert.Contains(facts, fact => fact.Id == first.Id && fact.Content == "database fact");
+        Assert.Contains(facts, fact => fact.Id == second.Id && fact.Content == "another database fact");
+        Assert.Contains("database fact", System.IO.File.ReadAllText(System.IO.Path.Combine(factsDirectory, first.Id + ".json")));
+        Assert.Contains("another database fact", System.IO.File.ReadAllText(System.IO.Path.Combine(factsDirectory, second.Id + ".json")));
     }
 
     [Fact]

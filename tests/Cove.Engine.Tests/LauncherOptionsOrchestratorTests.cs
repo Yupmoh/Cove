@@ -29,7 +29,7 @@ public sealed class LauncherOptionsOrchestratorTests
         var dir = WriteFixture("test-v2");
         var store = new AdapterManifestStore(dir);
         var runner = new MethodRunner();
-        var orch = new LaunchOrchestrator(store, runner, new BinaryDiscoveryService());
+        var orch = LaunchTestFactory.Create(store, runner, new BinaryDiscoveryService());
         var options = await orch.LoadLauncherOptionsAsync("test-v2");
 
         Assert.NotNull(options);
@@ -44,7 +44,7 @@ public sealed class LauncherOptionsOrchestratorTests
         var dir = WriteFixture("test-v1");
         var store = new AdapterManifestStore(dir);
         var runner = new MethodRunner();
-        var orch = new LaunchOrchestrator(store, runner, new BinaryDiscoveryService());
+        var orch = LaunchTestFactory.Create(store, runner, new BinaryDiscoveryService());
 
         var options = await orch.LoadLauncherOptionsAsync("test-v1");
 
@@ -57,7 +57,7 @@ public sealed class LauncherOptionsOrchestratorTests
         var dir = WriteFixture("test-v2");
         var store = new AdapterManifestStore(dir);
         var runner = new MethodRunner();
-        var orch = new LaunchOrchestrator(store, runner, new BinaryDiscoveryService());
+        var orch = LaunchTestFactory.Create(store, runner, new BinaryDiscoveryService());
 
         var options = await orch.LoadLauncherOptionsAsync("never-installed");
 
@@ -70,7 +70,7 @@ public sealed class LauncherOptionsOrchestratorTests
         var dir = WriteFixture("test-v2");
         var store = new AdapterManifestStore(dir);
         var runner = new MethodRunner();
-        var orch = new LaunchOrchestrator(store, runner, new BinaryDiscoveryService());
+        var orch = LaunchTestFactory.Create(store, runner, new BinaryDiscoveryService());
         var options = await orch.LoadLauncherOptionsAsync("test-v2");
 
         Assert.NotNull(options);
@@ -86,7 +86,7 @@ public sealed class LauncherOptionsOrchestratorTests
         var dir = WriteFixture("test-v2");
         var store = new AdapterManifestStore(dir);
         var runner = new MethodRunner();
-        var orch = new LaunchOrchestrator(store, runner, new BinaryDiscoveryService());
+        var orch = LaunchTestFactory.Create(store, runner, new BinaryDiscoveryService());
 
         var options = await orch.LoadLauncherOptionsAsync("test-v2");
 

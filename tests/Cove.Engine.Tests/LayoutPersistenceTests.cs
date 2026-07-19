@@ -19,6 +19,7 @@ public sealed class LayoutPersistenceTests
         try
         {
             var layout = new LayoutService();
+            layout.SetActiveBay("ws1");
             string shoreId = layout.CreateShore("main", new NookLeaf { NookId = "p1", Subtabs = new[] { new Subtab("p1", NookType.Terminal) } });
             layout.SplitNook(shoreId, "p1", SplitOrientation.Row, new NookLeaf { NookId = "p2", Subtabs = new[] { new Subtab("p2", NookType.Terminal) } });
 
@@ -41,6 +42,7 @@ public sealed class LayoutPersistenceTests
         try
         {
             var layout = new LayoutService();
+            layout.SetActiveBay("ws1");
             string shoreId = layout.CreateShore("main", new NookLeaf { NookId = "p1", Subtabs = new[] { new Subtab("p1", NookType.Terminal) } });
             BayPersistence.Save(layout.ToSnapshot("ws1", "demo", "/proj"), new NookDescriptor[0], dir);
             layout.SplitNook(shoreId, "p1", SplitOrientation.Row, new NookLeaf { NookId = "p2", Subtabs = new[] { new Subtab("p2", NookType.Terminal) } });
@@ -62,6 +64,7 @@ public sealed class LayoutPersistenceTests
         try
         {
             var layout = new LayoutService();
+            layout.SetActiveBay("ws1");
             layout.CreateShore("main", new NookLeaf { NookId = "p1", Subtabs = new[] { new Subtab("p1", NookType.Terminal) } });
             var snap = layout.ToSnapshot("ws1", "demo", "/my/project");
             BayPersistence.Save(snap, new NookDescriptor[0], dir);
