@@ -18,22 +18,71 @@ public sealed class GeneratorTests
         }
         """;
 
+    private const string ContractSource = """
+        namespace Cove.Cli
+        {
+            public sealed class CommandContext(int value)
+            {
+                public int Value { get; } = value;
+            }
+        }
+
+        namespace Cove.Engine
+        {
+            public sealed class EngineDispatchContext(int value)
+            {
+                public int Value { get; } = value;
+            }
+        }
+
+        namespace Cove.Protocol
+        {
+            public sealed class ControlResponse(int value)
+            {
+                public int Value { get; } = value;
+            }
+        }
+        """;
+
     [Fact]
-    public void EmitsExactHandlerRegistryForAttributedMethods()
+    public async Task EmitsExactHandlerRegistryForAttributedMethods()
     {
         const string source = """
             using Cove.Protocol;
-            namespace Cove.Cli;
-            internal static class CliCommands
+
+            namespace Cove.Cli
             {
-                [CoveCommand("version")] public static int Version(string command) => 0;
-                [CoveCommand("nook list")] public static int NookList(string command) => 0;
+                internal static class CliCommands
+                {
+                    [CoveCommand("version")]
+                    public static System.Threading.Tasks.Task<int> Version(
+                        CommandContext command) =>
+                        System.Threading.Tasks.Task.FromResult(command.Value + 1);
+
+                    [CoveCommand("nook list")]
+                    public static System.Threading.Tasks.Task<int> NookList(
+                        CommandContext command) =>
+                        System.Threading.Tasks.Task.FromResult(command.Value + 2);
+                }
+            }
+
+            namespace Cove.Engine
+            {
+                internal static class EngineCommands
+                {
+                    [CoveCommand("cove://commands/ping")]
+                    public static System.Threading.Tasks.Task<ControlResponse> Ping(
+                        EngineDispatchContext context) =>
+                        System.Threading.Tasks.Task.FromResult(
+                            new ControlResponse(context.Value + 3));
+                }
             }
             """;
 
         var (output, diagnostics) = GeneratorTestHarness.Run(
             new CoveCommandGenerator(),
             ("CoveCommandAttribute.cs", AttributeSource),
+            ("DispatchContracts.cs", ContractSource),
             ("CliCommands.cs", source));
 
         Assert.Empty(diagnostics);
@@ -45,9 +94,42 @@ public sealed class GeneratorTests
         var handlers = Assert.IsAssignableFrom<IReadOnlyDictionary<string, Delegate>>(
             registry.GetField("Handlers")!.GetValue(null));
 
-        Assert.Equal(new[] { "nook list", "version" }, handlers.Keys.Order(StringComparer.Ordinal));
+        Assert.Equal(
+            new[]
+            {
+                "cove://commands/ping",
+                "nook list",
+                "version"
+            },
+            handlers.Keys.Order(StringComparer.Ordinal));
         Assert.Equal("NookList", handlers["nook list"].Method.Name);
         Assert.Equal("Version", handlers["version"].Method.Name);
+
+        var cliContextType = assembly.GetType(
+            "Cove.Cli.CommandContext")!;
+        var cliContext = Activator.CreateInstance(
+            cliContextType,
+            40)!;
+        var cliResult = await (Task<int>)handlers["version"]
+            .DynamicInvoke(cliContext)!;
+        Assert.Equal(41, cliResult);
+
+        var engineContextType = assembly.GetType(
+            "Cove.Engine.EngineDispatchContext")!;
+        var engineContext = Activator.CreateInstance(
+            engineContextType,
+            40)!;
+        var coreTask = (Task)handlers["cove://commands/ping"]
+            .DynamicInvoke(engineContext)!;
+        await coreTask;
+        var coreResult = coreTask.GetType()
+            .GetProperty("Result")!
+            .GetValue(coreTask)!;
+        Assert.Equal(
+            43,
+            coreResult.GetType()
+                .GetProperty("Value")!
+                .GetValue(coreResult));
     }
 
     [Fact]
@@ -58,15 +140,27 @@ public sealed class GeneratorTests
             namespace Cove.Cli;
             internal static class CliCommands
             {
-                [CoveCommand("version")] public static int Version(string command) => 0;
-                [CoveCommand("nook list")] public static int NookList(string command) => 0;
-                [CoveCommand("theme list", Description = "Lists themes", Source = "core")] public static int ThemeList(string command) => 0;
+                [CoveCommand("version")]
+                public static System.Threading.Tasks.Task<int> Version(
+                    CommandContext command) =>
+                    System.Threading.Tasks.Task.FromResult(0);
+
+                [CoveCommand("nook list")]
+                public static System.Threading.Tasks.Task<int> NookList(
+                    CommandContext command) =>
+                    System.Threading.Tasks.Task.FromResult(0);
+
+                [CoveCommand("theme list", Description = "Lists themes", Source = "core")]
+                public static System.Threading.Tasks.Task<int> ThemeList(
+                    CommandContext command) =>
+                    System.Threading.Tasks.Task.FromResult(0);
             }
             """;
 
         var (output, diagnostics) = GeneratorTestHarness.Run(
             new CoveCommandGenerator(),
             ("CoveCommandAttribute.cs", AttributeSource),
+            ("DispatchContracts.cs", ContractSource),
             ("CliCommands.cs", source));
 
         Assert.Empty(diagnostics);
