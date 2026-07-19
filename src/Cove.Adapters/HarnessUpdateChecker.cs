@@ -4,12 +4,42 @@ using Microsoft.Extensions.Logging;
 
 namespace Cove.Adapters;
 
+public interface IHarnessRegistryClient
+{
+    Task<string?> GetLatestVersionAsync(string package, CancellationToken cancellationToken = default);
+}
+
+public sealed class NpmHarnessRegistryClient : IHarnessRegistryClient
+{
+    private static readonly Uri DefaultEndpoint = new("https://registry.npmjs.org/");
+    private readonly HttpClient _httpClient;
+    private readonly Uri _endpoint;
+
+    public NpmHarnessRegistryClient(HttpClient httpClient, Uri? endpoint = null)
+    {
+        _httpClient = httpClient;
+        _endpoint = endpoint ?? DefaultEndpoint;
+    }
+
+    public async Task<string?> GetLatestVersionAsync(string package, CancellationToken cancellationToken = default)
+    {
+        var escapedPackage = Uri.EscapeDataString(package);
+        var requestUri = new Uri(_endpoint, $"{escapedPackage}/latest");
+        using var response = await _httpClient.GetAsync(requestUri, cancellationToken).ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode)
+            return null;
+        var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        var latest = JsonSerializer.Deserialize(body, AdaptersJsonContext.Default.NpmLatestVersion);
+        return latest?.Version;
+    }
+}
+
+public sealed record NpmLatestVersion(string? Version);
+
 public sealed class HarnessUpdateChecker
 {
     private static readonly TimeSpan DefaultCacheTtl = TimeSpan.FromMinutes(10);
-    private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(8) };
-
-    private readonly Func<string, CancellationToken, Task<string?>> _fetchLatest;
+    private readonly IHarnessRegistryClient _registryClient;
     private readonly TimeProvider _time;
     private readonly TimeSpan _cacheTtl;
     private readonly ILogger? _logger;
@@ -19,28 +49,21 @@ public sealed class HarnessUpdateChecker
     private sealed record CacheEntry(string? Version, DateTimeOffset FetchedAt);
 
     public HarnessUpdateChecker(
-        Func<string, CancellationToken, Task<string?>> fetchLatest,
+        IHarnessRegistryClient registryClient,
         TimeProvider? time = null,
         TimeSpan? cacheTtl = null,
         ILogger? logger = null)
     {
-        _fetchLatest = fetchLatest;
+        _registryClient = registryClient;
         _time = time ?? TimeProvider.System;
         _cacheTtl = cacheTtl ?? DefaultCacheTtl;
         _logger = logger;
     }
 
     public static HarnessUpdateChecker CreateNpm(ILogger? logger = null)
-        => new(FetchNpmLatestAsync, logger: logger);
-
-    private static async Task<string?> FetchNpmLatestAsync(string package, CancellationToken ct)
     {
-        using var response = await Http.GetAsync($"https://registry.npmjs.org/{package}/latest", ct).ConfigureAwait(false);
-        if (!response.IsSuccessStatusCode)
-            return null;
-        var body = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
-        using var doc = JsonDocument.Parse(body);
-        return doc.RootElement.TryGetProperty("version", out var version) ? version.GetString() : null;
+        var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(8) };
+        return new HarnessUpdateChecker(new NpmHarnessRegistryClient(httpClient), logger: logger);
     }
 
     public async Task<string?> GetLatestVersionAsync(string package, CancellationToken ct = default)
@@ -55,7 +78,7 @@ public sealed class HarnessUpdateChecker
         string? version = null;
         try
         {
-            version = await _fetchLatest(package, ct).ConfigureAwait(false);
+            version = await _registryClient.GetLatestVersionAsync(package, ct).ConfigureAwait(false);
             if (version is null)
                 _logger?.HarnessLatestUnavailable(package);
         }

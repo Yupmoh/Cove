@@ -1,4 +1,4 @@
-using System.Text.Json;
+using Cove.Platform;
 using Microsoft.Extensions.Logging;
 
 namespace Cove.Adapters;
@@ -7,13 +7,18 @@ public sealed class AdapterManifestStore
 {
     private readonly string _adaptersRoot;
     private readonly ILogger? _logger;
+    private readonly IPlatformFileSystem _fileSystem;
     private readonly Dictionary<string, (AdapterManifest Manifest, DateTimeOffset LastWrite)> _cache = new();
     private readonly object _lock = new();
 
-    public AdapterManifestStore(string adaptersRoot, ILogger? logger = null)
+    public AdapterManifestStore(
+        string adaptersRoot,
+        ILogger? logger = null,
+        IPlatformFileSystem? fileSystem = null)
     {
         _adaptersRoot = adaptersRoot;
         _logger = logger;
+        _fileSystem = fileSystem ?? SystemPlatformFileSystem.Instance;
     }
 
     public string AdaptersRoot => _adaptersRoot;
@@ -34,14 +39,13 @@ public sealed class AdapterManifestStore
             return null;
         }
         var manifestPath = Path.Combine(ResolveDir(adapter), "adapter.json");
-        var fileInfo = new FileInfo(manifestPath);
-        if (!fileInfo.Exists)
+        if (!_fileSystem.FileExists(manifestPath))
         {
             _logger?.ManifestNotFound(adapter, manifestPath);
             return null;
         }
 
-        var lastWrite = fileInfo.LastWriteTimeUtc;
+        var lastWrite = _fileSystem.GetLastWriteTimeUtc(manifestPath);
         lock (_lock)
         {
             if (_cache.TryGetValue(adapter, out var cached) && cached.LastWrite == lastWrite)
@@ -53,18 +57,13 @@ public sealed class AdapterManifestStore
 
         try
         {
-            var json = File.ReadAllText(manifestPath);
-            var parsed = JsonSerializer.Deserialize(json, AdaptersJsonContext.Default.AdapterManifest);
-            if (parsed is null)
+            var json = _fileSystem.ReadAllText(manifestPath);
+            var (manifest, errors) = ManifestValidator.Parse(json, _logger);
+            if (manifest is null)
             {
-                _logger?.ManifestParsedNullAt(adapter, manifestPath);
+                var error = errors.Count > 0 ? $"{errors[0].Field}:{errors[0].Code}" : "unknown validation error";
+                _logger?.ManifestLoadFailedAt(adapter, manifestPath, error);
                 return null;
-            }
-            var manifest = NormalizeCollections(parsed);
-            if (manifest.ScreenState is { } screen && HasInvalidScreenRules(screen))
-            {
-                _logger?.ManifestScreenStateDropped(adapter);
-                manifest = manifest with { ScreenState = null };
             }
             lock (_lock)
             {
@@ -72,11 +71,6 @@ public sealed class AdapterManifestStore
             }
             _logger?.ManifestLoaded(adapter, manifestPath);
             return manifest;
-        }
-        catch (JsonException ex)
-        {
-            _logger?.ManifestLoadFailedAt(adapter, manifestPath, ex.Message);
-            return null;
         }
         catch (IOException ex)
         {
@@ -90,42 +84,15 @@ public sealed class AdapterManifestStore
         }
     }
 
-    private static AdapterManifest NormalizeCollections(AdapterManifest manifest) => manifest with
-    {
-        Hooks = manifest.Hooks ?? new Dictionary<string, string>(),
-        HookEnvelopes = manifest.HookEnvelopes ?? new Dictionary<string, HookEnvelopeDeclaration>(),
-        Install = manifest.Install ?? new Dictionary<string, InstallRecipe>(),
-        WellKnownPaths = manifest.WellKnownPaths ?? [],
-        SuggestedFlags = manifest.SuggestedFlags ?? [],
-    };
-
-    private static bool HasInvalidScreenRules(ScreenStateDeclaration screen)
-    {
-        foreach (var rule in screen.Rules)
-        {
-            if (string.IsNullOrEmpty(rule.Pattern) || !ScreenStateDeclaration.IsValidStatus(rule.Status))
-                return true;
-            try
-            {
-                _ = new System.Text.RegularExpressions.Regex(rule.Pattern,
-                    System.Text.RegularExpressions.RegexOptions.Multiline | System.Text.RegularExpressions.RegexOptions.CultureInvariant,
-                    TimeSpan.FromMilliseconds(100));
-            }
-            catch (ArgumentException)
-            {
-                return true;
-            }
-        }
-        return false;
-    }
-
     public IReadOnlyList<AdapterManifest> LoadAll()
     {
         var manifests = new List<AdapterManifest>();
-        if (!Directory.Exists(_adaptersRoot))
+        if (!_fileSystem.DirectoryExists(_adaptersRoot))
             return manifests;
-        foreach (var dir in Directory.EnumerateDirectories(_adaptersRoot))
+        foreach (var dir in _fileSystem.EnumerateFileSystemEntries(_adaptersRoot))
         {
+            if (!_fileSystem.DirectoryExists(dir))
+                continue;
             var name = Path.GetFileName(dir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
             if (string.IsNullOrEmpty(name))
             {

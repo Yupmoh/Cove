@@ -6,7 +6,12 @@ namespace Cove.Adapters;
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record AdapterManifest
 {
-    public int SdkVersion { get; init; }
+    private static readonly IReadOnlyDictionary<string, string> EmptyHooks = new Dictionary<string, string>();
+    private static readonly IReadOnlyDictionary<string, HookEnvelopeDeclaration> EmptyHookEnvelopes = new Dictionary<string, HookEnvelopeDeclaration>();
+    private readonly IReadOnlyDictionary<string, string>? _hooks;
+    private readonly IReadOnlyDictionary<string, HookEnvelopeDeclaration>? _hookEnvelopes;
+
+    public required int SdkVersion { get; init; }
     public required string Name { get; init; }
     public required string DisplayName { get; init; }
     public required string Description { get; init; }
@@ -18,38 +23,37 @@ public sealed record AdapterManifest
     public BinaryDiscovery? BinaryDiscovery { get; init; }
     public string? Icon { get; init; }
     public string? SkillInstallPath { get; init; }
-    public IReadOnlyList<string> WellKnownPaths { get; init; } = [];
-    public IReadOnlyList<string> SuggestedFlags { get; init; } = [];
     public AdapterRetention? Retention { get; init; }
     public SessionExtractor? SessionExtractor { get; init; }
-    public LauncherOptions? LauncherOptions { get; init; }
     public ScreenStateDeclaration? ScreenState { get; init; }
-    public IReadOnlyDictionary<string, string> Hooks { get; init; } = new Dictionary<string, string>();
+    public IReadOnlyDictionary<string, string> Hooks { get => _hooks ?? EmptyHooks; init => _hooks = value; }
     public string? SkillsDir { get; init; }
-    private readonly IReadOnlyDictionary<string, InstallRecipe>? _install;
-    public IReadOnlyDictionary<string, InstallRecipe> Install { get => _install ?? new Dictionary<string, InstallRecipe>(); init => _install = value; }
-    private readonly IReadOnlyDictionary<string, InstallRecipe>? _update;
-    public IReadOnlyDictionary<string, InstallRecipe> Update { get => _update ?? new Dictionary<string, InstallRecipe>(); init => _update = value; }
-    private readonly IReadOnlyDictionary<string, InstallRecipe>? _uninstall;
-    public IReadOnlyDictionary<string, InstallRecipe> Uninstall { get => _uninstall ?? new Dictionary<string, InstallRecipe>(); init => _uninstall = value; }
-    public IReadOnlyDictionary<string, HookEnvelopeDeclaration> HookEnvelopes { get; init; } = new Dictionary<string, HookEnvelopeDeclaration>();
+    public PlatformRecipes? Install { get; init; }
+    public PlatformRecipes? Update { get; init; }
+    public PlatformRecipes? Uninstall { get; init; }
+    public IReadOnlyDictionary<string, HookEnvelopeDeclaration> HookEnvelopes { get => _hookEnvelopes ?? EmptyHookEnvelopes; init => _hookEnvelopes = value; }
 }
 
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record HookEnvelopeDeclaration
 {
     public required HookEnvelopeKind Kind { get; init; }
     public string? HookEventName { get; init; }
-    public bool IncludeSystemMessage { get; init; }
+    public bool? IncludeSystemMessage { get; init; }
 }
 
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record ScreenStateRule
 {
     public required string Pattern { get; init; }
     public required string Status { get; init; }
 }
 
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record ScreenStateDeclaration
 {
+    private static readonly IReadOnlyList<ScreenStateRule> EmptyRules = [];
+    private readonly IReadOnlyList<ScreenStateRule>? _rules;
     private static readonly HashSet<string> Vocabulary = new()
     {
         "idle", "active", "tool-running", "needs-input", "needs-permission", "done", "error",
@@ -57,7 +61,7 @@ public sealed record ScreenStateDeclaration
 
     public int QuietMs { get; init; } = 2000;
     public int TailBytes { get; init; } = 4096;
-    public IReadOnlyList<ScreenStateRule> Rules { get; init; } = [];
+    public IReadOnlyList<ScreenStateRule> Rules { get => _rules ?? EmptyRules; init => _rules = value; }
 
     [JsonIgnore]
     public int EffectiveTailBytes => Math.Clamp(TailBytes, 256, 65536);
@@ -76,12 +80,14 @@ sealed class HookEnvelopeKindConverter : JsonStringEnumConverter<HookEnvelopeKin
     public HookEnvelopeKindConverter() : base(JsonNamingPolicy.CamelCase, allowIntegerValues: false) { }
 }
 
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record AdapterMethod
 {
     public string? Script { get; init; }
     public string? Static { get; init; }
 }
 
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record BinaryDiscovery
 {
     private readonly IReadOnlyList<string>? _commands;
@@ -92,24 +98,40 @@ public sealed record BinaryDiscovery
     public string? VersionRegex { get; init; }
 }
 
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record AdapterRetention
 {
-    public string? ReadScript { get; init; }
-    public string? WriteScript { get; init; }
-    public string? Recommended { get; init; }
+    public required IReadOnlyList<RetentionField> Fields { get; init; }
+    public required string ReadScript { get; init; }
+    public required string WriteScript { get; init; }
 }
 
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record RetentionField
+{
+    public required string Key { get; init; }
+    public required string Label { get; init; }
+    public string? Unit { get; init; }
+    public required int Default { get; init; }
+    public required int Recommended { get; init; }
+    public int? Min { get; init; }
+    public int? Max { get; init; }
+}
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record SessionExtractor
 {
     public required string Script { get; init; }
-    private readonly int _schemaVersion = 1;
-    public int SchemaVersion { get => _schemaVersion == 0 ? 1 : _schemaVersion; init => _schemaVersion = value; }
+    public required int SchemaVersion { get; init; }
+    public required IReadOnlyList<string> SupportsDepths { get; init; }
 }
 
-public sealed record LauncherOptions
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record PlatformRecipes
 {
-    private readonly IReadOnlyDictionary<string, string>? _static;
-    public IReadOnlyDictionary<string, string> Static { get => _static ?? new Dictionary<string, string>(); init => _static = value; }
+    public InstallRecipe? Macos { get; init; }
+    public InstallRecipe? Linux { get; init; }
+    public InstallRecipe? Windows { get; init; }
 }
 
 public sealed record RegistryEntry
@@ -134,6 +156,7 @@ public sealed record RegistryEntry
     public IReadOnlyDictionary<string, InstallRecipe> Install { get => _install ?? new Dictionary<string, InstallRecipe>(); init => _install = value; }
 }
 
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record InstallRecipe
 {
     public required string Cmd { get; init; }
@@ -177,6 +200,10 @@ public sealed record FooterChipData(string ProfileSlug, bool IsDefault, DateTime
 [JsonSerializable(typeof(AdapterManifest))]
 [JsonSerializable(typeof(AdapterMethod))]
 [JsonSerializable(typeof(BinaryDiscovery))]
+[JsonSerializable(typeof(AdapterRetention))]
+[JsonSerializable(typeof(RetentionField))]
+[JsonSerializable(typeof(SessionExtractor))]
+[JsonSerializable(typeof(PlatformRecipes))]
 [JsonSerializable(typeof(HookEnvelopeDeclaration))]
 [JsonSerializable(typeof(Dictionary<string, HookEnvelopeDeclaration>))]
 [JsonSerializable(typeof(ScreenStateDeclaration))]
@@ -193,4 +220,5 @@ public sealed record FooterChipData(string ProfileSlug, bool IsDefault, DateTime
 [JsonSerializable(typeof(NookSelectionStore))]
 [JsonSerializable(typeof(NookSelection))]
 [JsonSerializable(typeof(FooterChipData))]
+[JsonSerializable(typeof(NpmLatestVersion))]
 public sealed partial class AdaptersJsonContext : JsonSerializerContext { }

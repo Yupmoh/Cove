@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Adapter Manifest",
-  "description": "Schema for adapter.json manifest files used by the atrium Script Adapter SDK.",
+  "description": "Schema for adapter.json manifest files used by the Cove Script Adapter SDK.",
   "type": "object",
   "required": [
     "sdkVersion",
@@ -91,10 +91,10 @@
     },
     "hooks": {
       "type": "object",
-      "description": "SDK v2. Optional map of hook event names (kebab-case, e.g. 'session-start') to stable atrium:// URIs. When present, atrium passes ATRIUM_HOOK_URI_* env vars to hooks.sh install so the installer can bake them into the tool's hook config.",
+      "description": "SDK v2. Optional map of hook event names (kebab-case, e.g. 'session-start') to stable cove:// URIs.",
       "additionalProperties": {
         "type": "string",
-        "pattern": "^atrium://"
+        "pattern": "^cove://"
       }
     },
     "hookEnvelopes": {
@@ -299,6 +299,17 @@
             "type": "string",
             "minLength": 1
           }
+        },
+        "versionFlag": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Argument passed to a discovered binary to request its version."
+        },
+        "versionRegex": {
+          "type": "string",
+          "minLength": 1,
+          "format": "regex",
+          "description": "Regular expression whose first capture group contains the binary version."
         }
       },
       "additionalProperties": false
@@ -634,6 +645,7 @@
               "pattern": {
                 "type": "string",
                 "minLength": 1,
+            "format": "regex",
                 "description": ".NET regex evaluated against the stripped tail."
               },
               "status": {

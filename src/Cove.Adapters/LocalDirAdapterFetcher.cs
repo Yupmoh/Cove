@@ -1,35 +1,44 @@
+using Cove.Platform;
+
 namespace Cove.Adapters;
 
 public sealed class LocalDirAdapterFetcher : IAdapterFetcher
 {
     private readonly string _sourceDir;
+    private readonly IPlatformFileSystem _fileSystem;
 
-    public LocalDirAdapterFetcher(string sourceDir) => _sourceDir = sourceDir;
+    public LocalDirAdapterFetcher(string sourceDir, IPlatformFileSystem? fileSystem = null)
+    {
+        _sourceDir = sourceDir;
+        _fileSystem = fileSystem ?? SystemPlatformFileSystem.Instance;
+    }
 
     public Task FetchIntoAsync(string destDir, CancellationToken cancellationToken = default)
     {
-        if (!Directory.Exists(_sourceDir))
+        if (!_fileSystem.DirectoryExists(_sourceDir))
             throw new AdapterInstallException($"source directory does not exist: {_sourceDir}");
 
         CopyRecursive(_sourceDir, destDir, cancellationToken);
         return Task.CompletedTask;
     }
 
-    private static void CopyRecursive(string source, string dest, CancellationToken ct)
+    private void CopyRecursive(string source, string destination, CancellationToken cancellationToken)
     {
-        Directory.CreateDirectory(dest);
-        foreach (var dir in Directory.EnumerateDirectories(source))
+        _fileSystem.CreateDirectory(destination);
+        foreach (var entry in _fileSystem.EnumerateFileSystemEntries(source))
         {
-            ct.ThrowIfCancellationRequested();
-            var name = Path.GetFileName(dir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
-            if (name is ".git" or "node_modules" || name.StartsWith(".installing-", StringComparison.Ordinal))
-                continue;
-            CopyRecursive(dir, Path.Combine(dest, name), ct);
-        }
-        foreach (var file in Directory.EnumerateFiles(source))
-        {
-            ct.ThrowIfCancellationRequested();
-            File.Copy(file, Path.Combine(dest, Path.GetFileName(file)), overwrite: true);
+            cancellationToken.ThrowIfCancellationRequested();
+            var name = Path.GetFileName(entry.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+            if (_fileSystem.DirectoryExists(entry))
+            {
+                if (name is ".git" or "node_modules" || name.StartsWith(".installing-", StringComparison.Ordinal))
+                    continue;
+                CopyRecursive(entry, Path.Combine(destination, name), cancellationToken);
+            }
+            else
+            {
+                _fileSystem.CopyFile(entry, Path.Combine(destination, name), overwrite: true);
+            }
         }
     }
 }

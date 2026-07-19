@@ -1,4 +1,5 @@
 using Cove.Adapters;
+using Cove.Platform;
 using Cove.Testing;
 using Xunit;
 
@@ -26,9 +27,10 @@ public sealed class BinaryDiscoveryTests
         {
             MakeExecutable(binDir, "fake-cli", "echo '1.0.0'");
             var path = Environment.GetEnvironmentVariable("PATH") ?? "";
-            var discovery = new BinaryDiscoveryService(
-                pathResolver: () => binDir + Path.PathSeparator + path);
-            var result = discovery.Discover(new BinaryDiscovery { Commands = ["fake-cli"], VersionFlag = "--version" });
+            var discovery = new BinaryDiscoveryService();
+            var result = discovery.Discover(
+                new BinaryDiscovery { Commands = ["fake-cli"], VersionFlag = "--version" },
+                loginShellPath: binDir + Path.PathSeparator + path);
 
             Assert.Equal(AdapterDetectionState.Detected, result.State);
             Assert.NotNull(result.BinaryPath);
@@ -48,8 +50,9 @@ public sealed class BinaryDiscoveryTests
             var result = discovery.Discover(new BinaryDiscovery
             {
                 Commands = ["wk-cli"],
+                WellKnownPaths = [wkDir],
                 VersionFlag = "--version",
-            }, wellKnownPaths: [wkDir]);
+            });
 
             Assert.Equal(AdapterDetectionState.Detected, result.State);
             Assert.Contains("wk-cli", result.BinaryPath ?? "");
@@ -64,8 +67,9 @@ public sealed class BinaryDiscoveryTests
         var result = discovery.Discover(new BinaryDiscovery
         {
             Commands = ["definitely-not-a-real-binary-xyz"],
+            WellKnownPaths = [],
             VersionFlag = "--version",
-        }, wellKnownPaths: []);
+        });
 
         Assert.Equal(AdapterDetectionState.Missing, result.State);
         Assert.Null(result.BinaryPath);
@@ -79,9 +83,10 @@ public sealed class BinaryDiscoveryTests
         {
             MakeExecutable(binDir, "no-version-cli", "exit 0");
             var path = Environment.GetEnvironmentVariable("PATH") ?? "";
-            var discovery = new BinaryDiscoveryService(
-                pathResolver: () => binDir + Path.PathSeparator + path);
-            var result = discovery.Discover(new BinaryDiscovery { Commands = ["no-version-cli"], VersionFlag = "--version" });
+            var discovery = new BinaryDiscoveryService();
+            var result = discovery.Discover(
+                new BinaryDiscovery { Commands = ["no-version-cli"], VersionFlag = "--version" },
+                loginShellPath: binDir + Path.PathSeparator + path);
 
             Assert.Equal(AdapterDetectionState.Broken, result.State);
             Assert.NotNull(result.BinaryPath);
@@ -98,9 +103,10 @@ public sealed class BinaryDiscoveryTests
         {
             MakeExecutable(binDir, "stderr-cli", "echo '3.1.0' >&2; exit 1");
             var path = Environment.GetEnvironmentVariable("PATH") ?? "";
-            var discovery = new BinaryDiscoveryService(
-                pathResolver: () => binDir + Path.PathSeparator + path);
-            var result = discovery.Discover(new BinaryDiscovery { Commands = ["stderr-cli"], VersionFlag = "--version" });
+            var discovery = new BinaryDiscoveryService();
+            var result = discovery.Discover(
+                new BinaryDiscovery { Commands = ["stderr-cli"], VersionFlag = "--version" },
+                loginShellPath: binDir + Path.PathSeparator + path);
 
             Assert.Equal(AdapterDetectionState.Detected, result.State);
             Assert.Equal("3.1.0", result.Version);
@@ -117,12 +123,13 @@ public sealed class BinaryDiscoveryTests
         try
         {
             MakeExecutable(homeSub, "tilde-cli", "echo '1.5.0'");
-            var discovery = new BinaryDiscoveryService(homeResolver: () => home);
+            var discovery = new BinaryDiscoveryService(environment: new TestRuntimeEnvironment(home));
             var result = discovery.Discover(new BinaryDiscovery
             {
                 Commands = ["tilde-cli"],
+                WellKnownPaths = ["~/" + Path.GetFileName(homeSub)],
                 VersionFlag = "--version",
-            }, wellKnownPaths: ["~/" + Path.GetFileName(homeSub)]);
+            });
 
             Assert.Equal(AdapterDetectionState.Detected, result.State);
         }
@@ -141,8 +148,9 @@ public sealed class BinaryDiscoveryTests
             var result = discovery.Discover(new BinaryDiscovery
             {
                 Commands = ["hang-cli"],
+                WellKnownPaths = [wkDir],
                 VersionFlag = "--version",
-            }, wellKnownPaths: [wkDir]);
+            });
             sw.Stop();
 
             Assert.True(sw.Elapsed < TimeSpan.FromSeconds(10), $"probe took {sw.Elapsed}");
@@ -151,4 +159,13 @@ public sealed class BinaryDiscoveryTests
         }
         finally { TestDirectory.Delete(wkDir); }
     }
+}
+
+internal sealed class TestRuntimeEnvironment(string homeDirectory) : IRuntimeEnvironment
+{
+    public bool IsWindows => OperatingSystem.IsWindows();
+    public string? ExecutablePath => Environment.GetEnvironmentVariable("PATH");
+    public string HomeDirectory => homeDirectory;
+    public string SystemDirectory => Environment.GetFolderPath(Environment.SpecialFolder.System);
+    public IReadOnlyList<string> WindowsGitRoots => [];
 }

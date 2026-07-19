@@ -1,33 +1,52 @@
+using Cove.Platform;
+
 namespace Cove.Adapters;
 
-public static class BashLocator
+public interface IBashLocator
 {
-    public static string? Find()
-    {
-        if (!OperatingSystem.IsWindows())
-            return File.Exists("/bin/bash") ? "/bin/bash" : File.Exists("/usr/bin/bash") ? "/usr/bin/bash" : null;
+    string? Find();
+}
 
-        foreach (var root in WindowsGitRoots())
+public sealed class BashLocator : IBashLocator
+{
+    private readonly IPlatformFileSystem _fileSystem;
+    private readonly IRuntimeEnvironment _environment;
+
+    public BashLocator(
+        IPlatformFileSystem? fileSystem = null,
+        IRuntimeEnvironment? environment = null)
+    {
+        _fileSystem = fileSystem ?? SystemPlatformFileSystem.Instance;
+        _environment = environment ?? SystemRuntimeEnvironment.Instance;
+    }
+
+    public string? Find()
+    {
+        if (!_environment.IsWindows)
         {
-            var candidate = Path.Combine(root, "Git", "bin", "bash.exe");
-            if (File.Exists(candidate)) return candidate;
+            if (_fileSystem.FileExists("/bin/bash"))
+                return "/bin/bash";
+            return _fileSystem.FileExists("/usr/bin/bash") ? "/usr/bin/bash" : null;
         }
 
-        var system32 = Environment.GetFolderPath(Environment.SpecialFolder.System);
-        var pathDirs = (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries);
-        foreach (var dir in pathDirs)
+        foreach (var root in _environment.WindowsGitRoots)
         {
-            if (dir.StartsWith(system32, StringComparison.OrdinalIgnoreCase)) continue;
-            var candidate = Path.Combine(dir, "bash.exe");
-            if (File.Exists(candidate)) return candidate;
+            var candidate = Path.Combine(root, "Git", "bin", "bash.exe");
+            if (_fileSystem.FileExists(candidate))
+                return candidate;
+        }
+
+        foreach (var directory in SplitPath(_environment.ExecutablePath))
+        {
+            if (directory.StartsWith(_environment.SystemDirectory, StringComparison.OrdinalIgnoreCase))
+                continue;
+            var candidate = Path.Combine(directory, "bash.exe");
+            if (_fileSystem.FileExists(candidate))
+                return candidate;
         }
         return null;
     }
 
-    private static IEnumerable<string> WindowsGitRoots()
-    {
-        yield return Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
-        yield return Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86);
-        yield return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs");
-    }
+    private static IEnumerable<string> SplitPath(string? path)
+        => (path ?? "").Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries);
 }

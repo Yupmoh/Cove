@@ -35,10 +35,7 @@ public sealed class HarnessUpdateCheckerTests
     {
         var calls = 0;
         var time = new FakeTime();
-        var checker = new HarnessUpdateChecker(
-            (_, _) => { calls++; return Task.FromResult<string?>("2.0.0"); },
-            time,
-            TimeSpan.FromMinutes(10));
+        var checker = Checker((_, _) => { calls++; return Task.FromResult<string?>("2.0.0"); }, time);
 
         Assert.Equal("2.0.0", await checker.GetLatestVersionAsync("pkg"));
         Assert.Equal("2.0.0", await checker.GetLatestVersionAsync("pkg"));
@@ -50,10 +47,11 @@ public sealed class HarnessUpdateCheckerTests
     {
         var calls = 0;
         var time = new FakeTime();
-        var checker = new HarnessUpdateChecker(
-            (_, _) => { calls++; return Task.FromResult<string?>(calls == 1 ? "2.0.0" : "2.1.0"); },
-            time,
-            TimeSpan.FromMinutes(10));
+        var checker = Checker((_, _) =>
+        {
+            calls++;
+            return Task.FromResult<string?>(calls == 1 ? "2.0.0" : "2.1.0");
+        }, time);
 
         Assert.Equal("2.0.0", await checker.GetLatestVersionAsync("pkg"));
         time.Now = time.Now.AddMinutes(11);
@@ -65,10 +63,7 @@ public sealed class HarnessUpdateCheckerTests
     public async Task GetLatestVersion_CachesPerPackage()
     {
         var time = new FakeTime();
-        var checker = new HarnessUpdateChecker(
-            (pkg, _) => Task.FromResult<string?>(pkg == "a" ? "1.0.0" : "9.9.9"),
-            time,
-            TimeSpan.FromMinutes(10));
+        var checker = Checker((package, _) => Task.FromResult<string?>(package == "a" ? "1.0.0" : "9.9.9"), time);
 
         Assert.Equal("1.0.0", await checker.GetLatestVersionAsync("a"));
         Assert.Equal("9.9.9", await checker.GetLatestVersionAsync("b"));
@@ -79,10 +74,7 @@ public sealed class HarnessUpdateCheckerTests
     {
         var calls = 0;
         var time = new FakeTime();
-        var checker = new HarnessUpdateChecker(
-            (_, _) => { calls++; throw new HttpRequestException("offline"); },
-            time,
-            TimeSpan.FromMinutes(10));
+        var checker = Checker((_, _) => { calls++; throw new HttpRequestException("offline"); }, time);
 
         Assert.Null(await checker.GetLatestVersionAsync("pkg"));
         Assert.Null(await checker.GetLatestVersionAsync("pkg"));
@@ -94,18 +86,28 @@ public sealed class HarnessUpdateCheckerTests
     {
         var calls = 0;
         var time = new FakeTime();
-        var checker = new HarnessUpdateChecker(
-            (_, _) =>
-            {
-                calls++;
-                if (calls == 1) throw new HttpRequestException("offline");
-                return Task.FromResult<string?>("3.0.0");
-            },
-            time,
-            TimeSpan.FromMinutes(10));
+        var checker = Checker((_, _) =>
+        {
+            calls++;
+            if (calls == 1)
+                throw new HttpRequestException("offline");
+            return Task.FromResult<string?>("3.0.0");
+        }, time);
 
         Assert.Null(await checker.GetLatestVersionAsync("pkg"));
         time.Now = time.Now.AddMinutes(11);
         Assert.Equal("3.0.0", await checker.GetLatestVersionAsync("pkg"));
+    }
+
+    private static HarnessUpdateChecker Checker(
+        Func<string, CancellationToken, Task<string?>> fetch,
+        TimeProvider time)
+        => new(new DelegateHarnessRegistryClient(fetch), time, TimeSpan.FromMinutes(10));
+
+    private sealed class DelegateHarnessRegistryClient(
+        Func<string, CancellationToken, Task<string?>> fetch) : IHarnessRegistryClient
+    {
+        public Task<string?> GetLatestVersionAsync(string package, CancellationToken cancellationToken = default)
+            => fetch(package, cancellationToken);
     }
 }

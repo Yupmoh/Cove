@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Cove.Platform;
 using Microsoft.Extensions.Logging;
 
 namespace Cove.Adapters;
@@ -48,7 +49,10 @@ public static class BundledAdapterSeeder
         return Convert.ToHexString(incremental.GetHashAndReset());
     }
 
-    public static BundledSeedReport SeedFromBinaryLocation(string targetRoot, ILogger? logger = null)
+    public static BundledSeedReport SeedFromBinaryLocation(
+        string targetRoot,
+        ILogger? logger = null,
+        IExecutableMode? executableMode = null)
     {
         var source = ResolveSourceDir(AppContext.BaseDirectory);
         if (source is null)
@@ -56,11 +60,16 @@ public static class BundledAdapterSeeder
             logger?.BundledAdapterSourceMissing(AppContext.BaseDirectory);
             return new BundledSeedReport(Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>());
         }
-        return Seed(source, targetRoot, logger);
+        return Seed(source, targetRoot, logger, executableMode);
     }
 
-    public static BundledSeedReport Seed(string sourceRoot, string targetRoot, ILogger? logger = null)
+    public static BundledSeedReport Seed(
+        string sourceRoot,
+        string targetRoot,
+        ILogger? logger = null,
+        IExecutableMode? executableMode = null)
     {
+        executableMode ??= new SystemExecutableMode();
         var copied = new List<string>();
         var refreshed = new List<string>();
         var skipped = new List<string>();
@@ -86,7 +95,7 @@ public static class BundledAdapterSeeder
 
             if (!Directory.Exists(targetDir))
             {
-                CopyRecursive(sourceDir, targetDir, logger);
+                CopyRecursive(sourceDir, targetDir, logger, executableMode);
                 WriteStamp(targetDir, sourceHash);
                 copied.Add(name);
                 logger?.BundledAdapterSeeded(name);
@@ -99,7 +108,7 @@ public static class BundledAdapterSeeder
                 if (IsLegacyBundledAdapter(targetDir, name))
                 {
                     Directory.Delete(targetDir, recursive: true);
-                    CopyRecursive(sourceDir, targetDir, logger);
+                    CopyRecursive(sourceDir, targetDir, logger, executableMode);
                     WriteStamp(targetDir, sourceHash);
                     refreshed.Add(name);
                     logger?.BundledAdapterRefreshed(name);
@@ -116,7 +125,7 @@ public static class BundledAdapterSeeder
             if (!string.Equals(existing, sourceHash, StringComparison.Ordinal))
             {
                 Directory.Delete(targetDir, recursive: true);
-                CopyRecursive(sourceDir, targetDir, logger);
+                CopyRecursive(sourceDir, targetDir, logger, executableMode);
                 WriteStamp(targetDir, sourceHash);
                 refreshed.Add(name);
                 logger?.BundledAdapterRefreshed(name);
@@ -150,7 +159,7 @@ public static class BundledAdapterSeeder
         catch (IOException ex) { logger?.BundledStampReadFailed(stampPath, ex.Message); return string.Empty; }
     }
 
-    private static void CopyRecursive(string source, string dest, ILogger? logger)
+    private static void CopyRecursive(string source, string dest, ILogger? logger, IExecutableMode executableMode)
     {
         Directory.CreateDirectory(dest);
         foreach (var dir in Directory.EnumerateDirectories(source))
@@ -158,7 +167,7 @@ public static class BundledAdapterSeeder
             var name = Path.GetFileName(dir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
             if (name is ".git" or "node_modules")
                 continue;
-            CopyRecursive(dir, Path.Combine(dest, name), logger);
+            CopyRecursive(dir, Path.Combine(dest, name), logger, executableMode);
         }
         foreach (var file in Directory.EnumerateFiles(source))
         {
@@ -166,19 +175,17 @@ public static class BundledAdapterSeeder
                 continue;
             var destFile = Path.Combine(dest, Path.GetFileName(file));
             File.Copy(file, destFile, overwrite: true);
-            SetExecutableBitIfScript(destFile, logger);
+            SetExecutableBitIfScript(destFile, logger, executableMode);
         }
     }
 
-    private static void SetExecutableBitIfScript(string file, ILogger? logger)
+    private static void SetExecutableBitIfScript(string file, ILogger? logger, IExecutableMode executableMode)
     {
-        if (OperatingSystem.IsWindows())
-            return;
         if (!file.EndsWith(".sh", StringComparison.Ordinal))
             return;
         try
         {
-            File.SetUnixFileMode(file, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute | UnixFileMode.GroupRead | UnixFileMode.OtherRead);
+            executableMode.MakeUserExecutable(file);
         }
         catch (IOException ex) { logger?.BundledSetExecutableFailed(file, ex.Message); }
     }

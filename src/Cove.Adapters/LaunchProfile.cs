@@ -53,11 +53,13 @@ public sealed class LaunchProfileStore
 {
     private readonly string _root;
     private readonly ILogger? _logger;
+    private readonly TimeProvider _time;
 
-    public LaunchProfileStore(string root, ILogger? logger = null)
+    public LaunchProfileStore(string root, ILogger? logger = null, TimeProvider? time = null)
     {
         _root = root;
         _logger = logger;
+        _time = time ?? TimeProvider.System;
     }
 
     public LaunchProfile? Load(string adapter, string slug)
@@ -234,7 +236,7 @@ public sealed class LaunchProfileStore
         var nooks = LoadNooks(adapter);
         var selections = new Dictionary<string, NookSelection>(nooks.NookSelections)
         {
-            [nookId] = new NookSelection(slug, DateTimeOffset.UtcNow)
+            [nookId] = new NookSelection(slug, _time.GetUtcNow())
         };
         SaveNooks(adapter, nooks with { NookSelections = selections, LastUsed = slug });
     }
@@ -259,7 +261,7 @@ public sealed class LaunchProfileStore
         foreach (var (pid, sel) in nooks.NookSelections)
         {
             if (sel.Slug == slug)
-                selections[pid] = sel with { LastUsedAt = DateTimeOffset.UtcNow };
+                selections[pid] = sel with { LastUsedAt = _time.GetUtcNow() };
         }
         SaveNooks(adapter, nooks with { NookSelections = selections, LastUsed = slug });
     }

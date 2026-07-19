@@ -63,9 +63,9 @@ public sealed class AdapterManifestStoreTests
             Assert.NotNull(manifest);
             Assert.NotNull(manifest!.Hooks);
             Assert.NotNull(manifest.HookEnvelopes);
-            Assert.NotNull(manifest.Install);
-            Assert.NotNull(manifest.WellKnownPaths);
-            Assert.NotNull(manifest.SuggestedFlags);
+            Assert.Null(manifest.Install);
+            Assert.NotNull(manifest.BinaryDiscovery);
+            Assert.NotNull(manifest.BinaryDiscovery!.WellKnownPaths);
         }
         finally { TestDirectory.Delete(root); }
     }

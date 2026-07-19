@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Cove.Platform;
 using Microsoft.Extensions.Logging;
 
 namespace Cove.Adapters;
@@ -36,19 +37,35 @@ public sealed class RegistryService
     private readonly string? _cachePath;
     private readonly IRegistryFetcher? _fetcher;
     private readonly ILogger? _logger;
+    private readonly TimeProvider _time;
+    private readonly IPlatformFileSystem _fileSystem;
 
-    public RegistryService(TimeSpan? cacheTtl = null, ILogger? logger = null)
+    public RegistryService(
+        TimeSpan? cacheTtl = null,
+        ILogger? logger = null,
+        TimeProvider? time = null,
+        IPlatformFileSystem? fileSystem = null)
     {
         _cacheTtl = cacheTtl ?? TimeSpan.FromHours(1);
         _logger = logger;
+        _time = time ?? TimeProvider.System;
+        _fileSystem = fileSystem ?? SystemPlatformFileSystem.Instance;
     }
 
-    public RegistryService(string cachePath, IRegistryFetcher fetcher, TimeSpan? cacheTtl = null, ILogger? logger = null)
+    public RegistryService(
+        string cachePath,
+        IRegistryFetcher fetcher,
+        TimeSpan? cacheTtl = null,
+        ILogger? logger = null,
+        TimeProvider? time = null,
+        IPlatformFileSystem? fileSystem = null)
     {
         _cachePath = cachePath;
         _fetcher = fetcher;
         _cacheTtl = cacheTtl ?? TimeSpan.FromHours(1);
         _logger = logger;
+        _time = time ?? TimeProvider.System;
+        _fileSystem = fileSystem ?? SystemPlatformFileSystem.Instance;
     }
 
     public static Registry? ParseRegistry(string json, ILogger? logger = null)
@@ -64,12 +81,12 @@ public sealed class RegistryService
         }
     }
 
-    public Registry? GetCached() => _cachedAt != default && DateTimeOffset.UtcNow - _cachedAt < _cacheTtl ? _cached : null;
+    public Registry? GetCached() => _cachedAt != default && _time.GetUtcNow() - _cachedAt < _cacheTtl ? _cached : null;
 
     public void SetCache(Registry registry)
     {
         _cached = registry;
-        _cachedAt = DateTimeOffset.UtcNow;
+        _cachedAt = _time.GetUtcNow();
     }
 
     public async Task<Registry?> FetchAsync(CancellationToken cancellationToken = default)
@@ -81,14 +98,14 @@ public sealed class RegistryService
         }
 
         Registry? diskCached = null;
-        if (_cachePath is not null && File.Exists(_cachePath))
+        if (_cachePath is not null && _fileSystem.FileExists(_cachePath))
         {
             try
             {
-                var diskAge = DateTimeOffset.UtcNow - File.GetLastWriteTimeUtc(_cachePath);
+                var diskAge = _time.GetUtcNow() - _fileSystem.GetLastWriteTimeUtc(_cachePath);
                 if (diskAge < _cacheTtl)
                 {
-                    var diskJson = await File.ReadAllTextAsync(_cachePath, cancellationToken).ConfigureAwait(false);
+                    var diskJson = await _fileSystem.ReadAllTextAsync(_cachePath, cancellationToken).ConfigureAwait(false);
                     diskCached = ParseRegistry(diskJson, _logger);
                     if (diskCached is not null)
                     {
@@ -127,8 +144,8 @@ public sealed class RegistryService
                         try
                         {
                             var dir = Path.GetDirectoryName(_cachePath);
-                            if (dir is not null) Directory.CreateDirectory(dir);
-                            await File.WriteAllTextAsync(_cachePath, fetchedJson, cancellationToken).ConfigureAwait(false);
+                            if (dir is not null) _fileSystem.CreateDirectory(dir);
+                            await _fileSystem.WriteAllTextAsync(_cachePath, fetchedJson, cancellationToken).ConfigureAwait(false);
                         }
                         catch (IOException ex) { _logger?.RegistryCacheWriteFailed(_cachePath, ex.Message); }
                     }
@@ -138,11 +155,11 @@ public sealed class RegistryService
 
             if (diskCached is not null)
                 return diskCached;
-            if (_cachePath is not null && File.Exists(_cachePath))
+            if (_cachePath is not null && _fileSystem.FileExists(_cachePath))
             {
                 try
                 {
-                    var staleJson = await File.ReadAllTextAsync(_cachePath, cancellationToken).ConfigureAwait(false);
+                    var staleJson = await _fileSystem.ReadAllTextAsync(_cachePath, cancellationToken).ConfigureAwait(false);
                     var staleReg = ParseRegistry(staleJson, _logger);
                     if (staleReg is not null)
                     {

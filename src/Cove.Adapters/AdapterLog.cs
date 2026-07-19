@@ -11,6 +11,9 @@ internal static partial class AdapterLog
     [ZLoggerMessage(LogLevel.Warning, "uninstall hook timed out adapter={adapter} dir={dir} killed=true")]
     public static partial void UninstallHookTimeout(this ILogger logger, string adapter, string dir);
 
+    [ZLoggerMessage(LogLevel.Warning, "adapter uninstall skipped missing directory adapter={adapter} dir={dir}")]
+    public static partial void AdapterUninstallDirectoryMissing(this ILogger logger, string adapter, string dir);
+
     [ZLoggerMessage(LogLevel.Warning, "uninstall dir delete failed adapter={adapter} dir={dir} error={error}")]
     public static partial void UninstallDirDeleteFailed(this ILogger logger, string adapter, string dir, string error);
 
@@ -122,11 +125,11 @@ internal static partial class AdapterLog
     [ZLoggerMessage(LogLevel.Warning, "binary version probe failed path={path} error={error}")]
     public static partial void BinaryVersionProbeFailed(this ILogger logger, string path, string error);
 
-    [ZLoggerMessage(LogLevel.Warning, "binary version probe kill failed path={path} error={error}")]
-    public static partial void BinaryVersionProbeKillFailed(this ILogger logger, string path, string error);
-
     [ZLoggerMessage(LogLevel.Warning, "method run skipped no bash available adapter={adapter} script={script}")]
     public static partial void MethodNoBash(this ILogger logger, string adapter, string script);
+
+    [ZLoggerMessage(LogLevel.Error, "method process failed to start adapter={adapter} script={script} error={error}")]
+    public static partial void MethodStartFailed(this ILogger logger, string adapter, string script, string error);
 
     [ZLoggerMessage(LogLevel.Information, "method completed adapter={adapter} script={script} exitCode={exitCode} durationMs={durationMs}")]
     public static partial void MethodCompleted(this ILogger logger, string adapter, string script, int exitCode, long durationMs);
@@ -142,9 +145,6 @@ internal static partial class AdapterLog
 
     [ZLoggerMessage(LogLevel.Debug, "method stdout not json adapter={adapter} script={script} error={error}")]
     public static partial void MethodStdoutNotJson(this ILogger logger, string adapter, string script, string error);
-
-    [ZLoggerMessage(LogLevel.Warning, "method kill failed adapter={adapter} script={script} error={error}")]
-    public static partial void MethodKillFailed(this ILogger logger, string adapter, string script, string error);
 
     [ZLoggerMessage(LogLevel.Debug, "session list cache hit adapter={adapter} cwd={cwd} count={count}")]
     public static partial void SessionListCacheHit(this ILogger logger, string adapter, string cwd, int count);
@@ -178,12 +178,6 @@ internal static partial class AdapterLog
 
     [ZLoggerMessage(LogLevel.Warning, "manifest load failed adapter={adapter} path={path} error={error}")]
     public static partial void ManifestLoadFailedAt(this ILogger logger, string adapter, string path, string error);
-
-    [ZLoggerMessage(LogLevel.Warning, "manifest parsed to null adapter={adapter} path={path}")]
-    public static partial void ManifestParsedNullAt(this ILogger logger, string adapter, string path);
-
-    [ZLoggerMessage(LogLevel.Warning, "manifest screenState dropped (invalid rules) adapter={adapter}")]
-    public static partial void ManifestScreenStateDropped(this ILogger logger, string adapter);
 
     [ZLoggerMessage(LogLevel.Debug, "manifest validation rule failed adapter={adapter} field={field} code={code}")]
     public static partial void ManifestValidationRuleFailed(this ILogger logger, string adapter, string field, string code);
@@ -233,8 +227,8 @@ internal static partial class AdapterLog
     [ZLoggerMessage(LogLevel.Warning, "adapter cleanup dir failed dir={dir} error={error}")]
     public static partial void AdapterCleanupDirFailed(this ILogger logger, string dir, string error);
 
-    [ZLoggerMessage(LogLevel.Warning, "adapter hook kill failed adapter={adapter} event={hookEvent} error={error}")]
-    public static partial void AdapterHookKillFailed(this ILogger logger, string adapter, string hookEvent, string error);
+    [ZLoggerMessage(LogLevel.Error, "adapter hook process failed adapter={adapter} event={hookEvent} error={error}")]
+    public static partial void AdapterHookProcessFailed(this ILogger logger, string adapter, string hookEvent, string error);
 
     [ZLoggerMessage(LogLevel.Warning, "launch profile parse failed path={path} error={error}")]
     public static partial void LaunchProfileParseFailed(this ILogger logger, string path, string error);

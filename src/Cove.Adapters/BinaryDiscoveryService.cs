@@ -1,5 +1,5 @@
-using System.Diagnostics;
 using System.Text.RegularExpressions;
+using Cove.Platform;
 using Microsoft.Extensions.Logging;
 
 namespace Cove.Adapters;
@@ -11,73 +11,63 @@ public sealed record BinaryDiscoveryResult(
 
 public sealed class BinaryDiscoveryService
 {
-    private static readonly Regex VersionRegex = new(@"(\d+\.\d+\.\d+)", RegexOptions.Compiled);
+    private static readonly Regex DefaultVersionRegex = new(@"(\d+\.\d+\.\d+)", RegexOptions.Compiled | RegexOptions.CultureInvariant);
     private readonly ILogger? _logger;
-    private readonly Func<string?> _pathResolver;
-    private readonly Func<string> _homeResolver;
+    private readonly IPlatformFileSystem _fileSystem;
+    private readonly IProcessRunner _processRunner;
+    private readonly IRuntimeEnvironment _environment;
     private string? _cachedPath;
 
     public BinaryDiscoveryService(
         ILogger? logger = null,
-        Func<string?>? pathResolver = null,
-        Func<string>? homeResolver = null)
+        IPlatformFileSystem? fileSystem = null,
+        IProcessRunner? processRunner = null,
+        IRuntimeEnvironment? environment = null)
     {
         _logger = logger;
-        _pathResolver = pathResolver ?? (() => Environment.GetEnvironmentVariable("PATH"));
-        _homeResolver = homeResolver ?? (() => Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
+        _fileSystem = fileSystem ?? SystemPlatformFileSystem.Instance;
+        _processRunner = processRunner ?? new SystemProcessRunner();
+        _environment = environment ?? SystemRuntimeEnvironment.Instance;
     }
 
-    public BinaryDiscoveryResult Discover(BinaryDiscovery config, IReadOnlyList<string>? wellKnownPaths = null, string? loginShellPath = null)
+    public BinaryDiscoveryResult Discover(BinaryDiscovery config, string? loginShellPath = null)
     {
         var source = loginShellPath is not null ? "login-shell" : "process-env";
-        var rawPath = loginShellPath ?? _pathResolver() ?? "";
+        var rawPath = loginShellPath ?? _environment.ExecutablePath ?? "";
         var pathDirs = ResolvePathDirs(rawPath);
         var commands = string.Join(",", config.Commands);
-        var wellKnownCount = wellKnownPaths?.Count ?? 0;
 
-        _logger?.BinaryProbeStarted(commands, source, pathDirs.Count, wellKnownCount);
+        _logger?.BinaryProbeStarted(commands, source, pathDirs.Count, config.WellKnownPaths.Count);
         _logger?.BinaryProbePathContents(source, rawPath);
 
-        foreach (var cmd in config.Commands)
+        foreach (var command in config.Commands)
+            foreach (var directory in pathDirs)
+                if (TryCandidate(command, Path.Combine(directory, command), config, "path") is { } found)
+                    return found;
+
+        foreach (var directory in config.WellKnownPaths)
         {
-            foreach (var dir in pathDirs)
-            {
-                var candidate = Path.Combine(dir, cmd);
-                var exists = File.Exists(candidate);
-                _logger?.BinaryCandidateTested(cmd, candidate, exists, "path");
-                if (exists)
-                    return Resolve(cmd, candidate, config, "path");
-            }
+            var expanded = ExpandTilde(directory);
+            foreach (var command in config.Commands)
+                if (TryCandidate(command, Path.Combine(expanded, command), config, "well-known") is { } found)
+                    return found;
         }
 
-        if (wellKnownPaths is not null)
-            foreach (var wk in wellKnownPaths)
-            {
-                var expanded = ExpandTilde(wk);
-                foreach (var cmd in config.Commands)
-                {
-                    var candidate = Path.Combine(expanded, cmd);
-                    var exists = File.Exists(candidate);
-                    _logger?.BinaryCandidateTested(cmd, candidate, exists, "well-known");
-                    if (exists)
-                        return Resolve(cmd, candidate, config, "well-known");
-                }
-            }
-
-        _logger?.BinaryProbeMissing(commands, pathDirs.Count, wellKnownCount);
+        _logger?.BinaryProbeMissing(commands, pathDirs.Count, config.WellKnownPaths.Count);
         return new BinaryDiscoveryResult(AdapterDetectionState.Missing, null, null);
     }
 
-    private BinaryDiscoveryResult Resolve(string command, string candidate, BinaryDiscovery config, string probe)
+    private BinaryDiscoveryResult? TryCandidate(string command, string candidate, BinaryDiscovery config, string source)
     {
-        _logger?.BinaryResolved(command, candidate, probe);
-        if (OperatingSystem.IsWindows() && IsPosixStylePath(candidate))
+        var exists = _fileSystem.FileExists(candidate);
+        _logger?.BinaryCandidateTested(command, candidate, exists, source);
+        if (!exists)
+            return null;
+        _logger?.BinaryResolved(command, candidate, source);
+        if (_environment.IsWindows && IsPosixStylePath(candidate))
             _logger?.BinaryResolvedNonRunnableWindowsPath(command, candidate);
         return ProbeVersion(candidate, config);
     }
-
-    private static bool IsPosixStylePath(string path)
-        => path.StartsWith('/') || (path.Length > 2 && path[0] == '/' && path[2] == '/');
 
     private BinaryDiscoveryResult ProbeVersion(string binaryPath, BinaryDiscovery config)
     {
@@ -86,36 +76,30 @@ public sealed class BinaryDiscoveryService
         {
             try
             {
-                var psi = new ProcessStartInfo(binaryPath)
+                var request = new ProcessRunRequest(
+                    binaryPath,
+                    Path.GetDirectoryName(binaryPath) ?? ".",
+                    [config.VersionFlag],
+                    null,
+                    TimeSpan.FromSeconds(3));
+                var result = _processRunner.RunAsync(request).GetAwaiter().GetResult();
+                if (!result.Started)
                 {
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                };
-                psi.ArgumentList.Add(config.VersionFlag);
-
-                using var proc = Process.Start(psi);
-                if (proc is not null)
-                {
-                    var stdoutTask = proc.StandardOutput.ReadToEndAsync();
-                    var stderrTask = proc.StandardError.ReadToEndAsync();
-                    if (!proc.WaitForExit(3000))
-                    {
-                        try { proc.Kill(true); }
-                        catch (Exception ex) { _logger?.BinaryVersionProbeKillFailed(binaryPath, ex.Message); }
-                    }
-
-                    var drained = Task.WaitAll([stdoutTask, stderrTask], 2000);
-                    var stdout = drained || stdoutTask.IsCompletedSuccessfully ? stdoutTask.Result : "";
-                    var stderr = drained || stderrTask.IsCompletedSuccessfully ? stderrTask.Result : "";
-                    var combined = (stdout + "\n" + stderr).Trim();
-                    var match = VersionRegex.Match(combined);
-                    if (match.Success)
-                        version = match.Groups[1].Value;
+                    _logger?.BinaryVersionProbeFailed(binaryPath, "process did not start");
                 }
+                else if (result.TimedOut)
+                {
+                    _logger?.BinaryVersionProbeFailed(binaryPath, "process timed out");
+                }
+                var combined = (result.Stdout + "\n" + result.Stderr).Trim();
+                var regex = string.IsNullOrEmpty(config.VersionRegex)
+                    ? DefaultVersionRegex
+                    : new Regex(config.VersionRegex, RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100));
+                var match = regex.Match(combined);
+                if (match.Success)
+                    version = match.Groups.Count > 1 ? match.Groups[1].Value : match.Value;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 _logger?.BinaryVersionProbeFailed(binaryPath, ex.Message);
             }
@@ -128,20 +112,20 @@ public sealed class BinaryDiscoveryService
         return new BinaryDiscoveryResult(state, binaryPath, version);
     }
 
+    private string ExpandTilde(string path)
+    {
+        if (!path.StartsWith('~'))
+            return path;
+        return path.StartsWith("~/", StringComparison.Ordinal)
+            ? Path.Combine(_environment.HomeDirectory, path[2..])
+            : Path.Combine(_environment.HomeDirectory, path[1..]);
+    }
+
     private static IReadOnlyList<string> ResolvePathDirs(string path)
         => path.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries);
 
-    private string ExpandTilde(string path)
-    {
-        if (path.StartsWith("~", StringComparison.Ordinal))
-        {
-            var home = _homeResolver();
-            return path.StartsWith("~/", StringComparison.Ordinal)
-                ? Path.Combine(home, path[2..])
-                : Path.Combine(home, path[1..]);
-        }
-        return path;
-    }
+    private static bool IsPosixStylePath(string path)
+        => path.StartsWith('/') || (path.Length > 2 && path[0] == '/' && path[2] == '/');
 
     public void CachePath(string path) => _cachedPath = path;
     public string? GetCachedPath() => _cachedPath;

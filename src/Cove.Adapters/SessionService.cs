@@ -26,6 +26,7 @@ public sealed class SessionService
     private readonly TimeSpan _listTimeout;
     private readonly ILogger? _logger;
     private readonly Action? _backgroundRefreshCompleted;
+    private readonly TimeProvider _time;
     private readonly System.Collections.Concurrent.ConcurrentDictionary<(string adapter, string cwd), (List<RecentSession> sessions, DateTimeOffset at)> _cache = new();
     private readonly System.Collections.Concurrent.ConcurrentDictionary<(string adapter, string cwd), bool> _refreshing = new();
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, int> _schemaVersions = new();
@@ -35,13 +36,15 @@ public sealed class SessionService
         TimeSpan? cacheTtl = null,
         TimeSpan? listTimeout = null,
         ILogger? logger = null,
-        Action? backgroundRefreshCompleted = null)
+        Action? backgroundRefreshCompleted = null,
+        TimeProvider? time = null)
     {
         _runner = runner;
         _cacheTtl = cacheTtl ?? TimeSpan.FromSeconds(2);
         _listTimeout = listTimeout ?? TimeSpan.FromSeconds(3);
         _logger = logger;
         _backgroundRefreshCompleted = backgroundRefreshCompleted;
+        _time = time ?? TimeProvider.System;
     }
 
     private static string AdapterNameOf(string adapterDir)
@@ -54,14 +57,14 @@ public sealed class SessionService
         if (_cache.TryGetValue(key, out var entry))
         {
             _logger?.SessionListCacheHit(adapter, cwd, entry.sessions.Count);
-            if (DateTimeOffset.UtcNow - entry.at >= _cacheTtl)
+            if (_time.GetUtcNow() - entry.at >= _cacheTtl)
                 RefreshInBackground(adapter, adapterDir, cwd, key);
             return entry.sessions;
         }
 
         var (ok, sessions) = await FetchSessionsAsync(adapter, adapterDir, cwd, ct).ConfigureAwait(false);
         if (ok)
-            _cache[key] = (sessions, DateTimeOffset.UtcNow);
+            _cache[key] = (sessions, _time.GetUtcNow());
         return sessions;
     }
 
@@ -75,7 +78,7 @@ public sealed class SessionService
             {
                 var (ok, sessions) = await FetchSessionsAsync(adapter, adapterDir, cwd, CancellationToken.None).ConfigureAwait(false);
                 if (ok)
-                    _cache[key] = (sessions, DateTimeOffset.UtcNow);
+                    _cache[key] = (sessions, _time.GetUtcNow());
             }
             catch (Exception ex)
             {

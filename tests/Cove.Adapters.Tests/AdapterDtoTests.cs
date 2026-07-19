@@ -30,7 +30,6 @@ public sealed class AdapterDtoTests
                 VersionFlag = "--version",
                 VersionRegex = @"(\d+\.\d+\.\d+)",
             },
-            SuggestedFlags = ["--model", "sonnet"],
         };
 
         var json = JsonSerializer.Serialize(manifest, AdaptersJsonContext.Default.AdapterManifest);

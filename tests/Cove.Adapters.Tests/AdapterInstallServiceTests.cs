@@ -59,7 +59,7 @@ public sealed class AdapterInstallServiceTests
             File.WriteAllText(scriptPath, "#!/usr/bin/env bash\nset -euo pipefail\necho \"$COVE_ADAPTER_DIR\" > \"$COVE_ADAPTER_DIR/installed.marker\"\n");
             MakeExecutable(scriptPath);
             var fetcher = new TestAdapterFetcher(src);
-            var svc = new AdapterInstallService(new MethodRunner());
+            var svc = new AdapterInstallService();
 
             var installed = await svc.InstallAsync(dest, "test-adapter", fetcher);
 
@@ -87,7 +87,7 @@ public sealed class AdapterInstallServiceTests
             Directory.CreateDirectory(src);
             File.WriteAllText(Path.Combine(src, "adapter.json"), """{"name":"bad","sdkVersion":99}""");
             var fetcher = new TestAdapterFetcher(src);
-            var svc = new AdapterInstallService(new MethodRunner());
+            var svc = new AdapterInstallService();
 
             await Assert.ThrowsAsync<AdapterInstallException>(() => svc.InstallAsync(dest, "bad", fetcher));
 
@@ -109,7 +109,7 @@ public sealed class AdapterInstallServiceTests
             var scriptPath = Path.Combine(adapterDir, "hooks.sh");
             File.WriteAllText(scriptPath, "#!/usr/bin/env bash\nset -euo pipefail\necho uninstalled\n");
             MakeExecutable(scriptPath);
-            var svc = new AdapterInstallService(new MethodRunner());
+            var svc = new AdapterInstallService();
 
             await svc.UninstallAsync(dest, "to-remove");
 
@@ -130,7 +130,7 @@ public sealed class AdapterInstallServiceTests
             var scriptPath = Path.Combine(adapterDir, "hooks.sh");
             File.WriteAllText(scriptPath, "#!/usr/bin/env bash\nsleep 30\n");
             MakeExecutable(scriptPath);
-            var svc = new AdapterInstallService(new MethodRunner());
+            var svc = new AdapterInstallService();
 
             await svc.UninstallAsync(dest, "slow-hook");
 

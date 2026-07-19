@@ -1,5 +1,5 @@
-using System.IO;
 using System.Text.Json;
+using Cove.Platform;
 using Microsoft.Extensions.Logging;
 
 namespace Cove.Adapters;
@@ -17,12 +17,23 @@ public sealed class AdapterInstallException : Exception
 
 public sealed class AdapterInstallService
 {
-    private readonly MethodRunner _runner;
+    private readonly IPlatformFileSystem _fileSystem;
+    private readonly IExecutableMode _executableMode;
+    private readonly IBashLocator _bashLocator;
+    private readonly IProcessRunner _processRunner;
     private readonly ILogger<AdapterInstallService>? _logger;
 
-    public AdapterInstallService(MethodRunner runner, ILogger<AdapterInstallService>? logger = null)
+    public AdapterInstallService(
+        IPlatformFileSystem? fileSystem = null,
+        IExecutableMode? executableMode = null,
+        IBashLocator? bashLocator = null,
+        IProcessRunner? processRunner = null,
+        ILogger<AdapterInstallService>? logger = null)
     {
-        _runner = runner;
+        _fileSystem = fileSystem ?? SystemPlatformFileSystem.Instance;
+        _executableMode = executableMode ?? new SystemExecutableMode();
+        _bashLocator = bashLocator ?? new BashLocator(_fileSystem);
+        _processRunner = processRunner ?? new SystemProcessRunner();
         _logger = logger;
     }
 
@@ -31,23 +42,22 @@ public sealed class AdapterInstallService
         var finalDir = Path.Combine(adaptersRoot, name);
         var tempDir = Path.Combine(adaptersRoot, ".installing-" + name);
 
-        CleanupDir(tempDir, _logger);
-        Directory.CreateDirectory(tempDir);
+        CleanupDir(tempDir);
+        _fileSystem.CreateDirectory(tempDir);
 
         try
         {
             await fetcher.FetchIntoAsync(tempDir, ct).ConfigureAwait(false);
-
-            SetExecutableBits(tempDir, _logger);
+            SetExecutableBits(tempDir);
 
             var manifestPath = Path.Combine(tempDir, "adapter.json");
-            if (!File.Exists(manifestPath))
+            if (!_fileSystem.FileExists(manifestPath))
                 throw new AdapterInstallException($"adapter.json missing for {name}");
 
             AdapterManifest manifest;
             try
             {
-                var json = await File.ReadAllTextAsync(manifestPath, ct).ConfigureAwait(false);
+                var json = await _fileSystem.ReadAllTextAsync(manifestPath, ct).ConfigureAwait(false);
                 manifest = JsonSerializer.Deserialize(json, AdaptersJsonContext.Default.AdapterManifest)
                     ?? throw new AdapterInstallException($"adapter.json is null for {name}");
             }
@@ -64,14 +74,12 @@ public sealed class AdapterInstallService
             }
 
             VerifyReferencedScripts(tempDir, manifest, name);
-
-            if (Directory.Exists(finalDir))
-                Directory.Delete(finalDir, recursive: true);
-            Directory.Move(tempDir, finalDir);
+            if (_fileSystem.DirectoryExists(finalDir))
+                _fileSystem.DeleteDirectory(finalDir, recursive: true);
+            _fileSystem.MoveDirectory(tempDir, finalDir);
 
             InstallSkill(finalDir, manifest, name);
-
-            await RunHookAsync(finalDir, "install", name, ct, timeoutSeconds: 30).ConfigureAwait(false);
+            await RunHookAsync(finalDir, "install", name, ct, TimeSpan.FromSeconds(30)).ConfigureAwait(false);
 
             return new InstalledAdapter
             {
@@ -83,7 +91,7 @@ public sealed class AdapterInstallService
         }
         catch
         {
-            CleanupDir(tempDir, _logger);
+            CleanupDir(tempDir);
             throw;
         }
     }
@@ -91,20 +99,23 @@ public sealed class AdapterInstallService
     public async Task UninstallAsync(string adaptersRoot, string name, AdapterManifest? manifest = null, string? skillInstallPath = null, CancellationToken ct = default)
     {
         var adapterDir = Path.Combine(adaptersRoot, name);
-        if (!Directory.Exists(adapterDir))
-            return;
-
-        await RunHookAsync(adapterDir, "uninstall", name, ct, timeoutSeconds: 5).ConfigureAwait(false);
-
-        if (!string.IsNullOrEmpty(skillInstallPath) && File.Exists(skillInstallPath))
+        if (!_fileSystem.DirectoryExists(adapterDir))
         {
-            try { File.Delete(skillInstallPath); }
+            _logger?.AdapterUninstallDirectoryMissing(name, adapterDir);
+            return;
+        }
+
+        await RunHookAsync(adapterDir, "uninstall", name, ct, TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+
+        if (!string.IsNullOrEmpty(skillInstallPath) && _fileSystem.FileExists(skillInstallPath))
+        {
+            try { _fileSystem.DeleteFile(skillInstallPath); }
             catch (IOException ex) { _logger?.SkillRemoveFailed(name, skillInstallPath, ex.Message); }
         }
 
         try
         {
-            Directory.Delete(adapterDir, recursive: true);
+            _fileSystem.DeleteDirectory(adapterDir, recursive: true);
         }
         catch (IOException ex)
         {
@@ -112,21 +123,19 @@ public sealed class AdapterInstallService
         }
     }
 
-    private void VerifyReferencedScripts(string dir, AdapterManifest manifest, string name)
+    private void VerifyReferencedScripts(string directory, AdapterManifest manifest, string name)
     {
-        foreach (var (method, def) in manifest.Methods)
-        {
-            if (def.Script is { } script && !File.Exists(Path.Combine(dir, script)))
+        foreach (var definition in manifest.Methods.Values)
+            if (definition.Script is { } script && !_fileSystem.FileExists(Path.Combine(directory, script)))
                 _logger?.ReferencedScriptMissing(name, script);
-        }
-        if (manifest.SessionExtractor is { } se && !File.Exists(Path.Combine(dir, se.Script)))
-            _logger?.ReferencedScriptMissing(name, se.Script);
-        if (manifest.Retention is { } ret)
+        if (manifest.SessionExtractor is { } extractor && !_fileSystem.FileExists(Path.Combine(directory, extractor.Script)))
+            _logger?.ReferencedScriptMissing(name, extractor.Script);
+        if (manifest.Retention is { } retention)
         {
-            if (ret.ReadScript is { } rs && !File.Exists(Path.Combine(dir, rs)))
-                _logger?.ReferencedScriptMissing(name, rs);
-            if (ret.WriteScript is { } ws && !File.Exists(Path.Combine(dir, ws)))
-                _logger?.ReferencedScriptMissing(name, ws);
+            if (!_fileSystem.FileExists(Path.Combine(directory, retention.ReadScript)))
+                _logger?.ReferencedScriptMissing(name, retention.ReadScript);
+            if (!_fileSystem.FileExists(Path.Combine(directory, retention.WriteScript)))
+                _logger?.ReferencedScriptMissing(name, retention.WriteScript);
         }
     }
 
@@ -135,16 +144,17 @@ public sealed class AdapterInstallService
         if (string.IsNullOrEmpty(manifest.SkillInstallPath))
             return;
         var source = Path.Combine(adapterDir, "skill.md");
-        if (!File.Exists(source))
+        if (!_fileSystem.FileExists(source))
         {
             _logger?.SkillInstallSkipped(name, manifest.SkillInstallPath);
             return;
         }
         try
         {
-            var destDir = Path.GetDirectoryName(manifest.SkillInstallPath);
-            if (destDir is not null) Directory.CreateDirectory(destDir);
-            File.Copy(source, manifest.SkillInstallPath, overwrite: true);
+            var destinationDirectory = Path.GetDirectoryName(manifest.SkillInstallPath);
+            if (destinationDirectory is not null)
+                _fileSystem.CreateDirectory(destinationDirectory);
+            _fileSystem.CopyFile(source, manifest.SkillInstallPath, overwrite: true);
         }
         catch (IOException ex)
         {
@@ -152,75 +162,83 @@ public sealed class AdapterInstallService
         }
     }
 
-    private async Task RunHookAsync(string adapterDir, string @event, string adapterName, CancellationToken ct, int timeoutSeconds)
+    private async Task RunHookAsync(string adapterDir, string eventName, string adapterName, CancellationToken ct, TimeSpan timeout)
     {
         var hookPath = Path.Combine(adapterDir, "hooks.sh");
-        if (!File.Exists(hookPath))
+        if (!_fileSystem.FileExists(hookPath))
             return;
 
-        var bashExe = BashLocator.Find();
-        if (bashExe is null)
+        var bash = _bashLocator.Find();
+        if (bash is null)
         {
-            _logger?.HookSkippedNoBash(adapterName, @event);
+            _logger?.HookSkippedNoBash(adapterName, eventName);
             return;
         }
 
-        var psi = new System.Diagnostics.ProcessStartInfo
+        var environment = new Dictionary<string, string>(3, StringComparer.Ordinal)
         {
-            FileName = bashExe,
-            WorkingDirectory = adapterDir,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true,
+            ["COVE_ADAPTER_DIR"] = adapterDir,
+            ["COVE_EVENT"] = eventName,
+            ["COVE_SDK_VERSION"] = "2",
         };
-        psi.ArgumentList.Add(hookPath);
-        psi.ArgumentList.Add(@event);
-        psi.Environment["COVE_ADAPTER_DIR"] = adapterDir;
-        psi.Environment["COVE_EVENT"] = @event;
-        psi.Environment["COVE_SDK_VERSION"] = "2";
-
-        using var process = new System.Diagnostics.Process { StartInfo = psi };
-        process.Start();
-
-        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        cts.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
-
+        ProcessRunResult result;
         try
         {
-            await process.WaitForExitAsync(cts.Token).ConfigureAwait(false);
-            if (process.ExitCode != 0 && @event == "install")
-                _logger?.InstallHookFailed(adapterName, adapterDir, process.ExitCode);
+            result = await _processRunner.RunAsync(
+                new ProcessRunRequest(bash, adapterDir, [hookPath, eventName], environment, timeout),
+                ct).ConfigureAwait(false);
         }
-        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            try { process.Kill(entireProcessTree: true); }
-            catch (Exception ex) { _logger?.AdapterHookKillFailed(adapterName, @event, ex.Message); }
-            if (@event == "uninstall")
-                _logger?.UninstallHookTimeout(adapterName, adapterDir);
+            _logger?.AdapterHookProcessFailed(adapterName, eventName, ex.Message);
+            return;
         }
+
+        if (!result.Started)
+        {
+            _logger?.AdapterHookProcessFailed(adapterName, eventName, "process did not start");
+            return;
+        }
+        if (result.TimedOut)
+        {
+            _logger?.AdapterHookProcessFailed(adapterName, eventName, "process timed out");
+            if (eventName == "uninstall")
+                _logger?.UninstallHookTimeout(adapterName, adapterDir);
+            return;
+        }
+        if (result.ExitCode != 0 && eventName == "install")
+            _logger?.InstallHookFailed(adapterName, adapterDir, result.ExitCode);
     }
 
-    private static void SetExecutableBits(string dir, ILogger? logger)
+    private void SetExecutableBits(string directory)
     {
-        if (OperatingSystem.IsWindows()) return;
-        foreach (var file in Directory.EnumerateFiles(dir, "*.sh", SearchOption.AllDirectories))
+        foreach (var file in _fileSystem.EnumerateFiles(directory, "*.sh", SearchOption.AllDirectories))
         {
             try
             {
-                System.IO.File.SetUnixFileMode(file, System.IO.UnixFileMode.UserRead | System.IO.UnixFileMode.UserWrite | System.IO.UnixFileMode.UserExecute | System.IO.UnixFileMode.GroupRead | System.IO.UnixFileMode.OtherRead);
+                _executableMode.MakeUserExecutable(file);
             }
-            catch (IOException ex) { logger?.AdapterSetExecutableFailed(file, ex.Message); }
+            catch (IOException ex)
+            {
+                _logger?.AdapterSetExecutableFailed(file, ex.Message);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                _logger?.AdapterSetExecutableFailed(file, ex.Message);
+            }
         }
     }
 
-    private static void CleanupDir(string dir, ILogger? logger)
+    private void CleanupDir(string directory)
     {
         try
         {
-            if (Directory.Exists(dir))
-                Directory.Delete(dir, recursive: true);
+            if (_fileSystem.DirectoryExists(directory))
+                _fileSystem.DeleteDirectory(directory, recursive: true);
         }
-        catch (IOException ex) { logger?.AdapterCleanupDirFailed(dir, ex.Message); }
+        catch (IOException ex)
+        {
+            _logger?.AdapterCleanupDirFailed(directory, ex.Message);
+        }
     }
 }

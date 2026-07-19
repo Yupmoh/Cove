@@ -1,5 +1,5 @@
-using System.Diagnostics;
 using System.Text.Json;
+using Cove.Platform;
 using Microsoft.Extensions.Logging;
 
 namespace Cove.Adapters;
@@ -13,23 +13,18 @@ public sealed record MethodResult(int ExitCode, string Stdout, string Stderr, Js
 
 public sealed class MethodRunner
 {
-    private readonly Func<string?> _bashResolver;
+    private readonly IBashLocator _bashLocator;
+    private readonly IProcessRunner _processRunner;
     private readonly ILogger? _logger;
 
-    public MethodRunner(Func<string?>? bashResolver = null, ILogger? logger = null)
+    public MethodRunner(
+        IBashLocator? bashLocator = null,
+        IProcessRunner? processRunner = null,
+        ILogger? logger = null)
     {
-        _bashResolver = bashResolver ?? DefaultBashResolver;
+        _bashLocator = bashLocator ?? new BashLocator();
+        _processRunner = processRunner ?? new SystemProcessRunner();
         _logger = logger;
-    }
-
-    private static string? DefaultBashResolver() => BashLocator.Find();
-
-    private static string Digest(string text)
-    {
-        var trimmed = text.Trim();
-        if (trimmed.Length <= 200)
-            return trimmed.Replace('\n', ' ').Replace('\r', ' ');
-        return trimmed[..200].Replace('\n', ' ').Replace('\r', ' ');
     }
 
     public async Task<MethodResult> RunAsync(
@@ -41,76 +36,73 @@ public sealed class MethodRunner
         CancellationToken cancellationToken = default)
     {
         var adapterName = Path.GetFileName(adapterDir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
-        var bashExe = _bashResolver();
-        if (bashExe is null)
+        var bash = _bashLocator.Find();
+        if (bash is null)
         {
             _logger?.MethodNoBash(adapterName, script);
             return new MethodResult(-1, "", "no bash available", null);
         }
 
-        var stopwatch = Stopwatch.StartNew();
-        var scriptPath = Path.Combine(adapterDir, script);
-        var psi = new ProcessStartInfo
-        {
-            FileName = bashExe,
-            WorkingDirectory = adapterDir,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            StandardOutputEncoding = System.Text.Encoding.UTF8,
-            StandardErrorEncoding = System.Text.Encoding.UTF8,
-        };
-        psi.ArgumentList.Add(scriptPath);
-        foreach (var arg in args)
-            psi.ArgumentList.Add(arg);
+        var arguments = new string[args.Count + 1];
+        arguments[0] = Path.Combine(adapterDir, script);
+        for (var i = 0; i < args.Count; i++)
+            arguments[i + 1] = args[i];
 
-        psi.Environment["COVE_ADAPTER_DIR"] = adapterDir;
-        psi.Environment["COVE_SDK_VERSION"] = "2";
-        if (env is not null)
-            foreach (var kv in env)
-                psi.Environment[kv.Key] = kv.Value;
+        var environment = env is null
+            ? new Dictionary<string, string>(2, StringComparer.Ordinal)
+            : new Dictionary<string, string>(env, StringComparer.Ordinal);
+        environment["COVE_ADAPTER_DIR"] = adapterDir;
+        environment["COVE_SDK_VERSION"] = "2";
 
-        using var process = new Process { StartInfo = psi };
-        process.Start();
-
-        var stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
-        var stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
-
-        var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeoutCts.CancelAfter(timeout);
-
+        ProcessRunResult process;
         try
         {
-            await process.WaitForExitAsync(timeoutCts.Token).ConfigureAwait(false);
+            process = await _processRunner.RunAsync(
+                new ProcessRunRequest(bash, adapterDir, arguments, environment, timeout),
+                cancellationToken).ConfigureAwait(false);
         }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            try { process.Kill(entireProcessTree: true); }
-            catch (Exception ex) { _logger?.MethodKillFailed(adapterName, script, ex.Message); }
-            _logger?.MethodTimedOut(adapterName, script, (long)timeout.TotalMilliseconds);
-            return new MethodResult(-1, "", "timeout: killed", null);
+            _logger?.MethodStartFailed(adapterName, script, ex.Message);
+            return new MethodResult(-1, "", ex.Message, null);
         }
 
-        var stdout = await stdoutTask.ConfigureAwait(false);
-        var stderr = await stderrTask.ConfigureAwait(false);
-        stopwatch.Stop();
+        if (!process.Started)
+        {
+            _logger?.MethodStartFailed(adapterName, script, "process did not start");
+            return new MethodResult(-1, "", "process did not start", null);
+        }
+        if (process.TimedOut)
+        {
+            _logger?.MethodTimedOut(adapterName, script, (long)timeout.TotalMilliseconds);
+            return new MethodResult(-1, process.Stdout, "timeout: killed", null);
+        }
 
-        _logger?.MethodCompleted(adapterName, script, process.ExitCode, stopwatch.ElapsedMilliseconds);
-        _logger?.MethodStdoutDigest(adapterName, script, stdout.Length, Digest(stdout));
-        if (!string.IsNullOrWhiteSpace(stderr))
-            _logger?.MethodStderr(adapterName, script, stderr.Trim());
+        _logger?.MethodCompleted(adapterName, script, process.ExitCode, process.ElapsedMilliseconds);
+        _logger?.MethodStdoutDigest(adapterName, script, process.Stdout.Length, Digest(process.Stdout));
+        if (!string.IsNullOrWhiteSpace(process.Stderr))
+            _logger?.MethodStderr(adapterName, script, process.Stderr.Trim());
 
         JsonElement? json = null;
         if (process.ExitCode == 0)
         {
             try
             {
-                json = JsonDocument.Parse(stdout).RootElement.Clone();
+                json = JsonDocument.Parse(process.Stdout).RootElement.Clone();
             }
-            catch (JsonException ex) { _logger?.MethodStdoutNotJson(adapterName, script, ex.Message); }
+            catch (JsonException ex)
+            {
+                _logger?.MethodStdoutNotJson(adapterName, script, ex.Message);
+            }
         }
+        return new MethodResult(process.ExitCode, process.Stdout, process.Stderr, json);
+    }
 
-        return new MethodResult(process.ExitCode, stdout, stderr, json);
+    private static string Digest(string text)
+    {
+        var trimmed = text.Trim();
+        if (trimmed.Length > 200)
+            trimmed = trimmed[..200];
+        return trimmed.Replace('\n', ' ').Replace('\r', ' ');
     }
 }

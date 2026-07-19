@@ -11,13 +11,13 @@ public class AbsentMemberDefaultTests
       "name": "demo",
       "displayName": "Demo",
       "description": "d",
-      "accent": "#fff",
+      "accent": "#ffffff",
       "binary": "demo",
+      "sdkVersion": 2,
       "version": "1.0.0",
       "methods": {},
       "binaryDiscovery": { "versionFlag": "--version" },
-      "launcherOptions": {},
-      "sessionExtractor": { "script": "x.sh" }
+      "sessionExtractor": { "script": "x.sh", "schemaVersion": 1, "supportsDepths": ["quick"] }
     }
     """;
 
@@ -33,16 +33,7 @@ public class AbsentMemberDefaultTests
     }
 
     [Fact]
-    public void LauncherOptions_AbsentStatic_KeepEmpty()
-    {
-        var m = JsonSerializer.Deserialize(ManifestJson, AdaptersJsonContext.Default.AdapterManifest)!;
-        Assert.NotNull(m.LauncherOptions);
-        Assert.NotNull(m.LauncherOptions!.Static);
-        Assert.Empty(m.LauncherOptions.Static);
-    }
-
-    [Fact]
-    public void SessionExtractor_AbsentSchemaVersion_KeepsOne()
+    public void SessionExtractor_RequiredMembersDeserialize()
     {
         var m = JsonSerializer.Deserialize(ManifestJson, AdaptersJsonContext.Default.AdapterManifest)!;
         Assert.NotNull(m.SessionExtractor);
