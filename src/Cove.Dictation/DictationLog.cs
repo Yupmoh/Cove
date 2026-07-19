@@ -28,4 +28,7 @@ internal static partial class DictationLog
 
     [ZLoggerMessage(3507, LogLevel.Warning, "dictation shutdown drain failed error={error}")]
     public static partial void DictationShutdownDrainFailed(this ILogger logger, string error);
+
+    [ZLoggerMessage(3508, LogLevel.Warning, "dictation stop ignored state={state} shutdown={shutdown}")]
+    public static partial void DictationStopIgnored(this ILogger logger, string state, bool shutdown);
 }

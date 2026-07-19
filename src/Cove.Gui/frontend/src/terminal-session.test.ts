@@ -210,9 +210,9 @@ describe("TerminalSession", () => {
     liveSocket.onmessage?.({ data: JSON.stringify({ t: "resync", base: 10, modes: "" }) } as MessageEvent);
     callbacks[0]();
 
-    expect(session.consumed).toBe(10);
-    expect(session.expectedOffset).toBe(10);
-    expect(session.lastAck).toBe(10);
+    expect(session.receivedOffset).toBe(10);
+    expect(session.committedOffset).toBe(10);
+    expect(session.acknowledgedOffset).toBe(10);
     session.dispose();
     vi.unstubAllGlobals();
   });
@@ -249,8 +249,8 @@ describe("TerminalSession", () => {
     second.onmessage?.({ data: JSON.stringify({ t: "base", off: 0, head: 3, modes: "" }) } as MessageEvent);
 
     expect(second.close).not.toHaveBeenCalled();
-    expect(session.consumed).toBe(0);
-    expect(session.expectedOffset).toBe(0);
+    expect(session.receivedOffset).toBe(3);
+    expect(session.committedOffset).toBe(0);
     session.dispose();
     vi.useRealTimers();
     vi.unstubAllGlobals();
@@ -261,7 +261,6 @@ describe("TerminalSession", () => {
     ["unsafe base offset", { t: "base", off: Number.MAX_SAFE_INTEGER + 1, head: Number.MAX_SAFE_INTEGER + 1, modes: "" }],
     ["descending base range", { t: "base", off: 12, head: 11, modes: "" }],
     ["regressing base offset", { t: "base", off: 9, head: 11, modes: "" }],
-    ["regressing resync offset", { t: "resync", base: 9, modes: "" }],
   ])("rejects %s without mutating counters", (_name, message) => {
     vi.stubGlobal("location", { host: "localhost" });
     vi.stubGlobal("WebSocket", { OPEN: 1, CLOSING: 2, CLOSED: 3 });
@@ -282,18 +281,278 @@ describe("TerminalSession", () => {
     liveSocket.onmessage?.({ data: JSON.stringify(message) } as MessageEvent);
 
     expect({
-      consumed: session.consumed,
-      expectedOffset: session.expectedOffset,
-      replayUntilOffset: session.replayUntilOffset,
-      lastAck: session.lastAck,
+      receivedOffset: session.receivedOffset,
+      committedOffset: session.committedOffset,
+      acknowledgedOffset: session.acknowledgedOffset,
+      replayCursorOffset: session.replayCursorOffset,
+      replayTargetOffset: session.replayTargetOffset,
     }).toEqual({
-      consumed: 10,
-      expectedOffset: 10,
-      replayUntilOffset: 10,
-      lastAck: 10,
+      receivedOffset: 10,
+      committedOffset: 10,
+      acknowledgedOffset: 10,
+      replayCursorOffset: 10,
+      replayTargetOffset: 10,
     });
     expect(deps.warn).toHaveBeenCalledOnce();
     expect(liveSocket.close).toHaveBeenCalledWith(1008, "invalid terminal control offset");
+    session.dispose();
+    vi.unstubAllGlobals();
+  });
+
+  it("resets and accepts a forward base when the engine ring tail advances", () => {
+    vi.stubGlobal("location", { host: "localhost" });
+    vi.stubGlobal("WebSocket", { OPEN: 1, CLOSING: 2, CLOSED: 3 });
+    const owned = resources();
+    const liveSocket = socket();
+    const deps = dependencies(owned);
+    vi.mocked(deps.createSocket).mockReturnValue(liveSocket as unknown as WebSocket);
+    const session = new TerminalSession(
+      "nook-1",
+      10,
+      { isConnected: true } as HTMLElement,
+      {} as HTMLElement,
+      deps,
+      false,
+    );
+
+    session.connect();
+    liveSocket.onmessage?.({ data: JSON.stringify({ t: "base", off: 11, head: 13, modes: "" }) } as MessageEvent);
+
+    expect(liveSocket.close).not.toHaveBeenCalled();
+    expect(owned.term.reset).toHaveBeenCalledOnce();
+    expect({
+      receivedOffset: session.receivedOffset,
+      committedOffset: session.committedOffset,
+      acknowledgedOffset: session.acknowledgedOffset,
+      replayCursorOffset: session.replayCursorOffset,
+      replayTargetOffset: session.replayTargetOffset,
+    }).toEqual({
+      receivedOffset: 11,
+      committedOffset: 11,
+      acknowledgedOffset: 11,
+      replayCursorOffset: 11,
+      replayTargetOffset: 13,
+    });
+    session.dispose();
+    vi.unstubAllGlobals();
+  });
+
+  it("advances received, committed, and acknowledged offsets through distinct monotonic stages", () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("location", { host: "localhost" });
+    vi.stubGlobal("WebSocket", { OPEN: 1, CLOSING: 2, CLOSED: 3 });
+    const callbacks: Array<() => void> = [];
+    const owned = resources();
+    owned.term.write = vi.fn((_data: unknown, callback?: () => void) => {
+      if (callback) callbacks.push(callback);
+    });
+    const liveSocket = socket();
+    const deps = dependencies(owned);
+    vi.mocked(deps.createSocket).mockReturnValue(liveSocket as unknown as WebSocket);
+    const session = new TerminalSession(
+      "nook-1",
+      0,
+      { isConnected: true } as HTMLElement,
+      {} as HTMLElement,
+      deps,
+      false,
+    );
+
+    session.connect();
+    liveSocket.onmessage?.({ data: JSON.stringify({ t: "base", off: 0, head: 4, modes: "" }) } as MessageEvent);
+    liveSocket.onmessage?.({ data: relayFrame(0, [65, 66]) } as MessageEvent);
+    liveSocket.onmessage?.({ data: relayFrame(2, [67, 68]) } as MessageEvent);
+
+    expect([session.receivedOffset, session.committedOffset, session.acknowledgedOffset]).toEqual([4, 0, 0]);
+    callbacks[0]();
+    expect([session.receivedOffset, session.committedOffset, session.acknowledgedOffset]).toEqual([4, 2, 0]);
+    vi.advanceTimersByTime(100);
+    expect([session.receivedOffset, session.committedOffset, session.acknowledgedOffset]).toEqual([4, 2, 2]);
+    callbacks[1]();
+    vi.advanceTimersByTime(100);
+    expect([session.receivedOffset, session.committedOffset, session.acknowledgedOffset]).toEqual([4, 4, 4]);
+    expect(liveSocket.send.mock.calls).toEqual([
+      [JSON.stringify({ t: "ack", off: 2 })],
+      [JSON.stringify({ t: "ack", off: 4 })],
+    ]);
+
+    session.dispose();
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("replays uncommitted received bytes after reconnect without rewinding ownership counters", () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("location", { host: "localhost" });
+    vi.stubGlobal("WebSocket", { OPEN: 1, CLOSING: 2, CLOSED: 3 });
+    const callbacks: Array<() => void> = [];
+    const owned = resources();
+    owned.term.write = vi.fn((_data: unknown, callback?: () => void) => {
+      if (callback) callbacks.push(callback);
+    });
+    const first = socket();
+    const second = socket();
+    const deps = dependencies(owned);
+    vi.mocked(deps.createSocket)
+      .mockReturnValueOnce(first as unknown as WebSocket)
+      .mockReturnValueOnce(second as unknown as WebSocket);
+    const session = new TerminalSession(
+      "nook-1",
+      0,
+      { isConnected: true } as HTMLElement,
+      {} as HTMLElement,
+      deps,
+      false,
+    );
+
+    session.connect();
+    first.onmessage?.({ data: JSON.stringify({ t: "base", off: 0, head: 3, modes: "" }) } as MessageEvent);
+    first.onmessage?.({ data: relayFrame(0, [65, 66, 67]) } as MessageEvent);
+    expect([session.receivedOffset, session.committedOffset, session.acknowledgedOffset]).toEqual([3, 0, 0]);
+    first.onclose?.();
+    vi.advanceTimersByTime(250);
+    expect(deps.createSocket).toHaveBeenLastCalledWith("ws://localhost/pty?nook=nook-1&since=0");
+    second.onmessage?.({ data: JSON.stringify({ t: "base", off: 0, head: 3, modes: "" }) } as MessageEvent);
+    expect([session.receivedOffset, session.committedOffset, session.acknowledgedOffset]).toEqual([3, 0, 0]);
+    expect(session.replayCursorOffset).toBe(0);
+    second.onmessage?.({ data: relayFrame(0, [65, 66, 67]) } as MessageEvent);
+    callbacks[0]();
+    expect([session.receivedOffset, session.committedOffset, session.acknowledgedOffset]).toEqual([3, 0, 0]);
+    callbacks[1]();
+    vi.advanceTimersByTime(100);
+    expect([session.receivedOffset, session.committedOffset, session.acknowledgedOffset]).toEqual([3, 3, 3]);
+
+    session.dispose();
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("reconnects from the last committed cursor while a checkpoint restore is partial", () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("location", { host: "localhost" });
+    vi.stubGlobal("WebSocket", { OPEN: 1, CLOSING: 2, CLOSED: 3 });
+    const callbacks: Array<() => void> = [];
+    const owned = resources();
+    owned.term.write = vi.fn((_data: unknown, callback?: () => void) => {
+      if (callback) callbacks.push(callback);
+    });
+    const first = socket();
+    const second = socket();
+    const deps = dependencies(owned);
+    vi.mocked(deps.createSocket)
+      .mockReturnValueOnce(first as unknown as WebSocket)
+      .mockReturnValueOnce(second as unknown as WebSocket);
+    const session = new TerminalSession(
+      "nook-1",
+      0,
+      { isConnected: true } as HTMLElement,
+      {} as HTMLElement,
+      deps,
+      false,
+    );
+
+    session.connect();
+    first.onmessage?.({
+      data: JSON.stringify({
+        t: "base",
+        off: 10,
+        head: 10,
+        modes: "",
+        checkpoint: "QQ==",
+        checkpointCols: 80,
+        checkpointRows: 24,
+      }),
+    } as MessageEvent);
+    expect([session.receivedOffset, session.committedOffset, session.acknowledgedOffset]).toEqual([10, 0, 0]);
+
+    first.onclose?.();
+    vi.advanceTimersByTime(250);
+
+    expect(deps.createSocket).toHaveBeenLastCalledWith("ws://localhost/pty?nook=nook-1&since=0");
+    callbacks[0]();
+    expect([session.receivedOffset, session.committedOffset, session.acknowledgedOffset]).toEqual([10, 0, 0]);
+
+    session.dispose();
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("uses replay cursors for a resync rollback without decreasing ownership counters", () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("location", { host: "localhost" });
+    vi.stubGlobal("WebSocket", { OPEN: 1, CLOSING: 2, CLOSED: 3 });
+    const callbacks: Array<() => void> = [];
+    const owned = resources();
+    owned.term.write = vi.fn((_data: unknown, callback?: () => void) => {
+      if (callback) callbacks.push(callback);
+    });
+    const liveSocket = socket();
+    const deps = dependencies(owned);
+    vi.mocked(deps.createSocket).mockReturnValue(liveSocket as unknown as WebSocket);
+    const session = new TerminalSession(
+      "nook-1",
+      10,
+      { isConnected: true } as HTMLElement,
+      {} as HTMLElement,
+      deps,
+      false,
+    );
+
+    session.connect();
+    liveSocket.onmessage?.({ data: JSON.stringify({ t: "base", off: 10, head: 12, modes: "" }) } as MessageEvent);
+    liveSocket.onmessage?.({ data: relayFrame(10, [65, 66]) } as MessageEvent);
+    callbacks[0]();
+    vi.advanceTimersByTime(100);
+    expect([session.receivedOffset, session.committedOffset, session.acknowledgedOffset]).toEqual([12, 12, 12]);
+
+    liveSocket.onmessage?.({ data: JSON.stringify({ t: "resync", base: 10, modes: "" }) } as MessageEvent);
+    expect(liveSocket.close).not.toHaveBeenCalled();
+    expect([session.receivedOffset, session.committedOffset, session.acknowledgedOffset]).toEqual([12, 12, 12]);
+    expect(session.replayCursorOffset).toBe(10);
+    liveSocket.onmessage?.({ data: relayFrame(10, [65, 66]) } as MessageEvent);
+    callbacks[1]();
+    vi.advanceTimersByTime(100);
+    expect([session.receivedOffset, session.committedOffset, session.acknowledgedOffset]).toEqual([12, 12, 12]);
+    expect(liveSocket.send).toHaveBeenLastCalledWith(JSON.stringify({ t: "ack", off: 12 }));
+
+    session.dispose();
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("ignores duplicate frames without advancing any offset or writing twice", () => {
+    vi.stubGlobal("location", { host: "localhost" });
+    vi.stubGlobal("WebSocket", { OPEN: 1, CLOSING: 2, CLOSED: 3 });
+    const callbacks: Array<() => void> = [];
+    const owned = resources();
+    owned.term.write = vi.fn((_data: unknown, callback?: () => void) => {
+      if (callback) callbacks.push(callback);
+    });
+    const liveSocket = socket();
+    const deps = dependencies(owned);
+    vi.mocked(deps.createSocket).mockReturnValue(liveSocket as unknown as WebSocket);
+    const session = new TerminalSession(
+      "nook-1",
+      0,
+      { isConnected: true } as HTMLElement,
+      {} as HTMLElement,
+      deps,
+      false,
+    );
+
+    session.connect();
+    liveSocket.onmessage?.({ data: JSON.stringify({ t: "base", off: 0, head: 2, modes: "" }) } as MessageEvent);
+    const frame = relayFrame(0, [65, 66]);
+    liveSocket.onmessage?.({ data: frame } as MessageEvent);
+    liveSocket.onmessage?.({ data: frame } as MessageEvent);
+
+    expect(owned.term.write).toHaveBeenCalledOnce();
+    expect([session.receivedOffset, session.committedOffset, session.acknowledgedOffset]).toEqual([2, 0, 0]);
+    callbacks[0]();
+    liveSocket.onmessage?.({ data: frame } as MessageEvent);
+    expect(owned.term.write).toHaveBeenCalledOnce();
+    expect([session.receivedOffset, session.committedOffset, session.acknowledgedOffset]).toEqual([2, 2, 0]);
+
     session.dispose();
     vi.unstubAllGlobals();
   });

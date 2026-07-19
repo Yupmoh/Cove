@@ -17,7 +17,7 @@
     <PackageVersion Include="Ryn.Plugins.Badge" Version="0.27.0" />
     <PackageVersion Include="Ryn.Plugins.GlobalShortcut" Version="0.27.0" />
     <PackageVersion Include="Ryn.Plugins.WebViewPane" Version="0.27.0" />
-    <PackageVersion Include="Ryn.Plugins.Notification" Version="0.27.0" />
+    <PackageVersion Include="Ryn.Plugins.Notification" Version="0.27.1" />
     <PackageVersion Include="Ryn.Plugins.Dialog" Version="0.27.0" />
     <PackageVersion Include="Ryn.Plugins.Updater" Version="0.27.0" />
     <PackageVersion Include="ZLogger" Version="2.5.10" />
@@ -29,8 +29,8 @@
 
   <ItemGroup>
     <PackageVersion Include="Microsoft.Data.Sqlite.Core" Version="10.0.0" />
-    <PackageVersion Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.11" />
-    <PackageVersion Include="SQLitePCLRaw.core" Version="2.1.11" />
+    <PackageVersion Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.12" />
+    <PackageVersion Include="SQLitePCLRaw.core" Version="2.1.12" />
     <PackageVersion Include="Dapper" Version="2.1.35" />
     <PackageVersion Include="Dapper.AOT" Version="1.0.52" />
     <PackageVersion Include="Cronos" Version="0.8.4" />

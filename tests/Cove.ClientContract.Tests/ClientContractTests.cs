@@ -322,6 +322,9 @@ public sealed class ClientContractTests
         Assert.Equal(expectedClientKind, hello.ClientKind);
         Assert.False(string.IsNullOrWhiteSpace(hello.ClientVersion));
         Assert.Equal(ContractVectors.Channel, hello.Channel);
+        Assert.Equal(
+            ContractVectors.ControlToken,
+            hello.ControlToken);
         var data = JsonSerializer.SerializeToElement(
             new HelloResult(
                 ProtocolConstants.SemanticProtocolVersion,

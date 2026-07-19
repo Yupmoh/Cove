@@ -54,11 +54,26 @@ public static class AttachCompositor
         var conn = new FrameConnection(stream);
         await using (conn)
         {
+            string controlToken;
+            try
+            {
+                controlToken =
+                    ControlCredential.Read(paths.DataDir);
+            }
+            catch (Exception ex)
+                when (ex is IOException
+                    or UnauthorizedAccessException)
+            {
+                Console.Error.WriteLine(
+                    $"daemon control credential unavailable: {ex.Message}");
+                return 1;
+            }
             return await RunConnectedAsync(
                 conn,
                 paths.Channel,
                 nookId,
                 source,
+                controlToken,
                 SystemAttachTerminal.Instance,
                 cancellationToken).ConfigureAwait(false);
         }
@@ -68,20 +83,23 @@ public static class AttachCompositor
         FrameConnection connection,
         string channel,
         string nookId,
-        string source) =>
+        string source,
+        string controlToken) =>
         new(
             connection,
             nookId,
             "tui-attach",
             CoveBuild.InformationalVersion,
             channel,
-            source);
+            source,
+            controlToken);
 
     public static async Task<int> RunConnectedAsync(
         FrameConnection connection,
         string channel,
         string nookId,
         string source,
+        string controlToken,
         IAttachTerminal terminal,
         CancellationToken cancellationToken)
     {
@@ -89,7 +107,12 @@ public static class AttachCompositor
         var height = terminal.Height;
         VtEmulator vt = new(width, height);
         AnsiDiffEmitter emitter = new();
-        var session = CreateSession(connection, channel, nookId, source);
+        var session = CreateSession(
+            connection,
+            channel,
+            nookId,
+            source,
+            controlToken);
 
         SubscribeResult subResult;
         try

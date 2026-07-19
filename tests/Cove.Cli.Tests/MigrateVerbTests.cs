@@ -20,7 +20,7 @@ public sealed class MigrateVerbTests
                 var paths = new Cove.Engine.Daemon.DaemonPaths(Cove.Platform.CoveDataDir.Resolve(Cove.Platform.CoveChannel.Stable));
                 var endpoint = Cove.Platform.Ipc.ControlEndpointFactory.FromSocketPath(paths.DataDir.SocketPath);
                 var ctx = new CommandContext(paths, endpoint, new System.IO.StringWriter());
-                var result = await CliCommands.Migrate(ctx);
+                var result = await MigrationCommands.Migrate(ctx);
                 Assert.Equal(0, result);
             }
         }

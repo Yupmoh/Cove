@@ -104,7 +104,7 @@ public sealed class CliOutputLayerTests
             var result = await InvokeAgainstDaemonAsync(
                 root,
                 new[] { "terminal.fontFamily", "Berkeley Mono" },
-                CliCommands.ConfigSet);
+                ConfigCommands.ConfigSet);
 
             Assert.Equal(0, result.ExitCode);
             Assert.Equal("cove://commands/config.set", result.Request.Uri);
@@ -129,7 +129,7 @@ public sealed class CliOutputLayerTests
             var result = await InvokeAgainstDaemonAsync(
                 root,
                 new[] { "terminal.fontFamily" },
-                CliCommands.ConfigGet,
+                ConfigCommands.ConfigGet,
                 request => new Cove.Protocol.ControlResponse(
                     request.Id,
                     false,
@@ -156,7 +156,7 @@ public sealed class CliOutputLayerTests
             var result = await InvokeAgainstDaemonAsync(
                 root,
                 System.Array.Empty<string>(),
-                CliCommands.ExtensionList,
+                AdapterCommands.ExtensionList,
                 request =>
                 {
                     using var document = System.Text.Json.JsonDocument.Parse(
@@ -183,7 +183,7 @@ public sealed class CliOutputLayerTests
         try
         {
             const string id = "capture-\"quoted\\path";
-            var result = await InvokeAgainstDaemonAsync(root, new[] { "--id", id }, CliCommands.CaptureStop);
+            var result = await InvokeAgainstDaemonAsync(root, new[] { "--id", id }, CaptureCommands.CaptureStop);
 
             Assert.Equal(0, result.ExitCode);
             Assert.Equal("cove://commands/capture.stop", result.Request.Uri);
@@ -205,7 +205,7 @@ public sealed class CliOutputLayerTests
             var result = await InvokeAgainstDaemonAsync(
                 root,
                 new[] { "--nooks", "2", "--bays", "3", "--agents", "5" },
-                CliCommands.DiagnosticsSnapshot);
+                DiagnosticsCommands.DiagnosticsSnapshot);
 
             Assert.Equal(0, result.ExitCode);
             Assert.Equal("cove://commands/diagnostics.snapshot.take", result.Request.Uri);
@@ -231,6 +231,9 @@ public sealed class CliOutputLayerTests
         var paths = new Cove.Engine.Daemon.DaemonPaths(Cove.Platform.CoveDataDir.ForRoot(Cove.Platform.CoveChannel.Stable, root));
         var endpoint = Cove.Platform.Ipc.ControlEndpointFactory.FromSocketPath(paths.DataDir.SocketPath);
         System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(paths.DataDir.SocketPath)!);
+        System.IO.File.WriteAllText(
+            paths.ControlTokenPath,
+            "cli-output-test-control-token");
         await using var listener = endpoint.Bind();
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
         var server = Task.Run(async () =>

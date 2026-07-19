@@ -35,7 +35,14 @@ public sealed class PtyFrameValidationTests
             await WriteFrameAsync(stream, FrameType.StreamData, payload);
             await FakeEngine.WriteEnd(stream, 45, 0);
         });
-        await using var client = await PtyStreamClient.SubscribeAsync(engine.Dial, "0.1.0", "dev", "nook", 0, CancellationToken.None);
+        await using var client = await PtyStreamClient.SubscribeAsync(
+            engine.Dial,
+            "0.1.0",
+            "dev",
+            "nook",
+            0,
+            "test-control-token",
+            CancellationToken.None);
 
         ulong decodedOffset = 0;
         byte[]? decodedPayload = null;
@@ -59,7 +66,14 @@ public sealed class PtyFrameValidationTests
     {
         await using var engine = new FakeEngine();
         var serve = engine.ServeOnceAsync(0, 0, stream => WriteFrameAsync(stream, type, payload));
-        await using var client = await PtyStreamClient.SubscribeAsync(engine.Dial, "0.1.0", "dev", "nook", 0, CancellationToken.None);
+        await using var client = await PtyStreamClient.SubscribeAsync(
+            engine.Dial,
+            "0.1.0",
+            "dev",
+            "nook",
+            0,
+            "test-control-token",
+            CancellationToken.None);
 
         var exception = await Assert.ThrowsAsync<InvalidDataException>(() => client.PumpAsync(
             (_, _) => Task.CompletedTask,

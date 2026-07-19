@@ -21,6 +21,14 @@ interface CanvasState {
   state: Record<string, unknown>;
 }
 
+export function applyCanvasSourceDraft(current: CanvasState, draft: string): CanvasState {
+  try {
+    return JSON.parse(draft) as CanvasState;
+  } catch {
+    return current;
+  }
+}
+
 const COMPONENT_CATALOG: Record<string, string[]> = {
   "layout.row": ["direction", "gap", "align"],
   "layout.column": ["gap", "align"],
@@ -466,11 +474,7 @@ function toggleSourceView(): void {
     textarea.value = JSON.stringify(canvasState, null, 2);
     textarea.style.cssText = "width:100%;height:100%;padding:12px;background:#0b1622;border:none;color:#e5e9f0;font-family:'SF Mono',Monaco,monospace;font-size:12px;resize:none;outline:none;";
     textarea.addEventListener("input", () => {
-      try {
-        canvasState = JSON.parse(textarea.value) as CanvasState;
-      } catch {
-        // invalid JSON, keep editing
-      }
+      canvasState = applyCanvasSourceDraft(canvasState, textarea.value);
     });
     container.appendChild(textarea);
   }

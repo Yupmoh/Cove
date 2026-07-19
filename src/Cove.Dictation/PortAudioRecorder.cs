@@ -42,10 +42,16 @@ public sealed class PortAudioRecorder : IAudioRecorder, IDisposable
                 _captured.Clear();
             try
             {
-                var stream = new PortAudioSharp.Stream(parameters, null, _deviceRate, 0,
-                    StreamFlags.ClipOff, OnAudio, IntPtr.Zero);
-                stream.Start();
-                _stream = stream;
+                _stream = StartOwned(
+                    () => new PortAudioSharp.Stream(
+                        parameters,
+                        null,
+                        _deviceRate,
+                        0,
+                        StreamFlags.ClipOff,
+                        OnAudio,
+                        IntPtr.Zero),
+                    static stream => stream.Start());
             }
             catch (Exception ex) when (ex is not DictationException)
             {
@@ -119,6 +125,24 @@ public sealed class PortAudioRecorder : IAudioRecorder, IDisposable
             }
         }
         return StreamCallbackResult.Continue;
+    }
+
+    internal static T StartOwned<T>(
+        Func<T> create,
+        Action<T> start)
+        where T : IDisposable
+    {
+        var resource = create();
+        try
+        {
+            start(resource);
+            return resource;
+        }
+        catch
+        {
+            resource.Dispose();
+            throw;
+        }
     }
 
     public void Dispose()

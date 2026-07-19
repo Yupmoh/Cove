@@ -133,6 +133,13 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/diagnostics.snapshot.list` | core |  |
 | `cove://commands/diagnostics.snapshot.take` | core |  |
 | `cove://commands/diagnostics.status` | core |  |
+| `cove://commands/dictation.begin` | core |  |
+| `cove://commands/dictation.cancel` | core |  |
+| `cove://commands/dictation.ensure-model` | core |  |
+| `cove://commands/dictation.partial` | core |  |
+| `cove://commands/dictation.started` | core |  |
+| `cove://commands/dictation.status` | core |  |
+| `cove://commands/dictation.stop` | core |  |
 | `cove://commands/editor.get-state` | core |  |
 | `cove://commands/editor.open` | core |  |
 | `cove://commands/editor.save` | core |  |
@@ -143,9 +150,13 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/execute_js` | core | mcp-bridge execute_js (PL-30, render-bound) |
 | `cove://commands/extension.list` | core |  |
 | `cove://commands/extension.run` | core |  |
+| `cove://commands/feedback.save` | core |  |
+| `cove://commands/fs.list` | core |  |
 | `cove://commands/get_backend_state` | core | mcp-bridge get_backend_state (PL-30, headless-safe) |
 | `cove://commands/get_ipc_events` | core | mcp-bridge get_ipc_events (PL-30, headless-safe) |
 | `cove://commands/get_window_info` | core | mcp-bridge get_window_info (PL-30, render-bound) |
+| `cove://commands/git.summary` | core |  |
+| `cove://commands/hook.emit` | core |  |
 | `cove://commands/keybind.clear` | core |  |
 | `cove://commands/keybind.conflicts` | core |  |
 | `cove://commands/keybind.is-reserved` | core |  |
@@ -212,6 +223,7 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/perf.bundle.create` | core |  |
 | `cove://commands/perf.bundle.delete` | core |  |
 | `cove://commands/perf.bundle.list` | core |  |
+| `cove://commands/perf.result.save` | core |  |
 | `cove://commands/protocol.resolve` | core |  |
 | `cove://commands/registry.fetch` | core |  |
 | `cove://commands/resident.dock` | core |  |
@@ -221,6 +233,7 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/resident.undock` | core |  |
 | `cove://commands/restore.chooser` | core |  |
 | `cove://commands/restore.confirm` | core |  |
+| `cove://commands/restore.summary.get` | core |  |
 | `cove://commands/restore.undo` | core |  |
 | `cove://commands/review.add-comment` | core |  |
 | `cove://commands/review.audit` | core |  |
@@ -331,6 +344,7 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/vault.set-setting` | core |  |
 | `cove://commands/viewer.get-state` | core |  |
 | `cove://commands/viewer.open` | core |  |
+| `cove://commands/window.focus` | core |  |
 | `cove://commands/wing.create` | core |  |
 | `cove://commands/wing.list` | core |  |
 | `cove://commands/wing.remove` | core |  |
@@ -475,4 +489,4 @@ Generated from the command registry. Do not edit by hand.
 | `viewer get-state` | cli |  |
 | `viewer open` | cli |  |
 
-Total: 470 commands
+Total: 484 commands

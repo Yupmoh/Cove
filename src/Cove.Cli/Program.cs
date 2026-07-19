@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices;
 using System.Text.Json;
 using Cove.Cli;
 using Cove.Engine.Daemon;
@@ -51,7 +50,13 @@ string? matchedVerb = null;
 if (matchedVerb is not null)
 {
     var verbArgs = CommandContext.SliceVerbArgs(matchedVerb, cliArgs);
-    var context = new CommandContext(paths, endpoint, System.Console.Out, args: verbArgs, channel: channel);
+    var context = new CommandContext(
+        paths,
+        endpoint,
+        System.Console.Out,
+        args: verbArgs,
+        channel: channel,
+        optionArgs: cliArgs);
     var handler = (System.Func<CommandContext, System.Threading.Tasks.Task<int>>)CoveCommandRegistry.Handlers[matchedVerb];
     try
     {
@@ -95,8 +100,7 @@ static int Unknown(string sub)
 static async Task<int> RunDaemonAsync(DaemonPaths paths, IControlEndpoint endpoint, bool exitWhenIdle)
 {
     using var cts = new CancellationTokenSource();
-    using PosixSignalRegistration sigInt = PosixSignalRegistration.Create(PosixSignal.SIGINT, _ => cts.Cancel());
-    using PosixSignalRegistration sigTerm = PosixSignalRegistration.Create(PosixSignal.SIGTERM, _ => cts.Cancel());
+    using var signalRegistration = ShutdownSignalRegistration.Register(cts.Cancel);
     var host = new DaemonHost(paths, endpoint, exitWhenIdle);
     return await host.RunAsync(cts.Token);
 }

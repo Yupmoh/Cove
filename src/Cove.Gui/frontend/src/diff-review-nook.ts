@@ -1,5 +1,6 @@
 import { invoke } from "./invoke";
 import { FrontendCommand } from "./app/frontend-command";
+import { LifecycleScope, type NookContentHandle } from "./app/lifecycle";
 
 interface SnapshotListItem {
   id: string;
@@ -47,7 +48,8 @@ interface SnapshotInspectResult { diffs: SnapshotDiffItem[] }
 interface ReviewListCommentsResult { comments: ReviewCommentDto[] }
 interface AttributionListResult { entries: AttributionEntryDto[] }
 
-export async function renderDiffReviewNook(bayId: string): Promise<HTMLElement> {
+export async function renderDiffReviewNook(bayId: string): Promise<NookContentHandle> {
+  const lifecycle = new LifecycleScope();
   const el = document.createElement("div");
   el.className = "diff-review-nook";
   el.style.cssText = "display:flex;flex-direction:column;height:100%;background:#0b1622;color:#e5e9f0;font-family:system-ui,sans-serif;";
@@ -66,37 +68,51 @@ export async function renderDiffReviewNook(bayId: string): Promise<HTMLElement> 
   const commitField = commitInput.querySelector("input")!;
 
   let currentCommit: string | null = null;
-  let pollTimer: ReturnType<typeof setInterval> | null = null;
+  let polling = new LifecycleScope();
+  let loadGeneration = 0;
+
+  const loadCurrent = (commitSha: string, isInitial = true): void => {
+    const generation = ++loadGeneration;
+    void loadDiffReview(
+      commitSha,
+      diffContainer,
+      isInitial,
+      () => !lifecycle.isDisposed && generation === loadGeneration,
+    );
+  };
 
   const triggerLoad = () => {
     const commitSha = commitField.value.trim();
     if (commitSha) {
       currentCommit = commitSha;
-      loadDiffReview(commitSha, diffContainer);
+      loadCurrent(commitSha);
       startPolling();
     }
   };
 
   const startPolling = () => {
-    if (pollTimer) clearInterval(pollTimer);
-    pollTimer = setInterval(() => {
-      if (!el.isConnected) {
-        clearInterval(pollTimer!);
-        pollTimer = null;
-        return;
-      }
+    void polling.dispose();
+    polling = new LifecycleScope();
+    polling.interval(() => {
+      if (lifecycle.isDisposed || !el.isConnected) return;
       if (currentCommit) {
-        loadDiffReview(currentCommit, diffContainer, false);
+        loadCurrent(currentCommit, false);
       }
     }, 3000);
   };
 
-  loadBtn.addEventListener("click", triggerLoad);
-  commitField.addEventListener("keydown", (e) => {
+  lifecycle.listen(loadBtn, "click", triggerLoad);
+  lifecycle.listen(commitField, "keydown", (event) => {
+    const e = event as KeyboardEvent;
     if (e.key === "Enter") triggerLoad();
   });
 
-  return el;
+  lifecycle.own(() => {
+    loadGeneration += 1;
+    return polling.dispose();
+  });
+  lifecycle.own(() => el.remove());
+  return { element: el, dispose: () => lifecycle.dispose() };
 }
 function buildHeader(): HTMLElement {
   const header = document.createElement("div");
@@ -126,7 +142,13 @@ function buildCommitInput(): HTMLElement {
   return container;
 }
 
-async function loadDiffReview(commitSha: string, container: HTMLElement, isInitial: boolean = true): Promise<void> {
+async function loadDiffReview(
+  commitSha: string,
+  container: HTMLElement,
+  isInitial: boolean,
+  isCurrent: () => boolean,
+): Promise<void> {
+  if (!isCurrent()) return;
   if (isInitial) {
     container.innerHTML = "";
     const loading = document.createElement("div");
@@ -141,6 +163,7 @@ async function loadDiffReview(commitSha: string, container: HTMLElement, isIniti
       invoke<ReviewListCommentsResult>(FrontendCommand.ReviewListComments, { commitSha }).catch(() => ({ comments: [] as ReviewCommentDto[] })),
       invoke<AttributionListResult>(FrontendCommand.AttributionFindByRange, { filePath: "", startLine: 1, endLine: 999999 }).catch(() => ({ entries: [] as AttributionEntryDto[] })),
     ]);
+    if (!isCurrent()) return;
 
     const detached = document.createElement("div");
     detached.style.cssText = "padding:8px 12px;";
@@ -148,6 +171,7 @@ async function loadDiffReview(commitSha: string, container: HTMLElement, isIniti
     const latestSnap = snapshots.snapshots[0];
     if (latestSnap) {
       const diffResult = await invoke<SnapshotInspectResult>(FrontendCommand.SnapshotInspect, { id: latestSnap.id });
+      if (!isCurrent()) return;
       renderDiffLines(diffResult.diffs, detached, comments.comments, attribution.entries);
     }
 
@@ -161,12 +185,13 @@ async function loadDiffReview(commitSha: string, container: HTMLElement, isIniti
       detached.appendChild(empty);
     }
 
+    if (!isCurrent()) return;
     const savedScroll = container.scrollTop;
     container.innerHTML = "";
     container.appendChild(detached);
     container.scrollTop = savedScroll;
   } catch (e) {
-    if (isInitial) {
+    if (isInitial && isCurrent()) {
       container.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed: ${(e as Error).message}</div>`;
     }
   }

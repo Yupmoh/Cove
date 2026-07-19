@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
+using Cove.Platform;
 
 namespace Cove.Gui;
 
@@ -17,13 +18,18 @@ public sealed class MediaLeaseRegistry
     private readonly ConcurrentDictionary<string, Lease> _leases = new(StringComparer.Ordinal);
     private readonly TimeSpan _ttl;
     private readonly Func<DateTimeOffset> _clock;
+    private readonly IPlatformFileSystem _fileSystem;
 
     public MediaLeaseRegistry() : this(DefaultTtl) { }
 
-    public MediaLeaseRegistry(TimeSpan ttl, Func<DateTimeOffset>? clock = null)
+    public MediaLeaseRegistry(
+        TimeSpan ttl,
+        Func<DateTimeOffset>? clock = null,
+        IPlatformFileSystem? fileSystem = null)
     {
         _ttl = ttl;
         _clock = clock ?? (static () => DateTimeOffset.UtcNow);
+        _fileSystem = fileSystem ?? SystemPlatformFileSystem.Instance;
     }
 
     public string Issue(string filePath)
@@ -33,7 +39,7 @@ public sealed class MediaLeaseRegistry
         var full = Path.GetFullPath(filePath);
         if (!AllowedExtensions.Contains(Path.GetExtension(full)))
             throw new InvalidOperationException($"media lease rejected for non-media extension '{Path.GetExtension(full)}'");
-        if (!File.Exists(full))
+        if (!_fileSystem.FileExists(full))
             throw new InvalidOperationException($"media lease rejected for missing file '{full}'");
         var id = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
         _leases[id] = new Lease(full, _clock() + _ttl);

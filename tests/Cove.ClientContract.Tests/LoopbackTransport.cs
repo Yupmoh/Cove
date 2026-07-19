@@ -68,6 +68,11 @@ internal sealed class CliControlTransport : IAsyncDisposable
             OperatingSystem.IsWindows() ? null : "/tmp");
         var dataDirectory = CoveDataDir.ForRoot(CoveChannel.Dev, root);
         CoveTree.Ensure(dataDirectory);
+        var paths = new Cove.Engine.Daemon.DaemonPaths(
+            dataDirectory);
+        File.WriteAllText(
+            paths.ControlTokenPath,
+            ContractVectors.ControlToken);
         var endpoint = ControlEndpointFactory.FromSocketPath(dataDirectory.SocketPath);
         return new CliControlTransport(root, endpoint.Bind());
     }

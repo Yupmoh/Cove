@@ -198,54 +198,34 @@ public sealed class DictationServiceTests
         }
     }
 
-    private sealed class ShutdownDrain : IDisposable
-    {
-        private readonly TaskCompletionSource _completion =
-            new(TaskCreationOptions.RunContinuationsAsynchronously);
-        private readonly Thread _thread;
-
-        public ShutdownDrain(DictationService service)
-        {
-            _thread = new Thread(() =>
-            {
-                try
-                {
-                    service.Shutdown();
-                    _completion.TrySetResult();
-                }
-                catch (Exception ex)
-                {
-                    _completion.TrySetException(ex);
-                }
-            })
-            {
-                IsBackground = true,
-            };
-            _thread.Start();
-        }
-
-        public Task Completion => _completion.Task;
-
-        public void WaitUntilEntered()
-        {
-            Assert.True(
-                SpinWait.SpinUntil(
-                    () => (_thread.ThreadState & ThreadState.WaitSleepJoin) != 0,
-                    TimeSpan.FromSeconds(2)),
-                "shutdown did not enter its drain");
-            Assert.False(Completion.IsCompleted);
-        }
-
-        public void Dispose()
-        {
-            Assert.True(_thread.Join(TimeSpan.FromSeconds(2)), "shutdown thread did not exit");
-        }
-    }
-
     private static async Task ShutdownAsync(DictationService service)
     {
-        using var shutdown = new ShutdownDrain(service);
-        await shutdown.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await service.ShutdownAsync()
+            .AsTask()
+            .WaitAsync(TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public async Task ShutdownAsync_AwaitsInFlightDecodeWithoutBlockingCaller()
+    {
+        var rec = new FakeRecorder { Clip = Seconds(2) };
+        var tr = new BlockingTranscriber();
+        var svc = new DictationService(
+            rec,
+            new FakeTrimmer(),
+            tr,
+            NullLogger.Instance,
+            TimeSpan.FromMilliseconds(10));
+        svc.PartialTranscript = _ => { };
+
+        Assert.True(svc.Start());
+        Assert.True(tr.Entered.Wait(TimeSpan.FromSeconds(5)));
+
+        var shutdown = svc.ShutdownAsync();
+
+        Assert.False(shutdown.IsCompleted);
+        tr.Release.Set();
+        await shutdown.AsTask().WaitAsync(TimeSpan.FromSeconds(5));
     }
 
     [Fact]
@@ -274,7 +254,7 @@ public sealed class DictationServiceTests
     }
 
     [Fact]
-    public async Task Shutdown_WaitsForInFlightPartialDecode()
+    public async Task ShutdownAsync_WaitsForInFlightPartialDecode()
     {
         var rec = new FakeRecorder { Clip = Seconds(2) };
         var tr = new BlockingTranscriber();
@@ -283,21 +263,21 @@ public sealed class DictationServiceTests
 
         Assert.True(svc.Start());
         Assert.True(tr.Entered.Wait(TimeSpan.FromSeconds(5)));
-        using var shutdown = new ShutdownDrain(svc);
+        var shutdown = svc.ShutdownAsync();
         try
         {
-            shutdown.WaitUntilEntered();
+            Assert.False(shutdown.IsCompleted);
         }
         finally
         {
             tr.Release.Set();
-            await shutdown.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+            await shutdown.AsTask().WaitAsync(TimeSpan.FromSeconds(5));
         }
         Assert.True(tr.Exited);
     }
 
     [Fact]
-    public async Task Shutdown_WaitsForInFlightFinalDecode()
+    public async Task ShutdownAsync_WaitsForInFlightFinalDecode()
     {
         var rec = new FakeRecorder { Clip = Seconds(2) };
         var tr = new BlockingTranscriber();
@@ -306,16 +286,16 @@ public sealed class DictationServiceTests
         Assert.True(svc.Start());
         var stopTask = svc.StopAsync();
         Assert.True(tr.Entered.Wait(TimeSpan.FromSeconds(5)));
-        using var shutdown = new ShutdownDrain(svc);
+        var shutdown = svc.ShutdownAsync();
         DictationResult? result = null;
         try
         {
-            shutdown.WaitUntilEntered();
+            Assert.False(shutdown.IsCompleted);
         }
         finally
         {
             tr.Release.Set();
-            await shutdown.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+            await shutdown.AsTask().WaitAsync(TimeSpan.FromSeconds(5));
             result = await stopTask.WaitAsync(TimeSpan.FromSeconds(5));
         }
         Assert.True(tr.Exited);
@@ -323,7 +303,7 @@ public sealed class DictationServiceTests
     }
 
     [Fact]
-    public async Task Shutdown_SkipsFinalDecodeQueuedBehindBlockedPartial()
+    public async Task ShutdownAsync_SkipsFinalDecodeQueuedBehindBlockedPartial()
     {
         var rec = new FakeRecorder { Clip = Seconds(2) };
         var tr = new BlockingTranscriber();
@@ -333,18 +313,18 @@ public sealed class DictationServiceTests
         Assert.True(svc.Start());
         Assert.True(tr.Entered.Wait(TimeSpan.FromSeconds(5)));
         var stopTask = svc.StopAsync();
-        using var shutdown = new ShutdownDrain(svc);
+        var shutdown = svc.ShutdownAsync();
         DictationResult? result = null;
         try
         {
             Assert.Equal(DictationState.Transcribing, svc.State);
-            shutdown.WaitUntilEntered();
+            Assert.False(shutdown.IsCompleted);
             Assert.False(stopTask.IsCompleted);
         }
         finally
         {
             tr.Release.Set();
-            await shutdown.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+            await shutdown.AsTask().WaitAsync(TimeSpan.FromSeconds(5));
             result = await stopTask.WaitAsync(TimeSpan.FromSeconds(5));
         }
         Assert.Equal("", result!.Text);

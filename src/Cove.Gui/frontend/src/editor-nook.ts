@@ -19,6 +19,7 @@ import {
   type BlameLineLike,
 } from "./git-decorations";
 import { diagnosticsToMarkers, lspLanguageForPath, type LspDiagnosticLike } from "./lsp-markers";
+import { LifecycleScope, type NookContentHandle } from "./app/lifecycle";
 
 interface LspDiagnosticsResult {
   available: boolean;
@@ -98,7 +99,8 @@ interface EditorState {
 
 const LARGE_FILE_THRESHOLD = 5 * 1024 * 1024;
 
-export async function renderEditorNook(nookId: string, filePath: string): Promise<HTMLElement> {
+export async function renderEditorNook(nookId: string, filePath: string): Promise<NookContentHandle> {
+  const lifecycle = new LifecycleScope();
   const el = document.createElement("div");
   el.className = "editor-nook";
   el.style.cssText = "display:flex;flex-direction:column;height:100%;background:var(--panel);color:var(--fg);";
@@ -122,7 +124,7 @@ export async function renderEditorNook(nookId: string, filePath: string): Promis
     crumb.style.cssText = `color:${isLast ? "var(--fg)" : "var(--muted)"};font-weight:${isLast ? "600" : "400"};cursor:pointer;white-space:nowrap;`;
     crumb.textContent = seg.label;
     crumb.title = seg.path;
-    crumb.addEventListener("click", () => {
+    lifecycle.listen(crumb, "click", () => {
       invoke(FrontendCommand.SidebarReveal, { path: seg.path }).catch(() => {});
     });
     breadcrumbs.appendChild(crumb);
@@ -211,7 +213,7 @@ export async function renderEditorNook(nookId: string, filePath: string): Promis
     wrapBtn.style.color = wordWrap === "on" ? "var(--accent)" : "var(--muted)";
   };
   renderWrapBtn();
-  wrapBtn.addEventListener("click", () => {
+  lifecycle.listen(wrapBtn, "click", () => {
     wordWrap = toggleWordWrap(wordWrap);
     editor.updateOptions({ wordWrap });
     storeWordWrap(nookId, wordWrap);
@@ -223,7 +225,7 @@ export async function renderEditorNook(nookId: string, filePath: string): Promis
     minimapBtn.style.color = minimapOn ? "var(--accent)" : "var(--muted)";
   };
   renderMinimapBtn();
-  minimapBtn.addEventListener("click", () => {
+  lifecycle.listen(minimapBtn, "click", () => {
     minimapOn = !minimapOn;
     editor.updateOptions({ minimap: { enabled: minimapOn } });
     storeMinimap(nookId, minimapOn);
@@ -232,6 +234,7 @@ export async function renderEditorNook(nookId: string, filePath: string): Promis
 
   invoke<AttributionListResult>(FrontendCommand.AttributionFindByRange, { filePath, startLine: 1, endLine: 1000000 })
     .then((res) => {
+      if (lifecycle.isDisposed) return;
       const chip = latestAgentEdit(res.entries ?? []);
       if (chip) {
         agentChip.textContent = formatAgentEditChip(chip);
@@ -253,13 +256,14 @@ export async function renderEditorNook(nookId: string, filePath: string): Promis
   const lspRootDir = lspRootSlash > 0 ? filePath.slice(0, lspRootSlash) : filePath;
 
   const refreshLspDiagnostics = async () => {
-    if (lspLanguageForPath(filePath) === null) return;
+    if (lifecycle.isDisposed || lspLanguageForPath(filePath) === null) return;
     try {
       const result = await invoke<LspDiagnosticsResult>(FrontendCommand.LspDiagnostics, {
         filePath,
         content: model.getValue(),
         rootDir: lspRootDir,
       });
+      if (lifecycle.isDisposed) return;
       if (!result.available) {
         monaco.editor.setModelMarkers(model, "cove-lsp", []);
         if (!lspUnavailableLogged) {
@@ -270,6 +274,7 @@ export async function renderEditorNook(nookId: string, filePath: string): Promis
       }
       monaco.editor.setModelMarkers(model, "cove-lsp", diagnosticsToMarkers(result.diagnostics ?? []) as Monaco.editor.IMarkerData[]);
     } catch (e) {
+      if (lifecycle.isDisposed) return;
       monaco.editor.setModelMarkers(model, "cove-lsp", []);
       if (!lspUnavailableLogged) {
         lspUnavailableLogged = true;
@@ -280,10 +285,13 @@ export async function renderEditorNook(nookId: string, filePath: string): Promis
 
   const scheduleLspDiagnostics = () => {
     clearTimeout(lspTimer);
-    lspTimer = setTimeout(() => { void refreshLspDiagnostics(); }, 500);
+    lspTimer = setTimeout(() => {
+      if (!lifecycle.isDisposed) void refreshLspDiagnostics();
+    }, 500);
   };
 
-  model.onDidChangeContent(() => {
+  const modelChangeSubscription = model.onDidChangeContent(() => {
+    if (lifecycle.isDisposed) return;
     dirty = true;
     saveStatus.textContent = "Modified";
     saveStatus.style.color = "#cca766";
@@ -294,7 +302,7 @@ export async function renderEditorNook(nookId: string, filePath: string): Promis
 
   void refreshLspDiagnostics();
 
-  editor.onDidChangeCursorPosition((e: Monaco.editor.ICursorPositionChangedEvent) => {
+  const cursorSubscription = editor.onDidChangeCursorPosition((e: Monaco.editor.ICursorPositionChangedEvent) => {
     cursorPos.textContent = `Ln ${e.position.lineNumber}, Col ${e.position.column}`;
   });
 
@@ -306,8 +314,10 @@ export async function renderEditorNook(nookId: string, filePath: string): Promis
   let blameLines: BlameLineLike[] = [];
 
   const refreshDecorations = async () => {
+    if (lifecycle.isDisposed) return;
     try {
       const diff = await invoke<ScmDiffResult>(FrontendCommand.ScmDiff, { repoRoot: repoDir, filePath: fileName, ref: "HEAD" });
+      if (lifecycle.isDisposed) return;
       const marks = parseDiffDecorations(diff.newContent ?? "");
       const lineCount = model.getLineCount();
       decorations.set(
@@ -324,8 +334,10 @@ export async function renderEditorNook(nookId: string, filePath: string): Promis
   };
 
   const refreshBlame = async () => {
+    if (lifecycle.isDisposed) return;
     try {
       const blame = await invoke<ScmBlameResult>(FrontendCommand.ScmBlame, { repoRoot: repoDir, filePath: fileName });
+      if (lifecycle.isDisposed) return;
       blameLines = blame.lines ?? [];
     } catch {
       void 0;
@@ -336,7 +348,7 @@ export async function renderEditorNook(nookId: string, filePath: string): Promis
   blameTip.style.cssText = "position:absolute;display:none;z-index:20;background:var(--panel-2);border:1px solid var(--border);color:var(--fg);font-size:11px;padding:3px 8px;border-radius:5px;pointer-events:none;white-space:nowrap;";
   container.appendChild(blameTip);
 
-  editor.onMouseMove((e: Monaco.editor.IEditorMouseEvent) => {
+  const mouseMoveSubscription = editor.onMouseMove((e: Monaco.editor.IEditorMouseEvent) => {
     const line = e.target.position?.lineNumber;
     if (!line || blameLines.length === 0) {
       blameTip.style.display = "none";
@@ -354,8 +366,8 @@ export async function renderEditorNook(nookId: string, filePath: string): Promis
     blameTip.style.left = `${be.clientX - rect.left + 12}px`;
     blameTip.style.top = `${be.clientY - rect.top + 12}px`;
   });
-  editor.onMouseLeave(() => { blameTip.style.display = "none"; });
-  editor.onMouseDown((e: Monaco.editor.IEditorMouseEvent) => {
+  const mouseLeaveSubscription = editor.onMouseLeave(() => { blameTip.style.display = "none"; });
+  const mouseDownSubscription = editor.onMouseDown((e: Monaco.editor.IEditorMouseEvent) => {
     const line = e.target.position?.lineNumber;
     if (!line) return;
     const entry = blameForLine(blameLines, line);
@@ -368,25 +380,24 @@ export async function renderEditorNook(nookId: string, filePath: string): Promis
   void refreshBlame();
 
   const doSave = async () => {
-    if (readOnly) return;
+    if (readOnly || lifecycle.isDisposed) return;
     try {
       await invoke(FrontendCommand.EditorSave, { filePath, nookId, content: model.getValue() });
+      if (lifecycle.isDisposed) return;
       dirty = false;
       saveStatus.textContent = "Saved";
       saveStatus.style.color = "var(--muted)";
       void refreshDecorations();
       void refreshBlame();
     } catch (e) {
+      if (lifecycle.isDisposed) return;
       saveStatus.textContent = `Save failed: ${(e as Error).message}`;
       saveStatus.style.color = "#f85149";
     }
   };
 
-  const decorationsPoll = setInterval(() => {
-    if (!document.body.contains(el)) {
-      clearInterval(decorationsPoll);
-      return;
-    }
+  lifecycle.interval(() => {
+    if (lifecycle.isDisposed || !document.body.contains(el)) return;
     void refreshDecorations();
   }, 3000);
 
@@ -407,21 +418,20 @@ export async function renderEditorNook(nookId: string, filePath: string): Promis
     }
   } catch { void 0; }
 
-  const saveState = async () => {
-    try {
-      const cursor = JSON.stringify(editor.getSelection());
-      const scroll = JSON.stringify(editor.getScrollTop());
-      await invoke(FrontendCommand.EditorSetState, { nookId, cursor, scroll });
-    } catch { void 0; }
-  };
-
-  const observer = new MutationObserver(() => {
-    if (!document.body.contains(el)) {
-      void saveState();
-      observer.disconnect();
-    }
+  lifecycle.own(() => {
+    clearTimeout(saveTimer);
+    clearTimeout(lspTimer);
+    monaco.editor.setModelMarkers(model, "cove-lsp", []);
+    mouseDownSubscription.dispose();
+    mouseLeaveSubscription.dispose();
+    mouseMoveSubscription.dispose();
+    decorations.clear();
+    cursorSubscription.dispose();
+    modelChangeSubscription.dispose();
+    editor.dispose();
+    model.dispose();
+    el.remove();
   });
-  observer.observe(document.body, { childList: true, subtree: true });
 
-  return el;
+  return { element: el, dispose: () => lifecycle.dispose() };
 }

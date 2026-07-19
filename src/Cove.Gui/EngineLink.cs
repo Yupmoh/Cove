@@ -13,6 +13,7 @@ public sealed class EngineLink : IAsyncDisposable
     private readonly string _clientVersion;
     private readonly string _channel;
     private readonly string _endpoint;
+    private readonly string? _providedControlToken;
     private readonly SemaphoreSlim _connectGate = new(1, 1);
     private readonly SemaphoreSlim _writeGate = new(1, 1);
     private readonly ConcurrentDictionary<string, TaskCompletionSource<ControlResponse>> _pending = new();
@@ -25,8 +26,18 @@ public sealed class EngineLink : IAsyncDisposable
     private uint _seq;
     private int _idCounter;
 
-    public EngineLink(Func<CancellationToken, Task<Stream>> dial, string clientVersion, string channel)
-    { _dial = dial; _clientVersion = clientVersion; _channel = channel; _endpoint = GuiLogging.EndpointFor(channel); }
+    public EngineLink(
+        Func<CancellationToken, Task<Stream>> dial,
+        string clientVersion,
+        string channel,
+        string? controlToken = null)
+    {
+        _dial = dial;
+        _clientVersion = clientVersion;
+        _channel = channel;
+        _endpoint = GuiLogging.EndpointFor(channel);
+        _providedControlToken = controlToken;
+    }
 
     public void SetLogger(ILogger logger) => _log = logger;
 
@@ -42,16 +53,17 @@ public sealed class EngineLink : IAsyncDisposable
 
     private string? ReadControlToken()
     {
+        if (!string.IsNullOrEmpty(_providedControlToken))
+            return _providedControlToken;
+        var dd = Cove.Platform.CoveDataDir.Resolve(GuiLogging.ParseChannel(_channel));
         try
         {
-            var dd = Cove.Platform.CoveDataDir.Resolve(GuiLogging.ParseChannel(_channel));
-            var path = System.IO.Path.Combine(dd.IpcDir, _channel + ".control-token");
-            if (!System.IO.File.Exists(path))
-            {
-                _log.ControlTokenMissing(path);
-                return null;
-            }
-            return System.IO.File.ReadAllText(path).Trim();
+            return Cove.Platform.ControlCredential.Read(dd);
+        }
+        catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
+        {
+            _log.ControlTokenMissing(dd.ControlTokenPath);
+            return null;
         }
         catch (Exception ex)
         {

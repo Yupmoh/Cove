@@ -37,7 +37,7 @@ import type { ContextMenuHost } from "../../shell/context-menu-host";
 import type { FindBarFeature } from "../find/find-bar-feature";
 import type { BayBoxInput } from "../../bay-boxes";
 import type { NookDragState } from "../navigation/shore-tabs-feature";
-import { LifecycleScope, type ComponentHandle } from "../../app/lifecycle";
+import { LifecycleScope, type ComponentHandle, type NookContentHandle } from "../../app/lifecycle";
 import { FrontendCommand } from "../../app/frontend-command";
 
 export interface NookView {
@@ -205,6 +205,85 @@ interface NookView {
 const nooks = new Map<string, NookView>();
 
 const nookFilePaths = new Map<string, string>();
+
+interface OwnedContentRecord {
+  readonly key: string;
+  element: HTMLElement;
+  handle: NookContentHandle | null;
+  generation: number;
+}
+
+const ownedContent = new Map<string, OwnedContentRecord>();
+const pendingContentDisposals = new Set<Promise<void>>();
+let renderGeneration = 0;
+let activeSplitDragCleanup: (() => void) | null = null;
+
+function scheduleContentDisposal(handle: NookContentHandle): void {
+  const disposal = Promise.resolve(handle.dispose()).catch((error: unknown) => {
+    console.warn("nook content disposal failed", error);
+  });
+  pendingContentDisposals.add(disposal);
+  void disposal.finally(() => pendingContentDisposals.delete(disposal));
+}
+
+function disposeOwnedContent(record: OwnedContentRecord): void {
+  if (ownedContent.get(record.key) === record) ownedContent.delete(record.key);
+  record.generation = -1;
+  record.element.remove();
+  if (record.handle) scheduleContentDisposal(record.handle);
+}
+
+function renderOwnedContent(
+  key: string,
+  placeholderClass: string,
+  failureLabel: string,
+  factory: () => Promise<NookContentHandle>,
+): HTMLElement {
+  const existing = ownedContent.get(key);
+  if (existing) {
+    existing.generation = renderGeneration;
+    return existing.element;
+  }
+  const placeholder = document.createElement("div");
+  placeholder.className = placeholderClass;
+  placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
+  const record: OwnedContentRecord = { key, element: placeholder, handle: null, generation: renderGeneration };
+  ownedContent.set(key, record);
+  void factory().then((handle) => {
+    if (
+      lifecycle.isDisposed
+      || ownedContent.get(key) !== record
+      || record.generation !== renderGeneration
+      || !placeholder.isConnected
+    ) {
+      scheduleContentDisposal(handle);
+      return;
+    }
+    const element = handle.element;
+    element.style.flex = "1 1 0";
+    element.style.minWidth = "0";
+    element.style.minHeight = "0";
+    record.handle = handle;
+    record.element = element;
+    placeholder.replaceWith(element);
+  }).catch((error: unknown) => {
+    if (ownedContent.get(key) !== record || record.generation !== renderGeneration || lifecycle.isDisposed) return;
+    placeholder.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to load ${failureLabel}: ${(error as Error).message}</div>`;
+  });
+  return placeholder;
+}
+
+function renderOwnedContentSync(key: string, factory: () => NookContentHandle): HTMLElement {
+  const existing = ownedContent.get(key);
+  if (existing) {
+    existing.generation = renderGeneration;
+    return existing.element;
+  }
+  const handle = factory();
+  const record: OwnedContentRecord = { key, element: handle.element, handle, generation: renderGeneration };
+  ownedContent.set(key, record);
+  return handle.element;
+}
 
 function syncTitlebarWorkspaceOffset(): void {
   const workspaceLeft = leftSidebarEl.offsetLeft + leftSidebarEl.offsetWidth + 6;
@@ -568,21 +647,10 @@ function bayIdForNook(nookType: string): string | null {
   return null;
 }
 
-function renderKanbanNook(_nookId: string): HTMLElement {
-  const placeholder = document.createElement("div");
-  placeholder.className = "kanban-nook-placeholder";
-  placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
+function renderKanbanNook(nookId: string): HTMLElement {
   const bayId = bayIdForNook("tasks-kanban");
-  if (!bayId) return placeholder;
-  renderKanbanBoard(bayId).then(el => {
-    el.style.flex = "1 1 0";
-    el.style.minWidth = "0";
-    el.style.minHeight = "0";
-    placeholder.replaceWith(el);
-  }).catch(e => {
-    placeholder.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to load kanban: ${(e as Error).message}</div>`;
-  });
-  return placeholder;
+  if (!bayId) return document.createElement("div");
+  return renderOwnedContent(`tasks-kanban:${nookId}:${bayId}`, "kanban-nook-placeholder", "kanban", () => renderKanbanBoard(bayId));
 }
 
 function renderTaskListNook(_nookId: string): HTMLElement {
@@ -645,20 +713,9 @@ function renderMarkdownNoteNook(nookId: string): HTMLElement {
 }
 
 function renderSketchNoteNook(nookId: string): HTMLElement {
-  const placeholder = document.createElement("div");
-  placeholder.className = "sketch-note-placeholder";
-  placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
   const bayId = bayIdForNook("sketch-note");
-  if (!bayId) return placeholder;
-  renderSketchNote(bayId, nookId).then(el => {
-    el.style.flex = "1 1 0";
-    el.style.minWidth = "0";
-    el.style.minHeight = "0";
-    placeholder.replaceWith(el);
-  }).catch(e => {
-    placeholder.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to load sketch: ${(e as Error).message}</div>`;
-  });
-  return placeholder;
+  if (!bayId) return document.createElement("div");
+  return renderOwnedContent(`note-sketch:${nookId}:${bayId}`, "sketch-note-placeholder", "sketch", () => renderSketchNote(bayId, nookId));
 }
 
 function renderCanvasNoteNook(nookId: string): HTMLElement {
@@ -679,20 +736,9 @@ function renderCanvasNoteNook(nookId: string): HTMLElement {
 }
 
 function renderHtmlNoteNook(nookId: string): HTMLElement {
-  const placeholder = document.createElement("div");
-  placeholder.className = "html-note-placeholder";
-  placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
   const bayId = bayIdForNook("html-note");
-  if (!bayId) return placeholder;
-  renderHtmlNote(bayId, nookId).then(el => {
-    el.style.flex = "1 1 0";
-    el.style.minWidth = "0";
-    el.style.minHeight = "0";
-    placeholder.replaceWith(el);
-  }).catch(e => {
-    placeholder.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to load HTML note: ${(e as Error).message}</div>`;
-  });
-  return placeholder;
+  if (!bayId) return document.createElement("div");
+  return renderOwnedContent(`note-html:${nookId}:${bayId}`, "html-note-placeholder", "HTML note", () => renderHtmlNote(bayId, nookId));
 }
 
 function renderNotepadNookWrapper(_nookId: string): HTMLElement {
@@ -809,49 +855,32 @@ function renderSnapshotInspectorNook(_nookId: string): HTMLElement {
   return placeholder;
 }
 
-function renderDiffReviewNookWrapper(_nookId: string): HTMLElement {
-  const placeholder = document.createElement("div");
-  placeholder.className = "diff-review-placeholder";
-  placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
+function renderDiffReviewNookWrapper(nookId: string): HTMLElement {
   const bayId = bayIdForNook("diff-review");
-  if (!bayId) return placeholder;
-  renderDiffReviewNook(bayId).then(el => {
-    el.style.flex = "1 1 0";
-    el.style.minWidth = "0";
-    el.style.minHeight = "0";
-    placeholder.replaceWith(el);
-  }).catch(e => {
-    placeholder.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to load diff review: ${(e as Error).message}</div>`;
-  });
-  return placeholder;
+  if (!bayId) return document.createElement("div");
+  return renderOwnedContent(`diff-review:${nookId}:${bayId}`, "diff-review-placeholder", "diff review", () => renderDiffReviewNook(bayId));
 }
 
 function renderEditorNookWrapper(nookId: string): HTMLElement {
-  const placeholder = document.createElement("div");
-  placeholder.className = "editor-nook-placeholder";
-  placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
-  renderEditorNook(nookId, nookFilePaths.get(nookId) ?? nookId).then(el => {
-    el.style.flex = "1 1 0";
-    el.style.minWidth = "0";
-    el.style.minHeight = "0";
-    placeholder.replaceWith(el);
-  }).catch(e => {
-    placeholder.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to load editor: ${(e as Error).message}</div>`;
-  });
-  return placeholder;
+  const filePath = nookFilePaths.get(nookId) ?? nookId;
+  return renderOwnedContent(`editor:${nookId}:${filePath}`, "editor-nook-placeholder", "editor", () => renderEditorNook(nookId, filePath));
 }
 
 function renderImageNook(nookId: string): HTMLElement {
+  const imagePath = nookFilePaths.get(nookId) ?? nookId;
+  return renderOwnedContentSync(`image:${nookId}:${imagePath}`, () => {
+  const scope = new LifecycleScope();
   const el = document.createElement("div");
   el.className = "image-nook";
   el.style.cssText = "display:flex;align-items:center;justify-content:center;height:100%;background:#0d1117;overflow:hidden;position:relative;";
   const img = document.createElement("img");
   img.style.cssText = "max-width:100%;max-height:100%;object-fit:contain;transition:transform 0.1s;";
-  const imagePath = nookFilePaths.get(nookId) ?? nookId;
   img.alt = imagePath.split("/").pop() || imagePath;
   mediaUrl(imagePath).then((url) => {
+    if (scope.isDisposed) return;
     img.src = url;
   }).catch((err) => {
+    if (scope.isDisposed) return;
     console.warn("image media lease failed", imagePath, err);
   });
   const controls = document.createElement("div");
@@ -866,15 +895,20 @@ function renderImageNook(nookId: string): HTMLElement {
   zoomOutBtn.textContent = "-";
   zoomOutBtn.style.cssText = "padding:2px 8px;background:#30363d;border:none;color:#e6edf3;border-radius:3px;cursor:pointer;font-size:11px;";
   let zoom = 1;
-  fitBtn.addEventListener("click", () => { img.style.transform = "scale(1)"; zoom = 1; });
-  zoomInBtn.addEventListener("click", () => { zoom = Math.min(zoom * 1.25, 10); img.style.transform = `scale(${zoom})`; });
-  zoomOutBtn.addEventListener("click", () => { zoom = Math.max(zoom / 1.25, 0.1); img.style.transform = `scale(${zoom})`; });
+  scope.listen(fitBtn, "click", () => { img.style.transform = "scale(1)"; zoom = 1; });
+  scope.listen(zoomInBtn, "click", () => { zoom = Math.min(zoom * 1.25, 10); img.style.transform = `scale(${zoom})`; });
+  scope.listen(zoomOutBtn, "click", () => { zoom = Math.max(zoom / 1.25, 0.1); img.style.transform = `scale(${zoom})`; });
   controls.appendChild(fitBtn);
   controls.appendChild(zoomOutBtn);
   controls.appendChild(zoomInBtn);
   el.appendChild(img);
   el.appendChild(controls);
-  return el;
+  scope.own(() => {
+    img.removeAttribute("src");
+    el.remove();
+  });
+  return { element: el, dispose: () => scope.dispose() };
+  });
 }
 
 function activeProjectDir(): string {
@@ -954,33 +988,11 @@ function renderBrowserNookWrapper(nookId: string, url: string): HTMLElement {
 }
 
 function renderDiffViewerNookWrapper(nookId: string, refInput: string): HTMLElement {
-  const placeholder = document.createElement("div");
-  placeholder.className = "diff-viewer-placeholder";
-  placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
-  renderDiffViewerNook(nookId, nookId, refInput).then(el => {
-    el.style.flex = "1 1 0";
-    el.style.minWidth = "0";
-    el.style.minHeight = "0";
-    placeholder.replaceWith(el);
-  }).catch(e => {
-    placeholder.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to load diff: ${(e as Error).message}</div>`;
-  });
-  return placeholder;
+  return renderOwnedContent(`diff:${nookId}:${refInput}`, "diff-viewer-placeholder", "diff", () => renderDiffViewerNook(nookId, nookId, refInput));
 }
 
 function renderMarkdownNookWrapper(nookId: string): HTMLElement {
-  const placeholder = document.createElement("div");
-  placeholder.className = "markdown-nook-placeholder";
-  placeholder.style.cssText = "flex:1 1 0;min-width:0;min-height:0;overflow:hidden;";
-  renderMarkdownNook(nookId, nookId).then(el => {
-    el.style.flex = "1 1 0";
-    el.style.minWidth = "0";
-    el.style.minHeight = "0";
-    placeholder.replaceWith(el);
-  }).catch(e => {
-    placeholder.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to load markdown: ${(e as Error).message}</div>`;
-  });
-  return placeholder;
+  return renderOwnedContent(`markdown:${nookId}`, "markdown-nook-placeholder", "markdown", () => renderMarkdownNook(nookId, nookId));
 }
 
 function renderNode(node: MosaicNode): HTMLElement {
@@ -1010,8 +1022,14 @@ function renderNode(node: MosaicNode): HTMLElement {
     if (active.nookType === "search") return renderSearchNookWrapper(active.documentId);
     if (active.nookType === "browser") return renderBrowserNookWrapper(active.documentId, active.title ?? "about:blank");
     if (active.nookType === "diff") return renderDiffViewerNookWrapper(active.documentId, active.title ?? "");
-    if (active.nookType === "pdf") return renderPdfNook(nookFilePaths.get(active.documentId) ?? active.title ?? active.documentId);
-    if (active.nookType === "video") return renderVideoNook(nookFilePaths.get(active.documentId) ?? active.title ?? active.documentId);
+    if (active.nookType === "pdf") {
+      const filePath = nookFilePaths.get(active.documentId) ?? active.title ?? active.documentId;
+      return renderOwnedContentSync(`pdf:${active.documentId}:${filePath}`, () => renderPdfNook(filePath));
+    }
+    if (active.nookType === "video") {
+      const filePath = nookFilePaths.get(active.documentId) ?? active.title ?? active.documentId;
+      return renderOwnedContentSync(`video:${active.documentId}:${filePath}`, () => renderVideoNook(filePath));
+    }
     if (isEmpty) return emptyNookStrip(node.nookId);
     const activeEl = getNook(subs[activeIdx].documentId).el;
     activeEl.style.flexGrow = "1";
@@ -1060,6 +1078,7 @@ function renderNode(node: MosaicNode): HTMLElement {
 function wireSplitDivider(div: HTMLElement, col: boolean, a: HTMLElement, b: HTMLElement) {
   div.addEventListener("mousedown", (e) => {
     e.preventDefault();
+    activeSplitDragCleanup?.();
     const parent = div.parentElement;
     if (!parent) return;
     const rect = parent.getBoundingClientRect();
@@ -1075,13 +1094,18 @@ function wireSplitDivider(div: HTMLElement, col: boolean, a: HTMLElement, b: HTM
       b.style.flexGrow = String(sum - na);
       fitAll();
     };
-    const onUp = () => {
+    const cleanup = () => {
       document.removeEventListener("mousemove", onMove);
       document.removeEventListener("mouseup", onUp);
+      if (activeSplitDragCleanup === cleanup) activeSplitDragCleanup = null;
+    };
+    const onUp = () => {
+      cleanup();
       fitAll();
     };
     document.addEventListener("mousemove", onMove);
     document.addEventListener("mouseup", onUp);
+    activeSplitDragCleanup = cleanup;
   });
 }
 
@@ -1104,9 +1128,49 @@ function captureNookViewports(): void {
   for (const pv of nooks.values()) pv.session.captureViewport();
 }
 
+function collectOwnedContentKeys(node: MosaicNode | null, keys: Set<string>): void {
+  if (!node) return;
+  if (node.kind !== "leaf") {
+    collectOwnedContentKeys(node.childA, keys);
+    collectOwnedContentKeys(node.childB, keys);
+    return;
+  }
+  const subtabs = node.subtabs.length > 0 ? node.subtabs : [{ documentId: node.nookId, nookType: "terminal", title: null }];
+  const active = subtabs[Math.min(Math.max(0, node.activeSubtab), subtabs.length - 1)];
+  const bayId = workspace.snapshot?.id;
+  if (active.nookType === "tasks-kanban" && bayId) keys.add(`tasks-kanban:${active.documentId}:${bayId}`);
+  else if (active.nookType === "note-sketch" && bayId) keys.add(`note-sketch:${active.documentId}:${bayId}`);
+  else if (active.nookType === "note-html" && bayId) keys.add(`note-html:${active.documentId}:${bayId}`);
+  else if (active.nookType === "diff-review" && bayId) keys.add(`diff-review:${active.documentId}:${bayId}`);
+  else if (active.nookType === "editor") {
+    const filePath = nookFilePaths.get(active.documentId) ?? active.documentId;
+    keys.add(`editor:${active.documentId}:${filePath}`);
+  } else if (active.nookType === "diff") keys.add(`diff:${active.documentId}:${active.title ?? ""}`);
+  else if (active.nookType === "markdown") keys.add(`markdown:${active.documentId}`);
+  else if (active.nookType === "pdf") {
+    const filePath = nookFilePaths.get(active.documentId) ?? active.title ?? active.documentId;
+    keys.add(`pdf:${active.documentId}:${filePath}`);
+  } else if (active.nookType === "video") {
+    const filePath = nookFilePaths.get(active.documentId) ?? active.title ?? active.documentId;
+    keys.add(`video:${active.documentId}:${filePath}`);
+  } else if (active.nookType === "image") {
+    const filePath = nookFilePaths.get(active.documentId) ?? active.documentId;
+    keys.add(`image:${active.documentId}:${filePath}`);
+  }
+}
+
 function renderShore(): void {
   const shore = activeShore();
   captureNookViewports();
+  renderGeneration += 1;
+  activeSplitDragCleanup?.();
+  const desiredContent = new Set<string>();
+  if (!shoreTabsFeature.overviewVisible && shore?.layoutTree && !isEmptyShoreTree(shore.layoutTree)) {
+    collectOwnedContentKeys(shore.layoutTree, desiredContent);
+  }
+  for (const record of [...ownedContent.values()]) {
+    if (!desiredContent.has(record.key)) disposeOwnedContent(record);
+  }
   gridEl.innerHTML = "";
   const shoreEmpty = shore ? isEmptyShoreTree(shore.layoutTree) : false;
   if (shoreTabsFeature.overviewVisible) {
@@ -1198,6 +1262,10 @@ function refreshTitles(): void {
     resumeRecentSession,
     activeProjectDir,
     async dispose() {
+      activeSplitDragCleanup?.();
+      for (const record of [...ownedContent.values()]) disposeOwnedContent(record);
+      await Promise.all([...pendingContentDisposals]);
+      gridEl.innerHTML = "";
       for (const nookId of [...nooks.keys()]) disposeNook(nookId);
       await lifecycle.dispose();
     },

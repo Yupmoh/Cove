@@ -44,13 +44,16 @@ public sealed class CoveGuiCommands
     }
 
     [RynCommand("app.dictationStatus")]
-    public string DictationStatus() => _dictation.Status();
+    public async ValueTask<string> DictationStatus() =>
+        await _dictation.Status().ConfigureAwait(false);
 
     [RynCommand("app.dictationEnsureModel")]
-    public string DictationEnsureModel() => _dictation.EnsureModel();
+    public async ValueTask<string> DictationEnsureModel() =>
+        await _dictation.EnsureModel().ConfigureAwait(false);
 
     [RynCommand("app.dictationStart")]
-    public string DictationStart() => _dictation.StartDictation();
+    public async ValueTask<string> DictationStart() =>
+        await _dictation.StartDictation().ConfigureAwait(false);
 
     [RynCommand("app.dictationStop")]
     public async ValueTask<string> DictationStop() => await _dictation.StopDictation();
@@ -60,35 +63,19 @@ public sealed class CoveGuiCommands
         => await Call("cove://commands/nook.list", null, ct);
 
     [RynCommand("app.nookSpawn")]
-    public async ValueTask<string> NookSpawn(string command, string cwd, string inheritCwdFrom, int cols, int rows, string adapter, string agentName, string bay, string shore, string[]? args = null, string? sessionId = null, bool yolo = false, string? shellCommand = null, CancellationToken ct = default)
+    public async ValueTask<string> NookSpawn(string? command, string cwd, string inheritCwdFrom, int cols, int rows, string adapter, string agentName, string bay, string shore, string[]? args = null, string? sessionId = null, bool yolo = false, string? shellCommand = null, CancellationToken ct = default)
     {
-        var shell = string.IsNullOrEmpty(command) ? DefaultShell() : command;
-        var spawnArgs = args ?? Array.Empty<string>();
-        if (!string.IsNullOrEmpty(shellCommand))
-            (shell, spawnArgs) = ShellLaunch.Invocation(DefaultShell(), shellCommand);
-        var p = JsonSerializer.SerializeToElement(new SpawnParams(shell, spawnArgs, N(cwd), null, cols, rows, N(inheritCwdFrom), N(adapter), N(agentName), N(bay), N(shore), SessionId: N(sessionId ?? ""), Yolo: yolo), CoveJsonContext.Default.SpawnParams);
+        var p = JsonSerializer.SerializeToElement(new SpawnParams(command, args ?? [], N(cwd), null, cols, rows, N(inheritCwdFrom), N(adapter), N(agentName), N(bay), N(shore), SessionId: N(sessionId ?? ""), Yolo: yolo, ShellCommand: shellCommand), CoveJsonContext.Default.SpawnParams);
         return await Call("cove://commands/nook.spawn", p, ct);
     }
 
     [RynCommand("app.feedbackSave")]
-    public ValueTask<string> FeedbackSave(string json, string slug)
+    public async ValueTask<string> FeedbackSave(string json, string slug, CancellationToken ct = default)
     {
-        var dd = Cove.Platform.CoveDataDir.Resolve(ParseChannel(_link.Channel));
-        var dir = System.IO.Path.Combine(dd.Root, "feedback");
-        System.IO.Directory.CreateDirectory(dir);
-        var stamp = System.DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmss");
-        var safeSlug = string.IsNullOrWhiteSpace(slug) ? "ui-feedback" : slug;
-        var path = System.IO.Path.Combine(dir, $"{stamp}-{safeSlug}.json");
-        try
-        {
-            System.IO.File.WriteAllText(path, json);
-        }
-        catch (System.Exception ex)
-        {
-            _log.FeedbackSaveFailed(safeSlug, ex.Message);
-            throw;
-        }
-        return ValueTask.FromResult($"{{\"path\":\"{System.Text.Json.JsonEncodedText.Encode(path)}\"}}");
+        var parameters = JsonSerializer.SerializeToElement(
+            new FeedbackSaveParams(json, slug),
+            CoveJsonContext.Default.FeedbackSaveParams);
+        return await Call("cove://commands/feedback.save", parameters, ct);
     }
 
     [RynCommand("app.frontendLog")]
@@ -102,13 +89,6 @@ public sealed class CoveGuiCommands
             default: _log.FrontendInfo(safe); break;
         }
     }
-
-    private static Cove.Platform.CoveChannel ParseChannel(string channel) => channel switch
-    {
-        "beta" => Cove.Platform.CoveChannel.Beta,
-        "dev" => Cove.Platform.CoveChannel.Dev,
-        _ => Cove.Platform.CoveChannel.Stable,
-    };
 
     [RynCommand("app.nookWrite")]
     public async ValueTask<string> NookWrite(string nookId, string dataBase64, CancellationToken ct)
@@ -202,19 +182,39 @@ public sealed class CoveGuiCommands
     private static string? N(string s) => string.IsNullOrEmpty(s) ? null : s;
 
     [RynCommand("app.fsList")]
-    public ValueTask<string> FsList(string path)
-        => ValueTask.FromResult(FsListing.ListDirectory(path, 400));
+    public async ValueTask<string> FsList(string path, CancellationToken ct = default)
+    {
+        var parameters = JsonSerializer.SerializeToElement(
+            new DirectoryListParams(path),
+            CoveJsonContext.Default.DirectoryListParams);
+        return await Call("cove://commands/fs.list", parameters, ct);
+    }
 
     [RynCommand("app.gitSummary")]
-    public ValueTask<string> GitSummaryFor(string path)
-        => ValueTask.FromResult(GitSummary.Run(path));
+    public async ValueTask<string> GitSummaryFor(string path, CancellationToken ct = default)
+    {
+        var parameters = JsonSerializer.SerializeToElement(
+            new GitSummaryParams(path),
+            CoveJsonContext.Default.GitSummaryParams);
+        return await Call("cove://commands/git.summary", parameters, ct);
+    }
+
+    [RynCommand("app.savePerf")]
+    public async ValueTask<string> SavePerf(string json, string markdown, CancellationToken ct = default)
+    {
+        var parameters = JsonSerializer.SerializeToElement(
+            new PerformanceResultSaveParams(json, markdown),
+            CoveJsonContext.Default.PerformanceResultSaveParams);
+        var raw = await Call("cove://commands/perf.result.save", parameters, ct);
+        var result = JsonSerializer.Deserialize(
+            raw,
+            CoveJsonContext.Default.PerformanceResultSaveResult);
+        return result?.Directory ?? throw new InvalidOperationException("performance result directory missing");
+    }
 
     [RynCommand("app.adapterList")]
     public async ValueTask<string> AdapterList(CancellationToken ct)
         => await Call("cove://commands/adapter.list", null, ct);
-
-    private static string DefaultShell()
-        => OperatingSystem.IsWindows() ? "powershell.exe" : (Environment.GetEnvironmentVariable("SHELL") ?? "/bin/zsh");
 
     [RynCommand("app.callEngine")]
     public async ValueTask<string> CallEngine(string uri, string argsJson, CancellationToken ct)

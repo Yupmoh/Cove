@@ -8,28 +8,47 @@ namespace Cove.Cli;
 
 public sealed class CommandContext
 {
-    public CommandContext(DaemonPaths paths, IControlEndpoint endpoint, TextWriter stdout, TextWriter? stderr = null, string[]? args = null, CoveChannel? channel = null)
+    public CommandContext(
+        DaemonPaths paths,
+        IControlEndpoint endpoint,
+        TextWriter stdout,
+        TextWriter? stderr = null,
+        string[]? args = null,
+        CoveChannel? channel = null,
+        TextReader? stdin = null,
+        bool? isInputRedirected = null,
+        IPlatformFileSystem? files = null,
+        string[]? optionArgs = null)
     {
         Paths = paths;
         Endpoint = endpoint;
         Stdout = stdout;
         Stderr = stderr ?? System.Console.Error;
+        Stdin = stdin ?? System.Console.In;
+        Files = files ?? SystemPlatformFileSystem.Instance;
         Args = args ?? System.Array.Empty<string>();
-        Channel = channel ?? CliChannel.Resolve(Args);
-        IsJson = HasFlag(Args, "--json") || System.Environment.GetEnvironmentVariable("COVE_JSON") == "1";
-        Filter = FlagValue(Args, "--filter");
-        Source = FlagValue(Args, "--source") ?? "user:cli";
+        var options = optionArgs ?? Args;
+        Channel = channel ?? CliChannel.Resolve(options);
+        IsInputRedirected = isInputRedirected ?? System.Console.IsInputRedirected;
+        IsJson = HasFlag(options, "--json") || System.Environment.GetEnvironmentVariable("COVE_JSON") == "1";
+        Filter = FlagValue(options, "--filter");
+        Source = FlagValue(options, "--source") ?? "user:cli";
+        NoAutostart = HasFlag(options, "--no-autostart");
     }
 
     public DaemonPaths Paths { get; }
     public IControlEndpoint Endpoint { get; }
     public TextWriter Stdout { get; }
     public TextWriter Stderr { get; }
+    public TextReader Stdin { get; }
+    public IPlatformFileSystem Files { get; }
     public string[] Args { get; }
     public CoveChannel Channel { get; }
+    public bool IsInputRedirected { get; }
     public bool IsJson { get; }
     public string? Filter { get; }
     public string Source { get; }
+    public bool NoAutostart { get; }
 
     public void Render(JsonElement data)
     {
@@ -44,18 +63,18 @@ public sealed class CommandContext
     }
 
     public async Task<int> RouteCoreAsync(string uri)
-        => await RouteCoreWithParamsAsync(uri, null, noAutostart: Args.Contains("--no-autostart"));
+        => await RouteCoreWithParamsAsync(uri, null);
 
-    public Task<int> RouteCoreWithParamsAsync(string uri, string? paramsJson, bool noAutostart = false)
-        => RouteCoreWithParamsCoreAsync(uri, paramsJson, renderSuccess: null, successfulErrorCode: null, noAutostart);
+    public Task<int> RouteCoreWithParamsAsync(string uri, string? paramsJson, bool? noAutostart = null)
+        => RouteCoreWithParamsCoreAsync(uri, paramsJson, renderSuccess: null, successfulErrorCode: null, noAutostart ?? NoAutostart);
 
     internal Task<int> RouteCoreWithParamsAsync(
         string uri,
         string? paramsJson,
         Func<JsonElement?, int> renderSuccess,
         string? successfulErrorCode = null,
-        bool noAutostart = false)
-        => RouteCoreWithParamsCoreAsync(uri, paramsJson, renderSuccess, successfulErrorCode, noAutostart);
+        bool? noAutostart = null)
+        => RouteCoreWithParamsCoreAsync(uri, paramsJson, renderSuccess, successfulErrorCode, noAutostart ?? NoAutostart);
 
     private async Task<int> RouteCoreWithParamsCoreAsync(
         string uri,

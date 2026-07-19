@@ -11,12 +11,19 @@ public static class PtyWsHandler
 {
     public static async Task RunAsync(
         WebSocket ws, Func<CancellationToken, Task<Stream>> dial, string clientVersion, string channel,
-        string nookId, ulong since, ILogger logger, CancellationToken ct)
+        string nookId, ulong since, string controlToken, ILogger logger, CancellationToken ct)
     {
         PtyStreamClient? client = null;
         try
         {
-            client = await PtyStreamClient.SubscribeAsync(dial, clientVersion, channel, nookId, since, ct);
+            client = await PtyStreamClient.SubscribeAsync(
+                dial,
+                clientVersion,
+                channel,
+                nookId,
+                since,
+                controlToken,
+                ct);
             ulong browserAcked = client.BaseOffset;
             await SendText(ws, $"{{\"t\":\"base\",\"off\":{client.BaseOffset},\"head\":{client.ReplayUntilOffset},\"modes\":\"{client.TerminalModePreambleBase64}\",\"checkpoint\":\"{client.TerminalCheckpointBase64}\",\"checkpointCols\":{client.CheckpointCols},\"checkpointRows\":{client.CheckpointRows}}}", ct);
 

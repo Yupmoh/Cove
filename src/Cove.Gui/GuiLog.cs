@@ -71,8 +71,8 @@ internal static partial class GuiLog
     [ZLoggerMessage(LogLevel.Debug, "engine dial failed channel={channel} target={target} error={error}")]
     public static partial void LauncherDialFailed(this ILogger logger, string channel, string target, string error);
 
-    [ZLoggerMessage(LogLevel.Information, "engine spawn channel={channel} exe={exe}")]
-    public static partial void LauncherSpawn(this ILogger logger, string channel, string exe);
+    [ZLoggerMessage(LogLevel.Information, "engine spawn channel={channel}")]
+    public static partial void LauncherSpawn(this ILogger logger, string channel);
 
     [ZLoggerMessage(LogLevel.Error, "engine spawn timeout channel={channel} target={target} waitedMs={waitedMs}")]
     public static partial void LauncherSpawnTimeout(this ILogger logger, string channel, string target, long waitedMs);
@@ -83,17 +83,26 @@ internal static partial class GuiLog
     [ZLoggerMessage(LogLevel.Error, "gui command engine error uri={uri} error={error}")]
     public static partial void CommandEngineFailed(this ILogger logger, string uri, string error);
 
-    [ZLoggerMessage(LogLevel.Warning, "gui feedback save failed slug={slug} error={error}")]
-    public static partial void FeedbackSaveFailed(this ILogger logger, string slug, string error);
-
     [ZLoggerMessage(LogLevel.Warning, "engine event dropped no window channel={channel}")]
     public static partial void EventForwardNoWindow(this ILogger logger, string channel);
 
     [ZLoggerMessage(LogLevel.Warning, "engine event dropped no webview channel={channel}")]
     public static partial void EventForwardNoWebView(this ILogger logger, string channel);
 
-    [ZLoggerMessage(2074, LogLevel.Warning, "dictation model ensure failed error={error}")]
-    public static partial void DictationEnsureFailed(this ILogger logger, string error);
+    [ZLoggerMessage(2074, LogLevel.Warning, "dictation engine request failed uri={uri} error={error}")]
+    public static partial void DictationTransportFailed(this ILogger logger, string uri, string error);
+
+    [ZLoggerMessage(2075, LogLevel.Warning, "dictation capture failed operation={operation} error={error}")]
+    public static partial void DictationCaptureFailed(this ILogger logger, string operation, string error);
+
+    [ZLoggerMessage(2076, LogLevel.Error, "gui resource disposal failed resource={resource} error={error}")]
+    public static partial void GuiResourceDisposalFailed(this ILogger logger, string resource, string error);
+
+    [ZLoggerMessage(2077, LogLevel.Warning, "dictation partial failed sessionId={sessionId} error={error}")]
+    public static partial void DictationPartialFailed(this ILogger logger, string sessionId, string error);
+
+    [ZLoggerMessage(2078, LogLevel.Warning, "dictation cancel failed sessionId={sessionId} error={error}")]
+    public static partial void DictationCancelFailed(this ILogger logger, string sessionId, string error);
 
     [ZLoggerMessage(LogLevel.Trace, "engine event forwarded channel={channel}")]
     public static partial void EventForwarded(this ILogger logger, string channel);

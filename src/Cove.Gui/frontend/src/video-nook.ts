@@ -1,6 +1,8 @@
 import { mediaUrl } from "./media-url";
+import { LifecycleScope, type NookContentHandle } from "./app/lifecycle";
 
-export function renderVideoNook(filePath: string): HTMLElement {
+export function renderVideoNook(filePath: string): NookContentHandle {
+  const lifecycle = new LifecycleScope();
   const el = document.createElement("div");
   el.className = "video-nook";
   el.style.cssText = "display:flex;flex-direction:column;height:100%;background:#0d1117;color:#e6edf3;";
@@ -20,11 +22,18 @@ export function renderVideoNook(filePath: string): HTMLElement {
   el.appendChild(stage);
 
   mediaUrl(filePath).then((url) => {
+    if (lifecycle.isDisposed) return;
     video.src = url;
   }).catch((err) => {
+    if (lifecycle.isDisposed) return;
     console.warn("video media lease failed", filePath, err);
     header.textContent = `Failed to open ${filePath.split("/").pop() || filePath}`;
   });
 
-  return el;
+  lifecycle.own(() => {
+    video.pause();
+    video.removeAttribute("src");
+    video.load();
+  });
+  return { element: el, dispose: () => lifecycle.dispose() };
 }

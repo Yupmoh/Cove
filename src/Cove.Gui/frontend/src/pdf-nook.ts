@@ -1,6 +1,8 @@
 import { mediaUrl } from "./media-url";
+import { LifecycleScope, type NookContentHandle } from "./app/lifecycle";
 
-export function renderPdfNook(filePath: string): HTMLElement {
+export function renderPdfNook(filePath: string): NookContentHandle {
+  const lifecycle = new LifecycleScope();
   const el = document.createElement("div");
   el.className = "pdf-nook";
   el.style.cssText = "display:flex;flex-direction:column;height:100%;background:#0d1117;color:#e6edf3;";
@@ -16,11 +18,17 @@ export function renderPdfNook(filePath: string): HTMLElement {
   el.appendChild(frame);
 
   mediaUrl(filePath).then((url) => {
+    if (lifecycle.isDisposed) return;
     frame.src = url;
   }).catch((err) => {
+    if (lifecycle.isDisposed) return;
     console.warn("pdf media lease failed", filePath, err);
     header.textContent = `Failed to open ${filePath.split("/").pop() || filePath}`;
   });
 
-  return el;
+  lifecycle.own(() => {
+    frame.removeAttribute("src");
+    frame.src = "about:blank";
+  });
+  return { element: el, dispose: () => lifecycle.dispose() };
 }

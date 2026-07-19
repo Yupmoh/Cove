@@ -1,5 +1,6 @@
 import { invoke } from "./invoke";
 import { FrontendCommand } from "./app/frontend-command";
+import { LifecycleScope, type NookContentHandle } from "./app/lifecycle";
 
 interface NoteReadResult {
   id: string;
@@ -21,7 +22,8 @@ interface SketchState {
 let currentNoteId: string | null = null;
 let currentBayId: string | null = null;
 
-export async function renderSketchNote(bayId: string, noteId: string): Promise<HTMLElement> {
+export async function renderSketchNote(bayId: string, noteId: string): Promise<NookContentHandle> {
+  const lifecycle = new LifecycleScope();
   const el = document.createElement("div");
   el.className = "sketch-note-editor";
   el.style.cssText = "display:flex;flex-direction:column;height:100%;background:#0b1622;color:#e5e9f0;font-family:system-ui,sans-serif;";
@@ -35,35 +37,36 @@ export async function renderSketchNote(bayId: string, noteId: string): Promise<H
       id: noteId,
     });
 
-    el.appendChild(buildToolbar(bayId));
-    el.appendChild(buildCanvas(result.content));
+    el.appendChild(buildToolbar(bayId, lifecycle));
+    el.appendChild(buildCanvas(result.content, lifecycle));
   } catch (e) {
     el.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to load sketch: ${(e as Error).message}</div>`;
   }
 
-  return el;
+  lifecycle.own(() => el.remove());
+  return { element: el, dispose: () => lifecycle.dispose() };
 }
 
-function buildToolbar(bayId: string): HTMLElement {
+function buildToolbar(bayId: string, lifecycle: LifecycleScope): HTMLElement {
   const toolbar = document.createElement("div");
   toolbar.style.cssText = "padding:8px 12px;display:flex;gap:8px;align-items:center;border-bottom:1px solid #1e2d3f;flex-wrap:wrap;";
 
   const save = document.createElement("button");
   save.textContent = "Save";
   save.style.cssText = "padding:4px 12px;background:#2563eb;border:1px solid #3b82f6;border-radius:4px;color:#fff;cursor:pointer;font-size:12px;";
-  save.addEventListener("click", () => saveSketch());
+  lifecycle.listen(save, "click", () => { void saveSketch(); });
   toolbar.appendChild(save);
 
   const exportSvg = document.createElement("button");
   exportSvg.textContent = "Export SVG";
   exportSvg.style.cssText = "padding:4px 12px;background:#1e2d3f;border:1px solid #2b3d52;border-radius:4px;color:#e5e9f0;cursor:pointer;font-size:12px;";
-  exportSvg.addEventListener("click", () => exportFormat("svg"));
+  lifecycle.listen(exportSvg, "click", () => { void exportFormat("svg"); });
   toolbar.appendChild(exportSvg);
 
   const exportPng = document.createElement("button");
   exportPng.textContent = "Export PNG";
   exportPng.style.cssText = "padding:4px 12px;background:#1e2d3f;border:1px solid #2b3d52;border-radius:4px;color:#e5e9f0;cursor:pointer;font-size:12px;";
-  exportPng.addEventListener("click", () => exportFormat("png"));
+  lifecycle.listen(exportPng, "click", () => { void exportFormat("png"); });
   toolbar.appendChild(exportPng);
 
   const zoomLabel = document.createElement("span");
@@ -74,19 +77,19 @@ function buildToolbar(bayId: string): HTMLElement {
   const zoomIn = document.createElement("button");
   zoomIn.textContent = "+";
   zoomIn.style.cssText = "padding:4px 8px;background:#1e2d3f;border:1px solid #2b3d52;border-radius:4px;color:#e5e9f0;cursor:pointer;font-size:12px;";
-  zoomIn.addEventListener("click", () => adjustZoom(0.1));
+  lifecycle.listen(zoomIn, "click", () => adjustZoom(0.1));
   toolbar.appendChild(zoomIn);
 
   const zoomOut = document.createElement("button");
   zoomOut.textContent = "−";
   zoomOut.style.cssText = "padding:4px 8px;background:#1e2d3f;border:1px solid #2b3d52;border-radius:4px;color:#e5e9f0;cursor:pointer;font-size:12px;";
-  zoomOut.addEventListener("click", () => adjustZoom(-0.1));
+  lifecycle.listen(zoomOut, "click", () => adjustZoom(-0.1));
   toolbar.appendChild(zoomOut);
 
   return toolbar;
 }
 
-function buildCanvas(content: string): HTMLElement {
+function buildCanvas(content: string, lifecycle: LifecycleScope): HTMLElement {
   const container = document.createElement("div");
   container.className = "sketch-canvas-container";
   container.style.cssText = "flex:1;position:relative;overflow:hidden;background:#1a1a2e;";
@@ -111,19 +114,21 @@ function buildCanvas(content: string): HTMLElement {
       renderSketch(ctx, state, canvas.width, canvas.height);
     };
     resizeCanvas();
-    window.addEventListener("resize", resizeCanvas);
+    lifecycle.listen(window, "resize", resizeCanvas);
 
     let isDragging = false;
     let lastX = 0;
     let lastY = 0;
 
-    canvas.addEventListener("mousedown", (e) => {
+    lifecycle.listen(canvas, "mousedown", (event) => {
+      const e = event as MouseEvent;
       isDragging = true;
       lastX = e.offsetX;
       lastY = e.offsetY;
     });
 
-    canvas.addEventListener("mousemove", (e) => {
+    lifecycle.listen(canvas, "mousemove", (event) => {
+      const e = event as MouseEvent;
       if (!isDragging) return;
       state.appState.scrollX += (e.offsetX - lastX) / state.appState.zoom;
       state.appState.scrollY += (e.offsetY - lastY) / state.appState.zoom;
@@ -132,12 +137,13 @@ function buildCanvas(content: string): HTMLElement {
       renderSketch(ctx, state, canvas.width, canvas.height);
     });
 
-    canvas.addEventListener("mouseup", () => {
+    lifecycle.listen(canvas, "mouseup", () => {
       isDragging = false;
       saveViewportState(state);
     });
 
-    canvas.addEventListener("wheel", (e) => {
+    lifecycle.listen(canvas, "wheel", (event) => {
+      const e = event as WheelEvent;
       e.preventDefault();
       const delta = e.deltaY > 0 ? -0.1 : 0.1;
       state.appState.zoom = Math.max(0.1, Math.min(5, state.appState.zoom + delta));

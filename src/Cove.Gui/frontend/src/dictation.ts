@@ -296,6 +296,7 @@ export function setupDictation(deps: DictationDeps): ComponentHandle {
   let pill: HTMLElement | null = null;
 
   const showPill = (state: PillState, detail = ""): void => {
+    if (lifecycle.isDisposed) return;
     if (!pill) {
       pill = document.createElement("div");
       pill.className = "dictation-pill";
@@ -312,9 +313,12 @@ export function setupDictation(deps: DictationDeps): ComponentHandle {
   const hidePill = (): void => {
     if (pill) pill.style.display = "none";
   };
+  const scheduleHidePill = (delayMs: number): void => {
+    if (!lifecycle.isDisposed) lifecycle.timeout(hidePill, delayMs);
+  };
 
   const deliver = async (text: string, capturedFocus: Element | null, nookId: string | null): Promise<void> => {
-    if (!text) return;
+    if (!text || lifecycle.isDisposed) return;
     const route = classifyDictationTarget(describeFocus(capturedFocus), nookId);
     if (route === "editable" && capturedFocus) {
       insertIntoEditable(capturedFocus, text);
@@ -398,11 +402,13 @@ export function setupDictation(deps: DictationDeps): ComponentHandle {
   };
 
   const doStop = async (target: LiveTarget): Promise<void> => {
+    if (lifecycle.isDisposed) return;
     const capturedFocus = document.activeElement;
     const nookId = deps.getFocusedNookId();
     showPill("transcribing");
     try {
       const raw = await deps.invoke(FrontendCommand.AppDictationStop);
+      if (lifecycle.isDisposed) return;
       const result = JSON.parse(String(raw)) as { text?: string };
       const text = result.text ?? "";
       if (target) {
@@ -413,8 +419,9 @@ export function setupDictation(deps: DictationDeps): ComponentHandle {
       }
       hidePill();
     } catch (err) {
+      if (lifecycle.isDisposed) return;
       showPill("error", String(err));
-      setTimeout(hidePill, 3000);
+      scheduleHidePill(3000);
     }
   };
 
@@ -427,6 +434,7 @@ export function setupDictation(deps: DictationDeps): ComponentHandle {
     currentHold = null;
     void (async () => {
       const started = hold ? await hold.pending : false;
+      if (lifecycle.isDisposed) return;
       if (started && hold) {
         await doStop(hold.target);
       } else {
@@ -443,6 +451,7 @@ export function setupDictation(deps: DictationDeps): ComponentHandle {
     const pending = (async (): Promise<boolean> => {
       try {
         const raw = await deps.invoke(FrontendCommand.AppDictationStart);
+        if (lifecycle.isDisposed) return false;
         const result = JSON.parse(String(raw)) as { ok?: boolean; error?: string };
         if (result.ok) {
           if (held) showPill("recording");
@@ -454,13 +463,14 @@ export function setupDictation(deps: DictationDeps): ComponentHandle {
           await deps.invoke(FrontendCommand.AppDictationEnsureModel);
         } else {
           showPill("error", result.error ?? "failed");
-          setTimeout(hidePill, 3000);
+          scheduleHidePill(3000);
         }
         return false;
       } catch (err) {
+        if (lifecycle.isDisposed) return false;
         held = false;
         showPill("error", String(err));
-        setTimeout(hidePill, 3000);
+        scheduleHidePill(3000);
         return false;
       }
     })();
@@ -526,6 +536,7 @@ export function setupDictation(deps: DictationDeps): ComponentHandle {
   lifecycle.listen(window, "keydown", onKeyDown as EventListener, true);
   lifecycle.listen(window, "keyup", onKeyUp as EventListener, true);
   lifecycle.listen(window, "blur", onBlur);
+  lifecycle.own(() => spaceHold.blur());
 
   const eventSubscriptions = createDictationEventSubscriptions(
     (channel, handler) => deps.events.register(channel, handler),
@@ -544,14 +555,21 @@ export function setupDictation(deps: DictationDeps): ComponentHandle {
       model: (payload) => {
         if (payload?.ready) {
           showPill("downloading", "ready — hold F9 or space to dictate");
-          setTimeout(hidePill, 2500);
+          scheduleHidePill(2500);
         } else if (payload?.error) {
           showPill("error", payload.error);
-          setTimeout(hidePill, 5000);
+          scheduleHidePill(5000);
         }
       },
     },
   );
   lifecycle.own(() => eventSubscriptions.dispose());
+  lifecycle.own(() => {
+    held = false;
+    currentHold = null;
+    recordingTarget = null;
+    pill?.remove();
+    pill = null;
+  });
   return lifecycle;
 }

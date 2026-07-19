@@ -12,7 +12,7 @@ public class PtyRelayTests
         await using var engine = new FakeEngine();
         using var temp = GuiTestDirectory.Create("cove-relay-");
         await File.WriteAllTextAsync(Path.Combine(temp.Path, "index.html"), "<html>ok</html>");
-        await using var server = new LoopbackServer(temp.Path, engine.Dial, "0.1.0", "dev", port: 0);
+        await using var server = new LoopbackServer(temp.Path, engine.Dial, "0.1.0", "dev", port: 0, controlToken: "pty-relay-test-token");
         server.Start();
 
         var dataObserved = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -64,7 +64,7 @@ public class PtyRelayTests
         await using var engine = new FakeEngine();
         using var temp = GuiTestDirectory.Create("cove-relay-");
         await File.WriteAllTextAsync(Path.Combine(temp.Path, "index.html"), "<html>ok</html>");
-        await using var server = new LoopbackServer(temp.Path, engine.Dial, "0.1.0", "dev", port: 0);
+        await using var server = new LoopbackServer(temp.Path, engine.Dial, "0.1.0", "dev", port: 0, controlToken: "pty-relay-test-token");
         server.Start();
 
         var resyncObserved = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -102,7 +102,7 @@ public class PtyRelayTests
         await using var engine = new FakeEngine();
         using var temp = GuiTestDirectory.Create("cove-relay-");
         await File.WriteAllTextAsync(Path.Combine(temp.Path, "index.html"), "<html>ok</html>");
-        await using var server = new LoopbackServer(temp.Path, engine.Dial, "0.1.0", "dev", port: 0);
+        await using var server = new LoopbackServer(temp.Path, engine.Dial, "0.1.0", "dev", port: 0, controlToken: "pty-relay-test-token");
         server.Start();
         var checkpoint = Encoding.ASCII.GetBytes("STATE");
         var resyncObserved = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -143,7 +143,7 @@ public class PtyRelayTests
         await using var engine = new FakeEngine();
         using var temp = GuiTestDirectory.Create("cove-relay-");
         await File.WriteAllTextAsync(Path.Combine(temp.Path, "index.html"), "<html>ok</html>");
-        await using var server = new LoopbackServer(temp.Path, engine.Dial, "0.1.0", "dev", port: 0);
+        await using var server = new LoopbackServer(temp.Path, engine.Dial, "0.1.0", "dev", port: 0, controlToken: "pty-relay-test-token");
         server.Start();
 
         var expected = Enumerable.Range(0, 4).Select(i => $"terminal-{i}\r\n").ToArray();
@@ -198,7 +198,7 @@ public class PtyRelayTests
         await using var engine = new FakeEngine();
         using var temp = GuiTestDirectory.Create("cove-relay-");
         await File.WriteAllTextAsync(Path.Combine(temp.Path, "index.html"), "<html>ok</html>");
-        await using var server = new LoopbackServer(temp.Path, engine.Dial, "0.1.0", "dev", port: 0);
+        await using var server = new LoopbackServer(temp.Path, engine.Dial, "0.1.0", "dev", port: 0, controlToken: "pty-relay-test-token");
         server.Start();
 
         var serve = engine.ServeOnceAsync(0, 0, async stream =>
@@ -252,7 +252,7 @@ public class PtyRelayTests
         await using var engine = new FakeEngine();
         using var temp = GuiTestDirectory.Create("cove-relay-");
         await File.WriteAllTextAsync(Path.Combine(temp.Path, "index.html"), "<html>ok</html>");
-        await using var server = new LoopbackServer(temp.Path, engine.Dial, "0.1.0", "dev", port: 0);
+        await using var server = new LoopbackServer(temp.Path, engine.Dial, "0.1.0", "dev", port: 0, controlToken: "pty-relay-test-token");
         server.Start();
 
         var streamEndWriteStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -298,7 +298,7 @@ public class PtyRelayTests
         await using var engine = new FakeEngine();
         using var temp = GuiTestDirectory.Create("cove-relay-");
         await File.WriteAllTextAsync(Path.Combine(temp.Path, "index.html"), "<html>ok</html>");
-        await using var server = new LoopbackServer(temp.Path, engine.Dial, "0.1.0", "dev", port: 0);
+        await using var server = new LoopbackServer(temp.Path, engine.Dial, "0.1.0", "dev", port: 0, controlToken: "pty-relay-test-token");
         server.Start();
 
         var releaseScript = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);

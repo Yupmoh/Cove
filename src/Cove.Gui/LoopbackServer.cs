@@ -19,8 +19,10 @@ public sealed class LoopbackServer : IAsyncDisposable
     private readonly Func<CancellationToken, Task<Stream>> _dial;
     private readonly string _clientVersion;
     private readonly string _channel;
+    private readonly string? _controlToken;
     private readonly string? _capability;
     private readonly MediaLeaseRegistry? _mediaLeases;
+    private readonly IPlatformFileSystem _fileSystem;
     private readonly TcpListener _listener;
     private readonly ILogger _logger;
     private readonly CancellationTokenSource _cts = new();
@@ -29,18 +31,20 @@ public sealed class LoopbackServer : IAsyncDisposable
     private long _handlerId;
     public int Port { get; private set; }
 
-    public LoopbackServer(string webRoot, Func<CancellationToken, Task<Stream>> dial, string clientVersion, string channel, int port = DefaultPort)
-        : this(webRoot, dial, clientVersion, channel, NullLogger.Instance, port) { }
+    public LoopbackServer(string webRoot, Func<CancellationToken, Task<Stream>> dial, string clientVersion, string channel, int port = DefaultPort, string? controlToken = null)
+        : this(webRoot, dial, clientVersion, channel, NullLogger.Instance, port, controlToken: controlToken) { }
 
-    public LoopbackServer(string webRoot, Func<CancellationToken, Task<Stream>> dial, string clientVersion, string channel, ILogger logger, int port = DefaultPort, string? capability = null, MediaLeaseRegistry? mediaLeases = null)
+    public LoopbackServer(string webRoot, Func<CancellationToken, Task<Stream>> dial, string clientVersion, string channel, ILogger logger, int port = DefaultPort, string? capability = null, MediaLeaseRegistry? mediaLeases = null, IPlatformFileSystem? fileSystem = null, string? controlToken = null)
     {
         _webRoot = webRoot;
         _dial = dial;
         _clientVersion = clientVersion;
         _channel = channel;
+        _controlToken = controlToken;
         _logger = logger;
         _capability = capability;
         _mediaLeases = mediaLeases;
+        _fileSystem = fileSystem ?? SystemPlatformFileSystem.Instance;
         _listener = new TcpListener(IPAddress.Loopback, port);
         Port = port;
     }
@@ -177,7 +181,21 @@ public sealed class LoopbackServer : IAsyncDisposable
                     await stream.WriteAsync(Encoding.ASCII.GetBytes(resp), _cts.Token);
                     var (nook, since) = ParsePtyQuery(target);
                     var ws = WebSocket.CreateFromStream(stream, isServer: true, subProtocol: null, keepAliveInterval: TimeSpan.FromSeconds(30));
-                    await PtyWsHandler.RunAsync(ws, _dial, _clientVersion, _channel, nook, since, _logger, _cts.Token);
+                    var controlToken =
+                        _controlToken
+                        ?? Cove.Platform.ControlCredential.Read(
+                            Cove.Platform.CoveDataDir.Resolve(
+                                GuiLogging.ParseChannel(_channel)));
+                    await PtyWsHandler.RunAsync(
+                        ws,
+                        _dial,
+                        _clientVersion,
+                        _channel,
+                        nook,
+                        since,
+                        controlToken,
+                        _logger,
+                        _cts.Token);
                     return;
                 }
 
@@ -206,12 +224,12 @@ public sealed class LoopbackServer : IAsyncDisposable
         var rel = path == "/" ? "index.html" : path.TrimStart('/');
         if (!Path.HasExtension(rel)) rel = rel.TrimEnd('/') + "/index.html";
         var full = Path.GetFullPath(Path.Combine(_webRoot, rel));
-        if (!PathContainment.IsContainedPhysical(_webRoot, full) || !File.Exists(full))
+        if (!PathContainment.IsContainedPhysical(_webRoot, full) || !_fileSystem.FileExists(full))
         {
             await stream.WriteAsync(Encoding.ASCII.GetBytes("HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"), ct);
             return;
         }
-        var body = await File.ReadAllBytesAsync(full, ct);
+        var body = await _fileSystem.ReadAllBytesAsync(full, ct);
         var header = $"HTTP/1.1 200 OK\r\nContent-Type: {ContentType(full)}\r\nContent-Length: {body.Length}\r\nConnection: close\r\n\r\n";
         await stream.WriteAsync(Encoding.ASCII.GetBytes(header), ct);
         await stream.WriteAsync(body, ct);
@@ -248,14 +266,14 @@ public sealed class LoopbackServer : IAsyncDisposable
             await stream.WriteAsync(Encoding.ASCII.GetBytes("HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"), ct);
             return;
         }
-        if (!File.Exists(filePath))
+        if (!_fileSystem.FileExists(filePath))
         {
             _logger.LoopbackMediaNotFound(filePath);
             await stream.WriteAsync(Encoding.ASCII.GetBytes("HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"), ct);
             return;
         }
 
-        var length = new FileInfo(filePath).Length;
+        var length = _fileSystem.GetFileLength(filePath);
         headers.TryGetValue("range", out var rangeHeader);
         var range = MediaRange.Resolve(rangeHeader, length);
 
@@ -277,7 +295,7 @@ public sealed class LoopbackServer : IAsyncDisposable
         head.Append("Connection: close\r\n\r\n");
         await stream.WriteAsync(Encoding.ASCII.GetBytes(head.ToString()), ct);
 
-        await using var file = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+        await using var file = _fileSystem.OpenRead(filePath);
         file.Seek(range.Start, SeekOrigin.Begin);
         var remaining = range.Length;
         var buffer = new byte[81920];

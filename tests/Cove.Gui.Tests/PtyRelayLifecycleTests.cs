@@ -20,7 +20,13 @@ public sealed class PtyRelayLifecycleTests
             => new DisposeTrackingStream(await engine.Dial(ct), streamDisposed);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => PtyStreamClient.SubscribeAsync(
-            Dial, "0.1.0", "dev", "missing", 0, CancellationToken.None));
+            Dial,
+            "0.1.0",
+            "dev",
+            "missing",
+            0,
+            "test-control-token",
+            CancellationToken.None));
         await streamDisposed.Task.WaitAsync(TimeSpan.FromSeconds(2));
         await serve;
     }
@@ -37,7 +43,7 @@ public sealed class PtyRelayLifecycleTests
         async Task<Stream> Dial(CancellationToken ct)
             => new DisposeTrackingStream(await engine.Dial(ct), streamDisposed);
 
-        await using var server = new LoopbackServer(temp.Path, Dial, "0.1.0", "dev", port: 0);
+        await using var server = new LoopbackServer(temp.Path, Dial, "0.1.0", "dev", port: 0, controlToken: "pty-relay-test-token");
         server.Start();
         var serve = engine.ServeOnceAsync(0, 0, _ => releaseEngine.Task, allowPeerEof: true);
         using var ws = new ClientWebSocket();

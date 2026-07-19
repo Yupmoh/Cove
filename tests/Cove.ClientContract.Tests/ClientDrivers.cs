@@ -157,7 +157,11 @@ internal sealed class GuiClientContractDriver : IClientContractDriver
         JsonElement? parameters,
         CancellationToken cancellationToken)
     {
-        _link ??= new EngineLink(_ => Task.FromResult(_stream), "contract-client", ContractVectors.Channel);
+        _link ??= new EngineLink(
+            _ => Task.FromResult(_stream),
+            "contract-client",
+            ContractVectors.Channel,
+            ContractVectors.ControlToken);
         var response = await _link.RequestAsync(uri, parameters, cancellationToken).ConfigureAwait(false);
         return ClientContractDriver.Observe(response);
     }
@@ -170,6 +174,7 @@ internal sealed class GuiClientContractDriver : IClientContractDriver
             ContractVectors.Channel,
             ContractVectors.NookId,
             0,
+            ContractVectors.ControlToken,
             cancellationToken).ConfigureAwait(false);
         var subscription = new SubscribeResult(
             client.StreamId,
@@ -226,7 +231,8 @@ internal sealed class TuiClientContractDriver : IClientContractDriver
             _connection,
             ContractVectors.Channel,
             ContractVectors.NookId,
-            Source);
+            Source,
+            ContractVectors.ControlToken);
     }
 
     public string ControlClientKind => "tui-attach";
@@ -289,7 +295,8 @@ internal sealed class AttachContractSession : IAsyncDisposable
             clientKind,
             "contract-client",
             ContractVectors.Channel,
-            source);
+            source,
+            ContractVectors.ControlToken);
     }
 
     public async Task<ControlObservation> RequestAsync(

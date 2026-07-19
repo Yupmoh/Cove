@@ -2,6 +2,10 @@ export interface ComponentHandle {
   dispose(): void | Promise<void>;
 }
 
+export interface NookContentHandle extends ComponentHandle {
+  readonly element: HTMLElement;
+}
+
 export interface CoveComponent<Context> {
   mount(host: HTMLElement, context: Context): ComponentHandle;
 }
@@ -75,7 +79,8 @@ export class LifecycleScope implements ComponentHandle {
     const errors: unknown[] = [];
     for (let index = this.disposers.length - 1; index >= 0; index -= 1) {
       try {
-        await this.disposers[index]();
+        const result = this.disposers[index]();
+        if (result) await result;
       } catch (error) {
         errors.push(error);
       }

@@ -5,6 +5,7 @@ import { MonacoLoader } from "./monaco-loader";
 import { MarkdownViewMode } from "./markdown-view-mode";
 import { parseComments, insertComment, resolveComment, deleteComment, type CommentEntry } from "./markdown-comments";
 import { buildImageMarkdown, insertAt, pastedImageFileName } from "./image-paste";
+import { LifecycleScope, type NookContentHandle } from "./app/lifecycle";
 
 interface MarkdownState {
   filePath: string;
@@ -85,7 +86,8 @@ const markdownNookRegistry = new Map<string, MarkdownNookHandle>();
 export async function applyMarkdownSettings(settings: MarkdownSettings): Promise<void> {
   for (const handle of markdownNookRegistry.values()) handle.reapply(settings);
 }
-export async function renderMarkdownNook(nookId: string, filePath: string): Promise<HTMLElement> {
+export async function renderMarkdownNook(nookId: string, filePath: string): Promise<NookContentHandle> {
+  const lifecycle = new LifecycleScope();
   const el = document.createElement("div");
   el.className = "markdown-nook";
   el.style.cssText = "display:flex;flex-direction:column;height:100%;background:#1e1e1e;color:#d4d4d4;";
@@ -147,6 +149,7 @@ export async function renderMarkdownNook(nookId: string, filePath: string): Prom
   let monaco: typeof Monaco | null = null;
   let sourceEditor: Monaco.editor.IStandaloneCodeEditor | null = null;
   let sourceModel: Monaco.editor.ITextModel | null = null;
+  let sourceModelSubscription: Monaco.IDisposable | null = null;
 
   let mdSettings: MarkdownSettings = { ...DEFAULT_MARKDOWN_SETTINGS };
   try {
@@ -171,9 +174,10 @@ export async function renderMarkdownNook(nookId: string, filePath: string): Prom
     if (sourceEditor) sourceEditor.updateOptions({ fontFamily: mdSettings.defaultFont || "ui-monospace, monospace", fontSize: mdSettings.fontSize });
   };
   applyEditorStyle();
-  markdownNookRegistry.set(nookId, {
+  const registryHandle: MarkdownNookHandle = {
     reapply: (next: MarkdownSettings) => { mdSettings = next; applyEditorStyle(); },
-  });
+  };
+  markdownNookRegistry.set(nookId, registryHandle);
 
   try {
     const result = await invoke<{ content: string }>(FrontendCommand.EditorOpen, { filePath, nookId });
@@ -188,20 +192,24 @@ export async function renderMarkdownNook(nookId: string, filePath: string): Prom
     viewMode === MarkdownViewMode.Source && sourceModel ? sourceModel.getValue() : content;
 
   const doSave = async () => {
+    if (lifecycle.isDisposed) return;
     const saveContent = canonicalMarkdown();
     content = saveContent;
     try {
       await invoke(FrontendCommand.EditorSave, { filePath, nookId, content: saveContent });
+      if (lifecycle.isDisposed) return;
       dirty = false;
       saveStatus.textContent = "Saved";
       saveStatus.style.color = "#858585";
     } catch (e) {
+      if (lifecycle.isDisposed) return;
       saveStatus.textContent = `Save failed: ${(e as Error).message}`;
       saveStatus.style.color = "#f85149";
     }
   };
 
   const scheduleSave = () => {
+    if (lifecycle.isDisposed) return;
     dirty = true;
     saveStatus.textContent = "Modified";
     saveStatus.style.color = "#cca766";
@@ -213,9 +221,15 @@ export async function renderMarkdownNook(nookId: string, filePath: string): Prom
 
   const ensureSourceModel = async () => {
     if (!monaco) monaco = await MonacoLoader.load();
+    if (lifecycle.isDisposed) return;
     if (!sourceModel) {
       sourceModel = monaco.editor.createModel(content, "markdown");
-      sourceModel.onDidChangeContent(() => { content = sourceModel!.getValue(); scheduleSave(); refreshComments(); });
+      sourceModelSubscription = sourceModel.onDidChangeContent(() => {
+        if (lifecycle.isDisposed) return;
+        content = sourceModel!.getValue();
+        scheduleSave();
+        refreshComments();
+      });
     }
     if (!sourceEditor) {
       sourceEditor = monaco.editor.create(sourceContainer, {
@@ -230,9 +244,11 @@ export async function renderMarkdownNook(nookId: string, filePath: string): Prom
   };
 
   const switchToSource = async () => {
+    if (lifecycle.isDisposed) return;
     const text = viewMode === MarkdownViewMode.Source ? content : extractText(rteContainer);
     content = text;
     await ensureSourceModel();
+    if (lifecycle.isDisposed || !sourceModel) return;
     if (sourceModel!.getValue() !== content) sourceModel!.setValue(content);
     rteContainer.style.display = "none";
     sourceContainer.style.display = "block";
@@ -257,8 +273,10 @@ export async function renderMarkdownNook(nookId: string, filePath: string): Prom
   });
 
   const applyMarkdown = async (next: string) => {
+    if (lifecycle.isDisposed) return;
     content = next;
     await ensureSourceModel();
+    if (lifecycle.isDisposed || !sourceModel) return;
     sourceModel!.setValue(next);
     if (viewMode !== MarkdownViewMode.Source) await switchToSource();
     else { sourceContainer.style.display = "block"; rteContainer.style.display = "none"; }
@@ -338,6 +356,7 @@ export async function renderMarkdownNook(nookId: string, filePath: string): Prom
   el.addEventListener("paste", (ev) => { void handlePaste(ev); });
 
   async function handlePaste(ev: ClipboardEvent) {
+    if (lifecycle.isDisposed) return;
     const items = ev.clipboardData?.items;
     if (!items) return;
     let file: File | null = null;
@@ -347,6 +366,7 @@ export async function renderMarkdownNook(nookId: string, filePath: string): Prom
     if (!file) return;
     ev.preventDefault();
     const base64 = await fileToBase64(file);
+    if (lifecycle.isDisposed) return;
     if (!base64) {
       saveStatus.textContent = "Paste failed: could not read image";
       saveStatus.style.color = "#f85149";
@@ -357,6 +377,7 @@ export async function renderMarkdownNook(nookId: string, filePath: string): Prom
       const res = await invoke<{ mediaPath: string }>(FrontendCommand.NoteMediaSave, {
         bayId: "default", id: nookId, fileName, base64Data: base64,
       });
+      if (lifecycle.isDisposed) return;
       const link = buildImageMarkdown(res.mediaPath);
       await switchToSource();
       if (sourceEditor && sourceModel) {
@@ -379,10 +400,15 @@ export async function renderMarkdownNook(nookId: string, filePath: string): Prom
     if (state?.scroll) rteContainer.scrollTop = state.scroll;
   } catch { void 0; }
 
-  const cleanup = () => { markdownNookRegistry.delete(nookId); };
-  const removalObserver = new MutationObserver(() => { if (!el.isConnected) { cleanup(); removalObserver.disconnect(); } });
-  removalObserver.observe(el.parentElement ?? document.body, { childList: true, subtree: true });
-  return el;
+  lifecycle.own(() => {
+    clearTimeout(saveTimer);
+    sourceModelSubscription?.dispose();
+    sourceEditor?.dispose();
+    sourceModel?.dispose();
+    if (markdownNookRegistry.get(nookId) === registryHandle) markdownNookRegistry.delete(nookId);
+    el.remove();
+  });
+  return { element: el, dispose: () => lifecycle.dispose() };
 }
 
 function button(label: string): HTMLButtonElement {

@@ -15,6 +15,8 @@ internal static class ContractVectors
 {
     public const string Channel = "dev";
     public const string NookId = "nook-contract";
+    public const string ControlToken =
+        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
     public const ulong StreamId = 41;
     public const ulong BaseOffset = 100;
     public const ulong ResyncOffset = 200;

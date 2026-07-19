@@ -36,13 +36,7 @@ public sealed class AttachCompositorTests
                 24,
                 timeout.Token);
 
-            var exitCode = await AttachCompositor.RunConnectedAsync(
-                clientConnection,
-                "dev",
-                "nook-1",
-                "user:tui",
-                terminal,
-                timeout.Token);
+            var exitCode = await AttachCompositor.RunConnectedAsync(clientConnection, "dev", "nook-1", "user:tui", "test-control-token", terminal, timeout.Token);
             await server;
 
             Assert.Equal(0, exitCode);
@@ -75,13 +69,7 @@ public sealed class AttachCompositorTests
                 24,
                 timeout.Token);
 
-            var exitCode = await AttachCompositor.RunConnectedAsync(
-                clientConnection,
-                "dev",
-                "nook-1",
-                "user:tui",
-                terminal,
-                timeout.Token);
+            var exitCode = await AttachCompositor.RunConnectedAsync(clientConnection, "dev", "nook-1", "user:tui", "test-control-token", terminal, timeout.Token);
             await server;
 
             Assert.Equal(0, exitCode);
@@ -114,13 +102,7 @@ public sealed class AttachCompositorTests
                 2,
                 timeout.Token);
 
-            var exitCode = await AttachCompositor.RunConnectedAsync(
-                clientConnection,
-                "dev",
-                "nook-1",
-                "user:tui",
-                terminal,
-                timeout.Token);
+            var exitCode = await AttachCompositor.RunConnectedAsync(clientConnection, "dev", "nook-1", "user:tui", "test-control-token", terminal, timeout.Token);
             await server;
 
             Assert.Equal(0, exitCode);
@@ -149,13 +131,7 @@ public sealed class AttachCompositorTests
                 rendered.Task,
                 timeout.Token);
 
-            var exitCode = await AttachCompositor.RunConnectedAsync(
-                clientConnection,
-                "dev",
-                "nook-1",
-                "user:tui",
-                terminal,
-                timeout.Token);
+            var exitCode = await AttachCompositor.RunConnectedAsync(clientConnection, "dev", "nook-1", "user:tui", "test-control-token", terminal, timeout.Token);
             await server;
 
             Assert.Equal(0, exitCode);
@@ -177,13 +153,7 @@ public sealed class AttachCompositorTests
             var terminal = new TestAttachTerminal();
             var server = CompleteSubscriptionAndCloseAsync(serverSocket, timeout.Token);
 
-            var exitCode = await AttachCompositor.RunConnectedAsync(
-                clientConnection,
-                "dev",
-                "nook-1",
-                "user:tui",
-                terminal,
-                timeout.Token);
+            var exitCode = await AttachCompositor.RunConnectedAsync(clientConnection, "dev", "nook-1", "user:tui", "test-control-token", terminal, timeout.Token);
             await server;
 
             Assert.Equal(0, exitCode);
@@ -213,13 +183,7 @@ public sealed class AttachCompositorTests
             var server = CompleteSubscriptionAndCloseAsync(serverSocket, timeout.Token);
             var elapsed = Stopwatch.StartNew();
 
-            var exitCode = await AttachCompositor.RunConnectedAsync(
-                    clientConnection,
-                    "dev",
-                    "nook-1",
-                    "user:tui",
-                    terminal,
-                    timeout.Token)
+            var exitCode = await AttachCompositor.RunConnectedAsync(clientConnection, "dev", "nook-1", "user:tui", "test-control-token", terminal, timeout.Token)
                 .WaitAsync(TimeSpan.FromSeconds(3), timeout.Token);
             elapsed.Stop();
             await server;
@@ -249,13 +213,7 @@ public sealed class AttachCompositorTests
                 throwOnRawDispose: true);
             var server = CompleteSubscriptionAndSendMalformedFrameAsync(serverSocket, timeout.Token);
 
-            var exitCode = await AttachCompositor.RunConnectedAsync(
-                clientConnection,
-                "dev",
-                "nook-1",
-                "user:tui",
-                terminal,
-                timeout.Token);
+            var exitCode = await AttachCompositor.RunConnectedAsync(clientConnection, "dev", "nook-1", "user:tui", "test-control-token", terminal, timeout.Token);
             await server;
 
             Assert.Equal(1, exitCode);

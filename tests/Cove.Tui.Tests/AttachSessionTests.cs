@@ -21,19 +21,16 @@ public sealed class AttachSessionTests
         using (var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5)))
         {
             var serverTask = CompleteSubscriptionAsync(serverConnection, timeout.Token);
-            var session = new AttachSession(
-                clientConnection,
-                "nook-1",
-                "tui",
-                "0.1.0",
-                "dev",
-                "user:tui");
+            var session = new AttachSession(clientConnection, "nook-1", "tui", "0.1.0", "dev", "user:tui", "test-control-token");
 
             var result = await session.SubscribeAsync(timeout.Token);
             var requests = await serverTask;
 
             Assert.Equal("h", requests.Hello.Id);
             Assert.Equal("cove://sys/hello", requests.Hello.Uri);
+            var hello = requests.Hello.Params!.Value.Deserialize(
+                CoveJsonContext.Default.HelloParams);
+            Assert.Equal("test-control-token", hello?.ControlToken);
             Assert.Equal("s", requests.Subscribe.Id);
             Assert.Equal("cove://commands/nook.subscribe", requests.Subscribe.Uri);
             Assert.Equal(7UL, result.StreamId);
@@ -51,13 +48,7 @@ public sealed class AttachSessionTests
         using (var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5)))
         {
             var serverTask = CompleteSubscriptionAsync(serverConnection, timeout.Token);
-            var session = new AttachSession(
-                clientConnection,
-                "nook-1",
-                "tui",
-                "0.1.0",
-                "dev",
-                "user:tui");
+            var session = new AttachSession(clientConnection, "nook-1", "tui", "0.1.0", "dev", "user:tui", "test-control-token");
             await session.SubscribeAsync(timeout.Token);
             await serverTask;
 

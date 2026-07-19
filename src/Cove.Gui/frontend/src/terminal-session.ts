@@ -7,6 +7,7 @@ import { createKeyboardProtocolTracker, shiftEnterSequence, type KeyboardProtoco
 import { decodeBase64Bytes, decodeRelayData, decodeTerminalRestoreBytes, parseRelayText, toBase64Utf8 } from "./wsproto";
 import { processExitAction, replayViewportAction } from "./stream-guard";
 import { FrontendCommand } from "./app/frontend-command";
+import type { NookWrite } from "./write-queue";
 
 const CREDIT_THRESHOLD = 131072;
 type TimeoutHandle = ReturnType<typeof globalThis.setTimeout>;
@@ -37,7 +38,7 @@ export interface TerminalSessionDependencies {
   settings(): TerminalSettings;
   theme(): Record<string, string>;
   invoke<T>(command: FrontendCommand, args: unknown): Promise<T>;
-  write(nookId: string, dataBase64: string): Promise<void>;
+  write: NookWrite;
   onExit(nookId: string): void;
   createSocket(url: string): WebSocket;
   createResizeObserver?(callback: ResizeObserverCallback): ResizeObserver;
@@ -52,10 +53,11 @@ export class TerminalSession {
   readonly search: SearchAddon;
   readonly keyboard: KeyboardProtocolTracker;
   socket: WebSocket | null = null;
-  consumed: number;
-  lastAck: number;
-  expectedOffset: number;
-  replayUntilOffset: number;
+  private receivedCounter: number;
+  private committedCounter: number;
+  private acknowledgedCounter: number;
+  replayCursorOffset: number;
+  replayTargetOffset: number;
   replaying = true;
   resetOnReplay: boolean;
   restoringCheckpoint = false;
@@ -71,6 +73,9 @@ export class TerminalSession {
   private handlersBound = false;
   private disposed = false;
   private savedViewport: { baseY: number; viewportY: number } | null = null;
+  private replayCommittedCursorOffset: number;
+  private replayAcknowledgedCursorOffset: number;
+  private reconnectCursorOffset: number;
 
   constructor(
     readonly nookId: string,
@@ -97,10 +102,14 @@ export class TerminalSession {
       }
     }
     this.keyboard = createKeyboardProtocolTracker();
-    this.consumed = since;
-    this.lastAck = since;
-    this.expectedOffset = since;
-    this.replayUntilOffset = since;
+    this.receivedCounter = since;
+    this.committedCounter = since;
+    this.acknowledgedCounter = since;
+    this.replayCursorOffset = since;
+    this.replayCommittedCursorOffset = since;
+    this.replayAcknowledgedCursorOffset = since;
+    this.reconnectCursorOffset = since;
+    this.replayTargetOffset = since;
     this.resetOnReplay = resetOnReplay;
     this.observe(host);
     this.bindTerminalHandlers();
@@ -108,6 +117,18 @@ export class TerminalSession {
 
   get connected(): boolean {
     return this.socket !== null && this.socket.readyState < WebSocket.CLOSING;
+  }
+
+  get receivedOffset(): number {
+    return this.receivedCounter;
+  }
+
+  get committedOffset(): number {
+    return this.committedCounter;
+  }
+
+  get acknowledgedOffset(): number {
+    return this.acknowledgedCounter;
   }
 
   get socketClosed(): boolean {
@@ -186,25 +207,36 @@ export class TerminalSession {
       globalThis.clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
+    const requestedSinceOffset = this.reconnectCursorOffset;
     const socket = this.dependencies.createSocket(
-      `ws://${location.host}/pty?nook=${encodeURIComponent(this.nookId)}&since=${this.consumed}`,
+      `ws://${location.host}/pty?nook=${encodeURIComponent(this.nookId)}&since=${requestedSinceOffset}`,
     );
     this.socket = socket;
     this.replaying = true;
-    this.replayUntilOffset = this.consumed;
+    this.replayTargetOffset = requestedSinceOffset;
     const generation = ++this.generation;
     const current = () => !this.disposed && this.generation === generation;
     socket.binaryType = "arraybuffer";
     const sendAck = () => {
-      if (socket.readyState === WebSocket.OPEN && this.consumed > this.lastAck) {
-        socket.send(JSON.stringify({ t: "ack", off: this.consumed }));
-        this.lastAck = this.consumed;
+      const offset = this.replayCommittedCursorOffset;
+      if (socket.readyState === WebSocket.OPEN && offset > this.replayAcknowledgedCursorOffset) {
+        try {
+          socket.send(JSON.stringify({ t: "ack", off: offset }));
+          this.replayAcknowledgedCursorOffset = offset;
+          this.advanceAcknowledgedOffset(offset);
+        } catch (error) {
+          this.dependencies.warn("terminal acknowledgement failed", {
+            nookId: this.nookId,
+            offset,
+            error: String(error),
+          });
+        }
       }
     };
     socket.onmessage = (event) => {
       if (!current()) return;
       if (typeof event.data === "string") {
-        this.handleControlMessage(event.data, socket, current);
+        this.handleControlMessage(event.data, socket, current, requestedSinceOffset);
         return;
       }
       let frame;
@@ -217,29 +249,32 @@ export class TerminalSession {
       }
       const { offset, raw } = frame;
       const nextOffset = offset + raw.length;
-      if (offset < this.expectedOffset && nextOffset <= this.expectedOffset) return;
-      if (offset !== this.expectedOffset) {
+      if (offset < this.replayCursorOffset && nextOffset <= this.replayCursorOffset) return;
+      if (offset !== this.replayCursorOffset) {
         this.dependencies.warn("terminal stream offset mismatch", {
           nookId: this.nookId,
-          expected: this.expectedOffset,
+          expected: this.replayCursorOffset,
           received: offset,
         });
         socket.close(1008, "terminal stream offset mismatch");
         return;
       }
-      this.expectedOffset = nextOffset;
+      this.replayCursorOffset = nextOffset;
+      this.advanceReceivedOffset(nextOffset);
       this.keyboard.push(raw);
       const controlEpoch = this.controlEpoch;
       const commit = () => {
         if (!current() || this.controlEpoch !== controlEpoch) return;
-        this.consumed = nextOffset;
-        if (this.consumed - this.lastAck >= CREDIT_THRESHOLD) sendAck();
+        this.replayCommittedCursorOffset = nextOffset;
+        this.reconnectCursorOffset = nextOffset;
+        this.advanceCommittedOffset(nextOffset);
+        if (this.replayCommittedCursorOffset - this.replayAcknowledgedCursorOffset >= CREDIT_THRESHOLD) sendAck();
         this.scheduleCheckpoint();
       };
       this.term.write(raw, () => {
         if (!current() || this.controlEpoch !== controlEpoch) return;
-        if (this.replaying && nextOffset >= this.replayUntilOffset) this.finishReplay();
         commit();
+        if (this.replaying && nextOffset >= this.replayTargetOffset) this.finishReplay();
       });
     };
     this.clearAckTimer();
@@ -307,7 +342,12 @@ export class TerminalSession {
     this.term.dispose();
   }
 
-  private handleControlMessage(data: string, socket: WebSocket, current: () => boolean): void {
+  private handleControlMessage(
+    data: string,
+    socket: WebSocket,
+    current: () => boolean,
+    requestedSinceOffset: number,
+  ): void {
     let message: ReturnType<typeof parseRelayText>;
     try {
       message = parseRelayText(data);
@@ -321,10 +361,12 @@ export class TerminalSession {
     }
     if (!message) return;
     if (message.t === "base") {
+      const hasCheckpoint = Boolean(message.checkpoint && message.checkpointCols && message.checkpointRows);
+      const historyWasTrimmed = message.off > requestedSinceOffset && !hasCheckpoint;
       if (
         !this.isValidControlOffset(message.off)
         || !this.isValidControlOffset(message.head)
-        || message.off < this.consumed
+        || message.off < requestedSinceOffset
         || message.head < message.off
       ) {
         this.rejectControlOffset(socket, message.t, message.off, message.head);
@@ -332,42 +374,47 @@ export class TerminalSession {
       }
       const controlEpoch = ++this.controlEpoch;
       this.clearCheckpointTimer();
-      this.consumed = message.off;
-      this.expectedOffset = message.off;
-      this.replayUntilOffset = message.head;
-      this.lastAck = message.off;
+      this.beginReplayEpoch(message.off, message.head);
       this.restoringCheckpoint = false;
-      if (message.checkpoint && message.checkpointCols && message.checkpointRows) {
+      if (hasCheckpoint) {
         this.term.reset();
         this.restoringCheckpoint = true;
-        this.term.resize(message.checkpointCols, message.checkpointRows);
-        this.term.write(decodeTerminalRestoreBytes(message.checkpoint, message.modes), () => {
+        this.term.resize(message.checkpointCols!, message.checkpointRows!);
+        this.term.write(decodeTerminalRestoreBytes(message.checkpoint!, message.modes), () => {
           if (!current() || this.controlEpoch !== controlEpoch) return;
           this.restoringCheckpoint = false;
+          this.establishReplayBaseline(message.off);
           this.scheduleFit();
           if (message.head <= message.off) this.finishReplay();
         });
       } else {
-        if (this.resetOnReplay && this.replaying) {
+        if ((this.resetOnReplay && this.replaying) || historyWasTrimmed) {
           this.term.reset();
-          if (message.modes) this.term.write(decodeBase64Bytes(message.modes));
+          if (message.modes) {
+            this.restoringCheckpoint = true;
+            this.term.write(decodeBase64Bytes(message.modes), () => {
+              if (!current() || this.controlEpoch !== controlEpoch) return;
+              this.restoringCheckpoint = false;
+              this.establishReplayBaseline(message.off);
+              if (message.head <= message.off) this.finishReplay();
+            });
+            return;
+          }
         }
+        this.establishReplayBaseline(message.off);
         if (message.head <= message.off) this.finishReplay();
       }
       return;
     }
     if (message.t === "resync") {
-      if (!this.isValidControlOffset(message.base) || message.base < this.expectedOffset) {
+      if (!this.isValidControlOffset(message.base)) {
         this.rejectControlOffset(socket, message.t, message.base);
         return;
       }
       const controlEpoch = ++this.controlEpoch;
       this.clearCheckpointTimer();
       this.term.reset();
-      this.consumed = message.base;
-      this.expectedOffset = message.base;
-      this.replayUntilOffset = message.base;
-      this.lastAck = message.base;
+      this.beginReplayEpoch(message.base, message.base);
       this.restoringCheckpoint = false;
       if (message.checkpoint && message.checkpointCols && message.checkpointRows) {
         this.restoringCheckpoint = true;
@@ -375,11 +422,22 @@ export class TerminalSession {
         this.term.write(decodeTerminalRestoreBytes(message.checkpoint, message.modes), () => {
           if (!current() || this.controlEpoch !== controlEpoch) return;
           this.restoringCheckpoint = false;
+          this.establishReplayBaseline(message.base);
           this.scheduleFit();
           this.finishReplay(true);
         });
       } else {
-        if (message.modes) this.term.write(decodeBase64Bytes(message.modes));
+        if (message.modes) {
+          this.restoringCheckpoint = true;
+          this.term.write(decodeBase64Bytes(message.modes), () => {
+            if (!current() || this.controlEpoch !== controlEpoch) return;
+            this.restoringCheckpoint = false;
+            this.establishReplayBaseline(message.base);
+            this.finishReplay(true);
+          });
+          return;
+        }
+        this.establishReplayBaseline(message.base);
         this.finishReplay(true);
       }
       return;
@@ -413,7 +471,7 @@ export class TerminalSession {
         this.controlEpoch !== controlEpoch
         || this.replaying
         || this.restoringCheckpoint
-        || this.expectedOffset !== this.consumed
+        || this.replayCursorOffset !== this.replayCommittedCursorOffset
         || this.exited
         || this.disposed
       ) return;
@@ -422,7 +480,7 @@ export class TerminalSession {
       void this.dependencies.invoke(FrontendCommand.AppNookCheckpoint, {
         nookId: this.nookId,
         dataBase64,
-        offset: this.consumed,
+        offset: this.replayCommittedCursorOffset,
         cols: this.term.cols,
         rows: this.term.rows,
         scrollbackLines: settings.scrollback,
@@ -526,9 +584,37 @@ export class TerminalSession {
       type,
       offset,
       head,
-      expected: this.expectedOffset,
+      expected: this.replayCursorOffset,
     });
     socket.close(1008, "invalid terminal control offset");
+  }
+
+  private beginReplayEpoch(baseOffset: number, targetOffset: number): void {
+    this.replaying = true;
+    this.replayCursorOffset = baseOffset;
+    this.replayCommittedCursorOffset = baseOffset;
+    this.replayAcknowledgedCursorOffset = baseOffset;
+    this.replayTargetOffset = targetOffset;
+    this.advanceReceivedOffset(baseOffset);
+  }
+
+  private establishReplayBaseline(offset: number): void {
+    this.replayCommittedCursorOffset = offset;
+    this.reconnectCursorOffset = offset;
+    this.advanceCommittedOffset(offset);
+    this.advanceAcknowledgedOffset(offset);
+  }
+
+  private advanceReceivedOffset(offset: number): void {
+    this.receivedCounter = Math.max(this.receivedCounter, offset);
+  }
+
+  private advanceCommittedOffset(offset: number): void {
+    this.committedCounter = Math.max(this.committedCounter, offset);
+  }
+
+  private advanceAcknowledgedOffset(offset: number): void {
+    this.acknowledgedCounter = Math.max(this.acknowledgedCounter, offset);
   }
 
 }

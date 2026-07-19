@@ -1,8 +1,8 @@
-export type WriteFn = (nookId: string, dataBase64: string) => Promise<unknown>;
+export type NookWrite = (nookId: string, dataBase64: string) => Promise<unknown>;
 
 const tails = new Map<string, Promise<void>>();
 
-export function enqueueNookWrite(nookId: string, dataBase64: string, write: WriteFn): Promise<void> {
+export function enqueueNookWrite(nookId: string, dataBase64: string, write: NookWrite): Promise<void> {
   const prev = tails.get(nookId) ?? Promise.resolve();
   const result = prev
     .then(() => write(nookId, dataBase64))

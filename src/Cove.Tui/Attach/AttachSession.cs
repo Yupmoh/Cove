@@ -11,6 +11,7 @@ public sealed class AttachSession
     private readonly string _clientVersion;
     private readonly string _channel;
     private readonly string _source;
+    private readonly string _controlToken;
     private ulong _streamId;
     private ulong _ackedOffset;
     private uint _seq;
@@ -26,7 +27,8 @@ public sealed class AttachSession
         string clientKind,
         string clientVersion,
         string channel,
-        string source)
+        string source,
+        string controlToken)
     {
         _conn = conn;
         _nookId = nookId;
@@ -34,6 +36,7 @@ public sealed class AttachSession
         _clientVersion = clientVersion;
         _channel = channel;
         _source = source;
+        _controlToken = controlToken;
     }
 
     public async Task ConnectAsync(CancellationToken ct)
@@ -41,7 +44,12 @@ public sealed class AttachSession
         if (_helloCompleted)
             return;
         var helloEl = JsonSerializer.SerializeToElement(
-            new HelloParams(ProtocolConstants.SemanticProtocolVersion, _clientKind, _clientVersion, _channel),
+            new HelloParams(
+                ProtocolConstants.SemanticProtocolVersion,
+                _clientKind,
+                _clientVersion,
+                _channel,
+                ControlToken: _controlToken),
             CoveJsonContext.Default.HelloParams);
         await SendRequestAsync("h", "cove://sys/hello", helloEl, null, ct).ConfigureAwait(false);
         var response = await ReadResponseAsync("h", ct).ConfigureAwait(false);
@@ -54,7 +62,7 @@ public sealed class AttachSession
     {
         await ConnectAsync(ct).ConfigureAwait(false);
         var subEl = JsonSerializer.SerializeToElement(new SubscribeParams(_nookId, 0), CoveJsonContext.Default.SubscribeParams);
-        await SendRequestAsync("s", "cove://commands/nook.subscribe", subEl, _source, ct).ConfigureAwait(false);
+        await SendRequestAsync("s", ControlProtocolRoutes.NookSubscribe, subEl, _source, ct).ConfigureAwait(false);
         var subResp = await ReadResponseAsync("s", ct).ConfigureAwait(false);
         if (!subResp.Ok || subResp.Data is null)
             throw new InvalidOperationException($"subscribe failed: {subResp.Error?.Code}");

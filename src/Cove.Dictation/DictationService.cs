@@ -90,11 +90,17 @@ public sealed class DictationService
     {
         float[] clip;
         Task loop;
+        CancellationTokenSource? partialCancellation;
         lock (_sync)
         {
-            if (_state != DictationState.Recording)
+            if (_shutdown || _state != DictationState.Recording)
+            {
+                _logger.DictationStopIgnored(
+                    _state.ToString(),
+                    _shutdown);
                 return Task.FromResult(new DictationResult("", 0, 0));
-            _partialCts?.Cancel();
+            }
+            partialCancellation = _partialCts;
             _partialCts = null;
             loop = _partialLoop;
             try
@@ -108,6 +114,8 @@ public sealed class DictationService
             }
             _state = DictationState.Transcribing;
         }
+        partialCancellation?.Cancel();
+        partialCancellation?.Dispose();
         if (cancellationToken.IsCancellationRequested)
         {
             lock (_sync)
@@ -127,25 +135,32 @@ public sealed class DictationService
         return work;
     }
 
-    public void Shutdown()
+    public async ValueTask ShutdownAsync(
+        CancellationToken cancellationToken = default)
     {
         Task loop;
         Task final;
+        CancellationTokenSource? partialCancellation;
         lock (_sync)
         {
             _shutdown = true;
-            _partialCts?.Cancel();
+            partialCancellation = _partialCts;
             _partialCts = null;
             loop = _partialLoop;
             final = _finalWork;
         }
+        partialCancellation?.Cancel();
+        partialCancellation?.Dispose();
         try
         {
-            Task.WaitAll(loop, final);
+            await Task.WhenAll(loop, final)
+                .WaitAsync(cancellationToken)
+                .ConfigureAwait(false);
         }
         catch (Exception ex)
         {
             _logger.DictationShutdownDrainFailed(ex.Message);
+            throw;
         }
     }
 

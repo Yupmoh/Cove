@@ -1,5 +1,5 @@
-using System.IO;
 using Cove.Generated;
+using Cove.Platform;
 
 namespace Cove.Cli;
 
@@ -30,8 +30,8 @@ internal static class CliReferenceDoc
         return sb.ToString();
     }
 
-    public static void WriteTo(string path)
+    public static void WriteTo(string path, IPlatformFileSystem files)
     {
-        File.WriteAllText(path, Generate());
+        files.WriteAllText(path, Generate());
     }
 }

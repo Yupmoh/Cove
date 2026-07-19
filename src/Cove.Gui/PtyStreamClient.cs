@@ -29,14 +29,30 @@ public sealed class PtyStreamClient : IAsyncDisposable
     }
 
     public static async Task<PtyStreamClient> SubscribeAsync(
-        Func<CancellationToken, Task<Stream>> dial, string clientVersion, string channel, string nookId, ulong since, CancellationToken ct)
+        Func<CancellationToken, Task<Stream>> dial,
+        string clientVersion,
+        string channel,
+        string nookId,
+        ulong since,
+        string controlToken,
+        CancellationToken ct)
     {
         var s = await dial(ct);
         try
         {
             await Request(s, "cove://sys/hello",
-                JsonSerializer.SerializeToElement(new HelloParams(ProtocolConstants.SemanticProtocolVersion, "gui-stream", clientVersion, channel), CoveJsonContext.Default.HelloParams), null, 1, ct);
-            var sub = await Request(s, "cove://commands/nook.subscribe",
+                JsonSerializer.SerializeToElement(
+                    new HelloParams(
+                        ProtocolConstants.SemanticProtocolVersion,
+                        "gui-stream",
+                        clientVersion,
+                        channel,
+                        ControlToken: controlToken),
+                    CoveJsonContext.Default.HelloParams),
+                null,
+                1,
+                ct);
+            var sub = await Request(s, ControlProtocolRoutes.NookSubscribe,
                 JsonSerializer.SerializeToElement(new SubscribeParams(nookId, since), CoveJsonContext.Default.SubscribeParams), "user:gui", 2, ct);
             if (!sub.Ok || sub.Data is null) throw new InvalidOperationException($"subscribe failed: {sub.Error?.Code}");
             var r = JsonSerializer.Deserialize(sub.Data.Value, CoveJsonContext.Default.SubscribeResult)!;

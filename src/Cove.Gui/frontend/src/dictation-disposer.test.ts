@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { Window } from "happy-dom";
 import { setupDictation } from "./dictation";
 
 class FakeWindow {
@@ -53,5 +54,38 @@ describe("setupDictation", () => {
     expect(fakeWindow.listenerCount("keyup")).toBe(0);
     expect(fakeWindow.listenerCount("blur")).toBe(0);
     expect([...engineListeners.values()].map((listeners) => listeners.size)).toEqual([0, 0, 0]);
+  });
+
+  it("removes its pill and cancels status timers on disposal", async () => {
+    vi.useFakeTimers();
+    const testWindow = new Window();
+    vi.stubGlobal("window", testWindow);
+    vi.stubGlobal("document", testWindow.document);
+    vi.stubGlobal("localStorage", testWindow.localStorage);
+    vi.stubGlobal("HTMLInputElement", testWindow.HTMLInputElement);
+    vi.stubGlobal("HTMLTextAreaElement", testWindow.HTMLTextAreaElement);
+    const handlers = new Map<string, (data: unknown) => void>();
+    const feature = setupDictation({
+      invoke: async () => undefined,
+      events: {
+        register: (channel, handler) => {
+          handlers.set(channel, handler as (data: unknown) => void);
+          return { dispose: () => { handlers.delete(channel); } };
+        },
+      },
+      getFocusedNookId: () => null,
+      writeNook: async () => undefined,
+    });
+    const lateModel = handlers.get("dictation.model")!;
+
+    lateModel({ ready: true });
+    expect(document.querySelector(".dictation-pill")).not.toBeNull();
+    await feature.dispose();
+    lateModel({ error: "late" });
+    await vi.advanceTimersByTimeAsync(6000);
+
+    expect(document.querySelector(".dictation-pill")).toBeNull();
+    expect(vi.getTimerCount()).toBe(0);
+    vi.useRealTimers();
   });
 });

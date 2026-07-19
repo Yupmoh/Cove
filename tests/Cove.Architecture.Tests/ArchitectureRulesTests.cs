@@ -228,6 +228,79 @@ public sealed class ArchitectureRulesTests
     }
 
     [Fact]
+    public void ProductionSerialization_UsesGeneratedJsonMetadata()
+    {
+        var compilation = CreateCompilation(
+            EnumerateProductionFiles("*.cs"));
+        var violations = FindProductionSymbolViolations(
+            compilation,
+            ClassifyJsonSerializationViolation);
+
+        Assert.Empty(violations);
+    }
+
+    [Fact]
+    public void JsonSerializationAnalyzer_DetectsReflectionOverloads()
+    {
+        const string source = """
+            using System.Text.Json;
+            using System.Text.Json.Serialization.Metadata;
+            using Serializer = System.Text.Json.JsonSerializer;
+
+            internal static class JsonFixture
+            {
+                internal static string UnsafeSerialize(string value) =>
+                    Serializer.Serialize(value);
+
+                internal static JsonElement UnsafeElement(string value) =>
+                    Serializer.SerializeToElement(value);
+
+                internal static string? UnsafeDeserialize(JsonElement value) =>
+                    value.Deserialize<string>();
+
+                internal static string SafeSerialize(
+                    string value,
+                    JsonTypeInfo<string> typeInfo) =>
+                    Serializer.Serialize(value, typeInfo);
+
+                internal static string Lookalike(string value) =>
+                    JsonLookalike.Serialize(value);
+            }
+
+            internal static class JsonLookalike
+            {
+                internal static string Serialize(string value) => value;
+            }
+            """;
+        var path = Path.Combine(
+            RepositoryRoot,
+            "fixtures",
+            "JsonSerializationViolations.cs");
+        var tree = CSharpSyntaxTree.ParseText(
+            source,
+            CSharpParseOptions.Default
+                .WithLanguageVersion(LanguageVersion.Latest),
+            path);
+        var compilation = CSharpCompilation.Create(
+            "JsonSerializationFixture",
+            [tree],
+            PlatformReferences,
+            new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+
+        var violations = FindSymbolViolations(
+            compilation,
+            ClassifyJsonSerializationViolation);
+
+        Assert.Empty(
+            compilation.GetDiagnostics()
+                .Where(diagnostic =>
+                    diagnostic.Severity ==
+                    DiagnosticSeverity.Error));
+        Assert.Equal(3, violations.Length);
+    }
+
+    [Fact]
     public void ProductionSources_DoNotWriteDirectlyToConsole()
     {
         var files = EnumerateProductionFiles("*.cs");
@@ -252,6 +325,88 @@ public sealed class ArchitectureRulesTests
             });
 
         Assert.Empty(violations);
+    }
+
+    [Fact]
+    public void ProductionCSharpSources_DoNotContainComments()
+    {
+        var violations = FindCSharpCommentViolations(
+            EnumerateProductionFiles("*.cs"));
+
+        Assert.Empty(violations);
+    }
+
+    [Fact]
+    public void DaemonControlPlane_DoesNotManuallyDispatchCommandNamespace()
+    {
+        var daemonRoot = Path.Combine(
+            SourceRoot,
+            "Cove.Engine",
+            "Daemon");
+        var violations = Directory
+            .EnumerateFiles(
+                daemonRoot,
+                "*.cs",
+                SearchOption.AllDirectories)
+            .SelectMany(path =>
+            {
+                var root = CSharpSyntaxTree.ParseText(
+                        File.ReadAllText(path),
+                        CSharpParseOptions.Default
+                            .WithLanguageVersion(
+                                LanguageVersion.Latest),
+                        path)
+                    .GetRoot();
+                return root.DescendantTokens()
+                    .Where(token =>
+                        token.IsKind(
+                            SyntaxKind.StringLiteralToken) &&
+                        token.ValueText.StartsWith(
+                            "cove://commands/",
+                            StringComparison.Ordinal))
+                    .Where(token =>
+                        token.Parent?.AncestorsAndSelf()
+                            .Any(ancestor =>
+                                ancestor is
+                                    CaseSwitchLabelSyntax or
+                                    SwitchExpressionArmSyntax) == true)
+                    .Select(token =>
+                    {
+                        var position = token
+                            .GetLocation()
+                            .GetLineSpan()
+                            .StartLinePosition;
+                        return
+                            $"{RelativePath(path)}:{position.Line + 1}:{position.Character + 1}";
+                    });
+            })
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Empty(violations);
+    }
+
+    [Fact]
+    public void CommentAnalyzer_DetectsEveryCSharpCommentKind()
+    {
+        const string source = """
+            internal sealed class CommentFixture
+            {
+                // single
+                /* multi */
+                /// documentation
+                /** documentation block */
+            }
+            """;
+        var path = Path.Combine(
+            RepositoryRoot,
+            "fixtures",
+            "CommentViolations.cs");
+
+        var violations = FindCSharpCommentViolations(
+            [(path, source)]);
+
+        Assert.Equal(4, violations.Length);
     }
 
     [Fact]
@@ -282,6 +437,363 @@ public sealed class ArchitectureRulesTests
             });
 
         Assert.Empty(violations);
+    }
+
+    [Fact]
+    public void ThinClients_DoNotOwnPlatformOrEngineInfrastructure()
+    {
+        var compilation = CreateCompilation(
+            EnumerateProductionFiles("*.cs"));
+        var violations = FindProductionSymbolViolations(
+            compilation,
+            ClassifyThinClientBoundaryViolation);
+
+        Assert.True(
+            violations.Length == 0,
+            Environment.NewLine +
+            string.Join(Environment.NewLine, violations));
+    }
+
+    [Fact]
+    public void ThinClientBoundaryAnalyzer_DetectsEveryForbiddenFamilyAndKeepsExemptionsNarrow()
+    {
+        const string servicesSource = """
+            namespace Cove.Adapters
+            {
+                public sealed class AdapterManifestStore
+                {
+                    public void Load() { }
+                }
+            }
+
+            namespace Cove.Engine.Protocol
+            {
+                public sealed class ExtensionRegistry
+                {
+                    public void List() { }
+                }
+            }
+
+            namespace Cove.Engine.Hooks
+            {
+                public sealed class HookEmitClient
+                {
+                    public void Emit() { }
+                }
+            }
+
+            namespace Cove.Engine.Daemon
+            {
+                public sealed class PersistenceCoordinator
+                {
+                    public void Flush() { }
+                }
+            }
+
+            namespace Cove.Engine.Layout
+            {
+                public static class BayPersistence
+                {
+                    public static void Load() { }
+                }
+            }
+
+            namespace Cove.Engine.Launch
+            {
+                public sealed class LaunchOrchestrator
+                {
+                    public void Launch() { }
+                }
+            }
+
+            namespace Cove.Persistence
+            {
+                public static class AtomicJsonStore
+                {
+                    public static void Write() { }
+                }
+            }
+
+            namespace Cove.Dictation
+            {
+                public interface IAudioRecorder
+                {
+                    void Start();
+                    float[] Stop();
+                    float[] Snapshot(double seconds);
+                }
+
+                public interface ISpeechTrimmer
+                {
+                    float[] Trim(float[] samples);
+                }
+
+                public interface ITranscriber
+                {
+                    string Transcribe(float[] samples);
+                }
+
+                public sealed class PortAudioRecorder : IAudioRecorder, System.IDisposable
+                {
+                    public void Start() { }
+                    public float[] Stop() => [];
+                    public float[] Snapshot(double seconds) => [];
+                    public void Dispose() { }
+                }
+
+                public sealed class DictationModelManager
+                {
+                    public void Ensure() { }
+                }
+
+                public sealed class SileroSpeechTrimmer : ISpeechTrimmer
+                {
+                    public float[] Trim(float[] samples) => samples;
+                }
+
+                public sealed class SherpaTranscriber : ITranscriber
+                {
+                    public string Transcribe(float[] samples) => "";
+                }
+
+                public sealed class DictationService
+                {
+                    public void Start() { }
+                }
+            }
+            """;
+        const string forbiddenSource = """
+            using IO = System.IO.File;
+            using Sock = System.Net.Sockets.Socket;
+
+            internal sealed class ThinClientFixture
+            {
+                internal async System.Threading.Tasks.Task OwnInfrastructureAsync()
+                {
+                    _ = IO.ReadAllText("state");
+                    _ = System.IO.Directory.CreateDirectory("state");
+                    using var fileStream = new System.IO.FileStream(
+                        "state",
+                        System.IO.FileMode.OpenOrCreate);
+                    _ = new System.IO.FileInfo("state");
+                    _ = new System.IO.DirectoryInfo("state");
+                    using var watcher = new System.IO.FileSystemWatcher("state");
+                    using var process = System.Diagnostics.Process.Start(
+                        new System.Diagnostics.ProcessStartInfo("engine"));
+                    using var socket = new Sock(
+                        System.Net.Sockets.AddressFamily.Unix,
+                        System.Net.Sockets.SocketType.Stream,
+                        System.Net.Sockets.ProtocolType.Tcp);
+                    _ = new System.Net.Sockets.UnixDomainSocketEndPoint(
+                        "engine.sock");
+                    using var network = new System.Net.Sockets.NetworkStream(
+                        socket,
+                        ownsSocket: false);
+                    await network.WriteAsync(
+                        System.ReadOnlyMemory<byte>.Empty);
+                    using var http = new System.Net.Http.HttpClient();
+                    _ = System.Runtime.InteropServices
+                        .PosixSignalRegistration.Create(
+                            System.Runtime.InteropServices
+                                .PosixSignal.SIGTERM,
+                            _ => { });
+                    if (System.OperatingSystem.IsWindows())
+                    {
+                        return;
+                    }
+
+                    new Cove.Adapters.AdapterManifestStore().Load();
+                    new Cove.Engine.Protocol.ExtensionRegistry().List();
+                    new Cove.Engine.Hooks.HookEmitClient().Emit();
+                    new Cove.Engine.Daemon.PersistenceCoordinator().Flush();
+                    Cove.Engine.Layout.BayPersistence.Load();
+                    Cove.Persistence.AtomicJsonStore.Write();
+                    new Cove.Engine.Launch.LaunchOrchestrator().Launch();
+                    new Cove.Dictation.DictationModelManager().Ensure();
+                    Cove.Dictation.ISpeechTrimmer trimmer =
+                        new Cove.Dictation.SileroSpeechTrimmer();
+                    _ = trimmer.Trim([]);
+                    Cove.Dictation.ITranscriber transcriber =
+                        new Cove.Dictation.SherpaTranscriber();
+                    _ = transcriber.Transcribe([]);
+                    new Cove.Dictation.DictationService().Start();
+                    Cove.Dictation.IAudioRecorder recorder =
+                        new Cove.Dictation.PortAudioRecorder();
+                    recorder.Start();
+                }
+            }
+            """;
+        const string loopbackSource = """
+            internal sealed class LoopbackServer
+            {
+                internal async System.Threading.Tasks.Task TransferAsync(
+                    System.Net.Sockets.NetworkStream stream,
+                    System.Net.Sockets.Socket socket)
+                {
+                    await stream.WriteAsync(
+                        System.ReadOnlyMemory<byte>.Empty);
+                    await stream.ReadAsync(
+                        System.Memory<byte>.Empty);
+                    using var adjacent = new System.Net.Sockets.NetworkStream(
+                        socket,
+                        ownsSocket: false);
+                    socket.Listen(1);
+                }
+            }
+            """;
+        const string dictationHostSource = """
+            internal sealed class DictationHost
+            {
+                internal void Capture(Cove.Dictation.IAudioRecorder recorder)
+                {
+                    recorder.Start();
+                    _ = recorder.Stop();
+                    _ = recorder.Snapshot(1);
+                    using var owned = new Cove.Dictation.PortAudioRecorder();
+                    owned.Start();
+
+                    _ = System.IO.File.ReadAllText("adjacent");
+                    new Cove.Dictation.DictationModelManager().Ensure();
+                    Cove.Dictation.ISpeechTrimmer trimmer =
+                        new Cove.Dictation.SileroSpeechTrimmer();
+                    _ = trimmer.Trim([]);
+                }
+            }
+            """;
+        var forbiddenPath = Path.Combine(
+            SourceRoot,
+            "Cove.Gui",
+            "ThinClientFixture.cs");
+        var loopbackPath = Path.Combine(
+            SourceRoot,
+            "Cove.Gui",
+            "LoopbackServer.cs");
+        var dictationHostPath = Path.Combine(
+            SourceRoot,
+            "Cove.Gui",
+            "DictationHost.cs");
+        var parseOptions = CSharpParseOptions.Default
+            .WithLanguageVersion(LanguageVersion.Latest);
+        var trees = new[]
+        {
+            CSharpSyntaxTree.ParseText(
+                servicesSource,
+                parseOptions,
+                Path.Combine(
+                    RepositoryRoot,
+                    "generated",
+                    "ThinClientFixtureServices.cs")),
+            CSharpSyntaxTree.ParseText(
+                forbiddenSource,
+                parseOptions,
+                forbiddenPath),
+            CSharpSyntaxTree.ParseText(
+                loopbackSource,
+                parseOptions,
+                loopbackPath),
+            CSharpSyntaxTree.ParseText(
+                dictationHostSource,
+                parseOptions,
+                dictationHostPath)
+        };
+        var compilation = CSharpCompilation.Create(
+            "ThinClientBoundaryFixture",
+            trees,
+            PlatformReferences,
+            new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+
+        var violations = FindSymbolViolations(
+            compilation,
+            ClassifyThinClientBoundaryViolation);
+
+        Assert.Empty(
+            compilation.GetDiagnostics()
+                .Where(diagnostic =>
+                    diagnostic.Severity ==
+                    DiagnosticSeverity.Error));
+
+        var forbiddenFamilies = new[]
+        {
+            "System.IO.File.",
+            "System.IO.Directory.",
+            "System.IO.FileStream.",
+            "System.IO.FileInfo.",
+            "System.IO.DirectoryInfo.",
+            "System.IO.FileSystemWatcher.",
+            "System.Diagnostics.Process.",
+            "System.Diagnostics.ProcessStartInfo.",
+            "System.Net.Sockets.Socket.",
+            "System.Net.Sockets.UnixDomainSocketEndPoint.",
+            "System.Net.Sockets.NetworkStream.",
+            "System.Net.Http.HttpClient.",
+            "System.Runtime.InteropServices.PosixSignalRegistration.",
+            "System.OperatingSystem.",
+            "Cove.Adapters.AdapterManifestStore.",
+            "Cove.Engine.Protocol.ExtensionRegistry.",
+            "Cove.Engine.Hooks.HookEmitClient.",
+            "Cove.Engine.Daemon.PersistenceCoordinator.",
+            "Cove.Engine.Layout.BayPersistence.",
+            "Cove.Persistence.AtomicJsonStore.",
+            "Cove.Engine.Launch.LaunchOrchestrator.",
+            "Cove.Dictation.IAudioRecorder.",
+            "Cove.Dictation.DictationModelManager.",
+            "Cove.Dictation.PortAudioRecorder.",
+            "Cove.Dictation.ISpeechTrimmer.",
+            "Cove.Dictation.SileroSpeechTrimmer.",
+            "Cove.Dictation.ITranscriber.",
+            "Cove.Dictation.SherpaTranscriber.",
+            "Cove.Dictation.DictationService."
+        };
+        foreach (var family in forbiddenFamilies)
+        {
+            AssertThinClientViolation(
+                violations,
+                "src/Cove.Gui/ThinClientFixture.cs",
+                family);
+        }
+        AssertThinClientViolation(
+            violations,
+            "src/Cove.Gui/ThinClientFixture.cs",
+            "System.Net.Sockets.NetworkStream.WriteAsync");
+
+        AssertNoThinClientViolation(
+            violations,
+            "src/Cove.Gui/LoopbackServer.cs",
+            "System.Net.Sockets.NetworkStream.WriteAsync");
+        AssertThinClientViolation(
+            violations,
+            "src/Cove.Gui/LoopbackServer.cs",
+            "System.Net.Sockets.NetworkStream.ReadAsync");
+        AssertThinClientViolation(
+            violations,
+            "src/Cove.Gui/LoopbackServer.cs",
+            "System.Net.Sockets.NetworkStream.NetworkStream");
+        AssertThinClientViolation(
+            violations,
+            "src/Cove.Gui/LoopbackServer.cs",
+            "System.Net.Sockets.Socket.Listen");
+
+        AssertNoThinClientViolation(
+            violations,
+            "src/Cove.Gui/DictationHost.cs",
+            "Cove.Dictation.IAudioRecorder.");
+        AssertNoThinClientViolation(
+            violations,
+            "src/Cove.Gui/DictationHost.cs",
+            "Cove.Dictation.PortAudioRecorder.");
+        AssertThinClientViolation(
+            violations,
+            "src/Cove.Gui/DictationHost.cs",
+            "System.IO.File.ReadAllText");
+        AssertThinClientViolation(
+            violations,
+            "src/Cove.Gui/DictationHost.cs",
+            "Cove.Dictation.DictationModelManager.");
+        AssertThinClientViolation(
+            violations,
+            "src/Cove.Gui/DictationHost.cs",
+            "Cove.Dictation.ISpeechTrimmer.");
     }
 
     [Fact]
@@ -683,6 +1195,187 @@ public sealed class ArchitectureRulesTests
         return symbol is IAliasSymbol alias ? alias.Target : symbol;
     }
 
+    private static string? ClassifyJsonSerializationViolation(
+        SemanticModel model,
+        SyntaxNode node)
+    {
+        if (node is not InvocationExpressionSyntax invocation)
+            return null;
+
+        var method = model.GetSymbolInfo(invocation).Symbol
+            as IMethodSymbol;
+        var resolved = method?.ReducedFrom ?? method;
+        if (resolved is null)
+            return null;
+
+        var typeName = resolved.ContainingType.ToDisplayString();
+        var isSerializer =
+            typeName == "System.Text.Json.JsonSerializer";
+        var isHttpJson =
+            resolved.ContainingNamespace.ToDisplayString() ==
+            "System.Net.Http.Json" &&
+            typeName is
+                "System.Net.Http.Json.HttpClientJsonExtensions" or
+                "System.Net.Http.Json.HttpContentJsonExtensions" or
+                "System.Net.Http.Json.JsonContent";
+        if (!isSerializer && !isHttpJson)
+            return null;
+
+        var hasMetadata = resolved.Parameters.Any(parameter =>
+        {
+            var parameterType = parameter.Type;
+            if (parameterType.ToDisplayString() ==
+                "System.Text.Json.Serialization.JsonSerializerContext")
+            {
+                return true;
+            }
+
+            return parameterType is INamedTypeSymbol named &&
+                named.OriginalDefinition.ToDisplayString() ==
+                "System.Text.Json.Serialization.Metadata.JsonTypeInfo<T>";
+        });
+
+        return hasMetadata
+            ? null
+            : resolved.ToDisplayString();
+    }
+
+    private static string? ClassifyThinClientBoundaryViolation(
+        SemanticModel model,
+        SyntaxNode node)
+    {
+        var path = node.SyntaxTree.FilePath;
+        if (!IsProjectSource(
+                path,
+                "Cove.Gui",
+                "Cove.Cli",
+                "Cove.Tui"))
+        {
+            return null;
+        }
+
+        IMethodSymbol? method = node switch
+        {
+            InvocationExpressionSyntax invocation =>
+                model.GetSymbolInfo(invocation).Symbol
+                    as IMethodSymbol,
+            ObjectCreationExpressionSyntax creation =>
+                model.GetSymbolInfo(creation).Symbol
+                    as IMethodSymbol,
+            ImplicitObjectCreationExpressionSyntax creation =>
+                model.GetSymbolInfo(creation).Symbol
+                    as IMethodSymbol,
+            _ => null,
+        };
+        if (method is null)
+            return null;
+
+        method = method.ReducedFrom ?? method;
+        var typeName = method.ContainingType.ToDisplayString();
+        if (IsThinClientNetworkExemption(path, method) ||
+            IsThinClientMicrophoneCaptureExemption(path, typeName))
+        {
+            return null;
+        }
+
+        if (typeName is
+            "System.IO.File" or
+            "System.IO.Directory" or
+            "System.IO.FileStream" or
+            "System.IO.FileInfo" or
+            "System.IO.DirectoryInfo" or
+            "System.IO.FileSystemWatcher")
+        {
+            return method.ToDisplayString();
+        }
+
+        if (typeName is
+            "System.Diagnostics.Process" or
+            "System.Diagnostics.ProcessStartInfo" or
+            "System.Net.Sockets.Socket" or
+            "System.Net.Sockets.UnixDomainSocketEndPoint" or
+            "System.Net.Sockets.NetworkStream" or
+            "System.Net.Http.HttpClient" or
+            "System.Runtime.InteropServices.PosixSignalRegistration" or
+            "Cove.Adapters.AdapterManifestStore" or
+            "Cove.Engine.Protocol.ExtensionRegistry" or
+            "Cove.Engine.Hooks.HookEmitClient" or
+            "Cove.Engine.Daemon.PersistenceCoordinator" or
+            "Cove.Engine.Layout.BayPersistence" or
+            "Cove.Persistence.AtomicJsonStore" or
+            "Cove.Engine.Launch.LaunchOrchestrator" or
+            "Cove.Dictation.IAudioRecorder" or
+            "Cove.Dictation.DictationModelManager" or
+            "Cove.Dictation.PortAudioRecorder" or
+            "Cove.Dictation.ISpeechTrimmer" or
+            "Cove.Dictation.SileroSpeechTrimmer" or
+            "Cove.Dictation.ITranscriber" or
+            "Cove.Dictation.SherpaTranscriber" or
+            "Cove.Dictation.DictationService")
+        {
+            return method.ToDisplayString();
+        }
+
+        if (typeName == "System.OperatingSystem")
+            return method.ToDisplayString();
+
+        return null;
+    }
+
+    private static bool IsThinClientNetworkExemption(
+        string path,
+        IMethodSymbol method) =>
+        RelativePath(path) == "src/Cove.Gui/LoopbackServer.cs" &&
+        method.ContainingType.ToDisplayString() ==
+            "System.Net.Sockets.NetworkStream" &&
+        method.Name == "WriteAsync";
+
+    private static bool IsThinClientMicrophoneCaptureExemption(
+        string path,
+        string typeName) =>
+        RelativePath(path) == "src/Cove.Gui/DictationHost.cs" &&
+        typeName is
+            "Cove.Dictation.IAudioRecorder" or
+            "Cove.Dictation.PortAudioRecorder";
+
+    private static void AssertThinClientViolation(
+        string[] violations,
+        string path,
+        string symbolPrefix)
+    {
+        Assert.True(
+            violations.Any(violation =>
+                ViolationLocation(violation)
+                    .StartsWith(path + ":", StringComparison.Ordinal) &&
+                ViolationSymbol(violation)
+                    .StartsWith(symbolPrefix, StringComparison.Ordinal)),
+            $"Expected {path}: {symbolPrefix}{Environment.NewLine}" +
+            string.Join(Environment.NewLine, violations));
+    }
+
+    private static void AssertNoThinClientViolation(
+        string[] violations,
+        string path,
+        string symbolPrefix)
+    {
+        Assert.False(
+            violations.Any(violation =>
+                ViolationLocation(violation)
+                    .StartsWith(path + ":", StringComparison.Ordinal) &&
+                ViolationSymbol(violation)
+                    .StartsWith(symbolPrefix, StringComparison.Ordinal)),
+            $"Unexpected {path}: {symbolPrefix}{Environment.NewLine}" +
+            string.Join(Environment.NewLine, violations));
+    }
+
+    private static string ViolationSymbol(string violation)
+    {
+        var symbolSeparator = violation.IndexOf(": ", StringComparison.Ordinal);
+        return symbolSeparator < 0
+            ? violation
+            : violation[(symbolSeparator + 2)..];
+    }
+
     private static string? ClassifyReflectionViolation(SemanticModel model, SyntaxNode node)
     {
         if (IsCompileTimeMetadata(model, node))
@@ -844,6 +1537,44 @@ public sealed class ArchitectureRulesTests
         var position = node.GetLocation().GetLineSpan().StartLinePosition;
         return $"{RelativePath(path)}:{position.Line + 1}:{position.Character + 1}";
     }
+
+    private static string[] FindCSharpCommentViolations(
+        IEnumerable<string> paths) =>
+        FindCSharpCommentViolations(
+            paths.Select(path => (path, File.ReadAllText(path))));
+
+    private static string[] FindCSharpCommentViolations(
+        IEnumerable<(string Path, string Source)> sources) =>
+        sources
+            .SelectMany(source =>
+                CSharpSyntaxTree.ParseText(
+                        source.Source,
+                        CSharpParseOptions.Default
+                            .WithLanguageVersion(
+                                LanguageVersion.Latest),
+                        source.Path)
+                    .GetRoot()
+                    .DescendantTrivia(descendIntoTrivia: true)
+                    .Where(trivia =>
+                        trivia.IsKind(
+                            SyntaxKind.SingleLineCommentTrivia) ||
+                        trivia.IsKind(
+                            SyntaxKind.MultiLineCommentTrivia) ||
+                        trivia.IsKind(
+                            SyntaxKind.SingleLineDocumentationCommentTrivia) ||
+                        trivia.IsKind(
+                            SyntaxKind.MultiLineDocumentationCommentTrivia))
+                    .Select(trivia =>
+                    {
+                        var position = trivia
+                            .GetLocation()
+                            .GetLineSpan()
+                            .StartLinePosition;
+                        return
+                            $"{RelativePath(source.Path)}:{position.Line + 1}:{position.Character + 1}";
+                    }))
+            .Order(StringComparer.Ordinal)
+            .ToArray();
 
     private static string[] GetProjectReferences(string projectName)
     {

@@ -1,6 +1,5 @@
 using Cove.Platform;
 using Microsoft.Extensions.Logging;
-using ZLogger;
 
 namespace Cove.Gui;
 
@@ -10,15 +9,8 @@ public static class GuiLogging
     {
         var channel = ResolveChannelName();
         var dataDir = CoveDataDir.Resolve(ParseChannel(channel));
-        System.IO.Directory.CreateDirectory(dataDir.LogsDir);
-        var logPath = System.IO.Path.Combine(dataDir.LogsDir, "gui.log");
         var minimumLevel = ParseLevel(Environment.GetEnvironmentVariable("COVE_LOG_LEVEL"));
-        return LoggerFactory.Create(builder =>
-        {
-            builder.SetMinimumLevel(minimumLevel);
-            builder.AddZLoggerConsole();
-            builder.AddZLoggerFile(logPath);
-        });
+        return CoveLog.CreateNamedFileLoggerFactory(dataDir.LogsDir, "gui", minimumLevel);
     }
 
     public static string ResolveChannelName()

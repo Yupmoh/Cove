@@ -526,6 +526,34 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/dictation.begin",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/dictation.cancel",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/dictation.ensure-model",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/dictation.partial",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/dictation.started",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/dictation.status",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/dictation.stop",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/editor.get-state",
     "source": "core"
   },
@@ -569,6 +597,14 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/feedback.save",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/fs.list",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/get_backend_state",
     "description": "mcp-bridge get_backend_state (PL-30, headless-safe)",
     "source": "core"
@@ -581,6 +617,14 @@
   {
     "command": "cove://commands/get_window_info",
     "description": "mcp-bridge get_window_info (PL-30, render-bound)",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/git.summary",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/hook.emit",
     "source": "core"
   },
   {
@@ -849,6 +893,10 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/perf.result.save",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/protocol.resolve",
     "source": "core"
   },
@@ -882,6 +930,10 @@
   },
   {
     "command": "cove://commands/restore.confirm",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/restore.summary.get",
     "source": "core"
   },
   {
@@ -1325,6 +1377,10 @@
   },
   {
     "command": "cove://commands/viewer.open",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/window.focus",
     "source": "core"
   },
   {

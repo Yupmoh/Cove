@@ -1,4 +1,5 @@
 using Cove.Gui;
+using Cove.Platform;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Ryn.Core;
@@ -23,6 +24,7 @@ internal static class Program
         var startPath = string.IsNullOrEmpty(page) ? "" : "/" + page;
 
         using var loggerFactory = GuiLogging.CreateFactory();
+        var fileSystem = SystemPlatformFileSystem.Instance;
         GuiEngineLauncher.Logger = loggerFactory.CreateLogger("Cove.Gui.GuiEngineLauncher");
         var startupLog = loggerFactory.CreateLogger("Cove.Gui.Program");
         var url = $"http://localhost:{LoopbackServer.DefaultPort}{startPath}";
@@ -31,8 +33,10 @@ internal static class Program
         Func<CancellationToken, Task<Stream>> dial = ct => GuiEngineLauncher.ConnectOrSpawnAsync(channel, ct);
         var webRoot = Path.Combine(AppContext.BaseDirectory, "wwwroot");
         var capability = System.Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
-        var mediaLeases = new MediaLeaseRegistry();
-        var server = new LoopbackServer(webRoot, dial, version, channel, startupLog, capability: capability, mediaLeases: mediaLeases);
+        var mediaLeases = new MediaLeaseRegistry(
+            TimeSpan.FromHours(8),
+            fileSystem: fileSystem);
+        var server = new LoopbackServer(webRoot, dial, version, channel, startupLog, capability: capability, mediaLeases: mediaLeases, fileSystem: fileSystem);
         server.Start();
         var capSeparator = url.Contains('?') ? "&" : "?";
         var authorizedUrl = $"{url}{capSeparator}__cap={capability}";
@@ -52,7 +56,7 @@ internal static class Program
                 o.Backdrop = BackdropMaterial.Blur;
                 o.DevTools = Environment.GetEnvironmentVariable("COVE_DEVTOOLS") == "1";
                 var iconPath = Path.Combine(AppContext.BaseDirectory, "assets", "app-icon.png");
-                if (File.Exists(iconPath)) o.IconPath = iconPath;
+                if (fileSystem.FileExists(iconPath)) o.IconPath = iconPath;
             })
             .ConfigureServices(s =>
             {
@@ -60,7 +64,9 @@ internal static class Program
                 s.AddSingleton(link);
                 s.AddSingleton(mediaLeases);
                 s.AddSingleton<EngineEventForwarder>();
-                s.AddSingleton<DictationHost>();
+                s.AddSingleton(provider => new DictationHost(
+                    provider.GetRequiredService<ILogger<DictationHost>>(),
+                    link.RequestAsync));
                 s.AddSingleton<CoveGuiCommands>();
                 s.AddRynCommands();
                 s.AddCoveGuiCommands();
@@ -77,11 +83,11 @@ internal static class Program
                     o.CurrentVersion = version;
                     o.PublicKey = UpdateKeys.PublicKey;
                 });
-                s.AddPerfResultsCommand();
             })
             .Build();
 
         _ = app.Services.GetRequiredService<EngineEventForwarder>();
+        var dictation = app.Services.GetRequiredService<DictationHost>();
         try
         {
             app.Run();
@@ -90,11 +96,42 @@ internal static class Program
         {
             try
             {
-                link.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                dictation.DisposeAsync()
+                    .AsTask()
+                    .GetAwaiter()
+                    .GetResult();
             }
-            finally
+            catch (Exception ex)
             {
-                server.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                startupLog.GuiResourceDisposalFailed(
+                    "dictation",
+                    ex.Message);
+            }
+            try
+            {
+                link.DisposeAsync()
+                    .AsTask()
+                    .GetAwaiter()
+                    .GetResult();
+            }
+            catch (Exception ex)
+            {
+                startupLog.GuiResourceDisposalFailed(
+                    "engine-link",
+                    ex.Message);
+            }
+            try
+            {
+                server.DisposeAsync()
+                    .AsTask()
+                    .GetAwaiter()
+                    .GetResult();
+            }
+            catch (Exception ex)
+            {
+                startupLog.GuiResourceDisposalFailed(
+                    "loopback-server",
+                    ex.Message);
             }
         }
     }

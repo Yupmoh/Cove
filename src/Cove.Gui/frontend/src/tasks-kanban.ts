@@ -1,5 +1,6 @@
 import { invoke } from "./invoke";
 import { FrontendCommand } from "./app/frontend-command";
+import { LifecycleScope, type NookContentHandle } from "./app/lifecycle";
 
 interface TaskCard {
   id: string;
@@ -33,41 +34,57 @@ const PRIORITY_COLORS = ["#ef4444", "#f97316", "#eab308", "#6b7280"];
 const PRIORITY_LABELS = ["critical", "high", "medium", "low"];
 const SIZE_LABELS = ["xs", "s", "m", "l", "xl"];
 
-export async function renderKanbanBoard(bayId: string): Promise<HTMLElement> {
+let activeQuickActions: { scope: LifecycleScope; owner: LifecycleScope } | null = null;
+
+export async function renderKanbanBoard(bayId: string): Promise<NookContentHandle> {
+  const lifecycle = new LifecycleScope();
   const el = document.createElement("div");
   el.className = "kanban-board";
   el.style.cssText = "display:flex;gap:12px;padding:12px;overflow-x:auto;height:100%;background:#0b1622;color:#e5e9f0;font-family:system-ui,sans-serif;";
 
-  await refreshBoard(el, bayId);
+  await refreshBoard(el, bayId, lifecycle);
 
-  const refreshFn = () => refreshBoard(el, bayId);
+  const refreshFn = () => refreshBoard(el, bayId, lifecycle);
   el.dataset.refreshFn = "kanban-refresh";
   (window as unknown as Record<string, unknown>).__coveTaskRefresh = refreshFn;
 
-  return el;
+  lifecycle.own(async () => {
+    let menuDisposal: Promise<void> | null = null;
+    if (activeQuickActions?.owner === lifecycle) {
+      menuDisposal = activeQuickActions.scope.dispose();
+      activeQuickActions = null;
+    }
+    const globals = window as unknown as Record<string, unknown>;
+    if (globals.__coveTaskRefresh === refreshFn) delete globals.__coveTaskRefresh;
+    el.remove();
+    await menuDisposal;
+  });
+  return { element: el, dispose: () => lifecycle.dispose() };
 }
 
-async function refreshBoard(el: HTMLElement, bayId: string): Promise<void> {
+async function refreshBoard(el: HTMLElement, bayId: string, lifecycle: LifecycleScope): Promise<void> {
+  if (lifecycle.isDisposed) return;
   try {
     const [statusResult, cardResult] = await Promise.all([
       invoke<StatusListResult>(FrontendCommand.TaskStatusList, { bayId }),
       invoke<TaskListResult>(FrontendCommand.TaskList, { bayId }),
     ]);
 
+    if (lifecycle.isDisposed) return;
     const statuses = statusResult.statuses.filter(s => !s.hidden).sort((a, b) => a.position - b.position);
     const cards = cardResult.cards || [];
 
     el.innerHTML = "";
     for (const status of statuses) {
-      const column = createColumn(status, cards.filter(c => c.statusId === status.id), bayId);
+      const column = createColumn(status, cards.filter(c => c.statusId === status.id), bayId, lifecycle);
       el.appendChild(column);
     }
   } catch (e) {
-    el.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to load board: ${(e as Error).message}</div>`;
+    if (!lifecycle.isDisposed) el.innerHTML = `<div style="padding:20px;color:#ef4444;">Failed to load board: ${(e as Error).message}</div>`;
   }
 }
 
-function createColumn(status: StatusRow, cards: TaskCard[], bayId: string): HTMLElement {
+function createColumn(status: StatusRow, cards: TaskCard[], bayId: string, lifecycle: LifecycleScope): HTMLElement {
   const col = document.createElement("div");
   col.className = "kanban-column";
   col.style.cssText = "min-width:220px;flex:1;display:flex;flex-direction:column;background:#14202e;border-radius:8px;overflow:hidden;";
@@ -95,22 +112,23 @@ function createColumn(status: StatusRow, cards: TaskCard[], bayId: string): HTML
   cardList.addEventListener("drop", async (e) => {
     e.preventDefault();
     cardList.style.background = "";
+    if (lifecycle.isDisposed) return;
     const cardId = e.dataTransfer?.getData("text/plain");
     if (cardId) {
       await invoke(FrontendCommand.TaskUpdate, { id: cardId, bayId, statusId: status.id, source: "user:gui" });
-      await refreshBoard(col.parentElement as HTMLElement, bayId);
+      await refreshBoard(col.parentElement as HTMLElement, bayId, lifecycle);
     }
   });
 
   for (const card of cards) {
-    cardList.appendChild(createCard(card, bayId));
+    cardList.appendChild(createCard(card, bayId, lifecycle));
   }
 
   col.appendChild(cardList);
   return col;
 }
 
-function createCard(card: TaskCard, bayId: string): HTMLElement {
+function createCard(card: TaskCard, bayId: string, lifecycle: LifecycleScope): HTMLElement {
   const el = document.createElement("div");
   el.className = "kanban-card";
   el.draggable = true;
@@ -153,15 +171,17 @@ function createCard(card: TaskCard, bayId: string): HTMLElement {
 
   el.addEventListener("contextmenu", (e) => {
     e.preventDefault();
-    showQuickActions(card, bayId, e.clientX, e.clientY);
+    showQuickActions(card, bayId, e.clientX, e.clientY, lifecycle);
   });
 
   return el;
 }
 
-function showQuickActions(card: TaskCard, bayId: string, x: number, y: number): void {
-  const existing = document.querySelector(".quick-actions-menu");
-  if (existing) existing.remove();
+function showQuickActions(card: TaskCard, bayId: string, x: number, y: number, owner: LifecycleScope): void {
+  if (owner.isDisposed) return;
+  if (activeQuickActions) void activeQuickActions.scope.dispose();
+  const scope = new LifecycleScope();
+  activeQuickActions = { scope, owner };
 
   const menu = document.createElement("div");
   menu.className = "quick-actions-menu";
@@ -180,17 +200,26 @@ function showQuickActions(card: TaskCard, bayId: string, x: number, y: number): 
     btn.style.cssText = "padding:6px 10px;cursor:pointer;border-radius:4px;font-size:12px;";
     btn.addEventListener("mouseenter", () => { btn.style.background = "#2b3d52"; });
     btn.addEventListener("mouseleave", () => { btn.style.background = ""; });
-    btn.addEventListener("click", async () => {
-      menu.remove();
+    scope.listen(btn, "click", async () => {
+      await scope.dispose();
+      if (activeQuickActions?.scope === scope) activeQuickActions = null;
+      if (owner.isDisposed) return;
       await a.action();
-      await refreshBoard(document.querySelector(".kanban-board") as HTMLElement, bayId);
+      const board = document.querySelector(".kanban-board") as HTMLElement | null;
+      if (board) await refreshBoard(board, bayId, owner);
     });
     menu.appendChild(btn);
   }
 
   document.body.appendChild(menu);
-  const closeHandler = (e: MouseEvent) => {
-    if (!menu.contains(e.target as Node)) { menu.remove(); document.removeEventListener("click", closeHandler); }
+  scope.own(() => menu.remove());
+  const closeHandler = (event: Event) => {
+    if (!menu.contains(event.target as Node)) {
+      void scope.dispose();
+      if (activeQuickActions?.scope === scope) activeQuickActions = null;
+    }
   };
-  setTimeout(() => document.addEventListener("click", closeHandler), 0);
+  scope.timeout(() => {
+    if (!scope.isDisposed) scope.listen(document, "click", closeHandler);
+  }, 0);
 }

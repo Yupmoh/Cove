@@ -3,6 +3,7 @@ import { invoke } from "./invoke";
 import { FrontendCommand } from "./app/frontend-command";
 import { MonacoLoader, detectLanguage } from "./monaco-loader";
 import { DiffViewMode, parseRefSpec } from "./diff-view-model";
+import { LifecycleScope, type NookContentHandle } from "./app/lifecycle";
 
 
 interface DiffContent {
@@ -10,7 +11,8 @@ interface DiffContent {
   modifiedContent: string;
 }
 
-export async function renderDiffViewerNook(nookId: string, filePath: string, refInput: string): Promise<HTMLElement> {
+export async function renderDiffViewerNook(nookId: string, filePath: string, refInput: string): Promise<NookContentHandle> {
+  const lifecycle = new LifecycleScope();
   const el = document.createElement("div");
   el.className = "diff-viewer-nook";
   el.style.cssText = "display:flex;flex-direction:column;height:100%;background:#1e1e1e;color:#d4d4d4;";
@@ -82,11 +84,12 @@ export async function renderDiffViewerNook(nookId: string, filePath: string, ref
     changeCount.textContent = `+${added} −${removed}`;
   };
 
-  diffEditor.onDidUpdateDiff(() => { updateChangeCount(); });
+  let updateSubscription = diffEditor.onDidUpdateDiff(() => { updateChangeCount(); });
 
-  toggleBtn.addEventListener("click", () => {
+  lifecycle.listen(toggleBtn, "click", () => {
     mode = DiffViewMode.toggle(mode);
     toggleBtn.textContent = mode === DiffViewMode.SideBySide ? "Side-by-side" : "Unified";
+    updateSubscription.dispose();
     diffEditor.dispose();
     diffEditor = monaco.editor.createDiffEditor(container, {
       originalEditable: false,
@@ -96,12 +99,20 @@ export async function renderDiffViewerNook(nookId: string, filePath: string, ref
       automaticLayout: true,
     });
     diffEditor.setModel({ original: originalModel, modified: modifiedModel });
+    updateSubscription = diffEditor.onDidUpdateDiff(() => { updateChangeCount(); });
   });
 
-  findBtn.addEventListener("click", () => {
+  lifecycle.listen(findBtn, "click", () => {
     const modifiedEditor = diffEditor.getModifiedEditor();
     modifiedEditor.getAction("actions.find")?.run();
   });
 
-  return el;
+  lifecycle.own(() => {
+    updateSubscription.dispose();
+    diffEditor.dispose();
+    modifiedModel.dispose();
+    originalModel.dispose();
+    el.remove();
+  });
+  return { element: el, dispose: () => lifecycle.dispose() };
 }
