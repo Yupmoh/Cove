@@ -234,7 +234,6 @@ const launcherFeature = createLauncherFeature({
   workspace,
   workspaceController,
   spawnNook: (input) => workspaceView.spawn(input),
-  reload: () => workspaceActions.reload(),
   focusNook: (nookId) => workspaceView.focus(nookId),
   focusActiveNook: () => {
     if (!workspace.focusedNookId) return;
@@ -280,7 +279,6 @@ const workspaceView = createWorkspaceViewFeature({
   nookDrag,
   invoke,
   currentTermTheme: () => terminalPreferences.theme(settingsFeature.activeTheme),
-  reload: () => workspaceActions.reload(),
   renderLauncher: (shoreId, placeholderId) => launcherFeature.render(shoreId, placeholderId),
   invalidateLauncherRecents: () => launcherFeature.invalidateRecents(),
   refreshLauncherRecents: () => launcherFeature.refreshRecents(),
@@ -324,7 +322,6 @@ const shoreTabsFeature = createShoreTabsFeature({
   nooks: workspaceView.nooks,
   nookDrag,
   invoke,
-  reload: () => workspaceActions.reload(),
   renderShore: () => workspaceView.render(),
   focusNook: (nookId) => workspaceView.focus(nookId),
   clearDropOverlay: () => workspaceActions.clearDropOverlay(),
@@ -351,7 +348,6 @@ const bayCreateFeature = new BayCreateFeature({
   activeProjectDirectory: () => workspaceView.activeProjectDir(),
   buildIconGrid: (selected, onSelect) => workspaceSidebar.buildBayIconGrid(selected, onSelect),
   loadBays: () => workspaceSidebar.loadBayBoxes(),
-  reload: () => workspaceActions.reload(),
   showToast: showInAppToast,
 });
 
@@ -368,7 +364,6 @@ const workspaceSidebar = createWorkspaceSidebarFeature({
   launcherFeature,
   nooks: workspaceView.nooks,
   invoke,
-  reload: () => workspaceActions.reload(),
   focusNook: (nookId) => workspaceView.focus(nookId),
   revealNook: (nookId) => workspaceActions.revealNook(nookId),
   spawnNook: (input) => workspaceView.spawn(input),
@@ -471,7 +466,6 @@ const inspectFeature = createInspectFeature({
     nookType: "terminal",
   }),
   selectShore: (shoreId) => { workspace.activeShoreId = shoreId; },
-  reload: () => workspaceActions.reload(),
   focusNook: (nookId) => workspaceView.focus(nookId),
 });
 

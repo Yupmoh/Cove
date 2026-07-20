@@ -19,7 +19,7 @@ function fixture() {
     spawnNook: vi.fn(async () => ({ nookId: "nook-1" })),
     createShore: vi.fn(async () => ({ shoreId: "shore-1" })),
     selectShore: vi.fn(),
-    reload: vi.fn(async () => {}),
+
     focusNook: vi.fn(),
   };
   return { window, invoke, feature: createInspectFeature(dependencies) };

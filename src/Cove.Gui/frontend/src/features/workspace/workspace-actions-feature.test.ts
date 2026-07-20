@@ -221,5 +221,6 @@ describe("WorkspaceActionsFeature", () => {
     const create = feature.newShore();
     await create;
     expect(mutationOps).toEqual(["activateSubtab", "createShore"]);
+    expect(dependencies.invoke).not.toHaveBeenCalledWith("app.layoutGet", {});
   });
 });

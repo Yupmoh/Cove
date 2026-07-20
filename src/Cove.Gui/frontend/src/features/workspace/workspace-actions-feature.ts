@@ -112,7 +112,6 @@ async function splitActive(dir: "row" | "col"): Promise<void> {
   if (!src) return;
   const sp = (await workspaceView.spawn({ command: "", cwd: "", inheritCwdFrom: src, cols: 80, rows: 24, adapter: "", agentName: "", bay: "", shore: "" })).nookId;
   await workspaceController.mutate("split", { shoreId: workspace.activeShoreId, targetNookId: src, newNookId: sp, orientation: dir, name: "", nookId: "", dir: 0 });
-  await reload();
   workspaceView.focus(sp);
 }
 
@@ -122,7 +121,6 @@ async function moveNookToShore(nookId: string, targetShoreId: string): Promise<v
   try {
     await workspaceController.mutate("moveNookToShore", { shoreId: targetShoreId, nookId, targetNookId: "", newNookId: "", orientation: "", name: "", dir: 0 });
     workspace.activeShoreId = targetShoreId;
-    await reload();
     workspaceView.focus(nookId);
   } catch (err) { console.warn("move nook to shore failed", nookId, targetShoreId, err); }
 }
@@ -144,7 +142,7 @@ function clearDropOverlay(): void {
   dropOverlayEl?.remove();
 }
 
-async function applyNookMove(m: { op: string; nookId: string; targetNookId: string; orientation: string; dir: number }, focusId: string): Promise<void> {
+async function applyNookMove(m: { op: string; nookId: string; targetNookId: string; orientation: string; dir: number }, sourceNookId: string): Promise<void> {
   if (!workspace.activeShoreId) { console.warn("nook move without active shore"); return; }
   try {
     const srcShore = workspace.snapshot?.shores.find((r) => workspaceView.collectLeafIds(r.layoutTree).includes(m.nookId));
@@ -157,10 +155,9 @@ async function applyNookMove(m: { op: string; nookId: string; targetNookId: stri
       const idx = srcLeaf ? Math.max(0, srcLeaf.activeSubtab) : 0;
       await workspaceController.mutate("centerDrop", { shoreId: workspace.activeShoreId, targetNookId: m.nookId, nookId: m.targetNookId, dir: idx, newNookId: "", orientation: "", name: "" });
     } else {
-      await workspaceController.mutate("moveNook", { shoreId: workspace.activeShoreId, nookId: m.nookId, targetNookId: m.targetNookId, orientation: m.orientation, dir: m.dir, newNookId: "", name: "" });
+      await workspaceController.mutate("move", { shoreId: workspace.activeShoreId, targetNookId: m.targetNookId, nookId: sourceNookId, orientation: m.orientation, dir: m.dir, newNookId: "", name: "" });
     }
-    await reload();
-    workspaceView.focus(focusId);
+    workspaceView.focus(sourceNookId);
   } catch (err) { console.warn("nook move failed", m.op, err); }
 }
 
@@ -202,7 +199,6 @@ async function closeNookById(nookId: string): Promise<void> {
   await killNookProcess(nookId);
   try { await workspaceController.mutate("close", { shoreId: shore.id, nookId, targetNookId: "", newNookId: "", orientation: "", name: "", dir: 0 }); } catch (err) { console.warn("layout close on exit failed", nookId, err); }
   workspaceView.disposeNook(nookId);
-  await reload();
 }
 
 async function splitActiveWith(dir: "row" | "col", kind: string): Promise<void> {
@@ -227,7 +223,6 @@ async function splitActiveWith(dir: "row" | "col", kind: string): Promise<void> 
     nookType = kind;
   }
   await workspaceController.mutate("split", { shoreId: workspace.activeShoreId, targetNookId: target, newNookId: nookId, orientation: dir, name: "", nookId: "", dir: 0, nookType });
-  await reload();
   workspaceView.focus(nookId);
 }
 
@@ -238,7 +233,6 @@ async function closeFocused(): Promise<void> {
   await killNookProcess(nookId);
   await workspaceController.mutate("close", { shoreId: workspace.activeShoreId, nookId, targetNookId: "", newNookId: "", orientation: "", name: "", dir: 0 });
   workspaceView.disposeNook(nookId);
-  await reload();
 }
 
 async function closeOthers(keepNookId: string): Promise<void> {
@@ -253,7 +247,6 @@ async function closeOthers(keepNookId: string): Promise<void> {
     workspaceView.disposeNook(id);
   }
   workspaceView.focus(keepNookId);
-  await reload();
 }
 
 async function toggleZoom(): Promise<void> {
@@ -264,7 +257,6 @@ async function toggleZoom(): Promise<void> {
   } else {
     await workspaceController.mutate("zoom", { shoreId: workspace.activeShoreId, nookId: workspace.focusedNookId, targetNookId: "", newNookId: "", orientation: "", name: "", dir: 0 });
   }
-  await reload();
 }
 
 function cycleFocus(d: number): void {
@@ -285,7 +277,6 @@ async function newShore(): Promise<void> {
   const r = await workspaceController.mutate<{ shoreId: string }>("createShore", { newNookId: placeholder, name: shoreTabsFeature.nextName(), shoreId: "", targetNookId: "", orientation: "", nookId: "", dir: 0, nookType: "empty" });
   workspace.activeShoreId = r.shoreId;
   workspace.focusedNookId = null;
-  await reload();
 }
 
 function safeReplaceTarget(shoreId: string, placeholderId: string | null): string | null {
@@ -307,7 +298,6 @@ async function placeNookIntoShore(shoreId: string, placeholderId: string | null,
     await workspaceController.mutate("createShore", { newNookId: nookId, name: shoreName === "Shore" || !shoreName ? shoreTabsFeature.nextName() : shoreName, shoreId: "", targetNookId: "", orientation: "", nookId: "", dir: 0, nookType });
   }
   workspace.activeShoreId = shoreId;
-  await reload();
   workspaceView.focus(nookId);
 }
 
@@ -326,7 +316,6 @@ async function launchTileInto(shoreId: string | null, placeholderId: string | nu
   } else {
     const r = await workspaceController.mutate<{ shoreId: string }>("createShore", { newNookId: nookId, name: placeable.shoreName === "Shore" ? shoreTabsFeature.nextName() : placeable.shoreName, shoreId: "", targetNookId: "", orientation: "", nookId: "", dir: 0, nookType: placeable.nookType });
     workspace.activeShoreId = r.shoreId;
-    await reload();
     workspaceView.focus(nookId);
   }
 }
@@ -335,7 +324,6 @@ async function newBrowserShore(url: string): Promise<void> {
   const bp = await invoke<{ nookId: string; currentUrl: string }>(FrontendCommand.BrowserCreate, { url });
   const r = await workspaceController.mutate<{ shoreId: string }>("createShore", { newNookId: bp.nookId, name: "Browser", shoreId: "", targetNookId: "", orientation: "", nookId: "", dir: 0, nookType: "browser" });
   workspace.activeShoreId = r.shoreId;
-  await reload();
   workspaceView.focus(bp.nookId);
 }
 
@@ -348,9 +336,8 @@ async function closeShore(shoreId: string): Promise<void> {
     await killNookProcess(id);
     workspaceView.disposeNook(id);
   }
-  try { await workspaceController.mutate("closeShore", { shoreId, nookId: "", targetNookId: "", newNookId: "", orientation: "", name: "", dir: 0 }); } catch { void 0; }
+  await workspaceController.mutate("closeShore", { shoreId, nookId: "", targetNookId: "", newNookId: "", orientation: "", name: "", dir: 0 });
   if (workspace.activeShoreId === shoreId) workspace.activeShoreId = null;
-  await reload();
 }
 
 async function openBayLauncher(wsId: string): Promise<void> {
@@ -395,7 +382,6 @@ async function openTaskInNook(taskId: string): Promise<void> {
     const r = await workspaceController.mutate<{ shoreId: string }>("createShore", { newNookId: sp, name: "Task", shoreId: "", targetNookId: "", orientation: "", nookId: "", dir: 0, nookType: "tasks-kanban" });
     workspace.activeShoreId = r.shoreId;
     workspaceView.setNookFilePath(sp, taskId);
-    await reload();
     workspaceView.focus(sp);
   } catch { void 0; }
 }
@@ -406,7 +392,6 @@ async function openFileInEditor(filePath: string): Promise<void> {
     const r = await workspaceController.mutate<{ shoreId: string }>("createShore", { newNookId: sp, name: filePath.split("/").pop() || "Editor", shoreId: "", targetNookId: "", orientation: "", nookId: "", dir: 0, nookType: "editor" });
     workspace.activeShoreId = r.shoreId;
     workspaceView.setNookFilePath(sp, filePath);
-    await reload();
     workspaceView.focus(sp);
   } catch { void 0; }
 }
@@ -416,7 +401,6 @@ async function openToolShore(nookType: string, name: string): Promise<void> {
     const sp = (await workspaceView.spawn({ command: "", cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: "", agentName: "", bay: "", shore: "" })).nookId;
     const r = await workspaceController.mutate<{ shoreId: string }>("createShore", { newNookId: sp, name, shoreId: "", targetNookId: "", orientation: "", nookId: "", dir: 0, nookType });
     workspace.activeShoreId = r.shoreId;
-    await reload();
     workspaceView.focus(sp);
   } catch (e) { console.warn("openToolShore failed", nookType, e); }
 }
@@ -469,7 +453,6 @@ async function revealNook(nookId: string): Promise<void> {
     void workspaceController.mutate("activateSubtab", { shoreId: shore.id, nookId: location.leaf.nookId, targetNookId: "", newNookId: "", orientation: "", name: "", dir: location.subtabIndex })
       .catch((error) => {
         console.warn("nook subtab activation failed", nookId, error);
-        void reload();
       });
   }
   workspaceSidebar.acknowledgeAgentAttention(nookId);

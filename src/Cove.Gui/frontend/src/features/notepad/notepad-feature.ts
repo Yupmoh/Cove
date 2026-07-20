@@ -26,7 +26,6 @@ export interface NotepadFeatureDependencies {
   spawnNook(params: Record<string, unknown>): Promise<{ nookId: string }>;
   createShore(nookId: string): Promise<{ shoreId: string }>;
   selectShore(shoreId: string): void;
-  reload(): Promise<unknown>;
   focusNook(nookId: string): void;
   openNote(bayId: string, noteId: string): Promise<void>;
 }
@@ -138,7 +137,6 @@ export function createNotepadFeature(dependencies: NotepadFeatureDependencies): 
       const created = await dependencies.createShore(spawned.nookId);
       if (lifecycle.isDisposed) return;
       dependencies.selectShore(created.shoreId);
-      await dependencies.reload();
       if (lifecycle.isDisposed) return;
       dependencies.focusNook(spawned.nookId);
       await waitForElement(".notepad-editor", 3000);

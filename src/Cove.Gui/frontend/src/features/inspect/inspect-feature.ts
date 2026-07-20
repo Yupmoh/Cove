@@ -32,7 +32,6 @@ export interface InspectFeatureDependencies {
   spawnNook(params: Record<string, unknown>): Promise<{ nookId: string }>;
   createShore(nookId: string, name: string): Promise<{ shoreId: string }>;
   selectShore(shoreId: string): void;
-  reload(): Promise<unknown>;
   focusNook(nookId: string): void;
 }
 
@@ -88,7 +87,6 @@ export function createInspectFeature(dependencies: InspectFeatureDependencies): 
     });
     const created = await dependencies.createShore(spawned.nookId, shoreName);
     dependencies.selectShore(created.shoreId);
-    await dependencies.reload();
     dependencies.focusNook(spawned.nookId);
   };
 

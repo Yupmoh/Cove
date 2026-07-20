@@ -28,7 +28,6 @@ export interface ShoreTabsDependencies {
   nooks: ReadonlyMap<string, ShoreTabNookView>;
   nookDrag: NookDragState;
   invoke<T>(command: FrontendCommand, args: Record<string, unknown>): Promise<T>;
-  reload(): Promise<unknown>;
   renderShore(): void;
   focusNook(nookId: string): void;
   clearDropOverlay(): void;
@@ -67,7 +66,6 @@ export function createShoreTabsFeature(dependencies: ShoreTabsDependencies): Sho
   const nooks = dependencies.nooks;
   const nookDrag = dependencies.nookDrag;
   const invoke = dependencies.invoke;
-  const reload = dependencies.reload;
   const renderShore = dependencies.renderShore;
   const focusNook = dependencies.focusNook;
   const clearDropOverlay = dependencies.clearDropOverlay;
@@ -127,7 +125,6 @@ async function switchWingActive(wingId: string): Promise<void> {
     console.warn("wing switch failed", { bayId, wingId, error });
   }
   await loadWings();
-  await reload();
   renderShoreTabs();
 }
 
@@ -376,7 +373,6 @@ async function reorderShores(fromId: string, toId: string): Promise<void> {
   try {
     await workspaceController.mutate("reorder", { shoreIds: newOrder, shoreId: "", targetNookId: "", newNookId: "", orientation: "", name: "", nookId: "", dir: 0 });
   } catch (err) { console.warn("shore reorder failed", err); }
-  await reload();
 }
 
 function startRename(shoreId: string, nameEl: HTMLElement): void {
@@ -395,7 +391,6 @@ function startRename(shoreId: string, nameEl: HTMLElement): void {
       shore.name = newName;
       try {
         await workspaceController.mutate("rename", { shoreId, name: newName, nookId: "", targetNookId: "", newNookId: "", orientation: "", dir: 0 });
-        await reload();
         return;
       } catch (err) { console.warn("shore rename failed", shoreId, err); }
     }

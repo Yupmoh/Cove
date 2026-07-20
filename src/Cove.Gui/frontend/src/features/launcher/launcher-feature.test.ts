@@ -37,7 +37,7 @@ function fixture() {
     workspace: new WorkspaceStore(),
     workspaceController: new WorkspaceController(async <T>() => ({} as T)),
     spawnNook: vi.fn(async () => ({ nookId: "nook-1" })),
-    reload: vi.fn(async () => {}),
+
     focusNook: vi.fn(),
     focusActiveNook: terminalFocus,
     safeReplaceTarget: () => null,

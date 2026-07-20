@@ -77,7 +77,6 @@ export interface LauncherFeatureDependencies {
   workspace: WorkspaceStore;
   workspaceController: WorkspaceController;
   spawnNook: (params: Record<string, unknown>) => Promise<{ nookId: string }>;
-  reload: () => Promise<unknown>;
   focusNook: (nookId: string) => void;
   focusActiveNook: () => void;
   safeReplaceTarget: (shoreId: string, placeholderId: string | null) => string | null;
@@ -135,7 +134,6 @@ export function createLauncherFeature(dependencies: LauncherFeatureDependencies)
   const workspace = dependencies.workspace;
   const workspaceController = dependencies.workspaceController;
   const spawnNook = dependencies.spawnNook;
-  const reload = dependencies.reload;
   const focusNook = dependencies.focusNook;
   const safeReplaceTarget = dependencies.safeReplaceTarget;
   const nextShoreName = dependencies.nextShoreName;
@@ -163,7 +161,6 @@ async function launchHarnessUpdate(tile: LauncherTile): Promise<void> {
     const sp = (await spawnNook({ command: "", args: [], shellCommand: tile.updateCommand, cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: "", agentName: `Update ${tile.label}`, bay: "", shore: "" })).nookId;
     const r = await workspaceController.mutate<{ shoreId: string }>("createShore", { newNookId: sp, name: `Update ${tile.label}`, shoreId: "", targetNookId: "", orientation: "", nookId: "", dir: 0, nookType: "terminal" });
     workspace.activeShoreId = r.shoreId;
-    await reload();
     focusNook(sp);
   } catch (err) {
     console.warn("harness update launch failed", tile.adapterName, err);
@@ -176,7 +173,6 @@ async function launchHarnessShellTask(commandLine: string, shoreName: string): P
     const sp = (await spawnNook({ command: "", args: [], shellCommand: commandLine, cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: "", agentName: shoreName, bay: "", shore: "" })).nookId;
     const r = await workspaceController.mutate<{ shoreId: string }>("createShore", { newNookId: sp, name: shoreName, shoreId: "", targetNookId: "", orientation: "", nookId: "", dir: 0, nookType: "terminal" });
     workspace.activeShoreId = r.shoreId;
-    await reload();
     focusNook(sp);
     scheduleAdapterRedetect();
   } catch (err) {
@@ -266,7 +262,6 @@ async function spawnAgentInto(shoreId: string | null, placeholderId: string | nu
     const r = await workspaceController.mutate<{ shoreId: string }>("createShore", { newNookId: sp, name: nextShoreName(), shoreId: "", targetNookId: "", orientation: "", nookId: "", dir: 0 });
     workspace.activeShoreId = r.shoreId;
   }
-  await reload();
   focusNook(sp);
 }
 

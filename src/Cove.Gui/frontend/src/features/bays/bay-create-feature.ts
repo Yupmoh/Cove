@@ -13,7 +13,6 @@ export interface BayCreateDependencies {
   activeProjectDirectory(): string;
   buildIconGrid(selected: string | null, onSelect: (icon: string | null) => void): HTMLElement;
   loadBays(): Promise<void>;
-  reload(): Promise<unknown>;
   showToast(title: string, body: string, action?: () => void): void;
 }
 
@@ -119,7 +118,6 @@ export class BayCreateFeature implements ComponentHandle {
         }
       }
       await this.dependencies.loadBays();
-      await this.dependencies.reload();
     } catch (creationError) {
       console.warn("bay.create failed", creationError);
       error.textContent = "Could not create bay at that directory.";

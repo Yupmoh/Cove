@@ -64,7 +64,6 @@ export interface WorkspaceViewDependencies {
   nookDrag: NookDragState;
   invoke<T>(command: FrontendCommand, args: Record<string, unknown>): Promise<T>;
   currentTermTheme(): Record<string, string>;
-  reload(): Promise<unknown>;
   renderLauncher(shoreId: string | null, placeholderId: string | null): HTMLElement;
   invalidateLauncherRecents(): void;
   refreshLauncherRecents(): Promise<unknown>;
@@ -134,7 +133,6 @@ export function createWorkspaceViewFeature(dependencies: WorkspaceViewDependenci
   const nookDrag = dependencies.nookDrag;
   const invoke = dependencies.invoke;
   const currentTermTheme = dependencies.currentTermTheme;
-  const reload = dependencies.reload;
   const showInAppToast = dependencies.showInAppToast;
   const revealNook = dependencies.revealNook;
   const runAction = dependencies.runAction;
@@ -602,7 +600,6 @@ function findNookLocation(node: MosaicNode, nookId: string): { leaf: NookLeaf; s
 async function activateSubtab(leafId: string, index: number): Promise<void> {
   if (!workspace.activeShoreId) return;
   await workspaceController.mutate("activateSubtab", { shoreId: workspace.activeShoreId, nookId: leafId, targetNookId: "", newNookId: "", orientation: "", name: "", dir: index });
-  await reload();
 }
 
 function emptyNookStrip(nookId: string): HTMLElement {
@@ -635,9 +632,8 @@ function emptyNookStrip(nookId: string): HTMLElement {
 
 async function spawnIntoNook(nookId: string): Promise<void> {
   if (!workspace.activeShoreId) return;
-  const sp = (await spawnNook({ command: "", cwd: "", inheritCwdFrom: "", cols: 80, rows: 24, adapter: "", agentName: "", bay: "", shore: "" })).nookId;
+  const sp = (await spawnNook({ command: "", cwd: "", inheritCwdFrom: nookId, cols: 80, rows: 24, adapter: "", agentName: "", bay: "", shore: "" })).nookId;
   await workspaceController.mutate("addSubtab", { shoreId: workspace.activeShoreId, nookId: nookId, newNookId: sp, targetNookId: "", orientation: "", name: "", dir: 0 });
-  await reload();
 }
 
 function bayIdForNook(nookType: string): string | null {
@@ -816,7 +812,6 @@ async function performResume(action: ResumeAction): Promise<void> {
   const sp = (await spawnNook({ command: action.command, args: action.args, cwd: action.cwd, inheritCwdFrom: "", cols: 80, rows: 24, adapter: action.adapter, agentName: action.shoreName, bay: "", shore: "", sessionId: action.sessionId ?? undefined, yolo: action.yolo })).nookId;
   const r = await workspaceController.mutate<{ shoreId: string }>("createShore", { newNookId: sp, name: action.shoreName, shoreId: "", targetNookId: "", orientation: "", nookId: "", dir: 0, nookType: "terminal" });
   workspace.activeShoreId = r.shoreId;
-  await reload();
   focusNook(sp);
   if (action.toast) showInAppToast(action.toast.title, action.toast.body, () => revealNook(sp));
 }

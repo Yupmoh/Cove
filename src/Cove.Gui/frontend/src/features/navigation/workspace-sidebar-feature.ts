@@ -37,7 +37,6 @@ export interface WorkspaceSidebarDependencies {
   launcherFeature: LauncherFeature;
   nooks: ReadonlyMap<string, SidebarNookView>;
   invoke<T>(command: FrontendCommand, args: Record<string, unknown>): Promise<T>;
-  reload(): Promise<unknown>;
   focusNook(nookId: string): void;
   revealNook(nookId: string): void;
   spawnNook(input: Record<string, unknown>): Promise<{ nookId: string }>;
@@ -107,7 +106,6 @@ export function createWorkspaceSidebarFeature(dependencies: WorkspaceSidebarDepe
   const launcherFeature = dependencies.launcherFeature;
   const nooks = dependencies.nooks;
   const invoke = dependencies.invoke;
-  const reload = dependencies.reload;
   const focusNook = dependencies.focusNook;
   const revealNook = dependencies.revealNook;
   const spawnNook = dependencies.spawnNook;
@@ -174,7 +172,6 @@ const notepadFeature = createNotepadFeature({
     nookType: "notepad",
   }),
   selectShore: (shoreId) => { workspace.activeShoreId = shoreId; },
-  reload,
   focusNook,
   openNote,
 });
@@ -219,7 +216,6 @@ function startShoreRename(shoreId: string, labelEl: HTMLElement | null, currentN
     if (save && newName && newName !== currentName) {
       try { await workspaceController.mutate("rename", { shoreId, name: newName, nookId: "", targetNookId: "", newNookId: "", orientation: "", dir: 0 }); }
       catch (e) { console.warn("shore rename failed", shoreId, e); }
-      await reload();
       return;
     }
     renderSidebarContent("left");
@@ -263,7 +259,6 @@ async function deleteBay(wsId: string): Promise<void> {
   try {
     await invoke(FrontendCommand.BayDelete, { id: wsId });
     await loadBayBoxes();
-    await reload();
   } catch (e) { console.warn("bay.delete failed", wsId, e); }
 }
 
