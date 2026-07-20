@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- New Windows Claude Code, OMP, and Codex sessions now launch detected native executables instead of unusable `/c/...` paths returned by Git Bash
+- Windows session resume now builds native Claude Code, OMP, and Codex command lines from detected executable paths instead of relying on Git Bash paths and script-only dependencies
 - Windows Claude Code and OMP session discovery now scans native JSONL histories directly instead of silently returning no sessions when Git Bash lacks `jq`
 - Windows adapter discovery now applies executable extensions when scanning `PATH`, allowing installed `.exe`, `.cmd`, and `.bat` agent harnesses to appear in the launcher
 - Terminal relay now preserves absolute byte offsets, uses an explicit replay boundary, rejects stream gaps and stale generations, pauses hidden subscriptions, and reconnects from the last accepted offset

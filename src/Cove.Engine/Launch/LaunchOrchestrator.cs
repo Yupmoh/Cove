@@ -65,6 +65,17 @@ public sealed class LaunchOrchestrator
         if (adapter is null)
             throw new ResumeFailedException($"unknown adapter: {profile.Adapter}");
 
+        if (OperatingSystem.IsWindows())
+        {
+            var nativeBinary = await _processes.AcquireBinaryAsync(adapter, cancellationToken).ConfigureAwait(false);
+            if (!string.IsNullOrWhiteSpace(nativeBinary)
+                && WindowsAdapterLaunchCommand.Build(nativeBinary, adapter.Directory, profile, overrides) is { } nativeCommand)
+            {
+                LogComposed(profile.Adapter, nativeCommand);
+                return nativeCommand;
+            }
+        }
+
         if (adapter.Manifest.Methods.TryGetValue(
                 "build_launch_command",
                 out var method)

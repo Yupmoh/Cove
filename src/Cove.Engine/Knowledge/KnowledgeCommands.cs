@@ -450,10 +450,26 @@ public static class KnowledgeCommands
             return ctx.Fail("invalid_params", "adapter and sessionId are required");
         if (ctx.ManifestStore is not { } manifests)
             return ctx.Fail("not_ready", "adapter manifest store not available");
-        if (manifests.Load(p.Adapter) is null)
+        if (manifests.Load(p.Adapter) is not { } manifest)
             return ctx.Fail("not_found", $"unknown adapter: {p.Adapter}");
 
         var overrides = new Cove.Engine.Restart.LauncherOverrides { WorkingDir = p.Cwd, Yolo = p.Yolo };
+        if (OperatingSystem.IsWindows() && ctx.Launcher is { } windowsLauncher)
+        {
+            var detection = windowsLauncher.DescribeAdapterBinary(manifest);
+            if (detection.State == Cove.Adapters.AdapterDetectionState.Detected
+                && !string.IsNullOrWhiteSpace(detection.BinaryPath)
+                && Cove.Engine.Launch.WindowsAdapterResumeCommand.Build(
+                    p.Adapter,
+                    detection.BinaryPath,
+                    manifests.ResolveDir(p.Adapter),
+                    p.SessionId,
+                    overrides) is { } nativeCommand)
+            {
+                return ctx.Ok(new VaultResumeResult(true, p.Adapter, ToArgv(nativeCommand), nativeCommand.Cwd, "none", null), CoveJsonContext.Default.VaultResumeResult);
+            }
+        }
+
         var protocol = new Cove.Engine.Launch.AdapterResumeProtocol(manifests, new Cove.Adapters.MethodRunner());
         try
         {

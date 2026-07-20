@@ -115,4 +115,64 @@ public sealed class AdapterResumeProtocolTests
 
         Assert.False(proto.IsSessionReaped("any-session"));
     }
+
+    [Fact]
+    public void WindowsResumeCommand_OmpUsesNativeBinaryAndSessionId()
+    {
+        var command = WindowsAdapterResumeCommand.Build(
+            "omp",
+            @"C:\tools\omp.exe",
+            @"C:\cove\adapters\omp",
+            "omp-session",
+            new LauncherOverrides { WorkingDir = @"D:\Cove" });
+
+        Assert.NotNull(command);
+        Assert.Equal(@"C:\tools\omp.exe", command.Command);
+        Assert.Equal("--resume", command.Args[0]);
+        Assert.Equal("omp-session", command.Args[1]);
+        Assert.Contains(Path.Combine(@"C:\cove\adapters\omp", "cove-hooks.ts"), command.Args);
+    }
+
+    [Fact]
+    public void WindowsResumeCommand_ClaudePreservesPermissionOverride()
+    {
+        var command = WindowsAdapterResumeCommand.Build(
+            "claude-code",
+            @"C:\tools\claude.exe",
+            @"C:\cove\adapters\claude-code",
+            "claude-session",
+            new LauncherOverrides { Yolo = true });
+
+        Assert.NotNull(command);
+        Assert.Equal(["--resume", "claude-session", "--dangerously-skip-permissions"], command.Args);
+    }
+
+    [Fact]
+    public void WindowsLaunchCommand_ClaudeUsesNativeBinaryAndProfileOptions()
+    {
+        var profile = new LaunchProfile(
+            "Default",
+            "default",
+            "claude-code",
+            true,
+            "sonnet",
+            null,
+            [],
+            new Dictionary<string, string>(),
+            new Dictionary<string, bool>(),
+            [],
+            null,
+            1);
+
+        var command = WindowsAdapterLaunchCommand.Build(
+            @"C:\tools\claude.exe",
+            @"C:\cove\adapters\claude-code",
+            profile,
+            new LauncherOverrides { Yolo = true, WorkingDir = @"D:\Cove" });
+
+        Assert.NotNull(command);
+        Assert.Equal(@"C:\tools\claude.exe", command.Command);
+        Assert.Equal(["--dangerously-skip-permissions", "--model", "sonnet"], command.Args);
+        Assert.Equal(@"D:\Cove", command.Cwd);
+    }
 }

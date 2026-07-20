@@ -207,11 +207,6 @@ internal sealed class EngineRuntime : IAsyncDisposable
         var registry = new RegistryService(
             registryCachePath,
             registryFetcher);
-        var resumeProtocol = new AdapterResumeProtocol(
-            manifestStore,
-            new MethodRunner(logger: logger),
-            logger);
-        var resumeService = new AgentResumeService(resumeProtocol);
         var launchAdapterLookup =
             new LaunchAdapterLookup(manifestStore);
         var launchProcessAcquirer =
@@ -220,6 +215,13 @@ internal sealed class EngineRuntime : IAsyncDisposable
                 new BinaryDiscoveryService(logger),
                 probedPath,
                 logger);
+        var resumeProtocol = new AdapterResumeProtocol(
+            manifestStore,
+            new MethodRunner(logger: logger),
+            logger,
+            launchAdapterLookup,
+            launchProcessAcquirer);
+        var resumeService = new AgentResumeService(resumeProtocol);
         var launcher = new LaunchOrchestrator(
             new LaunchCommandComposer(),
             launchAdapterLookup,

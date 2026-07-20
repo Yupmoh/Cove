@@ -11,12 +11,23 @@ public sealed class AdapterResumeProtocol : IAdapterResume
     private readonly AdapterManifestStore _manifestStore;
     private readonly MethodRunner _methodRunner;
     private readonly ILogger? _logger;
+    private readonly ILaunchAdapterLookup? _adapters;
+    private readonly ILaunchProcessAcquirer? _processes;
 
-    public AdapterResumeProtocol(AdapterManifestStore manifestStore, MethodRunner methodRunner, ILogger? logger = null)
+    public AdapterResumeProtocol(
+        AdapterManifestStore manifestStore,
+        MethodRunner methodRunner,
+        ILogger? logger = null,
+        ILaunchAdapterLookup? adapters = null,
+        ILaunchProcessAcquirer? processes = null)
     {
+        if ((adapters is null) != (processes is null))
+            throw new ArgumentException("adapter lookup and process acquisition must be configured together");
         _manifestStore = manifestStore;
         _methodRunner = methodRunner;
         _logger = logger;
+        _adapters = adapters;
+        _processes = processes;
     }
 
     public async Task<ResumeCommand> BuildResumeCommandAsync(string adapter, string sessionId, LauncherOverrides overrides, System.Threading.CancellationToken cancellationToken = default)
@@ -24,6 +35,14 @@ public sealed class AdapterResumeProtocol : IAdapterResume
         var manifest = _manifestStore.Load(adapter);
         if (manifest is null)
             throw new ResumeFailedException($"unknown adapter: {adapter}");
+
+        if (OperatingSystem.IsWindows() && _adapters?.Find(adapter) is { } launchAdapter && _processes is { } processes)
+        {
+            var binary = await processes.AcquireBinaryAsync(launchAdapter, cancellationToken).ConfigureAwait(false);
+            if (!string.IsNullOrWhiteSpace(binary)
+                && WindowsAdapterResumeCommand.Build(adapter, binary, _manifestStore.ResolveDir(adapter), sessionId, overrides) is { } nativeCommand)
+                return nativeCommand;
+        }
 
         if (!manifest.Methods.TryGetValue("build_resume_command", out var method) || method.Script is null)
             throw new ResumeFailedException($"adapter {adapter} has no build_resume_command method");
