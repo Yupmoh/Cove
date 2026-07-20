@@ -155,7 +155,7 @@ async function applyNookMove(m: { op: string; nookId: string; targetNookId: stri
       const idx = srcLeaf ? Math.max(0, srcLeaf.activeSubtab) : 0;
       await workspaceController.mutate("centerDrop", { shoreId: workspace.activeShoreId, targetNookId: m.nookId, nookId: m.targetNookId, dir: idx, newNookId: "", orientation: "", name: "" });
     } else {
-      await workspaceController.mutate("move", { shoreId: workspace.activeShoreId, targetNookId: m.targetNookId, nookId: sourceNookId, orientation: m.orientation, dir: m.dir, newNookId: "", name: "" });
+      await workspaceController.mutate("moveNook", { shoreId: workspace.activeShoreId, targetNookId: m.targetNookId, nookId: sourceNookId, orientation: m.orientation, dir: m.dir, newNookId: "", name: "" });
     }
     workspaceView.focus(sourceNookId);
   } catch (err) { console.warn("nook move failed", m.op, err); }

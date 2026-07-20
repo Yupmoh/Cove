@@ -64,6 +64,51 @@ describe("WorkspaceActionsFeature", () => {
     feature.dispose();
   });
 
+  it("moves a nook through the registered daemon operation", async () => {
+    const window = new Window();
+    const workspace = new WorkspaceStore();
+    const state = snapshot();
+    workspace.applySnapshot(state);
+    const mutate = vi.fn(async () => ({}));
+    const dependencies = {
+      document: window.document,
+      workspace,
+      workspaceController: {
+        mutate,
+        transaction: vi.fn(async (work: () => Promise<unknown>) => work()),
+      },
+      workspaceView: {
+        collectLeafIds: () => ["nook-1"],
+        activeShore: () => state.shores[0],
+        focus: vi.fn(),
+      },
+      shoreTabsFeature: { render: vi.fn(), setActiveWing: vi.fn() },
+      workspaceSidebar: { render: vi.fn() },
+      launcherFeature: { refreshRecents: vi.fn(async () => {}) },
+      invoke: vi.fn(async () => ({})),
+      runAction: vi.fn(),
+    } as unknown as WorkspaceActionsDependencies;
+    const feature = createWorkspaceActionsFeature(dependencies);
+
+    await feature.applyNookMove({
+      op: "moveNook",
+      nookId: "nook-1",
+      targetNookId: "nook-2",
+      orientation: "row",
+      dir: 1,
+    }, "nook-1");
+
+    expect(mutate).toHaveBeenCalledExactlyOnceWith("moveNook", {
+      shoreId: "shore-1",
+      targetNookId: "nook-2",
+      nookId: "nook-1",
+      orientation: "row",
+      dir: 1,
+      newNookId: "",
+      name: "",
+    });
+  });
+
   it("closes native browser ownership through every nook close entry point", async () => {
     const window = new Window();
     const workspace = new WorkspaceStore();

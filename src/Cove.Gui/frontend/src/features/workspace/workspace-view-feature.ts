@@ -469,9 +469,22 @@ function makeNook(nookId: string, since: number): NookView {
 
   el.addEventListener("mousedown", () => { workspaceSidebar.acknowledgeAgentAttention(nookId); focusNook(nookId); });
   const setTitle = () => { titleSpan.textContent = pv.customTitle || pv.title || "shell"; };
-  header.addEventListener("mousedown", (e) => { if (e.target !== moreBtn) focusNook(nookId); });
-  header.draggable = true;
+  const isHeaderControl = (target: EventTarget | null): boolean =>
+    (target as Element | null)?.closest?.("button, input, textarea, select, a, [contenteditable='true']") !== null;
+  header.addEventListener("mousedown", (e) => {
+    if (isHeaderControl(e.target)) {
+      e.stopPropagation();
+      return;
+    }
+    focusNook(nookId);
+  });
+  titleSpan.draggable = true;
   header.addEventListener("dragstart", (e) => {
+    if (isHeaderControl(e.target) || !e.target || !titleSpan.contains(e.target as Node)) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
     if (!e.dataTransfer) return;
     e.dataTransfer.setData("text/cove-nook", nookId);
     e.dataTransfer.effectAllowed = "move";
