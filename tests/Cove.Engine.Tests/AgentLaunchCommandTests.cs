@@ -68,6 +68,10 @@ public sealed class AgentLaunchCommandTests
         Assert.Equal(McpScope.SameTab, scopes.GetScope(result.NookId));
         Assert.Equal("right", result.Placement);
         Assert.False(result.Resumed);
+        var split = Assert.IsType<SplitNode>(layout.GetRoot(shoreId));
+        Assert.Equal(SplitOrientation.Row, split.Orientation);
+        Assert.Equal("anchor", Assert.IsType<NookLeaf>(split.ChildA).NookId);
+        Assert.Equal(result.NookId, Assert.IsType<NookLeaf>(split.ChildB).NookId);
         nooks.Kill(result.NookId);
     }
 

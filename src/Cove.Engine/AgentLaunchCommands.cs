@@ -264,8 +264,8 @@ internal static class AgentLaunchCommands
     private static SplitOrientation Orientation(
         string placement) =>
         placement is "left" or "right"
-            ? SplitOrientation.Column
-            : SplitOrientation.Row;
+            ? SplitOrientation.Row
+            : SplitOrientation.Column;
 
     private static bool Before(string placement) =>
         placement is "left" or "above";
