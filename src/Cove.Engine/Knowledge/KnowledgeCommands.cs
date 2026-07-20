@@ -496,7 +496,7 @@ public static class KnowledgeCommands
     {
         if (ctx.Launcher is not { } orch || !orch.CanResolveProfiles)
             return null;
-        var profile = orch.FindProfile(adapter, "default");
+        var profile = orch.ResolveProfile(adapter);
         if (profile is null)
             return null;
         try

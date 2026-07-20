@@ -144,6 +144,7 @@ public sealed class AgentControlCommandTests
         Assert.Equal(
             "Reviewer",
             resume.GetProperty("name").GetString());
+        Assert.False(resume.TryGetProperty("profile", out _));
     }
 
     [Fact]

@@ -294,6 +294,9 @@ public sealed class NookRestartCommandTests
             [],
             null,
             1);
+
+        public LaunchProfile Resolve(string adapter) =>
+            Find(adapter, "default")!;
     }
 
     private sealed class RecordingResumeAdapter : IAdapterResume

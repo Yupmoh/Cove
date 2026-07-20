@@ -98,14 +98,16 @@ internal static class AgentLaunchCommands
             shoreId = relativeLocation.ShoreId;
         }
 
-        var profile = launcher.FindProfile(
-            parameters.Adapter,
-            parameters.Profile);
+        var profile = string.IsNullOrWhiteSpace(parameters.Profile)
+            ? launcher.ResolveProfile(parameters.Adapter)
+            : launcher.FindProfile(parameters.Adapter, parameters.Profile);
         if (profile is null)
         {
             return ctx.Fail(
                 "not_found",
-                $"unknown launch profile {parameters.Adapter}/{parameters.Profile}");
+                string.IsNullOrWhiteSpace(parameters.Profile)
+                    ? $"no launch profile for {parameters.Adapter}"
+                    : $"unknown launch profile {parameters.Adapter}/{parameters.Profile}");
         }
         var overrides = new LauncherOverrides
         {

@@ -48,6 +48,9 @@ public sealed class LaunchOrchestrator
     public LaunchProfile? FindProfile(string adapter, string profileSlug)
         => _profiles?.Find(adapter, profileSlug);
 
+    public LaunchProfile? ResolveProfile(string adapter)
+        => _profiles?.Resolve(adapter);
+
     public ResumeCommand BuildLaunchCommand(
         LaunchProfile profile,
         LauncherOverrides overrides)

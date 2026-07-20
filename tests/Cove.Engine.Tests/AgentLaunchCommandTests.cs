@@ -29,11 +29,12 @@ public sealed class AgentLaunchCommandTests
         var agents = new AgentMessageRouter();
         var sessions = new SessionResumeOrchestrator();
         var scopes = NewScopes();
-        var launcher = NewLauncher();
+        var profiles = new ProfileLookup();
+        var launcher = NewLauncher(profiles: profiles);
         var request = Request(new AgentLaunchParams(
             "new",
             "test",
-            "default",
+            null,
             null,
             "/tmp",
             "anchor",
@@ -68,6 +69,7 @@ public sealed class AgentLaunchCommandTests
         Assert.Equal(McpScope.SameTab, scopes.GetScope(result.NookId));
         Assert.Equal("right", result.Placement);
         Assert.False(result.Resumed);
+        Assert.Equal(1, profiles.ResolveCount);
         var split = Assert.IsType<SplitNode>(layout.GetRoot(shoreId));
         Assert.Equal(SplitOrientation.Row, split.Orientation);
         Assert.Equal("anchor", Assert.IsType<NookLeaf>(split.ChildA).NookId);
@@ -217,9 +219,10 @@ public sealed class AgentLaunchCommandTests
         NullLogger.Instance);
 
     private static LaunchOrchestrator NewLauncher(
-        AgentResumeService? resume = null) => new(
+        AgentResumeService? resume = null,
+        ILaunchProfileLookup? profiles = null) => new(
         new LaunchCommandComposer(),
-        profiles: new ProfileLookup(),
+        profiles: profiles ?? new ProfileLookup(),
         resumeService: resume);
 
     private static NookLeaf Leaf(string nookId) => new()
@@ -230,6 +233,8 @@ public sealed class AgentLaunchCommandTests
 
     private sealed class ProfileLookup : ILaunchProfileLookup
     {
+        public int ResolveCount { get; private set; }
+
         public LaunchProfile? Find(string adapter, string profileSlug) => new(
             "Default",
             profileSlug,
@@ -243,6 +248,12 @@ public sealed class AgentLaunchCommandTests
             [],
             null,
             1);
+
+        public LaunchProfile Resolve(string adapter)
+        {
+            ResolveCount++;
+            return Find(adapter, "selected")!;
+        }
     }
 
     private sealed class RecordingResumeAdapter : IAdapterResume

@@ -5,6 +5,7 @@ namespace Cove.Engine.Launch;
 public interface ILaunchProfileLookup
 {
     LaunchProfile? Find(string adapter, string profileSlug);
+    LaunchProfile Resolve(string adapter);
 }
 
 public sealed class LaunchProfileLookup(
@@ -30,4 +31,6 @@ public sealed class LaunchProfileLookup(
             null,
             1);
     }
+    public LaunchProfile Resolve(string adapter) =>
+        profiles.GetDefault(adapter);
 }

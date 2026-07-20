@@ -118,7 +118,7 @@ internal static class AgentCommands
         var parameters = new AgentLaunchParams(
             mode,
             positional[0],
-            ArgValue(ctx.Args, "--profile") ?? "default",
+            ArgValue(ctx.Args, "--profile"),
             mode == "resume" ? positional[1] : null,
             ArgValue(ctx.Args, "--cwd"),
             ArgValue(ctx.Args, "--relative-to"),

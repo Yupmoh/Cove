@@ -84,7 +84,7 @@ internal static class NookRestartCommands
                     "not_ready",
                     "current adapter session is not resumable");
             }
-            var profile = launcher.FindProfile(adapter, "default");
+            var profile = launcher.ResolveProfile(adapter);
             if (profile is null)
             {
                 return ctx.Fail(
@@ -164,7 +164,7 @@ internal static class NookRestartCommands
                     "not_ready",
                     "agent launcher unavailable");
             }
-            var profile = launcher.FindProfile(adapter, "default");
+            var profile = launcher.ResolveProfile(adapter);
             if (profile is null)
             {
                 return ctx.Fail(

@@ -110,7 +110,7 @@ public sealed record WorkspaceContextResult(
 public sealed record AgentLaunchParams(
     string Mode,
     string Adapter,
-    string Profile = "default",
+    string? Profile = null,
     string? SessionId = null,
     string? Cwd = null,
     string? RelativeToNookId = null,
