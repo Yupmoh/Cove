@@ -10,8 +10,11 @@ internal sealed class EngineEventRouter
     private readonly CancellationToken _shutdownToken;
     private readonly object _guiLock = new();
     private readonly List<FrameConnection> _guiConnections = new();
+    private readonly object _ipcLock = new();
+    private readonly Queue<IpcEventEntry> _ipcEvents = new();
     private RestorationSummaryEvent? _restorationSummary;
     private long _workspaceRevision;
+    private bool _ipcMonitoring;
 
     public EngineEventRouter(CancellationToken shutdownToken)
     {
@@ -20,6 +23,60 @@ internal sealed class EngineEventRouter
 
     public RestorationSummaryEvent? RestorationSummary => Volatile.Read(ref _restorationSummary);
     public long WorkspaceRevision => Interlocked.Read(ref _workspaceRevision);
+    public bool HasGuiClients
+    {
+        get
+        {
+            lock (_guiLock)
+                return _guiConnections.Count > 0;
+        }
+    }
+
+    public bool StartIpcMonitor()
+    {
+        lock (_ipcLock)
+        {
+            if (_ipcMonitoring)
+                return false;
+            _ipcEvents.Clear();
+            _ipcMonitoring = true;
+            return true;
+        }
+    }
+
+    public bool StopIpcMonitor()
+    {
+        lock (_ipcLock)
+        {
+            if (!_ipcMonitoring)
+                return false;
+            _ipcMonitoring = false;
+            return true;
+        }
+    }
+
+    public IpcEventLog GetIpcEvents()
+    {
+        lock (_ipcLock)
+            return new IpcEventLog(_ipcEvents.ToArray());
+    }
+
+    public void BroadcastCompatibilityEvent(
+        string channel,
+        JsonElement? payload)
+    {
+        JsonElement value;
+        if (payload is { } supplied)
+        {
+            value = supplied.Clone();
+        }
+        else
+        {
+            using var document = JsonDocument.Parse("{}");
+            value = document.RootElement.Clone();
+        }
+        BroadcastElement(channel, value);
+    }
 
     public void SetRestorationSummary(RestorationSummaryEvent summary)
     {
@@ -83,12 +140,13 @@ internal sealed class EngineEventRouter
 
     public void Broadcast<T>(string channel, T payload, JsonTypeInfo<T> typeInfo)
     {
+        var element = JsonSerializer.SerializeToElement(payload, typeInfo);
+        RecordIpcEvent(channel, element);
         FrameConnection[] guis;
         lock (_guiLock)
             guis = _guiConnections.ToArray();
         if (guis.Length == 0)
             return;
-        var element = JsonSerializer.SerializeToElement(payload, typeInfo);
         var frame = ControlCodec.Encode(new ControlEvent(channel, element));
         foreach (var gui in guis)
             _ = gui.WriteFrameAsync(FrameType.Event, 0, frame, _shutdownToken);
@@ -96,6 +154,14 @@ internal sealed class EngineEventRouter
 
     public void BroadcastDictation(string channel, JsonElement payload)
     {
+        BroadcastElement(channel, payload);
+    }
+
+    private void BroadcastElement(
+        string channel,
+        JsonElement payload)
+    {
+        RecordIpcEvent(channel, payload);
         FrameConnection[] guis;
         lock (_guiLock)
             guis = _guiConnections.ToArray();
@@ -104,6 +170,23 @@ internal sealed class EngineEventRouter
         var frame = ControlCodec.Encode(new ControlEvent(channel, payload));
         foreach (var gui in guis)
             _ = gui.WriteFrameAsync(FrameType.Event, 0, frame, _shutdownToken);
+    }
+
+    private void RecordIpcEvent(
+        string channel,
+        JsonElement payload)
+    {
+        lock (_ipcLock)
+        {
+            if (!_ipcMonitoring)
+                return;
+            if (_ipcEvents.Count == 1024)
+                _ipcEvents.Dequeue();
+            _ipcEvents.Enqueue(new IpcEventEntry(
+                channel,
+                DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                payload.Clone()));
+        }
     }
 
     private static bool IsMutatingVerb(string uri)

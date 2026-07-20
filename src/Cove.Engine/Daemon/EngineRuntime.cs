@@ -795,7 +795,12 @@ internal sealed class EngineRuntime : IAsyncDisposable
             Events.TryForwardFocus,
             () => Events.RestorationSummary,
             StartedAtUtc,
-            () => Events.WorkspaceRevision);
+            () => Events.WorkspaceRevision,
+            Events.BroadcastCompatibilityEvent,
+            Events.GetIpcEvents,
+            Events.StartIpcMonitor,
+            Events.StopIpcMonitor,
+            () => Events.HasGuiClients);
     }
 
     public Task ShutdownAsync()

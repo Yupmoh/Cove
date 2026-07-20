@@ -90,7 +90,12 @@ public sealed class EngineDispatchContext
         Func<CancellationToken, bool>? forwardWindowFocus = null,
         Func<RestorationSummaryEvent?>? getRestorationSummary = null,
         DateTimeOffset? engineStartedAtUtc = null,
-        Func<long>? getWorkspaceRevision = null)
+        Func<long>? getWorkspaceRevision = null,
+        Action<string, JsonElement?>? emitIpcEvent = null,
+        Func<IpcEventLog>? getIpcEvents = null,
+        Func<bool>? startIpcMonitor = null,
+        Func<bool>? stopIpcMonitor = null,
+        Func<bool>? hasRenderClient = null)
     {
         Request = request;
         Nooks = nooks;
@@ -159,6 +164,11 @@ public sealed class EngineDispatchContext
         GetRestorationSummary = getRestorationSummary;
         EngineStartedAtUtc = engineStartedAtUtc;
         GetWorkspaceRevision = getWorkspaceRevision;
+        EmitIpcEvent = emitIpcEvent;
+        GetIpcEvents = getIpcEvents;
+        StartIpcMonitor = startIpcMonitor;
+        StopIpcMonitor = stopIpcMonitor;
+        HasRenderClient = hasRenderClient;
     }
 
     public ControlRequest Request { get; }
@@ -228,6 +238,11 @@ public sealed class EngineDispatchContext
     public Func<RestorationSummaryEvent?>? GetRestorationSummary { get; }
     public DateTimeOffset? EngineStartedAtUtc { get; }
     public Func<long>? GetWorkspaceRevision { get; }
+    public Action<string, JsonElement?>? EmitIpcEvent { get; }
+    public Func<IpcEventLog>? GetIpcEvents { get; }
+    public Func<bool>? StartIpcMonitor { get; }
+    public Func<bool>? StopIpcMonitor { get; }
+    public Func<bool>? HasRenderClient { get; }
     public System.Func<ControlRequest, System.Threading.Tasks.Task<ControlResponse?>>? Redrive { get; set; }
 
     public ControlResponse Ok<T>(T data, JsonTypeInfo<T> typeInfo)

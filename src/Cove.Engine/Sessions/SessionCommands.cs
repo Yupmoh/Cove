@@ -44,6 +44,11 @@ public static class SessionCommands
             return Task.FromResult(ctx.Fail("not_ready", "session orchestrator not available"));
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.NookRefParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "nook ref required"));
+        var state = orch.GetState(p.NookId);
+        if (state is null)
+            return Task.FromResult(ctx.Fail("not_found", $"unknown session {p.NookId}"));
+        if (state.Lifecycle is not (SessionLifecycle.Background or SessionLifecycle.Waking))
+            return Task.FromResult(ctx.Fail("invalid_state", $"session {p.NookId} is {state.Lifecycle.ToString().ToLowerInvariant()}"));
 
         orch.Foreground(p.NookId);
         return Task.FromResult(ctx.Ok());

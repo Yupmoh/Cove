@@ -34,12 +34,18 @@ public sealed class ProtocolResolver
     private static (string?, JsonElement?) ResolveCommands(string[] segments, Dictionary<string, string> queryParams)
     {
         var action = segments.Length > 1 ? string.Join('.', segments[1..]) : "";
+        if (action == "launcher.open")
+            return (null, null);
+        if (action == "nook.close"
+            && queryParams.Remove("nook", out var nookId))
+        {
+            queryParams["nookId"] = nookId;
+        }
         var uri = action switch
         {
             "nook.split.horizontal" or "nook.split.vertical" => "cove://commands/layout.mutate",
             "nook.close" => "cove://commands/nook.kill",
             "shore.new" => "cove://commands/shore.create",
-            "launcher.open" => "cove://commands/launcher.open",
             _ => $"cove://commands/{action}",
         };
         return (uri, ToJson(queryParams));
@@ -62,7 +68,7 @@ public sealed class ProtocolResolver
         return action switch
         {
             "write" => ("cove://commands/nook.write", ToJson(queryParams)),
-            "scrollback" => ("cove://commands/nook.scrollback", ToJson(queryParams)),
+            "scrollback" => ("cove://commands/nook.read", ToJson(queryParams)),
             _ => ($"cove://commands/nook.{action}", ToJson(queryParams)),
         };
     }
@@ -74,17 +80,38 @@ public sealed class ProtocolResolver
 
         if (segments.Length >= 3)
         {
-            queryParams["target"] = segments[1];
             return segments[2] switch
             {
-                "message" => ("cove://commands/agent.message", ToJson(queryParams)),
-                "dismiss" => ("cove://commands/session.dismiss", ToJson(queryParams)),
-                "wake" => ("cove://commands/session.wake", ToJson(queryParams)),
+                "message" => WithTarget(
+                    "cove://commands/agent.message",
+                    "target",
+                    segments[1],
+                    queryParams),
+                "dismiss" => WithTarget(
+                    "cove://commands/session.dismiss",
+                    "nookId",
+                    segments[1],
+                    queryParams),
+                "wake" => WithTarget(
+                    "cove://commands/session.foreground",
+                    "nookId",
+                    segments[1],
+                    queryParams),
                 _ => (null, null),
             };
         }
 
         return (null, null);
+    }
+
+    private static (string?, JsonElement?) WithTarget(
+        string uri,
+        string key,
+        string value,
+        Dictionary<string, string> queryParams)
+    {
+        queryParams[key] = value;
+        return (uri, ToJson(queryParams));
     }
 
     private static (string?, JsonElement?) ResolveSkills(string[] segments, Dictionary<string, string> queryParams)
@@ -104,8 +131,8 @@ public sealed class ProtocolResolver
         {
             var eq = pair.IndexOf('=');
             if (eq < 0) continue;
-            var key = pair[..eq];
-            var value = pair[(eq + 1)..];
+            var key = Uri.UnescapeDataString(pair[..eq]);
+            var value = Uri.UnescapeDataString(pair[(eq + 1)..]);
             value = value switch
             {
                 "$FOCUS" when focusedNookId is not null => focusedNookId,

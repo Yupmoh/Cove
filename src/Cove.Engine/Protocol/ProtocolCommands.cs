@@ -16,6 +16,12 @@ public static class ProtocolCommands
         var (uri, resolvedParams) = resolver.Resolve(p.Uri, p.FocusedNookId, p.ActiveShoreId);
         if (uri is null)
             return Task.FromResult(ctx.Fail("not_found", $"unresolvable cove:// URI: {p.Uri}"));
+        if (!CoveCommandRegistry.Handlers.ContainsKey(uri))
+        {
+            return Task.FromResult(ctx.Fail(
+                "unsupported_alias",
+                $"resolved command is not registered: {uri}"));
+        }
 
         return Task.FromResult(ctx.Ok(new ProtocolResolveResult(uri, resolvedParams), CoveJsonContext.Default.ProtocolResolveResult));
     }

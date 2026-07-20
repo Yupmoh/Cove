@@ -1,7 +1,9 @@
 using System.IO;
 using System.Text.Json;
 using Cove.Engine.Config;
+using Cove.Engine.Daemon;
 using Cove.Engine.Protocol;
+using Cove.Protocol;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -70,22 +72,92 @@ public sealed class McpBridgeVerbTests
     }
 
     [Fact]
-    public async Task EmitEvent_ReturnsOk()
+    public async Task EmitEvent_BroadcastsRealDaemonEvent()
     {
         var prm = JsonDocument.Parse("{\"event\":\"test.event\"}").RootElement.Clone();
         var request = new Cove.Protocol.ControlRequest("1", "cove://commands/emit_event", prm);
-        var response = await EngineCommandRouter.RouteAsync(request);
+        string? emitted = null;
+        var response = await EngineCommandRouter.RouteAsync(
+            request,
+            emitIpcEvent: (channel, _) => emitted = channel);
         Assert.NotNull(response);
         Assert.True(response!.Ok);
+        Assert.Equal("test.event", emitted);
     }
 
     [Fact]
-    public async Task GetIpcEvents_ReturnsEmptyArray()
+    public async Task IpcMonitor_RecordsRealDaemonEventsUntilStopped()
     {
-        var request = new Cove.Protocol.ControlRequest("1", "cove://commands/get_ipc_events");
-        var response = await EngineCommandRouter.RouteAsync(request);
-        Assert.NotNull(response);
-        Assert.True(response!.Ok);
-        Assert.Equal(0, response.Data!.Value.GetProperty("events").GetArrayLength());
+        var events = new EngineEventRouter(
+            CancellationToken.None);
+        var started = await RouteMonitor(
+            "start_ipc_monitor",
+            events);
+        var duplicateStart = await RouteMonitor(
+            "start_ipc_monitor",
+            events);
+        events.PublishMutation(
+            "cove://commands/nook.rename");
+        var current = await RouteMonitor(
+            "get_ipc_events",
+            events);
+        var stopped = await RouteMonitor(
+            "stop_ipc_monitor",
+            events);
+        var duplicateStop = await RouteMonitor(
+            "stop_ipc_monitor",
+            events);
+        events.PublishMutation(
+            "cove://commands/nook.kill");
+        var afterStop = await RouteMonitor(
+            "get_ipc_events",
+            events);
+
+        Assert.True(started!.Ok);
+        Assert.True(stopped!.Ok);
+        Assert.Equal(
+            "already_monitoring",
+            duplicateStart!.Error!.Code);
+        Assert.Equal(
+            "not_monitoring",
+            duplicateStop!.Error!.Code);
+        Assert.Equal(
+            1,
+            current!.Data!.Value
+                .GetProperty("events")
+                .GetArrayLength());
+        Assert.Equal(
+            current.Data.Value.GetRawText(),
+            afterStop!.Data!.Value.GetRawText());
     }
+
+    [Fact]
+    public async Task RenderVerb_WithGui_ReturnsCapabilityResult()
+    {
+        var request = new Cove.Protocol.ControlRequest(
+            "1",
+            "cove://commands/execute_js");
+        var response = await EngineCommandRouter.RouteAsync(
+            request,
+            hasRenderClient: () => true);
+
+        Assert.NotNull(response);
+        Assert.False(response!.Ok);
+        Assert.Equal(
+            "unsupported_capability",
+            response.Error?.Code);
+    }
+
+    private static Task<ControlResponse?> RouteMonitor(
+        string verb,
+        EngineEventRouter events) =>
+        EngineCommandRouter.RouteAsync(
+            new ControlRequest(
+                verb,
+                $"cove://commands/{verb}"),
+            emitIpcEvent: events.BroadcastCompatibilityEvent,
+            getIpcEvents: events.GetIpcEvents,
+            startIpcMonitor: events.StartIpcMonitor,
+            stopIpcMonitor: events.StopIpcMonitor,
+            hasRenderClient: () => events.HasGuiClients);
 }
