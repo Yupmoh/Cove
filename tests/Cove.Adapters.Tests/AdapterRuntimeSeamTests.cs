@@ -36,6 +36,31 @@ public sealed class AdapterRuntimeSeamTests
     }
 
     [Fact]
+    public void BinaryDiscovery_ResolvesWindowsExecutableExtensionFromPath()
+    {
+        var directory = Path.Combine("C:", "tools");
+        var executable = Path.Combine(directory, "test-cli.exe");
+        var files = new FakePlatformFileSystem(executable);
+        var environment = new FakeRuntimeEnvironment
+        {
+            IsWindows = true,
+            ExecutablePath = directory,
+        };
+        var process = new FakeProcessRunner(new ProcessRunResult(true, false, 0, "test-cli 3.2.1", "", 5));
+        var service = new BinaryDiscoveryService(fileSystem: files, processRunner: process, environment: environment);
+
+        var result = service.Discover(new BinaryDiscovery
+        {
+            Commands = ["test-cli"],
+            VersionFlag = "--version",
+        });
+
+        Assert.Equal(AdapterDetectionState.Detected, result.State);
+        Assert.Equal(executable, result.BinaryPath);
+        Assert.Equal(executable, Assert.Single(process.Requests).FileName);
+    }
+
+    [Fact]
     public void BashLocator_UsesInjectedRuntimeView()
     {
         var files = new FakePlatformFileSystem("/custom/bin/bash.exe");

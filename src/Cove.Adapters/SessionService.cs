@@ -94,6 +94,12 @@ public sealed class SessionService
 
     private async Task<(bool Ok, List<RecentSession> Sessions)> FetchSessionsAsync(string adapter, string adapterDir, string cwd, CancellationToken ct)
     {
+        if (OperatingSystem.IsWindows() && WindowsRecentSessionDiscovery.List(adapter, cwd) is { } nativeSessions)
+        {
+            _logger?.SessionListCompleted(adapter, cwd, nativeSessions.Count);
+            return (true, nativeSessions);
+        }
+
         var result = await _runner.RunAsync(adapterDir, "list_recent_sessions.sh", [cwd], _listTimeout, null, ct).ConfigureAwait(false);
 
         List<RecentSession> sessions;

@@ -12,6 +12,7 @@ public sealed record BinaryDiscoveryResult(
 public sealed class BinaryDiscoveryService
 {
     private static readonly Regex DefaultVersionRegex = new(@"(\d+\.\d+\.\d+)", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    private static readonly string[] WindowsExecutableExtensions = [".exe", ".cmd", ".bat", ".com"];
     private readonly ILogger? _logger;
     private readonly IPlatformFileSystem _fileSystem;
     private readonly IProcessRunner _processRunner;
@@ -42,19 +43,31 @@ public sealed class BinaryDiscoveryService
 
         foreach (var command in config.Commands)
             foreach (var directory in pathDirs)
-                if (TryCandidate(command, Path.Combine(directory, command), config, "path") is { } found)
+                if (TryCommand(command, directory, config, "path") is { } found)
                     return found;
 
         foreach (var directory in config.WellKnownPaths)
         {
             var expanded = ExpandTilde(directory);
             foreach (var command in config.Commands)
-                if (TryCandidate(command, Path.Combine(expanded, command), config, "well-known") is { } found)
+                if (TryCommand(command, expanded, config, "well-known") is { } found)
                     return found;
         }
 
         _logger?.BinaryProbeMissing(commands, pathDirs.Count, config.WellKnownPaths.Count);
         return new BinaryDiscoveryResult(AdapterDetectionState.Missing, null, null);
+    }
+
+    private BinaryDiscoveryResult? TryCommand(string command, string directory, BinaryDiscovery config, string source)
+    {
+        if (TryCandidate(command, Path.Combine(directory, command), config, source) is { } exact)
+            return exact;
+        if (!_environment.IsWindows || Path.HasExtension(command))
+            return null;
+        foreach (var extension in WindowsExecutableExtensions)
+            if (TryCandidate(command, Path.Combine(directory, command + extension), config, source) is { } found)
+                return found;
+        return null;
     }
 
     private BinaryDiscoveryResult? TryCandidate(string command, string candidate, BinaryDiscovery config, string source)

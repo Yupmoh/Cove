@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- Windows Claude Code and OMP session discovery now scans native JSONL histories directly instead of silently returning no sessions when Git Bash lacks `jq`
+- Windows adapter discovery now applies executable extensions when scanning `PATH`, allowing installed `.exe`, `.cmd`, and `.bat` agent harnesses to appear in the launcher
 - Terminal relay now preserves absolute byte offsets, uses an explicit replay boundary, rejects stream gaps and stale generations, pauses hidden subscriptions, and reconnects from the last accepted offset
 - Terminal rendering now defaults to Canvas, coordinates resize through one visibility-aware observer, and no longer ends replay or changes alternate-screen mode on the first keypress
 - Removed temporary keyboard payload diagnostics from GUI logs
