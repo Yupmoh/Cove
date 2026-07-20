@@ -120,6 +120,8 @@ public sealed class LaunchOrchestrator
         }
 
         var fallback = _commands.Compose(binary, profile, overrides);
+        if (OperatingSystem.IsWindows())
+            fallback = WindowsAdapterLaunchCommand.WrapCommandShim(fallback);
         LogComposed(profile.Adapter, fallback);
         return fallback;
     }

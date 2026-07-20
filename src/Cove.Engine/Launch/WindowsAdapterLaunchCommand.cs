@@ -24,7 +24,18 @@ internal static class WindowsAdapterLaunchCommand
         if (profile.CliArgs.Count > 1)
             args.AddRange(profile.CliArgs.Skip(1));
         args.AddRange(overrides.ExtraFlags);
-        return new ResumeCommand(binary, args, overrides.WorkingDir ?? "");
+        return WrapCommandShim(new ResumeCommand(binary, args, overrides.WorkingDir ?? ""));
+    }
+
+    internal static ResumeCommand WrapCommandShim(ResumeCommand command)
+    {
+        if (!command.Command.EndsWith(".cmd", StringComparison.OrdinalIgnoreCase)
+            && !command.Command.EndsWith(".bat", StringComparison.OrdinalIgnoreCase))
+            return command;
+        return new ResumeCommand(
+            "cmd.exe",
+            ["/d", "/s", "/c", command.Command, .. command.Args],
+            command.Cwd);
     }
 
     private static List<string> OmpArgs(string adapterDirectory)

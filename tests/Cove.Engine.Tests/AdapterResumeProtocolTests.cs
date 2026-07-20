@@ -175,4 +175,35 @@ public sealed class AdapterResumeProtocolTests
         Assert.Equal(["--dangerously-skip-permissions", "--model", "sonnet"], command.Args);
         Assert.Equal(@"D:\Cove", command.Cwd);
     }
+
+    [Fact]
+    public void WindowsLaunchCommand_CodexWrapsNpmCommandShim()
+    {
+        var profile = new LaunchProfile(
+            "Default",
+            "default",
+            "codex",
+            true,
+            null,
+            null,
+            [],
+            new Dictionary<string, string>(),
+            new Dictionary<string, bool>(),
+            [],
+            null,
+            1);
+
+        var command = WindowsAdapterLaunchCommand.Build(
+            @"C:\Users\test\npm\codex.cmd",
+            @"C:\cove\adapters\codex",
+            profile,
+            new LauncherOverrides { Yolo = true, WorkingDir = @"D:\Cove" });
+
+        Assert.NotNull(command);
+        Assert.Equal("cmd.exe", command.Command);
+        Assert.Equal(
+            ["/d", "/s", "/c", @"C:\Users\test\npm\codex.cmd", "--dangerously-bypass-hook-trust", "--yolo"],
+            command.Args);
+        Assert.Equal(@"D:\Cove", command.Cwd);
+    }
 }

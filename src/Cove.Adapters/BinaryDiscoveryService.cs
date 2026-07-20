@@ -12,7 +12,7 @@ public sealed record BinaryDiscoveryResult(
 public sealed class BinaryDiscoveryService
 {
     private static readonly Regex DefaultVersionRegex = new(@"(\d+\.\d+\.\d+)", RegexOptions.Compiled | RegexOptions.CultureInvariant);
-    private static readonly string[] WindowsExecutableExtensions = [".exe", ".cmd", ".bat", ".com"];
+    private static readonly string[] WindowsExecutableExtensions = [".exe", ".com", ".cmd", ".bat"];
     private readonly ILogger? _logger;
     private readonly IPlatformFileSystem _fileSystem;
     private readonly IProcessRunner _processRunner;
@@ -60,13 +60,15 @@ public sealed class BinaryDiscoveryService
 
     private BinaryDiscoveryResult? TryCommand(string command, string directory, BinaryDiscovery config, string source)
     {
+        if (_environment.IsWindows && !Path.HasExtension(command))
+        {
+            foreach (var extension in WindowsExecutableExtensions)
+                if (TryCandidate(command, Path.Combine(directory, command + extension), config, source) is { } found)
+                    return found;
+            return null;
+        }
         if (TryCandidate(command, Path.Combine(directory, command), config, source) is { } exact)
             return exact;
-        if (!_environment.IsWindows || Path.HasExtension(command))
-            return null;
-        foreach (var extension in WindowsExecutableExtensions)
-            if (TryCandidate(command, Path.Combine(directory, command + extension), config, source) is { } found)
-                return found;
         return null;
     }
 
@@ -89,10 +91,15 @@ public sealed class BinaryDiscoveryService
         {
             try
             {
+                var isCommandShim = _environment.IsWindows
+                    && (binaryPath.EndsWith(".cmd", StringComparison.OrdinalIgnoreCase)
+                        || binaryPath.EndsWith(".bat", StringComparison.OrdinalIgnoreCase));
                 var request = new ProcessRunRequest(
-                    binaryPath,
+                    isCommandShim ? "cmd.exe" : binaryPath,
                     Path.GetDirectoryName(binaryPath) ?? ".",
-                    [config.VersionFlag],
+                    isCommandShim
+                        ? ["/d", "/s", "/c", binaryPath, config.VersionFlag]
+                        : [config.VersionFlag],
                     null,
                     TimeSpan.FromSeconds(3));
                 var result = _processRunner.RunAsync(request).GetAwaiter().GetResult();

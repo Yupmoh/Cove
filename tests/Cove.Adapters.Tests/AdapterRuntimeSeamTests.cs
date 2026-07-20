@@ -61,6 +61,35 @@ public sealed class AdapterRuntimeSeamTests
     }
 
     [Fact]
+    public void BinaryDiscovery_SkipsExtensionlessWindowsShimAndProbesCmdThroughCommandProcessor()
+    {
+        var directory = "tools";
+        var extensionless = Path.Combine(directory, "test-cli");
+        var commandShim = Path.Combine(directory, "test-cli.cmd");
+        var files = new FakePlatformFileSystem(extensionless, commandShim);
+        var environment = new FakeRuntimeEnvironment
+        {
+            IsWindows = true,
+            ExecutablePath = directory,
+        };
+        var process = new FakeProcessRunner(new ProcessRunResult(true, false, 0, "test-cli 3.2.1", "", 5));
+        var service = new BinaryDiscoveryService(fileSystem: files, processRunner: process, environment: environment);
+
+        var result = service.Discover(new BinaryDiscovery
+        {
+            Commands = ["test-cli"],
+            VersionFlag = "--version",
+        });
+
+        Assert.Equal(AdapterDetectionState.Detected, result.State);
+        Assert.Equal(commandShim, result.BinaryPath);
+        var request = Assert.Single(process.Requests);
+        Assert.Equal("cmd.exe", request.FileName);
+        Assert.Equal(["/d", "/s", "/c", commandShim, "--version"], request.Arguments);
+        Assert.DoesNotContain(extensionless, files.Probes);
+    }
+
+    [Fact]
     public void BashLocator_UsesInjectedRuntimeView()
     {
         var files = new FakePlatformFileSystem("/custom/bin/bash.exe");

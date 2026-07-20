@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New Windows Claude Code, OMP, and Codex sessions now launch detected native executables instead of unusable `/c/...` paths returned by Git Bash
 - Windows session resume now builds native Claude Code, OMP, and Codex command lines from detected executable paths instead of relying on Git Bash paths and script-only dependencies
 - Windows Claude Code and OMP session discovery now scans native JSONL histories directly instead of silently returning no sessions when Git Bash lacks `jq`
-- Windows adapter discovery now applies executable extensions when scanning `PATH`, allowing installed `.exe`, `.cmd`, and `.bat` agent harnesses to appear in the launcher
+- Windows adapter discovery now ignores non-runnable extensionless npm shims, probes `.cmd` and `.bat` shims through `cmd.exe`, and launches them through the command processor so installed harnesses such as Codex and Pi appear and run
 - Windows ConPTY terminals now resolve blank GUI commands to the default shell, keep child standard handles isolated from Cove, use only documented pseudoconsole flags, capture shell output through the PTY pipe, and avoid exit-wait races during teardown
 - Terminal relay now preserves absolute byte offsets, uses an explicit replay boundary, rejects stream gaps and stale generations, pauses hidden subscriptions, and reconnects from the last accepted offset
 - Terminal rendering now defaults to Canvas, coordinates resize through one visibility-aware observer, and no longer ends replay or changes alternate-screen mode on the first keypress
