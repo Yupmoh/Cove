@@ -38,7 +38,7 @@ public sealed class AdapterRuntimeSeamTests
     [Fact]
     public void BinaryDiscovery_ResolvesWindowsExecutableExtensionFromPath()
     {
-        var directory = Path.Combine("C:", "tools");
+        var directory = "tools";
         var executable = Path.Combine(directory, "test-cli.exe");
         var files = new FakePlatformFileSystem(executable);
         var environment = new FakeRuntimeEnvironment

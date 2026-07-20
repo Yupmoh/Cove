@@ -195,7 +195,6 @@ public sealed class WindowsPtySession : IPtySession
             }
             catch (ObjectDisposedException) when (HasExited)
             {
-                // Dispose may release the event after the watcher publishes the exit state.
             }
         }
         return _exitCode;
