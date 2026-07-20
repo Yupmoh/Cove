@@ -221,7 +221,7 @@ public sealed class BundledAdapterSeederTests : IDisposable
     public void InstallSkills_CopiesBundledSkillsToHarnessLocations()
     {
         var source = Path.Combine(_root, "source");
-        var claude = MakeSourceAdapter(
+        MakeSourceAdapter(
             source,
             "claude-code",
             """
@@ -229,7 +229,7 @@ public sealed class BundledAdapterSeederTests : IDisposable
               "skillInstallPath": "~/.claude/skills/cove/SKILL.md"
             }
             """);
-        var omp = MakeSourceAdapter(
+        MakeSourceAdapter(
             source,
             "omp",
             """
@@ -237,18 +237,94 @@ public sealed class BundledAdapterSeederTests : IDisposable
               "skillInstallPath": "~/.omp/agent/skills/cove/SKILL.md"
             }
             """);
-        File.WriteAllText(Path.Combine(claude, "skill.md"), "cove skill");
-        File.WriteAllText(Path.Combine(omp, "skill.md"), "cove skill");
+        MakeSourceAdapter(
+            source,
+            "codex",
+            """
+            {
+              "skillInstallPath": "~/.agents/skills/cove/SKILL.md"
+            }
+            """);
+        MakeSourceAdapter(
+            source,
+            "cursor-agent",
+            """
+            {
+              "skillInstallPath": "~/.agents/skills/cove/SKILL.md"
+            }
+            """);
+        MakeSourceAdapter(
+            source,
+            "hermes",
+            """
+            {
+              "skillInstallPath": "~/.hermes/skills/cove/SKILL.md"
+            }
+            """);
+        MakeSourceAdapter(
+            source,
+            "openclaw",
+            """
+            {
+              "skillInstallPath": "~/.agents/skills/cove/SKILL.md"
+            }
+            """);
+        MakeSourceAdapter(
+            source,
+            "opencode",
+            """
+            {
+              "skillInstallPath": "~/.agents/skills/cove/SKILL.md"
+            }
+            """);
+        MakeSourceAdapter(
+            source,
+            "pi",
+            """
+            {
+              "skillInstallPath": "~/.agents/skills/cove/SKILL.md"
+            }
+            """);
+        var shared = Path.Combine(source, "cove");
+        Directory.CreateDirectory(shared);
+        File.WriteAllText(Path.Combine(shared, "skill.md"), "cove skill");
         var home = Path.Combine(_root, "home");
 
         var installed = BundledAdapterSeeder.InstallSkills(source, home);
 
-        Assert.Equal(["claude-code", "omp"], installed);
+        Assert.Equal(
+            [
+                "claude-code",
+                "codex",
+                "cursor-agent",
+                "hermes",
+                "omp",
+                "openclaw",
+                "opencode",
+                "pi",
+            ],
+            installed);
         Assert.Equal(
             "cove skill",
             File.ReadAllText(Path.Combine(
                 home,
                 ".claude",
+                "skills",
+                "cove",
+                "SKILL.md")));
+        Assert.Equal(
+            "cove skill",
+            File.ReadAllText(Path.Combine(
+                home,
+                ".agents",
+                "skills",
+                "cove",
+                "SKILL.md")));
+        Assert.Equal(
+            "cove skill",
+            File.ReadAllText(Path.Combine(
+                home,
+                ".hermes",
                 "skills",
                 "cove",
                 "SKILL.md")));

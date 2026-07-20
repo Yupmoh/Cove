@@ -67,7 +67,13 @@ public sealed class ShippedAdapterExampleTests
 
     [Theory]
     [InlineData("claude-code", "~/.claude/skills/cove/SKILL.md")]
+    [InlineData("codex", "~/.agents/skills/cove/SKILL.md")]
+    [InlineData("cursor-agent", "~/.agents/skills/cove/SKILL.md")]
+    [InlineData("hermes", "~/.hermes/skills/cove/SKILL.md")]
     [InlineData("omp", "~/.omp/agent/skills/cove/SKILL.md")]
+    [InlineData("openclaw", "~/.agents/skills/cove/SKILL.md")]
+    [InlineData("opencode", "~/.agents/skills/cove/SKILL.md")]
+    [InlineData("pi", "~/.agents/skills/cove/SKILL.md")]
     public void ShippedCoveSkill_ProvidesDocumentedControlRecipes(
         string adapterName,
         string installPath)
@@ -80,7 +86,7 @@ public sealed class ShippedAdapterExampleTests
         Assert.NotNull(manifest);
         Assert.Equal(installPath, manifest!.SkillInstallPath);
 
-        var skillPath = Path.Combine(adapterDir, "skill.md");
+        var skillPath = Path.Combine(AdaptersRoot, "cove", "skill.md");
         Assert.True(File.Exists(skillPath), $"missing skill: {skillPath}");
         var skill = File.ReadAllText(skillPath);
         Assert.StartsWith("---\nname: cove\n", skill);

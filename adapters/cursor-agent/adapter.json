@@ -7,6 +7,8 @@
   "binary": "cursor-agent",
   "version": "1.0.0",
   "author": "Cove",
+  "skillInstallPath": "~/.agents/skills/cove/SKILL.md",
+  "skillsDir": "~/.agents/skills",
   "binaryDiscovery": {
     "commands": [
       "cursor-agent",

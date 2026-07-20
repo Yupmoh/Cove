@@ -146,6 +146,8 @@ public static class BundledAdapterSeeder
         ILogger? logger = null)
     {
         var installed = new List<string>();
+        var installedDestinations = new HashSet<string>(
+            StringComparer.Ordinal);
         if (!Directory.Exists(sourceRoot))
         {
             logger?.BundledAdapterSourceMissing(sourceRoot);
@@ -179,7 +181,14 @@ public static class BundledAdapterSeeder
                         "skill install path is empty");
                     continue;
                 }
-                var sourceSkill = Path.Combine(sourceDir, "skill.md");
+                var adapterSkill = Path.Combine(sourceDir, "skill.md");
+                var sharedSkill = Path.Combine(
+                    sourceRoot,
+                    "cove",
+                    "skill.md");
+                var sourceSkill = File.Exists(adapterSkill)
+                    ? adapterSkill
+                    : sharedSkill;
                 if (!File.Exists(sourceSkill))
                 {
                     logger?.SkillInstallSkipped(name, installPath);
@@ -196,7 +205,8 @@ public static class BundledAdapterSeeder
                     continue;
                 }
                 Directory.CreateDirectory(destinationDirectory);
-                File.Copy(sourceSkill, destination, overwrite: true);
+                if (installedDestinations.Add(destination))
+                    File.Copy(sourceSkill, destination, overwrite: true);
                 installed.Add(name);
             }
             catch (IOException ex)

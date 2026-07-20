@@ -7,6 +7,8 @@
   "binary": "hermes",
   "version": "1.0.0",
   "author": "Cove",
+  "skillInstallPath": "~/.hermes/skills/cove/SKILL.md",
+  "skillsDir": "~/.hermes/skills",
   "binaryDiscovery": {
     "commands": [
       "hermes"
