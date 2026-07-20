@@ -116,7 +116,8 @@ public sealed record NookOpenParams(
     string Placement = "right",
     string? BayId = null,
     int Cols = 80,
-    int Rows = 24);
+    int Rows = 24,
+    string? Url = null);
 public sealed record NookOpenResult(
     string NookId,
     string NookType,

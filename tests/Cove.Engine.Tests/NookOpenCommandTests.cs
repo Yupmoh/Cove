@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Cove.Engine.Browser;
 using Cove.Engine.Layout;
 using Cove.Engine.Protocol;
 using Cove.Engine.Pty;
@@ -151,6 +152,44 @@ public sealed class NookOpenCommandTests
         Assert.False(response!.Ok);
         Assert.Equal("access_denied", response.Error?.Code);
         Assert.Empty(nooks.List());
+    }
+
+    [PlatformFact(TestOperatingSystem.Unix)]
+    public async Task BrowserWithoutUrl_UsesDefaultAndPlacesBrowserLeaf()
+    {
+        using var nooks = NewNooks();
+        var browser = new BrowserNookManager();
+        var layout = LayoutWithAnchor(out var shoreId);
+        var response = await EngineCommandRouter.RouteAsync(
+            Request(new NookOpenParams(
+                "browser",
+                null,
+                [],
+                "/tmp",
+                "anchor",
+                "below",
+                "bay-1",
+                Url: null)),
+            nooks: nooks,
+            layout: layout,
+            browser: browser,
+            nookScopes: NewScopes());
+
+        Assert.True(response!.Ok, response.Error?.Message);
+        var result = response.Data!.Value.Deserialize(
+            Cove.Protocol.CoveJsonContext.Default.NookOpenResult)!;
+        var opened = browser.Get(result.NookId);
+        Assert.NotNull(opened);
+        Assert.Equal("https://duckduckgo.com", opened.CurrentUrl);
+        Assert.Equal("browser", result.NookType);
+        Assert.Empty(nooks.List());
+        var split = Assert.IsType<SplitNode>(layout.GetRoot(shoreId));
+        Assert.Equal(SplitOrientation.Column, split.Orientation);
+        var leaf = Assert.IsType<NookLeaf>(split.ChildB);
+        Assert.Equal(result.NookId, leaf.NookId);
+        Assert.Equal(NookType.Browser, Assert.Single(leaf.Subtabs).NookType);
+        Assert.Equal(result.NookId, layout.FocusedNookFor("bay-1"));
+        browser.Close(result.NookId);
     }
 
     private static ControlRequest Request(

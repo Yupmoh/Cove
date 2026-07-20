@@ -10,8 +10,6 @@ internal static class NookOpenCommands
     [CoveCommand("cove://commands/nook.open")]
     public static Task<ControlResponse> Open(EngineDispatchContext ctx)
     {
-        if (ctx.Nooks is not { } nooks)
-            return Task.FromResult(ctx.Fail("not_ready", "nook registry unavailable"));
         if (ctx.Layout is not { } layout)
             return Task.FromResult(ctx.Fail("not_ready", "layout service unavailable"));
         if (ctx.Request.Params is not JsonElement element
@@ -19,8 +17,8 @@ internal static class NookOpenCommands
         {
             return Task.FromResult(ctx.Fail("invalid_params", "nook open params required"));
         }
-        if (parameters.NookType != "terminal")
-            return Task.FromResult(ctx.Fail("invalid_params", "nook type must be terminal"));
+        if (parameters.NookType is not ("terminal" or "browser"))
+            return Task.FromResult(ctx.Fail("invalid_params", "nook type must be terminal or browser"));
         if (!TryPlacement(parameters.Placement, out var placement))
         {
             return Task.FromResult(ctx.Fail(
@@ -30,10 +28,27 @@ internal static class NookOpenCommands
         if (parameters.Cols <= 0 || parameters.Rows <= 0)
             return Task.FromResult(ctx.Fail("invalid_params", "cols and rows must be positive"));
         var arguments = parameters.Args ?? [];
-        if (string.IsNullOrWhiteSpace(parameters.Command)
-            && arguments.Length > 0)
+        if (parameters.NookType == "terminal")
         {
-            return Task.FromResult(ctx.Fail("invalid_params", "args require a command"));
+            if (ctx.Nooks is null)
+                return Task.FromResult(ctx.Fail("not_ready", "nook registry unavailable"));
+            if (!string.IsNullOrEmpty(parameters.Url))
+                return Task.FromResult(ctx.Fail("invalid_params", "terminal nooks do not accept a url"));
+            if (string.IsNullOrWhiteSpace(parameters.Command)
+                && arguments.Length > 0)
+            {
+                return Task.FromResult(ctx.Fail("invalid_params", "args require a command"));
+            }
+        }
+        else
+        {
+            if (ctx.Browser is null)
+                return Task.FromResult(ctx.Fail("not_ready", "browser manager unavailable"));
+            if (!string.IsNullOrWhiteSpace(parameters.Command)
+                || arguments.Length > 0)
+            {
+                return Task.FromResult(ctx.Fail("invalid_params", "browser nooks do not accept a command"));
+            }
         }
 
         var activeBayId = layout.ActiveBayId;
@@ -68,25 +83,39 @@ internal static class NookOpenCommands
         if (string.IsNullOrEmpty(bayId))
             return Task.FromResult(ctx.Fail("not_found", "active bay is unavailable"));
 
-        NookInfo? nook = null;
+        string? nookId = null;
         var placed = false;
         try
         {
-            nook = nooks.Spawn(new SpawnParams(
-                parameters.Command,
-                arguments,
-                parameters.Cwd,
-                Cols: parameters.Cols,
-                Rows: parameters.Rows,
-                Bay: bayId,
-                Shore: shoreId));
-            var leaf = Leaf(nook.NookId);
+            NookType nookType;
+            if (parameters.NookType == "terminal")
+            {
+                var nook = ctx.Nooks!.Spawn(new SpawnParams(
+                    parameters.Command,
+                    arguments,
+                    parameters.Cwd,
+                    Cols: parameters.Cols,
+                    Rows: parameters.Rows,
+                    Bay: bayId,
+                    Shore: shoreId));
+                nookId = nook.NookId;
+                nookType = NookType.Terminal;
+            }
+            else
+            {
+                nookId = "nook-" + Guid.NewGuid().ToString("N");
+                ctx.Browser!.Open(
+                    nookId,
+                    parameters.Url ?? "https://duckduckgo.com");
+                nookType = NookType.Browser;
+            }
+            var leaf = Leaf(nookId, nookType);
             if (placement == "new-shore")
             {
                 shoreId = layout.CreateShoreInWing(
                     bayId,
                     LayoutService.MainWingId,
-                    "Terminal",
+                    parameters.NookType == "terminal" ? "Terminal" : "Browser",
                     leaf);
             }
             else
@@ -99,11 +128,11 @@ internal static class NookOpenCommands
                     Before(placement));
             }
             placed = true;
-            layout.FocusNook(shoreId!, nook.NookId);
+            layout.FocusNook(shoreId!, nookId);
             return Task.FromResult(ctx.Ok(
                 new NookOpenResult(
-                    nook.NookId,
-                    "terminal",
+                    nookId,
+                    parameters.NookType,
                     bayId,
                     shoreId!,
                     placement),
@@ -111,11 +140,14 @@ internal static class NookOpenCommands
         }
         catch (Exception exception)
         {
-            if (nook is not null)
+            if (nookId is not null)
             {
                 if (placed)
-                    layout.CloseNook(shoreId!, nook.NookId);
-                nooks.Kill(nook.NookId);
+                    layout.CloseNook(shoreId!, nookId);
+                if (parameters.NookType == "terminal")
+                    ctx.Nooks!.Kill(nookId);
+                else
+                    ctx.Browser!.Close(nookId);
             }
             return Task.FromResult(ctx.Fail("launch_failed", exception.Message));
         }
@@ -139,9 +171,9 @@ internal static class NookOpenCommands
     private static bool Before(string placement) =>
         placement is "left" or "above";
 
-    private static NookLeaf Leaf(string nookId) => new()
+    private static NookLeaf Leaf(string nookId, NookType nookType) => new()
     {
         NookId = nookId,
-        Subtabs = [new Subtab(nookId, NookType.Terminal)],
+        Subtabs = [new Subtab(nookId, nookType)],
     };
 }

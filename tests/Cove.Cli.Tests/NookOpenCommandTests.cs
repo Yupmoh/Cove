@@ -70,6 +70,32 @@ public sealed class NookOpenCommandTests
         Assert.Equal("bay-1", parameters.GetProperty("bayId").GetString());
     }
 
+    [Fact]
+    public async Task Browser_PreservesExplicitUrlAndPlacement()
+    {
+        var result = await InvokeAsync([
+            "browser",
+            "--url",
+            "https://example.com/path?q=one",
+            "--relative-to",
+            "nook-anchor",
+            "--placement",
+            "below",
+            "--json",
+        ]);
+
+        Assert.Equal(0, result.ExitCode);
+        var parameters = result.Request.Params!.Value;
+        Assert.Equal("browser", parameters.GetProperty("nookType").GetString());
+        Assert.Equal(
+            "https://example.com/path?q=one",
+            parameters.GetProperty("url").GetString());
+        Assert.Equal(
+            "nook-anchor",
+            parameters.GetProperty("relativeToNookId").GetString());
+        Assert.Equal("below", parameters.GetProperty("placement").GetString());
+    }
+
     private static async Task<CommandResult> InvokeAsync(string[] args)
     {
         var root = TestDirectory.Create(

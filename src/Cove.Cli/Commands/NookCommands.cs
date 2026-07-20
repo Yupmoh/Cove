@@ -28,7 +28,8 @@ internal static class NookCommands
             ArgValue(ctx.Args, "--placement") ?? "right",
             ArgValue(ctx.Args, "--bay-id"),
             IntValue(ctx.Args, "--cols") ?? 80,
-            IntValue(ctx.Args, "--rows") ?? 24);
+            IntValue(ctx.Args, "--rows") ?? 24,
+            ArgValue(ctx.Args, "--url"));
         var json = JsonSerializer.Serialize(
             parameters,
             CoveJsonContext.Default.NookOpenParams);
@@ -135,6 +136,7 @@ internal static class NookCommands
             "--bay-id",
             "--cols",
             "--rows",
+            "--url",
         ]);
         for (var index = 0; index < args.Length; index++)
         {
