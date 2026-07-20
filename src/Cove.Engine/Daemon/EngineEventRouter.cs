@@ -11,6 +11,7 @@ internal sealed class EngineEventRouter
     private readonly object _guiLock = new();
     private readonly List<FrameConnection> _guiConnections = new();
     private RestorationSummaryEvent? _restorationSummary;
+    private long _workspaceRevision;
 
     public EngineEventRouter(CancellationToken shutdownToken)
     {
@@ -18,6 +19,7 @@ internal sealed class EngineEventRouter
     }
 
     public RestorationSummaryEvent? RestorationSummary => Volatile.Read(ref _restorationSummary);
+    public long WorkspaceRevision => Interlocked.Read(ref _workspaceRevision);
 
     public void SetRestorationSummary(RestorationSummaryEvent summary)
     {
@@ -54,19 +56,28 @@ internal sealed class EngineEventRouter
 
     public void PublishMutation(string uri)
     {
-        if (!IsMutatingVerb(uri))
-            return;
-        Broadcast(
-            "state.changed",
-            new StateChangedEvent(uri),
-            CoveJsonContext.Default.StateChangedEvent);
-        var taskChannel = ResolveTaskEventChannel(uri);
-        if (taskChannel is not null)
+        if (IsMutatingVerb(uri))
         {
             Broadcast(
-                taskChannel,
+                "state.changed",
                 new StateChangedEvent(uri),
                 CoveJsonContext.Default.StateChangedEvent);
+            var taskChannel = ResolveTaskEventChannel(uri);
+            if (taskChannel is not null)
+            {
+                Broadcast(
+                    taskChannel,
+                    new StateChangedEvent(uri),
+                    CoveJsonContext.Default.StateChangedEvent);
+            }
+        }
+        if (IsWorkspaceMutatingVerb(uri))
+        {
+            var revision = Interlocked.Increment(ref _workspaceRevision);
+            Broadcast(
+                "workspace.changed",
+                new WorkspaceChangedEvent(revision, uri),
+                CoveJsonContext.Default.WorkspaceChangedEvent);
         }
     }
 
@@ -107,6 +118,23 @@ internal sealed class EngineEventRouter
             || uri.StartsWith("cove://commands/task.", StringComparison.Ordinal)
             || uri.StartsWith("cove://commands/run.", StringComparison.Ordinal)
             || uri == "cove://commands/activity.acknowledge";
+    }
+
+    internal static bool IsWorkspaceMutatingVerb(string uri)
+    {
+        return uri == "cove://commands/layout.mutate"
+            || uri is "cove://commands/nook.spawn"
+                or "cove://commands/nook.kill"
+                or "cove://commands/nook.rename"
+            || IsVisibleMutationGroup(uri, "cove://commands/bay.", "list")
+            || IsVisibleMutationGroup(uri, "cove://commands/shore.", "list")
+            || IsVisibleMutationGroup(uri, "cove://commands/wing.", "list");
+    }
+
+    private static bool IsVisibleMutationGroup(string uri, string prefix, string readVerb)
+    {
+        return uri.StartsWith(prefix, StringComparison.Ordinal)
+            && !uri.Equals(prefix + readVerb, StringComparison.Ordinal);
     }
 
     private static string? ResolveTaskEventChannel(string uri)

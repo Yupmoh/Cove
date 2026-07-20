@@ -30,6 +30,7 @@ import { createWorkspaceViewFeature } from "./features/workspace/workspace-view-
 import { SplitChooserFeature } from "./shell/split-chooser-feature";
 import { BayCreateFeature } from "./features/bays/bay-create-feature";
 import { createWorkspaceActionsFeature } from "./features/workspace/workspace-actions-feature";
+import { createWorkspaceSyncFeature } from "./features/workspace/workspace-sync-feature";
 import { createBrowserAutomationFeature } from "./features/automation/browser-automation-feature";
 import { createNotificationFeature } from "./features/notifications/notification-feature";
 import { createHarnessUpdateFeature } from "./features/updater/harness-update-feature";
@@ -406,6 +407,11 @@ const workspaceActions = createWorkspaceActionsFeature({
   closeBrowserNook: closeBrowserWebview,
   reconcileBrowserNooks: reconcileBrowserBounds,
 });
+const workspaceSyncFeature = createWorkspaceSyncFeature({
+  engineEvents,
+  reload: () => workspaceActions.reload(),
+  warn: (message, error) => console.warn(message, error),
+});
 
 const appearanceFeature = createAppearanceFeature({
   document,
@@ -666,6 +672,7 @@ function registerApplicationOwnership(): void {
   appLifecycle.own(() => browserAutomationFeature.dispose());
   appLifecycle.own(() => harnessUpdateFeature.dispose());
   appLifecycle.own(() => agentStatusFeature.dispose());
+  appLifecycle.own(() => workspaceSyncFeature.dispose());
   appLifecycle.own(() => engineEvents.dispose());
   appLifecycle.own(disposeBrowserSessions);
   appLifecycle.own(() => {
@@ -708,6 +715,7 @@ engineEvents.start(() => {
   setupConfigurationEvents();
   browserAutomationFeature.start();
   agentStatusFeature.start();
+  workspaceSyncFeature.start();
   notificationFeature.start();
   engineEvents.register("dictation.model", (payload) => {
     if (payload?.error) onboardingFeature.setDictationModelError(payload.error);

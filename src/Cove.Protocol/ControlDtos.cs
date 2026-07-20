@@ -20,6 +20,7 @@ public sealed record ControlError(string Code, string Message);
 
 public sealed record ControlEvent(string Channel, JsonElement Payload);
 public sealed record StateChangedEvent(string Uri);
+public sealed record WorkspaceChangedEvent(long Revision, string Uri);
 public sealed record ConfigChangedEvent(string Key);
 public sealed record AgentChangedEvent(string NookId);
 
@@ -518,6 +519,7 @@ public sealed record PerformanceResultSaveResult(string Directory);
 [JsonSerializable(typeof(ControlResponse))]
 [JsonSerializable(typeof(ControlEvent))]
 [JsonSerializable(typeof(StateChangedEvent))]
+[JsonSerializable(typeof(WorkspaceChangedEvent))]
 [JsonSerializable(typeof(ConfigChangedEvent))]
 [JsonSerializable(typeof(AgentChangedEvent))]
 [JsonSerializable(typeof(ControlErrorFrame))]

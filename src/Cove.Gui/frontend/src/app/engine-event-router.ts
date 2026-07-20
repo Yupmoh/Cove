@@ -14,6 +14,7 @@ export interface EngineEventPayloads {
   "notification.deliver": unknown;
   "restore.summary": { restored?: number; fresh?: number; skipped?: number; bootedAt?: string };
   "state.changed": unknown;
+  "workspace.changed": { revision: number; uri: string };
 }
 
 interface EngineEventEnvelope {
