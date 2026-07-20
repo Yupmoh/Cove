@@ -76,6 +76,70 @@ public sealed class OmpSessionIntegrationTests
         if (root is not null) TestDirectory.Delete(root);
     }
 
+    [ExternalFact(TestOperatingSystem.Any, "bun")]
+    public async Task CoveHooks_EmitActivityTransitionsForAgentTurns()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "cove-omp-hooks-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var moduleUri = new Uri(Path.Combine(AdapterDir, "cove-hooks.ts")).AbsoluteUri;
+            var harness = """
+                const module = await import(__MODULE__);
+                const handlers = new Map();
+                const emitted = [];
+                const pi = { on: (event, handler) => handlers.set(event, handler) };
+                module.registerCoveHooks(pi, async (event, payload) => emitted.push({ event, payload }));
+                const context = { sessionManager: { getSessionFile: () => "/tmp/stamp_session-1.jsonl" } };
+                const events = [
+                  ["session_start", { type: "session_start", reason: "startup" }],
+                  ["agent_start", { type: "agent_start" }],
+                  ["tool_execution_start", { type: "tool_execution_start", toolCallId: "call-1", toolName: "read", args: {} }],
+                  ["tool_execution_end", { type: "tool_execution_end", toolCallId: "call-1", toolName: "read", result: {}, isError: false }],
+                  ["tool_execution_start", { type: "tool_execution_start", toolCallId: "call-2", toolName: "ask", args: {} }],
+                  ["tool_execution_end", { type: "tool_execution_end", toolCallId: "call-2", toolName: "ask", result: {}, isError: false }],
+                  ["agent_end", { type: "agent_end", messages: [] }],
+                  ["session_shutdown", { type: "session_shutdown" }],
+                ];
+                for (const [name, event] of events) {
+                  const handler = handlers.get(name);
+                  if (!handler) throw new Error(`missing handler ${name}`);
+                  await handler(event, context);
+                }
+                process.stdout.write(JSON.stringify(emitted));
+                """.Replace("__MODULE__", JsonSerializer.Serialize(moduleUri), StringComparison.Ordinal);
+            var harnessPath = Path.Combine(root, "harness.ts");
+            File.WriteAllText(harnessPath, harness);
+            var startInfo = new System.Diagnostics.ProcessStartInfo("bun")
+            {
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
+            startInfo.ArgumentList.Add(harnessPath);
+            using var process = System.Diagnostics.Process.Start(startInfo)
+                ?? throw new InvalidOperationException("bun process did not start");
+            var stdoutTask = process.StandardOutput.ReadToEndAsync();
+            var stderrTask = process.StandardError.ReadToEndAsync();
+            await process.WaitForExitAsync();
+            var stdout = await stdoutTask;
+            var stderr = await stderrTask;
+
+            Assert.True(process.ExitCode == 0, $"exit={process.ExitCode} stderr='{stderr}' stdout='{stdout}'");
+            using var document = JsonDocument.Parse(stdout);
+            var events = document.RootElement.EnumerateArray()
+                .Select(entry => entry.GetProperty("event").GetString() ?? "")
+                .ToArray();
+            Assert.Equal(
+                ["session-start", "user-prompt-submit", "pre-tool-use", "post-tool-use", "notification", "post-tool-use", "stop", "session-end"],
+                events);
+            Assert.Equal("session-1", document.RootElement[0].GetProperty("payload").GetProperty("session_id").GetString());
+            Assert.Equal("read", document.RootElement[2].GetProperty("payload").GetProperty("tool_name").GetString());
+            Assert.Equal("ask", document.RootElement[4].GetProperty("payload").GetProperty("tool_name").GetString());
+        }
+        finally { TestDirectory.Delete(root); }
+    }
+
     [ExternalFact(TestOperatingSystem.Unix, "bash")]
     public async Task BuildResumeCommand_FallsBackToFreshWhenSessionIsMissingFromOmpState()
     {

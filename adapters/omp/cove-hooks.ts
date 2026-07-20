@@ -4,6 +4,7 @@ import { basename } from "node:path";
 
 const cliPath = process.env.COVE_CLI_PATH ?? "";
 const nookId = process.env.COVE_NOOK_ID ?? "";
+type CoveEmit = (event: string, payload: Record<string, unknown>) => Promise<void>;
 
 function emit(event: string, payload: Record<string, unknown>): Promise<void> {
   if (!cliPath || !nookId) {
@@ -46,17 +47,44 @@ function resolveSessionId(ctx: { sessionManager?: { getSessionFile?: () => strin
   return stem.split("_").pop() ?? "";
 }
 
-export default function coveHooks(pi: ExtensionAPI): void {
+export function registerCoveHooks(pi: ExtensionAPI, emitEvent: CoveEmit): void {
   pi.on("session_start", async (_event, ctx) => {
     const sessionId = resolveSessionId(ctx as { sessionManager?: { getSessionFile?: () => string | null } });
     if (!sessionId) {
       console.error("cove omp hook session id unavailable");
       return;
     }
-    await emit("session-start", { session_id: sessionId });
+    await emitEvent("session-start", { session_id: sessionId });
+  });
+
+  pi.on("agent_start", async () => {
+    await emitEvent("user-prompt-submit", {});
+  });
+
+  pi.on("tool_execution_start", async (event) => {
+    await emitEvent(event.toolName === "ask" ? "notification" : "pre-tool-use", {
+      tool_name: event.toolName,
+      tool_call_id: event.toolCallId,
+    });
+  });
+
+  pi.on("tool_execution_end", async (event) => {
+    await emitEvent("post-tool-use", {
+      tool_name: event.toolName,
+      tool_call_id: event.toolCallId,
+      is_error: event.isError,
+    });
+  });
+
+  pi.on("agent_end", async () => {
+    await emitEvent("stop", {});
   });
 
   pi.on("session_shutdown", async () => {
-    await emit("session-end", {});
+    await emitEvent("session-end", {});
   });
+}
+
+export default function coveHooks(pi: ExtensionAPI): void {
+  registerCoveHooks(pi, emit);
 }

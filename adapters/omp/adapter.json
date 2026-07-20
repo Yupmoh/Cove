@@ -24,6 +24,7 @@
     "user-prompt-submit": "cove://hooks/omp/user-prompt-submit",
     "pre-tool-use": "cove://hooks/omp/pre-tool-use",
     "post-tool-use": "cove://hooks/omp/post-tool-use",
+    "notification": "cove://hooks/omp/notification",
     "stop": "cove://hooks/omp/stop"
   },
   "methods": {
