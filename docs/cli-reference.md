@@ -380,6 +380,7 @@ Generated from the command registry. Do not edit by hand.
 | `exec` | cli |  |
 | `extension list` | cli |  |
 | `extension run` | cli |  |
+| `hook context` | cli |  |
 | `hook emit` | cli |  |
 | `knowledge ping` | cli |  |
 | `launch-profile create` | cli |  |
@@ -498,4 +499,4 @@ Generated from the command registry. Do not edit by hand.
 | `viewer open` | cli |  |
 | `workspace context` | cli |  |
 
-Total: 493 commands
+Total: 494 commands

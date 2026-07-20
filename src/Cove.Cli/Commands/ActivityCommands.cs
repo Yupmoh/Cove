@@ -72,6 +72,41 @@ internal static class ActivityCommands
             });
     }
 
+    [CoveCommand("hook context")]
+    public static async Task<int> HookContext(CommandContext ctx)
+    {
+        var adapter = ArgValue(ctx.Args, "--adapter");
+        if (!string.Equals(adapter, "cursor-agent", StringComparison.Ordinal))
+        {
+            await ctx.Stderr.WriteLineAsync("error: --adapter cursor-agent required");
+            return 1;
+        }
+        var skillPath = Environment.GetEnvironmentVariable("COVE_SKILL_PATH");
+        if (string.IsNullOrWhiteSpace(skillPath))
+        {
+            await ctx.Stdout.WriteLineAsync("{}");
+            return 0;
+        }
+        if (!ctx.Files.FileExists(skillPath))
+        {
+            await ctx.Stderr.WriteLineAsync("error: COVE_SKILL_PATH does not exist");
+            await ctx.Stdout.WriteLineAsync("{}");
+            return 1;
+        }
+        var content = await ctx.Files.ReadAllTextAsync(skillPath, CancellationToken.None);
+        using var buffer = new MemoryStream();
+        using (var writer = new System.Text.Json.Utf8JsonWriter(buffer))
+        {
+            writer.WriteStartObject();
+            writer.WriteString("additional_context", content);
+            writer.WriteEndObject();
+            writer.Flush();
+        }
+        await ctx.Stdout.WriteLineAsync(
+            System.Text.Encoding.UTF8.GetString(buffer.GetBuffer(), 0, checked((int)buffer.Length)));
+        return 0;
+    }
+
     private static string? ArgValue(string[] args, string flag)
     {
         for (int i = 0; i < args.Length - 1; i++)

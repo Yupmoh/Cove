@@ -527,6 +527,22 @@ internal sealed class EngineRuntime : IAsyncDisposable
         HandoffTransport handoff,
         HandoffTakeover? takeover)
     {
+        CliBinLink.Ensure(
+            _paths.DataDir.Root,
+            Environment.ProcessPath,
+            _logger);
+        var seedReport = BundledAdapterSeeder.SeedFromBinaryLocation(
+            _components.AdaptersRoot,
+            _logger);
+        if (seedReport.Copied.Count + seedReport.Refreshed.Count > 0)
+        {
+            _logger.BundledAdaptersSeeded(
+                seedReport.Copied.Count,
+                seedReport.Refreshed.Count,
+                seedReport.SkippedUserManaged.Count);
+            OnAdaptersChanged();
+        }
+
         var restoration = _components.Restoration;
         var savedState = restoration.LoadState();
         var wasClean = savedState.CleanShutdown;
@@ -703,24 +719,9 @@ internal sealed class EngineRuntime : IAsyncDisposable
 
     public async Task PublishReadyAsync()
     {
-        CliBinLink.Ensure(
-            _paths.DataDir.Root,
-            Environment.ProcessPath,
-            _logger);
         await _components.HookServer
             .PublishPortAsync()
             .ConfigureAwait(false);
-        var report = BundledAdapterSeeder.SeedFromBinaryLocation(
-            _components.AdaptersRoot,
-            _logger);
-        if (report.Copied.Count + report.Refreshed.Count > 0)
-        {
-            _logger.BundledAdaptersSeeded(
-                report.Copied.Count,
-                report.Refreshed.Count,
-                report.SkippedUserManaged.Count);
-            OnAdaptersChanged();
-        }
     }
 
     public Task<ControlResponse?> RouteAsync(

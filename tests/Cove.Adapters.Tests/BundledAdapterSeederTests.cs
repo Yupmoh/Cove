@@ -218,6 +218,23 @@ public sealed class BundledAdapterSeederTests : IDisposable
     }
 
     [Fact]
+    public void Seed_CopiesCanonicalCoveSkillToRuntimeAdapterRoot()
+    {
+        var source = Path.Combine(_root, "source");
+        MakeSourceAdapter(source, "claude-code", "{\"name\":\"claude-code\"}");
+        var shared = Path.Combine(source, "cove");
+        Directory.CreateDirectory(shared);
+        File.WriteAllText(Path.Combine(shared, "skill.md"), "canonical Cove skill");
+        var target = Path.Combine(_root, "target");
+
+        BundledAdapterSeeder.Seed(source, target);
+
+        Assert.Equal(
+            "canonical Cove skill",
+            File.ReadAllText(Path.Combine(target, "cove", "skill.md")));
+    }
+
+    [Fact]
     public void InstallSkills_CopiesBundledSkillsToHarnessLocations()
     {
         var source = Path.Combine(_root, "source");

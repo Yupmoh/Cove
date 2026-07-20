@@ -85,6 +85,49 @@ public sealed class NookRegistryOwnershipTests
     }
 
     [Fact]
+    public void SpawnAndRespawn_ApplyHarnessStartupContextCentrally()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "cove-nook-bootstrap-" + Guid.NewGuid().ToString("N"));
+        var skillPath = Path.Combine(root, "adapters", "cove", "skill.md");
+        Directory.CreateDirectory(Path.GetDirectoryName(skillPath)!);
+        File.WriteAllText(skillPath, "Cove control");
+        try
+        {
+            var host = new TrackingHost();
+            var cliPath = Path.Combine(root, "bin", OperatingSystem.IsWindows() ? "cove.exe" : "cove");
+            var spawnEnvironment = new SpawnEnvironment("", root, cliPath, "bay-test", "dev");
+            var startupContext = new Launch.HarnessStartupContext(root, NullLogger.Instance);
+            using var registry = new NookRegistry(
+                host,
+                NullLogger.Instance,
+                spawnEnvironment,
+                startupContext: startupContext);
+
+            registry.Spawn(new SpawnParams("claude", ["--resume", "session-1"], Adapter: "claude-code"));
+
+            registry.RespawnAs(
+                "nook-resume",
+                "codex",
+                ["resume", "session-2"],
+                root,
+                80,
+                24,
+                adapter: "codex");
+
+            Assert.Equal(
+                ["--append-system-prompt-file", skillPath, "--resume", "session-1"],
+                host.Requests[0].Args);
+            Assert.Equal("-c", host.Requests[1].Args[0]);
+            Assert.Equal(["resume", "session-2"], host.Requests[1].Args.Skip(2));
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+                Directory.Delete(root, true);
+        }
+    }
+
+    [Fact]
     public void RespawnAs_ReplacesAndDisposesThePriorSessionExactlyOnce()
     {
         var host = new TrackingHost();

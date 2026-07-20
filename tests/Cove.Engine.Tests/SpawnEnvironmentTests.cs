@@ -17,8 +17,9 @@ public sealed class SpawnEnvironmentTests
         Assert.Equal("nook-abc", env["COVE_NOOK_ID"]);
         Assert.Equal("/data", env["COVE_DATA_DIR"]);
         Assert.Equal("/data/bin/cove", env["COVE_CLI_PATH"]);
+        Assert.Equal(Path.Combine("/data", "adapters", "cove", "skill.md"), env["COVE_SKILL_PATH"]);
         Assert.Equal("ws1", env["COVE_BAY_ID"]);
-        Assert.Equal("/probed/bin:/usr/bin", env["PATH"]);
+        Assert.Equal("/data/bin" + Path.PathSeparator + "/probed/bin:/usr/bin", env["PATH"]);
         Assert.True(env.ContainsKey("COVE_TASK_ID") && env["COVE_TASK_ID"] == "");
         Assert.True(env.ContainsKey("COVE_TASK_RUN_ID") && env["COVE_TASK_RUN_ID"] == "");
         Assert.True(env.ContainsKey("COVE_HOOK_PORT") && env["COVE_HOOK_PORT"] == "");

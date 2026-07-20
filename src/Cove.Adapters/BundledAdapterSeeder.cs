@@ -137,6 +137,14 @@ public static class BundledAdapterSeeder
             }
         }
 
+        var canonicalSkill = Path.Combine(sourceRoot, "cove", "skill.md");
+        if (File.Exists(canonicalSkill))
+        {
+            var canonicalTarget = Path.Combine(targetRoot, "cove", "skill.md");
+            Directory.CreateDirectory(Path.GetDirectoryName(canonicalTarget)!);
+            File.Copy(canonicalSkill, canonicalTarget, overwrite: true);
+        }
+
         return new BundledSeedReport(copied, refreshed, skipped);
     }
 

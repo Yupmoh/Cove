@@ -1,3 +1,4 @@
+using System.IO;
 using System.Collections.Generic;
 
 namespace Cove.Engine;
@@ -69,6 +70,7 @@ public sealed class SpawnEnvironment
         env["COVE_CHANNEL"] = _channel;
         env["COVE_CLI_PATH"] = _cliPath;
         env["COVE_DATA_DIR"] = _dataDir;
+        env["COVE_SKILL_PATH"] = Path.Combine(_dataDir, "adapters", "cove", "skill.md");
         env["COVE_NOOK_ID"] = nookId;
         env["COVE_NOOK_TOKEN"] = nookToken ?? "";
         env["COVE_BAY_ID"] = _bayId;
@@ -76,6 +78,23 @@ public sealed class SpawnEnvironment
         env["COVE_TASK_ID"] = "";
         env["COVE_TASK_RUN_ID"] = "";
         env["COVE_HOOK_PORT"] = "";
+        var cliDirectory = Path.GetDirectoryName(_cliPath);
+        if (!string.IsNullOrWhiteSpace(cliDirectory))
+        {
+            var path = env.TryGetValue("PATH", out var configuredPath)
+                ? configuredPath
+                : "";
+            var comparison = OperatingSystem.IsWindows()
+                ? System.StringComparison.OrdinalIgnoreCase
+                : System.StringComparison.Ordinal;
+            var containsCliDirectory = path
+                .Split(Path.PathSeparator, System.StringSplitOptions.RemoveEmptyEntries)
+                .Any(entry => string.Equals(entry, cliDirectory, comparison));
+            if (!containsCliDirectory)
+                env["PATH"] = string.IsNullOrEmpty(path)
+                    ? cliDirectory
+                    : cliDirectory + Path.PathSeparator + path;
+        }
         return env;
     }
 }

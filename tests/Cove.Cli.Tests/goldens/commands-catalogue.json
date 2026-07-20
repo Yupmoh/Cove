@@ -1524,6 +1524,10 @@
     "source": "cli"
   },
   {
+    "command": "hook context",
+    "source": "cli"
+  },
+  {
     "command": "hook emit",
     "source": "cli"
   },

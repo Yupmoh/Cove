@@ -86,6 +86,7 @@ public sealed class CommandsCatalogueTests
         Assert.Equal("TaskCommands", HandlerOwner("task list"));
         Assert.Equal("NoteCommands", HandlerOwner("note list"));
         Assert.Equal("DiagnosticsCommands", HandlerOwner("diagnostics status"));
+        Assert.Equal("ActivityCommands", HandlerOwner("hook context"));
 
         var largestOwner = CoveCommandRegistry.Handlers
             .Where(entry => !entry.Key.StartsWith("cove://", StringComparison.Ordinal))

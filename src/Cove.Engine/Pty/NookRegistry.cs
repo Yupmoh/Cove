@@ -1,3 +1,4 @@
+using Cove.Engine.Launch;
 using Cove.Persistence;
 using Cove.Platform;
 using Cove.Platform.Pty;
@@ -15,6 +16,7 @@ public sealed class NookRegistry : IDisposable, Cove.Engine.Agents.INookWriter
     private readonly IPtyHost _host;
     private readonly ILogger _logger;
     private readonly SpawnEnvironment? _spawnEnvironment;
+    private readonly HarnessStartupContext _startupContext;
     private readonly string? _shellDir;
     private readonly IShellResolver _shellResolver;
     private readonly NookIdentityService _identities = new();
@@ -29,13 +31,17 @@ public sealed class NookRegistry : IDisposable, Cove.Engine.Agents.INookWriter
         SpawnEnvironment? spawnEnv = null,
         string? shellDir = null,
         string? projectDir = null,
-        IShellResolver? shellResolver = null)
+        IShellResolver? shellResolver = null,
+        HarnessStartupContext? startupContext = null)
     {
         ArgumentNullException.ThrowIfNull(host);
         ArgumentNullException.ThrowIfNull(logger);
         _host = host;
         _logger = logger;
         _spawnEnvironment = spawnEnv;
+        _startupContext = startupContext ?? new HarnessStartupContext(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            logger);
         _shellDir = shellDir;
         _shellResolver = shellResolver ?? SystemShellResolver.Instance;
         _projectDir = projectDir;
@@ -106,7 +112,8 @@ public sealed class NookRegistry : IDisposable, Cove.Engine.Agents.INookWriter
             cwd,
             parameters.Cols,
             parameters.Rows,
-            parameters.Env);
+            parameters.Env,
+            parameters.Adapter);
         _sessions.Tag(identity.NookId, parameters.Adapter, parameters.AgentName);
         return info;
     }
@@ -132,6 +139,7 @@ public sealed class NookRegistry : IDisposable, Cove.Engine.Agents.INookWriter
             cols,
             rows,
             environment,
+            adapter,
             priorScrollback);
         _sessions.Tag(nookId, adapter, agentName);
         return info;
@@ -158,6 +166,7 @@ public sealed class NookRegistry : IDisposable, Cove.Engine.Agents.INookWriter
             cols,
             rows,
             environment,
+            adapter,
             restoreState.Tail);
         if (_sessions.TryGet(nookId, out var session))
             _terminalState.RestoreCheckpoint(session, restoreState);
@@ -173,11 +182,23 @@ public sealed class NookRegistry : IDisposable, Cove.Engine.Agents.INookWriter
         int cols,
         int rows,
         IReadOnlyDictionary<string, string>? callerEnvironment,
+        string? adapter,
         byte[]? priorScrollback = null)
     {
         var environment = _spawnEnvironment is { } spawnEnvironment
             ? spawnEnvironment.Build(identity.NookId, callerEnvironment, identity.Token)
             : callerEnvironment;
+        if (environment is Dictionary<string, string> managedEnvironment
+            && !string.IsNullOrWhiteSpace(adapter))
+        {
+            var startupCommand = _startupContext.Apply(
+                adapter,
+                command,
+                args,
+                managedEnvironment);
+            command = startupCommand.Command;
+            args = startupCommand.Args;
+        }
         if (environment is Dictionary<string, string> environmentDictionary
             && _shellDir is { } shellDir)
         {
