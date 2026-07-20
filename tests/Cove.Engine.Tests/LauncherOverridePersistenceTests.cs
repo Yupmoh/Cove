@@ -16,7 +16,7 @@ public sealed class LauncherOverridePersistenceTests
         {
             var store = new LauncherOverrideStore(dir);
             var orch = LaunchTestFactory.Create(overrides: store);
-            var overrides = new LauncherOverrides { Yolo = true, ExtraFlags = new[] { "--verbose" }, WorkingDir = "/tmp" };
+            var overrides = new LauncherOverrides { Yolo = true, ExtraFlags = new[] { "--verbose" }, WorkingDir = "/tmp", Model = "model-x", Effort = "high" };
 
             orch.PersistOverrides("nook-1", overrides);
 
@@ -25,6 +25,8 @@ public sealed class LauncherOverridePersistenceTests
             Assert.True(loaded!.Yolo);
             Assert.Contains("--verbose", loaded.ExtraFlags);
             Assert.Equal("/tmp", loaded.WorkingDir);
+            Assert.Equal("model-x", loaded.Model);
+            Assert.Equal("high", loaded.Effort);
         }
         finally { Cove.Testing.TestDirectory.Delete(dir); }
     }

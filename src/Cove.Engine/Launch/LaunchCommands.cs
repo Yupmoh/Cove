@@ -1,6 +1,5 @@
 using System.Text.Json;
 using Cove.Engine.Restart;
-using Cove.Generated;
 using Cove.Protocol;
 
 namespace Cove.Engine.Launch;
@@ -21,7 +20,7 @@ public static class LaunchCommands
         if (profile is null)
             return ctx.Fail("not_found", $"profile '{p.Adapter}/{p.ProfileSlug}' not found");
 
-        var overrides = ToOverrides(p.Yolo, p.WorkingDir, p.ExtraFlags, p.Env);
+        var overrides = ToOverrides(p.Yolo, p.WorkingDir, p.ExtraFlags, p.Env, p.Model, p.Effort);
         try
         {
             var cmd = await orch.BuildLaunchCommandAsync(profile, overrides).ConfigureAwait(false);
@@ -41,7 +40,7 @@ public static class LaunchCommands
         if (ctx.Request.Params is not JsonElement el || el.Deserialize(CoveJsonContext.Default.LaunchOverrideSaveParams) is not { } p)
             return Task.FromResult(ctx.Fail("invalid_params", "override save params required"));
 
-        var overrides = ToOverrides(p.Yolo, p.WorkingDir, p.ExtraFlags, p.Env);
+        var overrides = ToOverrides(p.Yolo, p.WorkingDir, p.ExtraFlags, p.Env, p.Model, p.Effort);
         orch.PersistOverrides(p.NookId, overrides);
         return Task.FromResult(ctx.Ok());
     }
@@ -72,12 +71,25 @@ public static class LaunchCommands
         return Task.FromResult(ctx.Ok());
     }
 
-    private static LauncherOverrides ToOverrides(bool yolo, string? workingDir, string[] extraFlags, Dictionary<string, string> env)
-        => new() { Yolo = yolo, WorkingDir = workingDir, ExtraFlags = extraFlags ?? [], Env = env ?? new() };
+    private static LauncherOverrides ToOverrides(
+        bool yolo,
+        string? workingDir,
+        string[] extraFlags,
+        Dictionary<string, string> env,
+        string? model,
+        string? effort) => new()
+        {
+            Yolo = yolo,
+            WorkingDir = workingDir,
+            ExtraFlags = extraFlags ?? [],
+            Env = env ?? new(),
+            Model = model,
+            Effort = effort,
+        };
 
     private static ResumeCommandDto ToDto(ResumeCommand cmd)
         => new(cmd.Command, cmd.Args.ToArray(), cmd.Cwd);
 
     private static LauncherOverridesDto ToDto(LauncherOverrides o)
-        => new(o.Yolo, o.WorkingDir, o.ExtraFlags.ToArray(), o.Env.ToDictionary(e => e.Key, e => e.Value));
+        => new(o.Yolo, o.WorkingDir, o.ExtraFlags.ToArray(), o.Env.ToDictionary(e => e.Key, e => e.Value), o.Model, o.Effort);
 }

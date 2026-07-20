@@ -46,6 +46,10 @@ model="$(flag_string "model")"
 if [ -n "$model" ] && [ "$model" != "default" ]; then
   args+=("--model" "$model")
 fi
+effort="$(flag_string "effort")"
+if [ -n "$effort" ] && [ "$effort" != "default" ]; then
+  args+=("--effort" "$effort")
+fi
 extra_args="$(flag_string "extraArgs")"
 if [ -n "$extra_args" ]; then
   read -r -a extra_parts <<< "$extra_args"

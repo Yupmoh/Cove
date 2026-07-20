@@ -8,6 +8,8 @@ public sealed record LauncherOverrides
 {
     public bool Yolo { get; init; }
     public string? WorkingDir { get; init; }
+    public string? Model { get; init; }
+    public string? Effort { get; init; }
     private readonly IReadOnlyDictionary<string, string>? _env;
     public IReadOnlyDictionary<string, string> Env { get => _env ?? new Dictionary<string, string>(); init => _env = value; }
     private readonly IReadOnlyList<string>? _extraFlags;

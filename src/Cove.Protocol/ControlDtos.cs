@@ -142,7 +142,9 @@ public sealed record AgentLaunchParams(
     bool Yolo = false,
     int Cols = 80,
     int Rows = 24,
-    string AccessScope = "same-bay");
+    string AccessScope = "same-bay",
+    string? Model = null,
+    string? Effort = null);
 public sealed record AgentLaunchResult(
     string NookId,
     string Adapter,
@@ -252,12 +254,12 @@ public sealed record SessionListResult(System.Collections.Generic.IReadOnlyList<
 public sealed record ReplayInfoDto(string Command, int? ExitCode, int? Signal);
 public sealed record SpawnedNooksResult(System.Collections.Generic.IReadOnlyList<string> NookIds);
 
-public sealed record LaunchBuildParams(string Adapter, string ProfileSlug, bool Yolo, string? WorkingDir, string[] ExtraFlags, Dictionary<string, string> Env);
+public sealed record LaunchBuildParams(string Adapter, string ProfileSlug, bool Yolo, string? WorkingDir, string[] ExtraFlags, Dictionary<string, string> Env, string? Model = null, string? Effort = null);
 public sealed record LaunchResumeParams(string Adapter, string ProfileSlug, string SessionId, bool Yolo, string? WorkingDir, string[] ExtraFlags, Dictionary<string, string> Env);
-public sealed record LaunchOverrideSaveParams(string NookId, bool Yolo, string? WorkingDir, string[] ExtraFlags, Dictionary<string, string> Env);
+public sealed record LaunchOverrideSaveParams(string NookId, bool Yolo, string? WorkingDir, string[] ExtraFlags, Dictionary<string, string> Env, string? Model = null, string? Effort = null);
 public sealed record LaunchOverrideGetParams(string NookId);
 public sealed record ResumeCommandDto(string Command, string[] Args, string Cwd);
-public sealed record LauncherOverridesDto(bool Yolo, string? WorkingDir, string[] ExtraFlags, Dictionary<string, string> Env);
+public sealed record LauncherOverridesDto(bool Yolo, string? WorkingDir, string[] ExtraFlags, Dictionary<string, string> Env, string? Model = null, string? Effort = null);
 
 public sealed record AdapterListItemDto(string Name, string DisplayName, string Accent, string Binary, string? Status = null, string? Version = null, string? BinaryPath = null, string? UpdateCommand = null, string? UninstallCommand = null, string? InstallCommand = null, string? Description = null);
 public sealed record AdapterListResult(System.Collections.Generic.IReadOnlyList<AdapterListItemDto> Adapters);

@@ -9,6 +9,10 @@ flag_true() {
   printf '%s' "$FLAGS_JSON" | grep -q "\"$1\"[[:space:]]*:[[:space:]]*true"
 }
 
+flag_string() {
+  printf '%s' "$FLAGS_JSON" | sed -n "s/.*\"$1\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" | head -1
+}
+
 resolve_binary() {
   local name="$1"; shift
   local candidate
@@ -32,6 +36,14 @@ if [ -f "$ADAPTER_DIR/hooks-settings.json" ]; then
 fi
 if flag_true "dangerouslySkipPermissions"; then
   args+=("--dangerously-skip-permissions")
+fi
+model="$(flag_string "model")"
+if [ -n "$model" ] && [ "$model" != "default" ]; then
+  args+=("--model" "$model")
+fi
+effort="$(flag_string "effort")"
+if [ -n "$effort" ] && [ "$effort" != "default" ]; then
+  args+=("--effort" "$effort")
 fi
 
 out='{"command":['

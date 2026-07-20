@@ -113,6 +113,8 @@ internal static class AgentLaunchCommands
         {
             Yolo = parameters.Yolo,
             WorkingDir = parameters.Cwd,
+            Model = parameters.Model,
+            Effort = parameters.Effort,
         };
 
         ResumeCommand command;

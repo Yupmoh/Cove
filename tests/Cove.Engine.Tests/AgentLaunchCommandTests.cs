@@ -44,7 +44,9 @@ public sealed class AgentLaunchCommandTests
             false,
             80,
             24,
-            "same-tab"));
+            "same-tab",
+            "model-x",
+            "high"));
 
         var response = await EngineCommandRouter.RouteAsync(
             request,
@@ -70,6 +72,9 @@ public sealed class AgentLaunchCommandTests
         Assert.Equal("right", result.Placement);
         Assert.False(result.Resumed);
         Assert.Equal(1, profiles.ResolveCount);
+        var overrides = launcher.GetOverrides(result.NookId);
+        Assert.Equal("model-x", overrides!.Model);
+        Assert.Equal("high", overrides.Effort);
         var split = Assert.IsType<SplitNode>(layout.GetRoot(shoreId));
         Assert.Equal(SplitOrientation.Row, split.Orientation);
         Assert.Equal("anchor", Assert.IsType<NookLeaf>(split.ChildA).NookId);

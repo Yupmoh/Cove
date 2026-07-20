@@ -44,6 +44,14 @@ args=("$bin" "--dangerously-bypass-hook-trust")
 if flag_true "dangerouslySkipPermissions"; then
   args+=("--yolo")
 fi
+model="$(flag_string "model")"
+if [ -n "$model" ] && [ "$model" != "default" ]; then
+  args+=("--model" "$model")
+fi
+effort="$(flag_string "effort")"
+if [ -n "$effort" ] && [ "$effort" != "default" ]; then
+  args+=("--config" "model_reasoning_effort=\"$effort\"")
+fi
 
 out='{"command":['
 for i in "${!args[@]}"; do

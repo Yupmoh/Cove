@@ -128,7 +128,9 @@ internal static class AgentCommands
             ctx.Args.Contains("--yolo"),
             IntValue(ctx.Args, "--cols") ?? 80,
             IntValue(ctx.Args, "--rows") ?? 24,
-            ArgValue(ctx.Args, "--access-scope") ?? "same-bay");
+            ArgValue(ctx.Args, "--access-scope") ?? "same-bay",
+            ArgValue(ctx.Args, "--model"),
+            ArgValue(ctx.Args, "--effort"));
         var json = JsonSerializer.Serialize(
             parameters,
             CoveJsonContext.Default.AgentLaunchParams);

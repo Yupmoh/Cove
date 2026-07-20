@@ -67,9 +67,25 @@ public sealed class AdapterResumeProtocol : IAdapterResume
         var extra = new Dictionary<string, string>();
         var argParts = new List<string>(overrides.ExtraFlags);
         var extraArgs = argParts.Count > 0 ? string.Join(" ", argParts) : null;
-        var flags = new ResumeFlags(sessionId, overrides.Yolo, overrides.WorkingDir, extra, extraArgs);
+        var flags = new ResumeFlags(
+            sessionId,
+            overrides.Yolo,
+            overrides.WorkingDir,
+            extra,
+            extraArgs,
+            Selection(overrides.Model),
+            Selection(overrides.Effort));
         return JsonSerializer.Serialize(flags, ResumeFlagsJsonContext.Default.ResumeFlags);
     }
+
+    private static string? Selection(string? value) =>
+        string.IsNullOrWhiteSpace(value)
+        || string.Equals(
+            value,
+            "default",
+            StringComparison.OrdinalIgnoreCase)
+            ? null
+            : value;
 
     private static ResumeCommand ParseCommand(System.Text.Json.JsonElement json, string? workingDir)
     {
@@ -93,7 +109,9 @@ public sealed record ResumeFlags(
     [property: JsonPropertyName("dangerouslySkipPermissions")] bool DangerouslySkipPermissions,
     [property: JsonPropertyName("worktreePath")] string? WorktreePath,
     [property: JsonPropertyName("extra")] IReadOnlyDictionary<string, string> Extra,
-    [property: JsonPropertyName("extraArgs")] string? ExtraArgs);
+    [property: JsonPropertyName("extraArgs")] string? ExtraArgs,
+    [property: JsonPropertyName("model")] string? Model,
+    [property: JsonPropertyName("effort")] string? Effort);
 
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase, DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
 [JsonSerializable(typeof(ResumeFlags))]

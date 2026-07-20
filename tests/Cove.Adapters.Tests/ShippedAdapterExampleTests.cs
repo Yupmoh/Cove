@@ -121,4 +121,78 @@ public sealed class ShippedAdapterExampleTests
             Assert.True((mode & UnixFileMode.UserExecute) != 0, $"not executable: {path}");
         }
     }
+    [PlatformTheory(TestOperatingSystem.Unix)]
+    [Trait(TestTraits.Category, TestTraits.Platform)]
+    [System.Runtime.Versioning.UnsupportedOSPlatform("windows")]
+    [InlineData(
+        "claude-code",
+        "--effort",
+        "high",
+        "--dangerously-skip-permissions")]
+    [InlineData(
+        "codex",
+        "--config",
+        "model_reasoning_effort=\"high\"",
+        "--dangerously-bypass-hook-trust")]
+    [InlineData("omp", "--thinking", "high", "--hook")]
+    public void ShippedLaunchAndResumeScripts_MapSelectionsAndPreserveHooks(
+        string adapterName,
+        string effortFlag,
+        string effortValue,
+        string requiredFlag)
+    {
+        const string flags =
+            "{\"dangerouslySkipPermissions\":true,\"model\":\"model-x\",\"effort\":\"high\"}";
+        var launch = RunScript(
+            adapterName,
+            "build_launch_command.sh",
+            flags);
+        var resume = RunScript(
+            adapterName,
+            "build_resume_command.sh",
+            "session-1",
+            flags);
+
+        foreach (var arguments in new[] { launch, resume })
+        {
+            var modelIndex = Array.IndexOf(arguments, "--model");
+            Assert.True(modelIndex >= 0);
+            Assert.Equal("model-x", arguments[modelIndex + 1]);
+            var effortIndex = Array.IndexOf(arguments, effortFlag);
+            Assert.True(effortIndex >= 0);
+            Assert.Equal(effortValue, arguments[effortIndex + 1]);
+            Assert.Contains(requiredFlag, arguments);
+        }
+    }
+
+    private static string[] RunScript(
+        string adapterName,
+        string scriptName,
+        params string[] arguments)
+    {
+        var start = new System.Diagnostics.ProcessStartInfo("/bin/bash")
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+        };
+        start.ArgumentList.Add(
+            Path.Combine(AdaptersRoot, adapterName, scriptName));
+        foreach (var argument in arguments)
+            start.ArgumentList.Add(argument);
+        using var process = System.Diagnostics.Process.Start(start)!;
+        var stdout = process.StandardOutput.ReadToEnd();
+        var stderr = process.StandardError.ReadToEnd();
+        process.WaitForExit();
+        Assert.True(
+            process.ExitCode == 0,
+            $"{adapterName}/{scriptName}: {stderr}");
+        using var document = System.Text.Json.JsonDocument.Parse(stdout);
+        return document.RootElement
+            .GetProperty("command")
+            .EnumerateArray()
+            .Select(item => item.GetString()!)
+            .ToArray();
+    }
+
 }

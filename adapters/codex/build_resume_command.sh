@@ -45,10 +45,22 @@ flag_true() {
   printf '%s' "$FLAGS_JSON" | grep -q "\"$1\"[[:space:]]*:[[:space:]]*true"
 }
 
+flag_string() {
+  printf '%s' "$FLAGS_JSON" | sed -n "s/.*\"$1\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" | head -1
+}
+
 bin="$(resolve_binary codex /opt/homebrew/bin/codex /usr/local/bin/codex)"
 args=("$bin" "--dangerously-bypass-hook-trust")
 if flag_true "dangerouslySkipPermissions"; then
   args+=("--yolo")
+fi
+model="$(flag_string "model")"
+if [ -n "$model" ] && [ "$model" != "default" ]; then
+  args+=("--model" "$model")
+fi
+effort="$(flag_string "effort")"
+if [ -n "$effort" ] && [ "$effort" != "default" ]; then
+  args+=("--config" "model_reasoning_effort=\"$effort\"")
 fi
 if [ "$session_known" -eq 1 ]; then
   args+=("resume" "$SESSION_ID")

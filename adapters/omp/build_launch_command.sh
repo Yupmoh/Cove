@@ -22,6 +22,13 @@ flag_string() {
   printf '%s' "$FLAGS_JSON" | sed -n "s/.*\"$1\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" | head -1
 }
 
+json_escape() {
+  local value="$1"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  printf '%s' "$value"
+}
+
 ADAPTER_DIR="${COVE_ADAPTER_DIR:-$(cd "$(dirname "$0")" && pwd)}"
 custom_command="$(flag_string "command")"
 custom_command="${custom_command/#~\//$HOME/}"
@@ -30,4 +37,20 @@ if [ -n "$custom_command" ]; then
 else
   bin="$(resolve_binary omp "$HOME/.bun/bin/omp" /opt/homebrew/bin/omp /usr/local/bin/omp)"
 fi
-printf '{"command":["%s","--allow-home","--hook","%s/cove-hooks.ts"]}\n' "$bin" "$ADAPTER_DIR"
+args=("$bin" "--allow-home" "--hook" "$ADAPTER_DIR/cove-hooks.ts")
+model="$(flag_string "model")"
+if [ -n "$model" ] && [ "$model" != "default" ]; then
+  args+=("--model" "$model")
+fi
+effort="$(flag_string "effort")"
+if [ -n "$effort" ] && [ "$effort" != "default" ]; then
+  args+=("--thinking" "$effort")
+fi
+
+out='{"command":['
+for i in "${!args[@]}"; do
+  [ "$i" -gt 0 ] && out+=','
+  out+="\"$(json_escape "${args[$i]}")\""
+done
+out+=']}'
+printf '%s\n' "$out"

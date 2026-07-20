@@ -103,6 +103,29 @@ public sealed class AdapterResumeProtocolTests
     }
 
     [Fact]
+    public void ResumeFlags_IncludeExplicitSelections()
+    {
+        var json = JsonSerializer.Serialize(
+            new ResumeFlags(
+                "session-1",
+                false,
+                null,
+                new Dictionary<string, string>(),
+                null,
+                "model-x",
+                "high"),
+            ResumeFlagsJsonContext.Default.ResumeFlags);
+        using var document = JsonDocument.Parse(json);
+
+        Assert.Equal(
+            "model-x",
+            document.RootElement.GetProperty("model").GetString());
+        Assert.Equal(
+            "high",
+            document.RootElement.GetProperty("effort").GetString());
+    }
+
+    [Fact]
     public async Task WaitForReadiness_NoOp_ReturnsCompleted()
     {
         var root = WriteFixture("test-v2");
@@ -133,13 +156,23 @@ public sealed class AdapterResumeProtocolTests
             @"C:\tools\omp.exe",
             @"C:\cove\adapters\omp",
             "omp-session",
-            new LauncherOverrides { WorkingDir = @"D:\Cove" });
+            new LauncherOverrides { WorkingDir = @"D:\Cove", Model = "model-x", Effort = "high" });
 
         Assert.NotNull(command);
         Assert.Equal(@"C:\tools\omp.exe", command.Command);
-        Assert.Equal("--resume", command.Args[0]);
-        Assert.Equal("omp-session", command.Args[1]);
-        Assert.Contains(Path.Combine(@"C:\cove\adapters\omp", "cove-hooks.ts"), command.Args);
+        Assert.Equal(
+            [
+                "--resume",
+                "omp-session",
+                "--allow-home",
+                "--hook",
+                Path.Combine(@"C:\cove\adapters\omp", "cove-hooks.ts"),
+                "--model",
+                "model-x",
+                "--thinking",
+                "high",
+            ],
+            command.Args);
     }
 
     [Fact]
@@ -150,10 +183,10 @@ public sealed class AdapterResumeProtocolTests
             @"C:\tools\claude.exe",
             @"C:\cove\adapters\claude-code",
             "claude-session",
-            new LauncherOverrides { Yolo = true });
+            new LauncherOverrides { Yolo = true, Model = "opus", Effort = "high" });
 
         Assert.NotNull(command);
-        Assert.Equal(["--resume", "claude-session", "--dangerously-skip-permissions"], command.Args);
+        Assert.Equal(["--resume", "claude-session", "--dangerously-skip-permissions", "--model", "opus", "--effort", "high"], command.Args);
     }
 
     [Fact]
@@ -177,11 +210,11 @@ public sealed class AdapterResumeProtocolTests
             @"C:\tools\claude.exe",
             @"C:\cove\adapters\claude-code",
             profile,
-            new LauncherOverrides { Yolo = true, WorkingDir = @"D:\Cove" });
+            new LauncherOverrides { Yolo = true, WorkingDir = @"D:\Cove", Model = "opus", Effort = "high" });
 
         Assert.NotNull(command);
         Assert.Equal(@"C:\tools\claude.exe", command.Command);
-        Assert.Equal(["--dangerously-skip-permissions", "--model", "sonnet"], command.Args);
+        Assert.Equal(["--dangerously-skip-permissions", "--model", "opus", "--effort", "high"], command.Args);
         Assert.Equal(@"D:\Cove", command.Cwd);
     }
 
@@ -206,13 +239,84 @@ public sealed class AdapterResumeProtocolTests
             @"C:\Users\test\npm\codex.cmd",
             @"C:\cove\adapters\codex",
             profile,
-            new LauncherOverrides { Yolo = true, WorkingDir = @"D:\Cove" });
+            new LauncherOverrides { Yolo = true, WorkingDir = @"D:\Cove", Model = "gpt-x", Effort = "high" });
 
         Assert.NotNull(command);
         Assert.Equal("cmd.exe", command.Command);
         Assert.Equal(
-            ["/d", "/s", "/c", @"C:\Users\test\npm\codex.cmd", "--dangerously-bypass-hook-trust", "--yolo"],
+            ["/d", "/s", "/c", @"C:\Users\test\npm\codex.cmd", "--dangerously-bypass-hook-trust", "--yolo", "--model", "gpt-x", "--config", "model_reasoning_effort=\"high\""],
             command.Args);
         Assert.Equal(@"D:\Cove", command.Cwd);
     }
+    [Fact]
+    public void WindowsLaunchCommand_OmpPreservesHooksAndSelections()
+    {
+        var profile = new LaunchProfile(
+            "Default",
+            "default",
+            "omp",
+            true,
+            null,
+            null,
+            [],
+            new Dictionary<string, string>(),
+            new Dictionary<string, bool>(),
+            [],
+            null,
+            1);
+
+        var command = WindowsAdapterLaunchCommand.Build(
+            @"C:\tools\omp.exe",
+            @"C:\cove\adapters\omp",
+            profile,
+            new LauncherOverrides
+            {
+                Model = "model-x",
+                Effort = "high",
+            });
+
+        Assert.NotNull(command);
+        Assert.Equal(
+            [
+                "--allow-home",
+                "--hook",
+                Path.Combine(@"C:\cove\adapters\omp", "cove-hooks.ts"),
+                "--model",
+                "model-x",
+                "--thinking",
+                "high",
+            ],
+            command.Args);
+    }
+
+    [Fact]
+    public void WindowsResumeCommand_CodexPlacesSelectionsBeforeResume()
+    {
+        var command = WindowsAdapterResumeCommand.Build(
+            "codex",
+            @"C:\tools\codex.exe",
+            @"C:\cove\adapters\codex",
+            "codex-session",
+            new LauncherOverrides
+            {
+                Yolo = true,
+                Model = "gpt-x",
+                Effort = "high",
+            });
+
+        Assert.NotNull(command);
+        Assert.Equal(
+            [
+                "--dangerously-bypass-hook-trust",
+                "--yolo",
+                "--model",
+                "gpt-x",
+                "--config",
+                "model_reasoning_effort=\"high\"",
+                "resume",
+                "codex-session",
+            ],
+            command.Args);
+    }
+
 }

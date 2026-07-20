@@ -1,4 +1,8 @@
 using System.Linq;
+using System.Text.Json;
+using Cove.Engine;
+using Cove.Engine.Protocol;
+using Cove.Protocol;
 using Cove.Adapters;
 using Cove.Engine.Launch;
 using Cove.Engine.Restart;
@@ -73,6 +77,145 @@ public sealed class LaunchOrchestratorTests
         var cmd = orch.BuildLaunchCommand(profile, overrides);
 
         Assert.Contains("--env=FOO=bar", cmd.Args);
+    }
+
+    [Theory]
+    [InlineData("claude-code", "--effort", "override-effort")]
+    [InlineData("codex", "--config", "model_reasoning_effort=\"override-effort\"")]
+    [InlineData("omp", "--thinking", "override-effort")]
+    [InlineData("pi", "--thinking", "override-effort")]
+    public void BuildLaunchCommand_ExplicitSelectionsOverrideProfile(
+        string adapter,
+        string effortFlag,
+        string effortValue)
+    {
+        var profile = NewProfile(adapter) with
+        {
+            Model = "profile-model",
+            Effort = "profile-effort",
+            CliArgs = ["agent"],
+        };
+        var overrides = new LauncherOverrides
+        {
+            Model = "override-model",
+            Effort = "override-effort",
+        };
+
+        var command = LaunchTestFactory.Create()
+            .BuildLaunchCommand(profile, overrides);
+
+        Assert.Equal(
+            ["--model", "override-model", effortFlag, effortValue],
+            command.Args);
+    }
+
+    [Theory]
+    [InlineData("claude-code", "--effort", "profile-effort")]
+    [InlineData("codex", "--config", "model_reasoning_effort=\"profile-effort\"")]
+    [InlineData("omp", "--thinking", "profile-effort")]
+    [InlineData("pi", "--thinking", "profile-effort")]
+    public void BuildLaunchCommand_OmittedSelectionsUseProfile(
+        string adapter,
+        string effortFlag,
+        string effortValue)
+    {
+        var profile = NewProfile(adapter) with
+        {
+            Model = "profile-model",
+            Effort = "profile-effort",
+            CliArgs = ["agent"],
+        };
+
+        var command = LaunchTestFactory.Create()
+            .BuildLaunchCommand(profile, new LauncherOverrides());
+
+        Assert.Equal(
+            ["--model", "profile-model", effortFlag, effortValue],
+            command.Args);
+    }
+
+    [Theory]
+    [InlineData(null, null)]
+    [InlineData("", " ")]
+    [InlineData("default", "DEFAULT")]
+    public void BuildLaunchCommand_EmptyOrDefaultSelectionsAreSuppressed(
+        string? model,
+        string? effort)
+    {
+        var profile = NewProfile("pi") with
+        {
+            Model = model,
+            Effort = effort,
+            CliArgs = ["agent"],
+        };
+
+        var command = LaunchTestFactory.Create()
+            .BuildLaunchCommand(profile, new LauncherOverrides());
+
+        Assert.Empty(command.Args);
+    }
+
+    [Fact]
+    public void BuildFlagsJson_UsesExplicitSelectionsOverProfile()
+    {
+        var profile = NewProfile("claude-code") with
+        {
+            Model = "profile-model",
+            Effort = "profile-effort",
+        };
+        var composer = new LaunchCommandComposer();
+
+        var json = composer.BuildFlagsJson(
+            profile,
+            new LauncherOverrides
+            {
+                Model = "override-model",
+                Effort = "override-effort",
+            });
+        using var document = System.Text.Json.JsonDocument.Parse(json);
+
+        Assert.Equal(
+            "override-model",
+            document.RootElement.GetProperty("model").GetString());
+        Assert.Equal(
+            "override-effort",
+            document.RootElement.GetProperty("effort").GetString());
+    }
+
+    [Fact]
+    public async Task OverrideCommands_SaveAndReturnSelections()
+    {
+        var launcher = LaunchTestFactory.Create();
+        var save = await EngineCommandRouter.RouteAsync(
+            new ControlRequest(
+                "save",
+                "cove://commands/launch.overrides.save",
+                JsonSerializer.SerializeToElement(
+                    new LaunchOverrideSaveParams(
+                        "nook-1",
+                        false,
+                        null,
+                        [],
+                        new Dictionary<string, string>(),
+                        "model-x",
+                        "high"),
+                    CoveJsonContext.Default.LaunchOverrideSaveParams)),
+            launcher: launcher);
+        var get = await EngineCommandRouter.RouteAsync(
+            new ControlRequest(
+                "get",
+                "cove://commands/launch.overrides.get",
+                JsonSerializer.SerializeToElement(
+                    new LaunchOverrideGetParams("nook-1"),
+                    CoveJsonContext.Default.LaunchOverrideGetParams)),
+            launcher: launcher);
+
+        Assert.True(save!.Ok, save.Error?.Message);
+        Assert.True(get!.Ok, get.Error?.Message);
+        var overrides = get.Data!.Value.Deserialize(
+            CoveJsonContext.Default.LauncherOverridesDto)!;
+        Assert.Equal("model-x", overrides.Model);
+        Assert.Equal("high", overrides.Effort);
     }
 
     [Fact]

@@ -35,7 +35,7 @@ public sealed class LaunchCommandComposer
             profile.CliArgs.Count > 0
                 ? profile.CliArgs.Skip(1)
                 : Array.Empty<string>());
-        ApplyOverrides(args, overrides);
+        ApplyOverrides(args, profile, overrides);
         return new ResumeCommand(binary, args, overrides.WorkingDir ?? "");
     }
 
@@ -91,8 +91,8 @@ public sealed class LaunchCommandComposer
             overrides.Yolo,
             null,
             extra,
-            profile.Model,
-            profile.Effort,
+            EffectiveSelection(overrides.Model, profile.Model),
+            EffectiveSelection(overrides.Effort, profile.Effort),
             extraArguments,
             null,
             command);
@@ -103,10 +103,37 @@ public sealed class LaunchCommandComposer
 
     private static void ApplyOverrides(
         List<string> arguments,
+        LaunchProfile profile,
         LauncherOverrides overrides)
     {
         if (overrides.Yolo)
             arguments.Add("--dangerously-skip-permissions");
+        var model = EffectiveSelection(overrides.Model, profile.Model);
+        var effort = EffectiveSelection(overrides.Effort, profile.Effort);
+        if (model is not null
+            && profile.Adapter is "claude-code" or "codex" or "omp" or "pi")
+        {
+            arguments.Add("--model");
+            arguments.Add(model);
+        }
+        if (effort is not null)
+        {
+            if (profile.Adapter == "claude-code")
+            {
+                arguments.Add("--effort");
+                arguments.Add(effort);
+            }
+            else if (profile.Adapter == "codex")
+            {
+                arguments.Add("--config");
+                arguments.Add($"model_reasoning_effort=\"{effort}\"");
+            }
+            else if (profile.Adapter is "omp" or "pi")
+            {
+                arguments.Add("--thinking");
+                arguments.Add(effort);
+            }
+        }
         foreach (var flag in overrides.ExtraFlags)
             arguments.Add(flag);
         foreach (var environment in overrides.Env)
@@ -114,5 +141,19 @@ public sealed class LaunchCommandComposer
             arguments.Add(
                 $"--env={environment.Key}={environment.Value}");
         }
+    }
+
+    private static string? EffectiveSelection(
+        string? overrideValue,
+        string? profileValue)
+    {
+        var value = overrideValue ?? profileValue;
+        return string.IsNullOrWhiteSpace(value)
+            || string.Equals(
+                value,
+                "default",
+                StringComparison.OrdinalIgnoreCase)
+                ? null
+                : value;
     }
 }

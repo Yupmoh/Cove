@@ -106,6 +106,10 @@ public sealed class AgentControlCommandTests
                 "--placement",
                 "below",
                 "--yolo",
+                "--model",
+                "openrouter/model-x",
+                "--effort",
+                "high",
                 "--access-scope",
                 "same-tab",
             ],
@@ -132,6 +136,10 @@ public sealed class AgentControlCommandTests
         Assert.Equal("below", launch.GetProperty("placement").GetString());
         Assert.True(launch.GetProperty("yolo").GetBoolean());
         Assert.Equal(
+            "openrouter/model-x",
+            launch.GetProperty("model").GetString());
+        Assert.Equal("high", launch.GetProperty("effort").GetString());
+        Assert.Equal(
             "same-tab",
             launch.GetProperty("accessScope").GetString());
         var resume = resumed.Request.Params!.Value;
@@ -145,6 +153,22 @@ public sealed class AgentControlCommandTests
             "Reviewer",
             resume.GetProperty("name").GetString());
         Assert.False(resume.TryGetProperty("profile", out _));
+    }
+
+    [Fact]
+    public async Task AgentLaunch_OmittedSelectionsRemainNull()
+    {
+        var launched = await InvokeAsync(
+            AgentCommands.AgentLaunch,
+            ["pi", "--profile", "default"],
+            LaunchResponse);
+
+        Assert.Equal(0, launched.ExitCode);
+        var parameters = launched.Request.Params!.Value.Deserialize(
+            CoveJsonContext.Default.AgentLaunchParams)!;
+        Assert.Null(parameters.Model);
+        Assert.Null(parameters.Effort);
+        Assert.Equal("default", parameters.Profile);
     }
 
     [Fact]
