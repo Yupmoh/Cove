@@ -876,6 +876,8 @@ internal sealed class EngineRuntime : IAsyncDisposable
 
     private void OnHookStateChanged(string nookId)
     {
+        if (_components.HookRouter.GetNookState(nookId) is { } state)
+            _components.AgentRouter.UpdateStatus(nookId, state.Status);
         Events.Broadcast(
             "agent.changed",
             new AgentChangedEvent(nookId),

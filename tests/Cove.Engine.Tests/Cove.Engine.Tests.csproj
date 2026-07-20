@@ -15,7 +15,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="../../src/Cove.Cli/Cove.Cli.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="../../src/Cove.Engine/Cove.Engine.csproj" />
+    <ProjectReference Include="../../src/Cove.Gui/Cove.Gui.csproj" />
     <ProjectReference Include="../../src/Cove.Platform/Cove.Platform.csproj" />
     <ProjectReference Include="../../src/Cove.Protocol/Cove.Protocol.csproj" />
   </ItemGroup>
