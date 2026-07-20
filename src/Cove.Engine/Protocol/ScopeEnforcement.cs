@@ -13,6 +13,19 @@ internal enum ConnectionPrincipalKind
     Nook
 }
 
+public enum ScopePolicy
+{
+    Unspecified,
+    ControlOnly,
+    NookAllowed,
+    SelfOnly,
+    TargetScoped,
+    PlacementScoped,
+    ListScoped,
+    LayoutRead,
+    LayoutMutation
+}
+
 internal sealed record ConnectionPrincipal
 {
     public static ConnectionPrincipal Unauthenticated { get; } =
@@ -44,27 +57,139 @@ internal sealed record ConnectionPrincipal
 internal static class ScopeEnforcement
 {
     public static bool IsRepresentedVerb(string uri) =>
-        IsNookTargetingVerb(uri)
+        PolicyFor(uri) != ScopePolicy.Unspecified
+        || IsNookTargetingVerb(uri)
         || IsExplicitNookAllowedVerb(uri)
         || IsControlOnlyVerb(uri);
 
+    public static bool IsAgentControlVerb(string uri) =>
+        uri.StartsWith(
+            "cove://commands/agent.",
+            StringComparison.Ordinal)
+        || uri.StartsWith(
+            "cove://commands/launch-profile.",
+            StringComparison.Ordinal)
+        || uri.StartsWith(
+            "cove://commands/layout.",
+            StringComparison.Ordinal)
+        || uri.StartsWith(
+            "cove://commands/nook.",
+            StringComparison.Ordinal)
+        || uri.StartsWith(
+            "cove://commands/session.",
+            StringComparison.Ordinal)
+        || uri is "cove://commands/hook.emit"
+            or "cove://commands/nook-types.list"
+            or "cove://commands/vault.reindex"
+            or "cove://commands/vault.resume"
+            or "cove://commands/vault.search"
+            or "cove://commands/vault.set-setting"
+            or "cove://commands/workspace.context";
+
+    public static ScopePolicy PolicyFor(string uri) => uri switch
+    {
+        "cove://commands/agent.close" =>
+            ScopePolicy.TargetScoped,
+        "cove://commands/agent.definition.delete" =>
+            ScopePolicy.ControlOnly,
+        "cove://commands/agent.definition.list" =>
+            ScopePolicy.NookAllowed,
+        "cove://commands/agent.definition.show" =>
+            ScopePolicy.NookAllowed,
+        "cove://commands/agent.launch" =>
+            ScopePolicy.PlacementScoped,
+        "cove://commands/agent.list" =>
+            ScopePolicy.ListScoped,
+        "cove://commands/agent.message" =>
+            ScopePolicy.TargetScoped,
+        "cove://commands/agent.replay" =>
+            ScopePolicy.TargetScoped,
+        "cove://commands/agent.spawned-nooks" =>
+            ScopePolicy.TargetScoped,
+        "cove://commands/agent.stop" =>
+            ScopePolicy.TargetScoped,
+        "cove://commands/hook.emit" =>
+            ScopePolicy.SelfOnly,
+        "cove://commands/launch-profile.create" =>
+            ScopePolicy.ControlOnly,
+        "cove://commands/launch-profile.delete" =>
+            ScopePolicy.ControlOnly,
+        "cove://commands/launch-profile.get" =>
+            ScopePolicy.NookAllowed,
+        "cove://commands/launch-profile.list" =>
+            ScopePolicy.NookAllowed,
+        "cove://commands/launch-profile.set-default" =>
+            ScopePolicy.ControlOnly,
+        "cove://commands/launch-profile.update" =>
+            ScopePolicy.ControlOnly,
+        "cove://commands/layout.get" =>
+            ScopePolicy.LayoutRead,
+        "cove://commands/layout.mutate" =>
+            ScopePolicy.LayoutMutation,
+        "cove://commands/layout.snapshot" =>
+            ScopePolicy.LayoutRead,
+        "cove://commands/nook-types.list" =>
+            ScopePolicy.NookAllowed,
+        "cove://commands/nook.checkpoint" =>
+            ScopePolicy.TargetScoped,
+        "cove://commands/nook.kill" =>
+            ScopePolicy.TargetScoped,
+        "cove://commands/nook.list" =>
+            ScopePolicy.ControlOnly,
+        "cove://commands/nook.read" =>
+            ScopePolicy.TargetScoped,
+        "cove://commands/nook.rename" =>
+            ScopePolicy.TargetScoped,
+        "cove://commands/nook.resize" =>
+            ScopePolicy.TargetScoped,
+        "cove://commands/nook.restart" =>
+            ScopePolicy.TargetScoped,
+        "cove://commands/nook.scope.get" =>
+            ScopePolicy.TargetScoped,
+        "cove://commands/nook.scope.set" =>
+            ScopePolicy.ControlOnly,
+        "cove://commands/nook.search" =>
+            ScopePolicy.TargetScoped,
+        "cove://commands/nook.spawn" =>
+            ScopePolicy.ControlOnly,
+        ControlProtocolRoutes.NookSubscribe =>
+            ScopePolicy.TargetScoped,
+        "cove://commands/nook.write" =>
+            ScopePolicy.TargetScoped,
+        "cove://commands/session.background" =>
+            ScopePolicy.TargetScoped,
+        "cove://commands/session.dismiss" =>
+            ScopePolicy.TargetScoped,
+        "cove://commands/session.foreground" =>
+            ScopePolicy.TargetScoped,
+        "cove://commands/session.list" =>
+            ScopePolicy.ControlOnly,
+        "cove://commands/session.recent" =>
+            ScopePolicy.NookAllowed,
+        "cove://commands/session.state" =>
+            ScopePolicy.TargetScoped,
+        "cove://commands/session.stop" =>
+            ScopePolicy.TargetScoped,
+        "cove://commands/vault.reindex" =>
+            ScopePolicy.ControlOnly,
+        "cove://commands/vault.resume" =>
+            ScopePolicy.NookAllowed,
+        "cove://commands/vault.search" =>
+            ScopePolicy.NookAllowed,
+        "cove://commands/vault.set-setting" =>
+            ScopePolicy.ControlOnly,
+        "cove://commands/workspace.context" =>
+            ScopePolicy.TargetScoped,
+        _ => ScopePolicy.Unspecified
+    };
+
     public static bool IsNookTargetingVerb(string uri)
     {
+        if (PolicyFor(uri) == ScopePolicy.TargetScoped)
+            return true;
         return uri switch
         {
-            "cove://commands/nook.write" => true,
-            "cove://commands/nook.resize" => true,
-            "cove://commands/nook.kill" => true,
-            "cove://commands/nook.rename" => true,
-            "cove://commands/nook.search" => true,
-            "cove://commands/nook.read" => true,
-            "cove://commands/nook.checkpoint" => true,
-            "cove://commands/nook.restart" => true,
-            ControlProtocolRoutes.NookSubscribe => true,
-            "cove://commands/nook.scope.get" => true,
-            "cove://commands/workspace.context" => true,
             "cove://commands/send_to_agent" => true,
-            "cove://commands/agent.message" => true,
             "cove://commands/canvas.action" => true,
             "cove://commands/browser.open" => true,
             "cove://commands/browser.navigate" => true,
@@ -102,16 +227,52 @@ internal static class ScopeEnforcement
             return Denied(request.Id, "connection is not authenticated");
         if (principal.Kind == ConnectionPrincipalKind.Control)
             return null;
-        if (IsControlOnlyVerb(request.Uri))
+        request = request with
+        {
+            CallerNookId = principal.NookId,
+        };
+        var policy = PolicyFor(request.Uri);
+        if (policy == ScopePolicy.ControlOnly
+            || IsControlOnlyVerb(request.Uri))
         {
             return Denied(
                 request.Id,
                 "command requires the daemon control capability");
         }
+        if (policy == ScopePolicy.TargetScoped)
+            return Check(request, scopeStore, bays, layout, agentRouter);
+        if (policy == ScopePolicy.SelfOnly)
+            return CheckSelf(request);
+        if (policy == ScopePolicy.PlacementScoped)
+        {
+            return CheckAgentLaunch(
+                request,
+                scopeStore,
+                layout);
+        }
+        if (policy == ScopePolicy.ListScoped)
+            return CheckAgentList(request, scopeStore);
+        if (policy == ScopePolicy.LayoutRead)
+            return CheckLayoutRead(request, scopeStore, layout);
+        if (policy == ScopePolicy.LayoutMutation)
+        {
+            return CheckLayoutMutation(
+                request,
+                scopeStore,
+                layout);
+        }
+        if (policy == ScopePolicy.NookAllowed)
+            return null;
         if (IsNookTargetingVerb(request.Uri))
             return Check(request, scopeStore, bays, layout, agentRouter);
         if (IsExplicitNookAllowedVerb(request.Uri))
             return null;
+        if (IsAgentControlVerb(request.Uri))
+        {
+            return Denied(
+                request.Id,
+                "command is not represented by the agent control policy");
+        }
         if (IsScopedDomain(request.Uri))
         {
             return Denied(
@@ -142,8 +303,7 @@ internal static class ScopeEnforcement
     }
 
     private static bool IsControlOnlyVerb(string uri) =>
-        uri is "cove://commands/nook.scope.set"
-            or "cove://sys/daemon.stop"
+        uri is "cove://sys/daemon.stop"
             or "cove://handoff/begin"
             or "cove://commands/browser.automation.result"
             or "cove://commands/dictation.status"
@@ -195,14 +355,12 @@ internal static class ScopeEnforcement
 
     private static bool IsExplicitNookAllowedVerb(string uri)
     {
+        if (PolicyFor(uri) == ScopePolicy.NookAllowed)
+            return true;
         return uri switch
         {
             "cove://sys/ping" => true,
             "cove://sys/daemon.status" => true,
-            "cove://commands/hook.emit" => true,
-            "cove://commands/nook.list" => true,
-            "cove://commands/nook.spawn" => true,
-            "cove://commands/agent.launch" => true,
             "cove://commands/browser.create" => true,
             "cove://commands/knowledge.ping" => true,
             "cove://commands/note.create" => true,
@@ -231,10 +389,6 @@ internal static class ScopeEnforcement
             "cove://commands/memory.propose" => true,
             "cove://commands/memory.proposal.transition" => true,
             "cove://commands/edits.find" => true,
-            "cove://commands/vault.search" => true,
-            "cove://commands/vault.resume" => true,
-            "cove://commands/vault.set-setting" => true,
-            "cove://commands/vault.reindex" => true,
             "cove://commands/library.list" => true,
             "cove://commands/library.materialize" => true,
             "cove://commands/review.add-comment" => true,
@@ -252,6 +406,289 @@ internal static class ScopeEnforcement
             "cove://commands/review.dispatch" => true,
             _ => false
         };
+    }
+
+    private static ControlResponse? CheckSelf(
+        ControlRequest request)
+    {
+        var targetNookId = request.Params
+            is JsonElement
+            {
+                ValueKind: JsonValueKind.Object
+            } element
+            && TryGetString(
+                element,
+                "nookId",
+                out var explicitTarget)
+            ? explicitTarget
+            : request.CallerNookId;
+        return string.Equals(
+            request.CallerNookId,
+            targetNookId,
+            StringComparison.Ordinal)
+            ? null
+            : Denied(
+                request.Id,
+                "command is restricted to the caller nook");
+    }
+
+    private static ControlResponse? CheckAgentLaunch(
+        ControlRequest request,
+        NookScopeStore scopeStore,
+        LayoutService? layout)
+    {
+        if (layout is null)
+        {
+            return Denied(
+                request.Id,
+                "layout service is unavailable");
+        }
+        if (request.Params is not JsonElement element
+            || element.Deserialize(
+                CoveJsonContext.Default.AgentLaunchParams)
+                is not { } parameters)
+        {
+            return Invalid(
+                request.Id,
+                "agent launch params are required");
+        }
+        if (parameters.Placement is not (
+            "left" or "right" or "above" or "below"
+            or "new-shore"))
+        {
+            return Invalid(
+                request.Id,
+                "agent launch placement is invalid");
+        }
+        var callerNookId = request.CallerNookId!;
+        var relativeNookId =
+            parameters.RelativeToNookId ?? callerNookId;
+        var relativeLocation =
+            layout.ResolveNookLocation(relativeNookId);
+        if (relativeLocation.BayId is null
+            || relativeLocation.ShoreId is null)
+        {
+            return Invalid(
+                request.Id,
+                "relative nook is not placed");
+        }
+        if (parameters.BayId is not null
+            && !string.Equals(
+                parameters.BayId,
+                relativeLocation.BayId,
+                StringComparison.Ordinal))
+        {
+            return Invalid(
+                request.Id,
+                "bayId must match the relative nook bay");
+        }
+        return CheckBoundary(
+            request.Id,
+            callerNookId,
+            relativeLocation.BayId,
+            parameters.Placement == "new-shore"
+                ? null
+                : relativeLocation.ShoreId,
+            scopeStore,
+            layout,
+            "agent launch placement exceeds caller scope");
+    }
+
+    private static ControlResponse? CheckAgentList(
+        ControlRequest request,
+        NookScopeStore scopeStore)
+    {
+        var parameters = request.Params is JsonElement element
+            ? element.Deserialize(
+                CoveJsonContext.Default.AgentListParams)
+            : null;
+        var requested = parameters?.Scope ?? "same-tab";
+        var callerScope = scopeStore.GetScope(
+            request.CallerNookId!);
+        var allowed = requested switch
+        {
+            "same-tab" => true,
+            "same-bay" =>
+                callerScope is McpScope.SameBay or McpScope.All,
+            "all" => callerScope == McpScope.All,
+            _ => false,
+        };
+        return allowed
+            ? null
+            : Denied(
+                request.Id,
+                "agent list scope exceeds caller scope");
+    }
+
+    private static ControlResponse? CheckLayoutRead(
+        ControlRequest request,
+        NookScopeStore scopeStore,
+        LayoutService? layout)
+    {
+        if (layout is null)
+        {
+            return Denied(
+                request.Id,
+                "layout service is unavailable");
+        }
+        var callerNookId = request.CallerNookId!;
+        var callerLocation =
+            layout.ResolveNookLocation(callerNookId);
+        var targetBayId = request.Params is JsonElement element
+            ? element.Deserialize(
+                CoveJsonContext.Default.LayoutGetParams)?.BayId
+            : null;
+        targetBayId ??= callerLocation.BayId;
+        if (targetBayId is null)
+        {
+            return Invalid(
+                request.Id,
+                "caller nook is not placed");
+        }
+        var scope = scopeStore.GetScope(callerNookId);
+        var allowed = scope switch
+        {
+            McpScope.SameTab => false,
+            McpScope.SameBay =>
+                callerLocation.BayId == targetBayId,
+            McpScope.All => true,
+            _ => false,
+        };
+        return allowed
+            ? null
+            : Denied(
+                request.Id,
+                "layout inspection exceeds caller scope");
+    }
+
+    private static ControlResponse? CheckLayoutMutation(
+        ControlRequest request,
+        NookScopeStore scopeStore,
+        LayoutService? layout)
+    {
+        if (layout is null)
+        {
+            return Denied(
+                request.Id,
+                "layout service is unavailable");
+        }
+        if (request.Params is not JsonElement element
+            || element.Deserialize(
+                CoveJsonContext.Default.LayoutMutateParams)
+                is not { } parameters)
+        {
+            return Invalid(
+                request.Id,
+                "layout mutate params are required");
+        }
+        var callerNookId = request.CallerNookId!;
+        var scope = scopeStore.GetScope(callerNookId);
+        if (parameters.Op is "createShore" or "reorder")
+        {
+            return scope == McpScope.All
+                ? null
+                : Denied(
+                    request.Id,
+                    "workspace-wide layout mutation requires all scope");
+        }
+        var checkedBoundary = false;
+        if (!string.IsNullOrEmpty(parameters.ShoreId))
+        {
+            var owner = ResolveShoreLocation(
+                layout,
+                parameters.ShoreId);
+            if (owner.BayId is null)
+            {
+                return Invalid(
+                    request.Id,
+                    "target shore is not placed");
+            }
+            var denied = CheckBoundary(
+                request.Id,
+                callerNookId,
+                owner.BayId,
+                owner.ShoreId,
+                scopeStore,
+                layout,
+                "layout mutation exceeds caller scope");
+            if (denied is not null)
+                return denied;
+            checkedBoundary = true;
+        }
+        foreach (var nookId in new[]
+        {
+            parameters.NookId,
+            parameters.TargetNookId,
+        })
+        {
+            if (string.IsNullOrEmpty(nookId))
+                continue;
+            var location = layout.ResolveNookLocation(nookId);
+            if (location.BayId is null)
+            {
+                return Invalid(
+                    request.Id,
+                    $"nook {nookId} is not placed");
+            }
+            var denied = CheckBoundary(
+                request.Id,
+                callerNookId,
+                location.BayId,
+                location.ShoreId,
+                scopeStore,
+                layout,
+                "layout mutation exceeds caller scope");
+            if (denied is not null)
+                return denied;
+            checkedBoundary = true;
+        }
+        return checkedBoundary
+            ? null
+            : Invalid(
+                request.Id,
+                "layout mutation target is required");
+    }
+
+    private static (string? BayId, string? ShoreId)
+        ResolveShoreLocation(
+            LayoutService layout,
+            string shoreId)
+    {
+        foreach (var bayId in layout.BayIds)
+        {
+            if (layout.ShoresFor(bayId).Any(
+                shore => shore.Id == shoreId))
+            {
+                return (bayId, shoreId);
+            }
+        }
+        return (null, null);
+    }
+
+    private static ControlResponse? CheckBoundary(
+        string requestId,
+        string callerNookId,
+        string targetBayId,
+        string? targetShoreId,
+        NookScopeStore scopeStore,
+        LayoutService layout,
+        string deniedMessage)
+    {
+        var callerLocation =
+            layout.ResolveNookLocation(callerNookId);
+        var allowed = scopeStore.GetScope(callerNookId) switch
+        {
+            McpScope.SameTab =>
+                targetShoreId is not null
+                && callerLocation.ShoreId == targetShoreId,
+            McpScope.SameBay =>
+                callerLocation.BayId == targetBayId,
+            McpScope.All => true,
+            _ => false,
+        };
+        return allowed
+            ? null
+            : Denied(requestId, deniedMessage);
     }
 
     private static string? ResolveTargetNookId(
@@ -414,4 +851,13 @@ internal static class ScopeEnforcement
             false,
             null,
             new ControlError("access_denied", message));
+
+    private static ControlResponse Invalid(
+        string id,
+        string message) =>
+        new(
+            id,
+            false,
+            null,
+            new ControlError("invalid_params", message));
 }

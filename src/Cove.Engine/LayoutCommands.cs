@@ -18,6 +18,7 @@ internal static class LayoutCommands
         var requestedBayId = ctx.Request.Params is JsonElement el
             ? el.Deserialize(Cove.Protocol.CoveJsonContext.Default.LayoutGetParams)?.BayId
             : null;
+        requestedBayId ??= CallerBayId(ctx, layout);
         var snapshot = string.IsNullOrEmpty(requestedBayId)
             ? ActiveSnapshot(ctx, layout)
             : SnapshotFor(ctx, layout, requestedBayId);
@@ -29,8 +30,20 @@ internal static class LayoutCommands
     {
         if (ctx.Layout is not { } layout)
             return Task.FromResult(ctx.Fail("not_ready", "layout service unavailable"));
-        return Task.FromResult(ctx.Ok(ActiveSnapshot(ctx, layout), Cove.Persistence.CoveJsonContext.Default.BaySnapshot));
+        var callerBayId = CallerBayId(ctx, layout);
+        var snapshot = string.IsNullOrEmpty(callerBayId)
+            ? ActiveSnapshot(ctx, layout)
+            : SnapshotFor(ctx, layout, callerBayId);
+        return Task.FromResult(ctx.Ok(snapshot, Cove.Persistence.CoveJsonContext.Default.BaySnapshot));
     }
+
+    private static string? CallerBayId(
+        EngineDispatchContext ctx,
+        Cove.Engine.Layout.LayoutService layout) =>
+        string.IsNullOrEmpty(ctx.Request.CallerNookId)
+            ? null
+            : layout.ResolveNookLocation(
+                ctx.Request.CallerNookId).BayId;
 
     private static Cove.Persistence.BaySnapshot SnapshotFor(EngineDispatchContext ctx, Cove.Engine.Layout.LayoutService layout, string wsId)
     {

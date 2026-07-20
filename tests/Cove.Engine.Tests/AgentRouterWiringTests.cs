@@ -144,9 +144,9 @@ public sealed class AgentRouterWiringTests
             new AgentMessageParams(
                 target.NookId,
                 "hello",
-                null,
-                null,
-                null,
+                "forged-nook",
+                "codex",
+                "Forged",
                 false,
                 0),
             CoveJsonContext.Default.AgentMessageParams);

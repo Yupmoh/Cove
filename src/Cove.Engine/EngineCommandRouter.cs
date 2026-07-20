@@ -87,17 +87,6 @@ public static class EngineCommandRouter
         System.DateTimeOffset? engineStartedAtUtc = null,
         System.Func<long>? getWorkspaceRevision = null)
     {
-        System.Func<EngineDispatchContext, System.Threading.Tasks.Task<ControlResponse>> typed;
-        try
-        {
-            if (!CoveCommandRegistry.Handlers.TryGetValue(request.Uri, out var handler))
-                return null;
-            typed = (System.Func<EngineDispatchContext, System.Threading.Tasks.Task<ControlResponse>>)handler;
-        }
-        catch
-        {
-            return null;
-        }
         try
         {
             if (nookScopes is not null)
@@ -112,6 +101,17 @@ public static class EngineCommandRouter
                 if (denied is not null)
                     return denied;
             }
+            if (!CoveCommandRegistry.Handlers.TryGetValue(
+                    request.Uri,
+                    out var handler))
+            {
+                return null;
+            }
+            var typed =
+                (System.Func<
+                    EngineDispatchContext,
+                    System.Threading.Tasks.Task<ControlResponse>>)
+                handler;
             var dispatchCtx = new EngineDispatchContext(request, nooks, layout, bays, runCommands, restoration, snapshots, skills, agents, launchProfiles, adapterEnv, hookServer, hookRouter, agentRouter, activity, sessions, lifecycle, launcher, taskService, dispatchSaga, resumeSaga, timeline, blackboard, noteFiles, memory, memoryRanker, proposals, consolidator, edits, corpus, vaultSettings, library, reviews, attribution, reviewDispatcher, nookTypes, browser, config, manifestStore, registry, omniChat, nookScopes, stateBus, extensions, captures, gitReadModel, searchService, themes, keybindings, browserAutomation, diagnostics, perfBundles, recentSessions, lspService, sessionService, baysDir, taskScheduler, directoryListing, gitSummary, feedbackStore, performanceResults, dictation, cancellationToken, forwardWindowFocus, getRestorationSummary, engineStartedAtUtc, getWorkspaceRevision);
             dispatchCtx.Redrive = subReq => RouteAsync(subReq, nooks, layout, bays, runCommands, restoration, snapshots, skills, agents, launchProfiles, adapterEnv, hookServer, hookRouter, agentRouter, activity, sessions, lifecycle, launcher, taskService, dispatchSaga, resumeSaga, timeline, blackboard, noteFiles, memory, memoryRanker, proposals, consolidator, edits, corpus, vaultSettings, library, reviews, attribution, reviewDispatcher, nookTypes, browser, config, manifestStore, registry, omniChat, nookScopes, stateBus, extensions, captures, gitReadModel, searchService, themes, keybindings, browserAutomation, diagnostics, perfBundles, recentSessions, lspService, sessionService, baysDir, taskScheduler, directoryListing, gitSummary, feedbackStore, performanceResults, dictation, cancellationToken, forwardWindowFocus, getRestorationSummary, engineStartedAtUtc, getWorkspaceRevision);
             return await typed(dispatchCtx);

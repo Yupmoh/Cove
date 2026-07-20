@@ -1,5 +1,8 @@
 using System.Text.Json;
 using Cove.Engine.Protocol;
+using Cove.Engine.Layout;
+using Cove.Persistence;
+using Cove.Protocol;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 using Cove.Testing;
@@ -115,6 +118,54 @@ public sealed class ScopeEnforcementTests
         "cove://commands/review.dispatch"
     };
 
+    public static TheoryData<string, ScopePolicy> AgentControlPolicies => new()
+    {
+        {
+            "cove://commands/nook.spawn",
+            ScopePolicy.ControlOnly
+        },
+        {
+            "cove://commands/agent.launch",
+            ScopePolicy.PlacementScoped
+        },
+        {
+            "cove://commands/agent.list",
+            ScopePolicy.ListScoped
+        },
+        {
+            "cove://commands/agent.message",
+            ScopePolicy.TargetScoped
+        },
+        {
+            "cove://commands/agent.stop",
+            ScopePolicy.TargetScoped
+        },
+        {
+            "cove://commands/session.state",
+            ScopePolicy.TargetScoped
+        },
+        {
+            "cove://commands/layout.get",
+            ScopePolicy.LayoutRead
+        },
+        {
+            "cove://commands/layout.mutate",
+            ScopePolicy.LayoutMutation
+        },
+        {
+            "cove://commands/session.recent",
+            ScopePolicy.NookAllowed
+        },
+        {
+            "cove://commands/hook.emit",
+            ScopePolicy.SelfOnly
+        },
+        {
+            "cove://commands/launch-profile.create",
+            ScopePolicy.ControlOnly
+        }
+    };
+
     [Theory]
     [MemberData(nameof(ScopedCommandUris))]
     public void ScopedCommands_AreRepresentedByTheAuthorizationPolicy(string uri)
@@ -128,6 +179,241 @@ public sealed class ScopeEnforcementTests
     public void SecurityDomainCommands_AreExplicitlyRepresented(string uri)
     {
         Assert.True(ScopeEnforcement.IsRepresentedVerb(uri), uri);
+    }
+
+    [Theory]
+    [MemberData(nameof(AgentControlPolicies))]
+    public void AgentControlCommands_HaveExplicitPolicies(
+        string uri,
+        ScopePolicy expected)
+    {
+        Assert.Equal(expected, ScopeEnforcement.PolicyFor(uri));
+    }
+
+    [Fact]
+    public void EveryRegisteredAgentControlCommand_HasPolicy()
+    {
+        var missing = EngineCommandCatalogue.RegisteredRoutes
+            .Where(ScopeEnforcement.IsAgentControlVerb)
+            .Where(uri =>
+                ScopeEnforcement.PolicyFor(uri)
+                    == ScopePolicy.Unspecified)
+            .ToArray();
+
+        Assert.Empty(missing);
+    }
+
+    [Fact]
+    public void ControlPrincipal_CanAdministerEveryAgentControlCommand()
+    {
+        var scopeStore = new NookScopeStore(
+            NewDir(),
+            NullLogger.Instance);
+        foreach (var uri in EngineCommandCatalogue.RegisteredRoutes
+            .Where(ScopeEnforcement.IsAgentControlVerb))
+        {
+            var denied = ScopeEnforcement.Authorize(
+                ConnectionPrincipal.Control("cli"),
+                new ControlRequest("control", uri),
+                scopeStore,
+                null,
+                null,
+                null);
+            Assert.Null(denied);
+        }
+    }
+
+    [Fact]
+    public void NookPrincipal_CannotUseRawSpawn()
+    {
+        var denied = ScopeEnforcement.Authorize(
+            ConnectionPrincipal.Nook("cli", "caller"),
+            new ControlRequest(
+                "spawn",
+                "cove://commands/nook.spawn",
+                JsonDocument.Parse(
+                    """{"command":"/bin/sleep"}""")
+                    .RootElement.Clone()),
+            new NookScopeStore(
+                NewDir(),
+                NullLogger.Instance),
+            null,
+            null,
+            null);
+
+        Assert.NotNull(denied);
+        Assert.Equal("access_denied", denied!.Error?.Code);
+    }
+
+    [Fact]
+    public void AgentLaunch_CrossBayIsDeniedBeforeDispatch()
+    {
+        var (layout, caller, target, _, _) =
+            TwoBayLayout();
+        var scopes = new NookScopeStore(
+            NewDir(),
+            NullLogger.Instance);
+        scopes.SetScope(caller, McpScope.SameBay);
+        var parameters = JsonSerializer.SerializeToElement(
+            new AgentLaunchParams(
+                "new",
+                "omp",
+                RelativeToNookId: target,
+                BayId: "bay-b"),
+            Cove.Protocol.CoveJsonContext.Default.AgentLaunchParams);
+
+        var denied = ScopeEnforcement.Authorize(
+            ConnectionPrincipal.Nook("cli", caller),
+            new ControlRequest(
+                "launch",
+                "cove://commands/agent.launch",
+                parameters),
+            scopes,
+            null,
+            layout,
+            null);
+
+        Assert.NotNull(denied);
+        Assert.Equal("access_denied", denied!.Error?.Code);
+    }
+
+    [Fact]
+    public void LayoutMutation_CrossShoreIsDeniedBeforeDispatch()
+    {
+        var (layout, caller, target, targetShore) =
+            SameBayTwoShoreLayout();
+        var scopes = new NookScopeStore(
+            NewDir(),
+            NullLogger.Instance);
+        scopes.SetScope(caller, McpScope.SameTab);
+        var parameters = JsonSerializer.SerializeToElement(
+            new LayoutMutateParams(
+                "focus",
+                ShoreId: targetShore,
+                NookId: target),
+            Cove.Protocol.CoveJsonContext.Default.LayoutMutateParams);
+
+        var denied = ScopeEnforcement.Authorize(
+            ConnectionPrincipal.Nook("cli", caller),
+            new ControlRequest(
+                "layout",
+                "cove://commands/layout.mutate",
+                parameters),
+            scopes,
+            null,
+            layout,
+            null);
+
+        Assert.NotNull(denied);
+        Assert.Equal("access_denied", denied!.Error?.Code);
+    }
+
+    [Fact]
+    public void LayoutMutation_SameShoreIsAllowed()
+    {
+        var (layout, caller, _, _, _) = TwoBayLayout();
+        var callerShore =
+            layout.ResolveNookLocation(caller).ShoreId!;
+        var scopes = new NookScopeStore(
+            NewDir(),
+            NullLogger.Instance);
+        scopes.SetScope(caller, McpScope.SameTab);
+        var parameters = JsonSerializer.SerializeToElement(
+            new LayoutMutateParams(
+                "focus",
+                ShoreId: callerShore,
+                NookId: caller),
+            Cove.Protocol.CoveJsonContext.Default.LayoutMutateParams);
+
+        var denied = ScopeEnforcement.Authorize(
+            ConnectionPrincipal.Nook("cli", caller),
+            new ControlRequest(
+                "layout",
+                "cove://commands/layout.mutate",
+                parameters),
+            scopes,
+            null,
+            layout,
+            null);
+
+        Assert.Null(denied);
+    }
+
+    [Fact]
+    public void LayoutRead_CrossBayIsDeniedBeforeDispatch()
+    {
+        var (layout, caller, _, _, _) = TwoBayLayout();
+        var scopes = new NookScopeStore(
+            NewDir(),
+            NullLogger.Instance);
+        scopes.SetScope(caller, McpScope.SameBay);
+        var parameters = JsonSerializer.SerializeToElement(
+            new LayoutGetParams("bay-b"),
+            Cove.Protocol.CoveJsonContext.Default.LayoutGetParams);
+
+        var denied = ScopeEnforcement.Authorize(
+            ConnectionPrincipal.Nook("cli", caller),
+            new ControlRequest(
+                "layout",
+                "cove://commands/layout.get",
+                parameters),
+            scopes,
+            null,
+            layout,
+            null);
+
+        Assert.NotNull(denied);
+        Assert.Equal("access_denied", denied!.Error?.Code);
+    }
+
+    [Fact]
+    public async Task LayoutSnapshot_DefaultsToCallerBay()
+    {
+        var (layout, caller, _, _, _) = TwoBayLayout();
+        var scopes = new NookScopeStore(
+            NewDir(),
+            NullLogger.Instance);
+        scopes.SetScope(caller, McpScope.SameBay);
+
+        var response = await EngineCommandRouter.RouteAsync(
+            new ControlRequest(
+                "layout",
+                "cove://commands/layout.snapshot",
+                CallerNookId: caller),
+            layout: layout,
+            nookScopes: scopes);
+
+        Assert.True(response!.Ok, response.Error?.Message);
+        var snapshot = response.Data!.Value.Deserialize(
+            Cove.Persistence.CoveJsonContext.Default
+                .BaySnapshot)!;
+        Assert.Equal("bay-a", snapshot.Id);
+    }
+
+    [Fact]
+    public void AgentList_CannotEscalatePastCallerScope()
+    {
+        var scopes = new NookScopeStore(
+            NewDir(),
+            NullLogger.Instance);
+        scopes.SetScope("caller", McpScope.SameBay);
+        var parameters = JsonSerializer.SerializeToElement(
+            new AgentListParams("all"),
+            Cove.Protocol.CoveJsonContext.Default.AgentListParams);
+
+        var denied = ScopeEnforcement.Authorize(
+            ConnectionPrincipal.Nook("cli", "caller"),
+            new ControlRequest(
+                "list",
+                "cove://commands/agent.list",
+                parameters),
+            scopes,
+            null,
+            null,
+            null);
+
+        Assert.NotNull(denied);
+        Assert.Equal("access_denied", denied!.Error?.Code);
     }
 
     [PlatformFact(TestOperatingSystem.Unix)]
@@ -258,5 +544,56 @@ public sealed class ScopeEnforcementTests
 
         Assert.NotNull(response);
         Assert.Equal("access_denied", response!.Error?.Code);
+    }
+
+    private static (
+        LayoutService Layout,
+        string Caller,
+        string Target,
+        string CallerShore,
+        string TargetShore) TwoBayLayout()
+    {
+        const string caller = "nook-caller";
+        const string target = "nook-target";
+        var layout = new LayoutService();
+        layout.SetActiveBay("bay-a");
+        var callerShore = layout.CreateShore(
+            "Caller",
+            Leaf(caller));
+        layout.SetActiveBay("bay-b");
+        var targetShore = layout.CreateShore(
+            "Target",
+            Leaf(target));
+        return (
+            layout,
+            caller,
+            target,
+            callerShore,
+            targetShore);
+    }
+
+    private static NookLeaf Leaf(string nookId) => new()
+    {
+        NookId = nookId,
+        Subtabs =
+        [
+            new Subtab(nookId, NookType.Terminal),
+        ],
+    };
+
+    private static (
+        LayoutService Layout,
+        string Caller,
+        string Target,
+        string TargetShore) SameBayTwoShoreLayout()
+    {
+        const string caller = "nook-caller";
+        const string target = "nook-target";
+        var layout = new LayoutService();
+        layout.SetActiveBay("bay-a");
+        layout.CreateShore("Caller", Leaf(caller));
+        var targetShore =
+            layout.CreateShore("Target", Leaf(target));
+        return (layout, caller, target, targetShore);
     }
 }

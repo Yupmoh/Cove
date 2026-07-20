@@ -98,14 +98,6 @@ internal static class AgentLaunchCommands
             shoreId = relativeLocation.ShoreId;
         }
 
-        var scopeDenied = CheckPlacementScope(
-            ctx,
-            layout,
-            bayId,
-            shoreId);
-        if (scopeDenied is not null)
-            return scopeDenied;
-
         var profile = launcher.FindProfile(
             parameters.Adapter,
             parameters.Profile);
@@ -241,35 +233,6 @@ internal static class AgentLaunchCommands
             }
             return ctx.Fail("launch_failed", ex.Message);
         }
-    }
-
-    private static ControlResponse? CheckPlacementScope(
-        EngineDispatchContext ctx,
-        LayoutService layout,
-        string targetBayId,
-        string? targetShoreId)
-    {
-        if (string.IsNullOrEmpty(ctx.Request.CallerNookId))
-            return null;
-        var callerNookId = ctx.Request.CallerNookId;
-        var callerLocation = layout.ResolveNookLocation(callerNookId);
-        var scope = ctx.NookScopes?.GetScope(callerNookId)
-            ?? McpScope.SameBay;
-        var allowed = scope switch
-        {
-            McpScope.SameTab =>
-                targetShoreId is not null
-                && callerLocation.ShoreId == targetShoreId,
-            McpScope.SameBay =>
-                callerLocation.BayId == targetBayId,
-            McpScope.All => true,
-            _ => false,
-        };
-        return allowed
-            ? null
-            : ctx.Fail(
-                "access_denied",
-                "agent launch placement exceeds caller scope");
     }
 
     private static bool TryScope(

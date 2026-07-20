@@ -19,15 +19,21 @@ public static class AgentMessageCommands
         if (target is null)
             return ctx.Fail("not_found", $"no agent matches '{p.Target}'");
 
+        var authenticatedSender =
+            ctx.Request.CallerNookId;
         var senderNookId =
-            ctx.Request.CallerNookId ?? p.FromNookId;
+            authenticatedSender ?? p.FromNookId;
         var senderAgent = string.IsNullOrEmpty(senderNookId)
             ? null
             : router.ResolveTarget(senderNookId);
         var sender = new AgentMessageSender(
             senderNookId ?? "",
-            p.FromAdapter ?? senderAgent?.Adapter ?? "",
-            p.FromName ?? senderAgent?.Name);
+            authenticatedSender is null
+                ? p.FromAdapter ?? senderAgent?.Adapter ?? ""
+                : senderAgent?.Adapter ?? "",
+            authenticatedSender is null
+                ? p.FromName ?? senderAgent?.Name
+                : senderAgent?.Name);
         var body = p.NoFrame
             ? AgentMessageFramer.NoFrame(p.Body)
             : AgentMessageFramer.Frame(
