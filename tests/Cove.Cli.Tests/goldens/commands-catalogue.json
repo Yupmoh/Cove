@@ -849,6 +849,10 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/nook.stack",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/nook.write",
     "source": "core"
   },
@@ -1629,6 +1633,10 @@
   },
   {
     "command": "nook restart",
+    "source": "cli"
+  },
+  {
+    "command": "nook stack",
     "source": "cli"
   },
   {

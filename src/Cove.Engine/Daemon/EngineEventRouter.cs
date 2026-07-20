@@ -212,6 +212,7 @@ internal sealed class EngineEventRouter
                 or "cove://commands/nook.open"
                 or "cove://commands/nook.rename"
                 or "cove://commands/nook.restart"
+                or "cove://commands/nook.stack"
                 or "cove://commands/agent.launch"
             || IsVisibleMutationGroup(uri, "cove://commands/bay.", "list")
             || IsVisibleMutationGroup(uri, "cove://commands/shore.", "list")

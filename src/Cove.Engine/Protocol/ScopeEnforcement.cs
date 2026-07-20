@@ -148,6 +148,8 @@ internal static class ScopeEnforcement
             ScopePolicy.TargetScoped,
         "cove://commands/nook.restart" =>
             ScopePolicy.TargetScoped,
+        "cove://commands/nook.stack" =>
+            ScopePolicy.TargetScoped,
         "cove://commands/nook.scope.get" =>
             ScopePolicy.TargetScoped,
         "cove://commands/nook.scope.set" =>

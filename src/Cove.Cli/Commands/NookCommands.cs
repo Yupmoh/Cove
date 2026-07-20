@@ -55,6 +55,26 @@ internal static class NookCommands
             json);
     }
 
+    [CoveCommand("nook stack")]
+    public static Task<int> NookStack(CommandContext ctx)
+    {
+        var nookId = FirstPositional(ctx.Args);
+        var placement = ArgValue(ctx.Args, "--placement");
+        if (nookId is null
+            || placement is not ("left" or "right" or "above" or "below"))
+        {
+            ctx.Stderr.WriteLine(
+                "usage: cove nook stack <nook-id> --placement <left|right|above|below>");
+            return Task.FromResult(1);
+        }
+        var json = JsonSerializer.Serialize(
+            new NookStackParams(nookId, placement),
+            CoveJsonContext.Default.NookStackParams);
+        return ctx.RouteCoreWithParamsAsync(
+            "cove://commands/nook.stack",
+            json);
+    }
+
     [CoveCommand("nook restart")]
     public static Task<int> NookRestart(CommandContext ctx)
     {

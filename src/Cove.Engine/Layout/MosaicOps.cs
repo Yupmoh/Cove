@@ -37,6 +37,120 @@ public static class MosaicOps
         };
     }
 
+    public static (MosaicNode Root, int Nooks)? BalanceStack(
+        MosaicNode root,
+        string targetNookId,
+        SplitOrientation orientation)
+    {
+        var path = new List<SplitNode>();
+        if (!FindPath(root, targetNookId, path))
+            return null;
+        var componentIndex = -1;
+        for (var index = path.Count - 1; index >= 0; index--)
+        {
+            if (path[index].Orientation == orientation)
+            {
+                componentIndex = index;
+                break;
+            }
+        }
+        if (componentIndex < 0)
+            return null;
+        while (componentIndex > 0
+               && path[componentIndex - 1].Orientation == orientation)
+        {
+            componentIndex--;
+        }
+        var component = path[componentIndex];
+        var lanes = new List<MosaicNode>();
+        CollectLanes(component, orientation, lanes);
+        var rebuilt = BuildBalanced(lanes, orientation, 0, lanes.Count);
+        return (
+            ReplaceNode(root, component, rebuilt),
+            lanes.Count);
+    }
+
+    private static bool FindPath(
+        MosaicNode node,
+        string targetNookId,
+        List<SplitNode> path)
+    {
+        if (node is NookLeaf leaf)
+            return leaf.NookId == targetNookId;
+        if (node is not SplitNode split)
+            return false;
+        path.Add(split);
+        if (FindPath(split.ChildA, targetNookId, path)
+            || FindPath(split.ChildB, targetNookId, path))
+        {
+            return true;
+        }
+        path.RemoveAt(path.Count - 1);
+        return false;
+    }
+
+    private static void CollectLanes(
+        MosaicNode node,
+        SplitOrientation orientation,
+        List<MosaicNode> lanes)
+    {
+        if (node is SplitNode split
+            && split.Orientation == orientation)
+        {
+            CollectLanes(split.ChildA, orientation, lanes);
+            CollectLanes(split.ChildB, orientation, lanes);
+            return;
+        }
+        lanes.Add(node);
+    }
+
+    private static MosaicNode BuildBalanced(
+        IReadOnlyList<MosaicNode> lanes,
+        SplitOrientation orientation,
+        int offset,
+        int count)
+    {
+        if (count == 1)
+            return lanes[offset];
+        var leftCount = count / 2;
+        return new SplitNode
+        {
+            Orientation = orientation,
+            Ratio = (double)leftCount / count,
+            ChildA = BuildBalanced(
+                lanes,
+                orientation,
+                offset,
+                leftCount),
+            ChildB = BuildBalanced(
+                lanes,
+                orientation,
+                offset + leftCount,
+                count - leftCount),
+        };
+    }
+
+    private static MosaicNode ReplaceNode(
+        MosaicNode node,
+        MosaicNode target,
+        MosaicNode replacement)
+    {
+        if (ReferenceEquals(node, target))
+            return replacement;
+        if (node is not SplitNode split)
+            return node;
+        var childA = ReplaceNode(split.ChildA, target, replacement);
+        var childB = ReplaceNode(split.ChildB, target, replacement);
+        return ReferenceEquals(childA, split.ChildA)
+               && ReferenceEquals(childB, split.ChildB)
+            ? split
+            : split with
+            {
+                ChildA = childA,
+                ChildB = childB,
+            };
+    }
+
     public static MosaicNode ReplaceLeaf(MosaicNode root, string nookId, Func<NookLeaf, NookLeaf> transform)
     {
         return Replace(root);

@@ -129,6 +129,15 @@ public sealed record NookCloseResult(
     string NookType,
     string BayId,
     string ShoreId);
+public sealed record NookStackParams(
+    string NookId,
+    string Placement);
+public sealed record NookStackResult(
+    string NookId,
+    string BayId,
+    string ShoreId,
+    string Placement,
+    int Nooks);
 public sealed record AgentLaunchParams(
     string Mode,
     string Adapter,
@@ -612,6 +621,8 @@ public sealed record PerformanceResultSaveResult(string Directory);
 [JsonSerializable(typeof(NookOpenParams))]
 [JsonSerializable(typeof(NookOpenResult))]
 [JsonSerializable(typeof(NookCloseResult))]
+[JsonSerializable(typeof(NookStackParams))]
+[JsonSerializable(typeof(NookStackResult))]
 [JsonSerializable(typeof(AgentLaunchParams))]
 [JsonSerializable(typeof(AgentLaunchResult))]
 [JsonSerializable(typeof(NookRestartParams))]

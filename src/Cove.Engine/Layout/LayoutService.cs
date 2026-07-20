@@ -205,6 +205,32 @@ public sealed class LayoutService
         OnChanged?.Invoke();
     }
 
+    public int BalanceStack(
+        string shoreId,
+        string nookId,
+        SplitOrientation orientation)
+    {
+        int nooks;
+        lock (_sync)
+        {
+            var (_, shore) = GetShoreOrThrow(shoreId);
+            var balanced = MosaicOps.BalanceStack(
+                shore.Root,
+                nookId,
+                orientation);
+            if (balanced is null)
+            {
+                throw new InvalidOperationException(
+                    "no matching stack contains nook");
+            }
+            shore.Root = balanced.Value.Root;
+            shore.ZoomedNookId = null;
+            nooks = balanced.Value.Nooks;
+        }
+        OnChanged?.Invoke();
+        return nooks;
+    }
+
     public void ReplaceNook(string shoreId, string targetNookId, NookLeaf newLeaf)
     {
         lock (_sync)

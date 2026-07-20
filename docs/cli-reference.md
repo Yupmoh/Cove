@@ -212,6 +212,7 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/nook.scope.set` | core |  |
 | `cove://commands/nook.search` | core |  |
 | `cove://commands/nook.spawn` | core |  |
+| `cove://commands/nook.stack` | core |  |
 | `cove://commands/nook.write` | core |  |
 | `cove://commands/note.create` | core |  |
 | `cove://commands/note.delete` | core |  |
@@ -407,6 +408,7 @@ Generated from the command registry. Do not edit by hand.
 | `nook list` | cli |  |
 | `nook open` | cli |  |
 | `nook restart` | cli |  |
+| `nook stack` | cli |  |
 | `nook-types list` | cli |  |
 | `note create` | cli |  |
 | `note delete` | cli |  |
@@ -503,4 +505,4 @@ Generated from the command registry. Do not edit by hand.
 | `viewer open` | cli |  |
 | `workspace context` | cli |  |
 
-Total: 498 commands
+Total: 500 commands
