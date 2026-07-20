@@ -1,5 +1,4 @@
 using System.Text.Json;
-using Cove.Generated;
 using Cove.Protocol;
 
 namespace Cove.Engine.Agents;
@@ -20,8 +19,21 @@ public static class AgentMessageCommands
         if (target is null)
             return ctx.Fail("not_found", $"no agent matches '{p.Target}'");
 
-        var sender = new AgentMessageSender(p.FromNookId ?? "", p.FromAdapter ?? "", p.FromName);
-        var body = p.NoFrame ? AgentMessageFramer.NoFrame(p.Body) : AgentMessageFramer.Frame(sender, p.Body, replyPrefix: p.FromNookId);
+        var senderNookId =
+            ctx.Request.CallerNookId ?? p.FromNookId;
+        var senderAgent = string.IsNullOrEmpty(senderNookId)
+            ? null
+            : router.ResolveTarget(senderNookId);
+        var sender = new AgentMessageSender(
+            senderNookId ?? "",
+            p.FromAdapter ?? senderAgent?.Adapter ?? "",
+            p.FromName ?? senderAgent?.Name);
+        var body = p.NoFrame
+            ? AgentMessageFramer.NoFrame(p.Body)
+            : AgentMessageFramer.Frame(
+                sender,
+                p.Body,
+                replyPrefix: senderNookId);
 
         var delivery = new AgentMessageDelivery(nooks);
         var delivered = await delivery.DeliverAsync(target.NookId, body, p.SubmitPauseMs).ConfigureAwait(false);
@@ -37,22 +49,17 @@ public static class AgentMessageCommands
         if (ctx.AgentRouter is not { } router)
             return Task.FromResult(ctx.Fail("not_ready", "agent router not available"));
 
-        var scope = "same-tab";
-        string? requesterNookId = null;
-        string? requesterBay = null;
-        string? requesterShore = null;
-
-        if (ctx.Request.Params is JsonElement el && el.ValueKind == JsonValueKind.Object)
-        {
-            if (el.TryGetProperty("scope", out var s) && s.ValueKind == JsonValueKind.String)
-                scope = s.GetString() ?? "same-tab";
-            if (el.TryGetProperty("requesterNookId", out var rp) && rp.ValueKind == JsonValueKind.String)
-                requesterNookId = rp.GetString();
-            if (el.TryGetProperty("requesterBay", out var rw) && rw.ValueKind == JsonValueKind.String)
-                requesterBay = rw.GetString();
-            if (el.TryGetProperty("requesterShore", out var rr) && rr.ValueKind == JsonValueKind.String)
-                requesterShore = rr.GetString();
-        }
+        var parameters = ctx.Request.Params is JsonElement element
+            ? element.Deserialize(
+                CoveJsonContext.Default.AgentListParams)
+            : null;
+        var scope = parameters?.Scope ?? "same-tab";
+        var requesterNookId = ctx.Request.CallerNookId;
+        var requester = string.IsNullOrEmpty(requesterNookId)
+            ? null
+            : router.ResolveTarget(requesterNookId);
+        var requesterBay = requester?.Bay;
+        var requesterShore = requester?.Shore;
 
         var agents = router.List(scope, requesterBay, requesterNookId, requesterShore).ToList();
         var dtos = agents.Select(a => new AgentListDto(a.NookId, a.Adapter, a.Name, a.Bay, a.Shore, a.Status, a.McpAccessScope)).ToList();

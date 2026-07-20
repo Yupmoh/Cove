@@ -1,0 +1,2 @@
+NOOK ID	ADAPTER	NAME	STATUS	BAY	SHORE	SCOPE
+nook-b	omp	Builder	working	bay-1	shore-1	same-tab

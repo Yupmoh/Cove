@@ -1,5 +1,4 @@
 using System.Text.Json;
-using Cove.Engine;
 using Cove.Engine.Agents;
 using Cove.Engine.Pty;
 using Cove.Platform.Pty;
@@ -76,5 +75,101 @@ public sealed class AgentRouterWiringTests
         Assert.Equal(1, agents.GetArrayLength());
         Assert.Equal("claude-code", agents[0].GetProperty("adapter").GetString());
         Assert.Equal("A", agents[0].GetProperty("name").GetString());
+    }
+
+    [Fact]
+    public async Task AgentList_DerivesSameTabFromCallerIdentity()
+    {
+        var router = new AgentMessageRouter();
+        router.Register(
+            "caller",
+            "omp",
+            "Caller",
+            "bay-1",
+            "shore-1");
+        router.Register(
+            "peer",
+            "claude-code",
+            "Peer",
+            "bay-1",
+            "shore-1");
+        router.Register(
+            "foreign",
+            "codex",
+            "Foreign",
+            "bay-1",
+            "shore-2");
+        var parameters = JsonSerializer.SerializeToElement(
+            new AgentListParams("same-tab"),
+            CoveJsonContext.Default.AgentListParams);
+
+        var response = await EngineCommandRouter.RouteAsync(
+            new ControlRequest(
+                "list",
+                "cove://commands/agent.list",
+                parameters,
+                CallerNookId: "caller"),
+            agentRouter: router);
+
+        Assert.True(response!.Ok);
+        var agents = response.Data!.Value.GetProperty("agents");
+        Assert.Single(agents.EnumerateArray());
+        Assert.Equal(
+            "peer",
+            agents[0].GetProperty("nookId").GetString());
+    }
+
+    [PlatformFact(TestOperatingSystem.Unix)]
+    public async Task AgentMessage_DerivesFramedSenderFromCaller()
+    {
+        using var nooks = NewNooks();
+        var target = nooks.Spawn(new SpawnParams(
+            "/bin/sh",
+            ["-c", "cat"],
+            "/tmp"));
+        var router = new AgentMessageRouter();
+        router.Register(
+            "caller",
+            "omp",
+            "Caller",
+            "bay-1",
+            "shore-1");
+        router.Register(
+            target.NookId,
+            "claude-code",
+            "Peer",
+            "bay-1",
+            "shore-1");
+        var parameters = JsonSerializer.SerializeToElement(
+            new AgentMessageParams(
+                target.NookId,
+                "hello",
+                null,
+                null,
+                null,
+                false,
+                0),
+            CoveJsonContext.Default.AgentMessageParams);
+
+        var response = await EngineCommandRouter.RouteAsync(
+            new ControlRequest(
+                "message",
+                "cove://commands/agent.message",
+                parameters,
+                CallerNookId: "caller"),
+            nooks: nooks,
+            agentRouter: router);
+        await Task.Delay(100);
+        var output = System.Text.Encoding.UTF8.GetString(
+            nooks.Read(target.NookId, 0, 65536));
+
+        Assert.True(response!.Ok);
+        Assert.Contains(
+            "Message from Caller (omp)",
+            output);
+        Assert.Contains(
+            "cove agent message caller",
+            output);
+        nooks.Kill(target.NookId);
     }
 }

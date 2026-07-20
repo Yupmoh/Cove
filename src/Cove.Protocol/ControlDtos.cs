@@ -215,6 +215,7 @@ public sealed record NookStateItem(string NookId, string Adapter, string Status,
 public sealed record NookStatesResult(NookStateItem[] Nooks);
 
 public sealed record AgentMessageParams(string Target, string Body, string? FromNookId, string? FromAdapter, string? FromName, bool NoFrame, int? SubmitPauseMs);
+public sealed record AgentListParams(string Scope = "same-tab");
 public sealed record AgentListDto(string NookId, string Adapter, string? Name, string? Bay, string? Shore, string Status, string McpAccessScope);
 public sealed record AgentListResult(System.Collections.Generic.IReadOnlyList<AgentListDto> Agents);
 
@@ -678,7 +679,8 @@ public sealed record PerformanceResultSaveResult(string Directory);
 [JsonSerializable(typeof(NookStateItem))]
 [JsonSerializable(typeof(NookStatesResult))]
 [JsonSerializable(typeof(AgentMessageParams))]
-[JsonSerializable(typeof(AgentListDto))]
+[JsonSerializable(typeof(AgentListParams))]
+[JsonSerializable(typeof(AgentListResult))]
 [JsonSerializable(typeof(AgentListResult))]
 [JsonSerializable(typeof(ActivityCardDto))]
 [JsonSerializable(typeof(ActivityListResult))]

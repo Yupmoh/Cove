@@ -40,6 +40,22 @@
     "source": "cli"
   },
   {
+    "command": "agent launch",
+    "source": "cli"
+  },
+  {
+    "command": "agent list",
+    "source": "cli"
+  },
+  {
+    "command": "agent message",
+    "source": "cli"
+  },
+  {
+    "command": "agent resume",
+    "source": "cli"
+  },
+  {
     "command": "attach",
     "source": "cli"
   },
@@ -1589,6 +1605,10 @@
   },
   {
     "command": "nook list",
+    "source": "cli"
+  },
+  {
+    "command": "nook restart",
     "source": "cli"
   },
   {

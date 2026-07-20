@@ -14,6 +14,10 @@ Generated from the command registry. Do not edit by hand.
 | `agent definition delete` | cli |  |
 | `agent definition list` | cli |  |
 | `agent definition show` | cli |  |
+| `agent launch` | cli |  |
+| `agent list` | cli |  |
+| `agent message` | cli |  |
+| `agent resume` | cli |  |
 | `attach` | cli |  |
 | `attribution find-by-line` | cli |  |
 | `attribution find-by-range` | cli |  |
@@ -397,6 +401,7 @@ Generated from the command registry. Do not edit by hand.
 | `memory supersede` | cli |  |
 | `migrate` | cli |  |
 | `nook list` | cli |  |
+| `nook restart` | cli |  |
 | `nook-types list` | cli |  |
 | `note create` | cli |  |
 | `note delete` | cli |  |
@@ -493,4 +498,4 @@ Generated from the command registry. Do not edit by hand.
 | `viewer open` | cli |  |
 | `workspace context` | cli |  |
 
-Total: 488 commands
+Total: 493 commands
