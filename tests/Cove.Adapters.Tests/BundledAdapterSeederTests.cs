@@ -216,4 +216,50 @@ public sealed class BundledAdapterSeederTests : IDisposable
         Assert.Empty(report.Refreshed);
         Assert.Empty(report.SkippedUserManaged);
     }
+
+    [Fact]
+    public void InstallSkills_CopiesBundledSkillsToHarnessLocations()
+    {
+        var source = Path.Combine(_root, "source");
+        var claude = MakeSourceAdapter(
+            source,
+            "claude-code",
+            """
+            {
+              "skillInstallPath": "~/.claude/skills/cove/SKILL.md"
+            }
+            """);
+        var omp = MakeSourceAdapter(
+            source,
+            "omp",
+            """
+            {
+              "skillInstallPath": "~/.omp/agent/skills/cove/SKILL.md"
+            }
+            """);
+        File.WriteAllText(Path.Combine(claude, "skill.md"), "cove skill");
+        File.WriteAllText(Path.Combine(omp, "skill.md"), "cove skill");
+        var home = Path.Combine(_root, "home");
+
+        var installed = BundledAdapterSeeder.InstallSkills(source, home);
+
+        Assert.Equal(["claude-code", "omp"], installed);
+        Assert.Equal(
+            "cove skill",
+            File.ReadAllText(Path.Combine(
+                home,
+                ".claude",
+                "skills",
+                "cove",
+                "SKILL.md")));
+        Assert.Equal(
+            "cove skill",
+            File.ReadAllText(Path.Combine(
+                home,
+                ".omp",
+                "agent",
+                "skills",
+                "cove",
+                "SKILL.md")));
+    }
 }

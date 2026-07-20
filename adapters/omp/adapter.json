@@ -7,6 +7,8 @@
   "binary": "omp",
   "version": "1.0.0",
   "author": "Cove",
+  "skillInstallPath": "~/.omp/agent/skills/cove/SKILL.md",
+  "skillsDir": "~/.omp/agent/skills",
   "binaryDiscovery": {
     "commands": ["omp"],
     "wellKnownPaths": [

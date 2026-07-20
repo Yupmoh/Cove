@@ -60,7 +60,12 @@ public static class BundledAdapterSeeder
             logger?.BundledAdapterSourceMissing(AppContext.BaseDirectory);
             return new BundledSeedReport(Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>());
         }
-        return Seed(source, targetRoot, logger, executableMode);
+        var report = Seed(source, targetRoot, logger, executableMode);
+        InstallSkills(
+            source,
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            logger);
+        return report;
     }
 
     public static BundledSeedReport Seed(
@@ -135,6 +140,81 @@ public static class BundledAdapterSeeder
         return new BundledSeedReport(copied, refreshed, skipped);
     }
 
+    public static IReadOnlyList<string> InstallSkills(
+        string sourceRoot,
+        string homeDirectory,
+        ILogger? logger = null)
+    {
+        var installed = new List<string>();
+        if (!Directory.Exists(sourceRoot))
+        {
+            logger?.BundledAdapterSourceMissing(sourceRoot);
+            return installed;
+        }
+
+        foreach (var sourceDir in Directory
+                     .EnumerateDirectories(sourceRoot)
+                     .OrderBy(Path.GetFileName, StringComparer.Ordinal))
+        {
+            var name = Path.GetFileName(sourceDir.TrimEnd(
+                Path.DirectorySeparatorChar,
+                Path.AltDirectorySeparatorChar));
+            var manifestPath = Path.Combine(sourceDir, "adapter.json");
+            if (string.IsNullOrEmpty(name) || !File.Exists(manifestPath))
+                continue;
+            try
+            {
+                using var document = JsonDocument.Parse(
+                    File.ReadAllText(manifestPath));
+                if (!document.RootElement.TryGetProperty(
+                        "skillInstallPath",
+                        out var installPathElement))
+                    continue;
+                var installPath = installPathElement.GetString();
+                if (string.IsNullOrWhiteSpace(installPath))
+                {
+                    logger?.SkillInstallFailed(
+                        name,
+                        installPath ?? string.Empty,
+                        "skill install path is empty");
+                    continue;
+                }
+                var sourceSkill = Path.Combine(sourceDir, "skill.md");
+                if (!File.Exists(sourceSkill))
+                {
+                    logger?.SkillInstallSkipped(name, installPath);
+                    continue;
+                }
+                var destination = ExpandHome(installPath, homeDirectory);
+                var destinationDirectory = Path.GetDirectoryName(destination);
+                if (destinationDirectory is null)
+                {
+                    logger?.SkillInstallFailed(
+                        name,
+                        installPath,
+                        "skill install path has no directory");
+                    continue;
+                }
+                Directory.CreateDirectory(destinationDirectory);
+                File.Copy(sourceSkill, destination, overwrite: true);
+                installed.Add(name);
+            }
+            catch (IOException ex)
+            {
+                logger?.SkillInstallFailed(name, manifestPath, ex.Message);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                logger?.SkillInstallFailed(name, manifestPath, ex.Message);
+            }
+            catch (JsonException ex)
+            {
+                logger?.SkillInstallFailed(name, manifestPath, ex.Message);
+            }
+        }
+        return installed;
+    }
+
     private static bool IsLegacyBundledAdapter(string adapterDir, string name)
     {
         try
@@ -192,4 +272,22 @@ public static class BundledAdapterSeeder
 
     private static string RelativePosixPath(string root, string full)
         => Path.GetRelativePath(root, full).Replace(Path.DirectorySeparatorChar, '/');
+
+    private static string ExpandHome(
+        string path,
+        string homeDirectory)
+    {
+        if (path == "~")
+            return homeDirectory;
+        if (path.StartsWith("~/", StringComparison.Ordinal)
+            || path.StartsWith("~\\", StringComparison.Ordinal))
+        {
+            return Path.Combine(
+                homeDirectory,
+                path[2..].Replace(
+                    '/',
+                    Path.DirectorySeparatorChar));
+        }
+        return path;
+    }
 }

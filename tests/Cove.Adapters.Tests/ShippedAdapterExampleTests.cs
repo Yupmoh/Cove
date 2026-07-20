@@ -65,6 +65,39 @@ public sealed class ShippedAdapterExampleTests
         Assert.Contains("--nook-id \"$COVE_NOOK_ID\"", idleCommand!);
     }
 
+    [Theory]
+    [InlineData("claude-code", "~/.claude/skills/cove/SKILL.md")]
+    [InlineData("omp", "~/.omp/agent/skills/cove/SKILL.md")]
+    public void ShippedCoveSkill_ProvidesDocumentedControlRecipes(
+        string adapterName,
+        string installPath)
+    {
+        var adapterDir = Path.Combine(AdaptersRoot, adapterName);
+        var manifestJson = File.ReadAllText(
+            Path.Combine(adapterDir, "adapter.json"));
+        var (manifest, errors) = ManifestValidator.Parse(manifestJson);
+        Assert.Empty(errors);
+        Assert.NotNull(manifest);
+        Assert.Equal(installPath, manifest!.SkillInstallPath);
+
+        var skillPath = Path.Combine(adapterDir, "skill.md");
+        Assert.True(File.Exists(skillPath), $"missing skill: {skillPath}");
+        var skill = File.ReadAllText(skillPath);
+        Assert.StartsWith("---\nname: cove\n", skill);
+        Assert.Contains("$COVE_CLI_PATH", skill);
+        Assert.Contains("$COVE_NOOK_ID", skill);
+        Assert.Contains("workspace context", skill);
+        Assert.Contains("session recent", skill);
+        Assert.Contains("agent launch", skill);
+        Assert.Contains("agent resume", skill);
+        Assert.Contains("nook restart", skill);
+        Assert.Contains("agent message", skill);
+        Assert.Contains("agent list", skill);
+        Assert.Contains("nook.kill", skill);
+        Assert.DoesNotContain("layout.mutate", skill, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("refresh Cove", skill, StringComparison.OrdinalIgnoreCase);
+    }
+
     [PlatformTheory(TestOperatingSystem.Unix)]
     [Trait(TestTraits.Category, TestTraits.Platform)]
     [System.Runtime.Versioning.UnsupportedOSPlatform("windows")]
