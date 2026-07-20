@@ -12,14 +12,14 @@
     <PackageVersion Include="xunit.runner.visualstudio" Version="2.8.2" />
     <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" />
     <PackageVersion Include="BenchmarkDotNet" Version="0.14.0" />
-    <PackageVersion Include="Ryn" Version="0.27.0" />
-    <PackageVersion Include="Ryn.Plugins.MenuBar" Version="0.27.0" />
-    <PackageVersion Include="Ryn.Plugins.Badge" Version="0.27.0" />
-    <PackageVersion Include="Ryn.Plugins.GlobalShortcut" Version="0.27.0" />
-    <PackageVersion Include="Ryn.Plugins.WebViewPane" Version="0.27.0" />
-    <PackageVersion Include="Ryn.Plugins.Notification" Version="0.27.1" />
-    <PackageVersion Include="Ryn.Plugins.Dialog" Version="0.27.0" />
-    <PackageVersion Include="Ryn.Plugins.Updater" Version="0.27.0" />
+    <PackageVersion Include="Ryn" Version="0.27.2" />
+    <PackageVersion Include="Ryn.Plugins.MenuBar" Version="0.27.2" />
+    <PackageVersion Include="Ryn.Plugins.Badge" Version="0.27.2" />
+    <PackageVersion Include="Ryn.Plugins.GlobalShortcut" Version="0.27.2" />
+    <PackageVersion Include="Ryn.Plugins.WebViewPane" Version="0.27.2" />
+    <PackageVersion Include="Ryn.Plugins.Notification" Version="0.27.2" />
+    <PackageVersion Include="Ryn.Plugins.Dialog" Version="0.27.2" />
+    <PackageVersion Include="Ryn.Plugins.Updater" Version="0.27.2" />
     <PackageVersion Include="ZLogger" Version="2.5.10" />
   </ItemGroup>
 
