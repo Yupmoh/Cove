@@ -1,4 +1,3 @@
-using Cove.Adapters;
 using Cove.Testing;
 using Xunit;
 
@@ -97,9 +96,24 @@ public sealed class ShippedAdapterExampleTests
         Assert.Contains("agent launch", skill);
         Assert.Contains("agent resume", skill);
         Assert.Contains("nook restart", skill);
+        Assert.Contains("nook open terminal", skill);
+        Assert.Contains("nook open browser", skill);
+        Assert.Contains("--command", skill);
+        Assert.Contains("--arg", skill);
+        Assert.Contains("--url", skill);
+        Assert.Contains("--model", skill);
+        Assert.Contains("--effort", skill);
+        Assert.Contains("nook stack", skill);
+        Assert.Contains("nook close", skill);
+        Assert.Contains("A profile is durable", skill);
+        Assert.Contains("previously returned nook ID", skill);
+        Assert.Contains("After the final open", skill);
         Assert.Contains("agent message", skill);
         Assert.Contains("agent list", skill);
-        Assert.Contains("nook.kill", skill);
+        Assert.DoesNotContain("exec nook.kill", skill);
+        Assert.DoesNotContain("control-token", skill);
+        Assert.DoesNotContain("socket path", skill, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("manually reload", skill, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("layout.mutate", skill, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("refresh Cove", skill, StringComparison.OrdinalIgnoreCase);
     }
