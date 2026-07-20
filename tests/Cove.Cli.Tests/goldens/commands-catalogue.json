@@ -212,6 +212,10 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/agent.launch",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/agent.list",
     "source": "core"
   },
@@ -798,6 +802,10 @@
   },
   {
     "command": "cove://commands/nook.resize",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/nook.restart",
     "source": "core"
   },
   {
@@ -1412,6 +1420,10 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/workspace.context",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/worktree.adopt",
     "source": "core"
   },
@@ -1953,6 +1965,10 @@
   },
   {
     "command": "viewer open",
+    "source": "cli"
+  },
+  {
+    "command": "workspace context",
     "source": "cli"
   }
 ]

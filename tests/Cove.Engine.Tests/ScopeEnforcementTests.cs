@@ -30,6 +30,7 @@ public sealed class ScopeEnforcementTests
         "cove://commands/nook.search",
         "cove://commands/nook.read",
         "cove://commands/nook.checkpoint",
+        "cove://commands/nook.restart",
         "cove://commands/nook.subscribe",
         "cove://commands/nook.scope.get",
         "cove://commands/send_to_agent",

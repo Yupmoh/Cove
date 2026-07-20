@@ -120,7 +120,8 @@ public sealed class NookRegistry : IDisposable, Cove.Engine.Agents.INookWriter
         int rows,
         byte[]? priorScrollback = null,
         string? adapter = null,
-        string? agentName = null)
+        string? agentName = null,
+        IReadOnlyDictionary<string, string>? environment = null)
     {
         _logger.NookRespawn(nookId, command, adapter ?? "");
         var info = SpawnCore(
@@ -130,7 +131,7 @@ public sealed class NookRegistry : IDisposable, Cove.Engine.Agents.INookWriter
             cwd,
             cols,
             rows,
-            null,
+            environment,
             priorScrollback);
         _sessions.Tag(nookId, adapter, agentName);
         return info;
@@ -145,7 +146,8 @@ public sealed class NookRegistry : IDisposable, Cove.Engine.Agents.INookWriter
         int rows,
         TerminalRestoreState restoreState,
         string? adapter = null,
-        string? agentName = null)
+        string? agentName = null,
+        IReadOnlyDictionary<string, string>? environment = null)
     {
         _logger.NookRespawn(nookId, command, adapter ?? "");
         var info = SpawnCore(
@@ -155,7 +157,7 @@ public sealed class NookRegistry : IDisposable, Cove.Engine.Agents.INookWriter
             cwd,
             cols,
             rows,
-            null,
+            environment,
             restoreState.Tail);
         if (_sessions.TryGet(nookId, out var session))
             _terminalState.RestoreCheckpoint(session, restoreState);

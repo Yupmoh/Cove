@@ -59,6 +59,7 @@ internal static class ScopeEnforcement
             "cove://commands/nook.search" => true,
             "cove://commands/nook.read" => true,
             "cove://commands/nook.checkpoint" => true,
+            "cove://commands/nook.restart" => true,
             ControlProtocolRoutes.NookSubscribe => true,
             "cove://commands/nook.scope.get" => true,
             "cove://commands/workspace.context" => true,

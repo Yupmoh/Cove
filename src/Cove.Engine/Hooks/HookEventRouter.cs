@@ -64,6 +64,27 @@ public sealed class HookEventRouter
         _nookStates.GetOrAdd(nookId, _ => new NookAgentState(nookId, adapter, string.IsNullOrEmpty(status) ? "idle" : status, 0, System.DateTimeOffset.UtcNow, SessionId: sessionId));
     }
 
+    public void Reset(
+        string nookId,
+        string adapter,
+        string? sessionId = null,
+        string status = "idle")
+    {
+        if (string.IsNullOrEmpty(nookId))
+        {
+            _logger?.HookEventNoNookId(adapter, "reset");
+            return;
+        }
+        _nookStates[nookId] = new NookAgentState(
+            nookId,
+            adapter,
+            status,
+            0,
+            DateTimeOffset.UtcNow,
+            SessionId: sessionId);
+        StateChanged?.Invoke(nookId);
+    }
+
     public bool Acknowledge(string nookId)
     {
         while (_nookStates.TryGetValue(nookId, out var existing))

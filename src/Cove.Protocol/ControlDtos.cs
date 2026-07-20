@@ -129,6 +129,24 @@ public sealed record AgentLaunchResult(
     string ShoreId,
     string Placement,
     bool Resumed);
+public sealed record NookRestartParams(
+    string NookId,
+    string Mode,
+    bool PreserveScrollback = true,
+    string? Command = null,
+    System.Collections.Generic.IReadOnlyList<string>? Args = null,
+    string? Cwd = null,
+    string ResumeFallback = "none");
+public sealed record NookRestartResult(
+    string NookId,
+    string Mode,
+    string Outcome,
+    bool FallbackUsed,
+    string? Adapter,
+    string? SessionId,
+    string? BayId,
+    string? ShoreId,
+    int PreservedScrollbackBytes);
 public sealed record NookRenameParams(string NookId, string Title);
 public sealed record NookReadParams(string NookId, long Offset = 0, int MaxBytes = 65536);
 public sealed record NookCheckpointParams(string NookId, string DataBase64, long Offset, int Cols, int Rows, int ScrollbackLines);
@@ -568,6 +586,8 @@ public sealed record PerformanceResultSaveResult(string Directory);
 [JsonSerializable(typeof(WorkspaceContextResult))]
 [JsonSerializable(typeof(AgentLaunchParams))]
 [JsonSerializable(typeof(AgentLaunchResult))]
+[JsonSerializable(typeof(NookRestartParams))]
+[JsonSerializable(typeof(NookRestartResult))]
 [JsonSerializable(typeof(HookEmitParams))]
 [JsonSerializable(typeof(DictationAudioPayload))]
 [JsonSerializable(typeof(DictationSessionParams))]

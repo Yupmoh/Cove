@@ -57,6 +57,7 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/agent.definition.delete` | core |  |
 | `cove://commands/agent.definition.list` | core |  |
 | `cove://commands/agent.definition.show` | core |  |
+| `cove://commands/agent.launch` | core |  |
 | `cove://commands/agent.list` | core |  |
 | `cove://commands/agent.message` | core |  |
 | `cove://commands/agent.replay` | core |  |
@@ -200,6 +201,7 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/nook.read` | core |  |
 | `cove://commands/nook.rename` | core |  |
 | `cove://commands/nook.resize` | core |  |
+| `cove://commands/nook.restart` | core |  |
 | `cove://commands/nook.scope.get` | core |  |
 | `cove://commands/nook.scope.set` | core |  |
 | `cove://commands/nook.search` | core |  |
@@ -352,6 +354,7 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/wing.reorder` | core |  |
 | `cove://commands/wing.set-icon` | core |  |
 | `cove://commands/wing.switch` | core |  |
+| `cove://commands/workspace.context` | core |  |
 | `cove://commands/worktree.adopt` | core |  |
 | `cove://commands/worktree.create` | core |  |
 | `cove://commands/worktree.list` | core |  |
@@ -488,5 +491,6 @@ Generated from the command registry. Do not edit by hand.
 | `version` | cli |  |
 | `viewer get-state` | cli |  |
 | `viewer open` | cli |  |
+| `workspace context` | cli |  |
 
-Total: 484 commands
+Total: 488 commands
