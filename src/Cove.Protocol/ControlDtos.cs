@@ -94,6 +94,19 @@ public sealed record ResizeParams(string NookId, int Cols, int Rows);
 
 public sealed record NookWriteParams(string NookId, string DataBase64);
 public sealed record NookRefParams(string NookId);
+public sealed record WorkspaceContextParams(string? NookId = null);
+public sealed record WorkspaceContextResult(
+    string NookId,
+    string? Adapter,
+    string? SessionId,
+    string? BayId,
+    string? ShoreId,
+    string? FocusedNookId,
+    string ActiveBayId,
+    string? ActiveShoreId,
+    long LayoutRevision,
+    string? Cwd,
+    string EffectiveAccessScope);
 public sealed record NookRenameParams(string NookId, string Title);
 public sealed record NookReadParams(string NookId, long Offset = 0, int MaxBytes = 65536);
 public sealed record NookCheckpointParams(string NookId, string DataBase64, long Offset, int Cols, int Rows, int ScrollbackLines);
@@ -529,6 +542,8 @@ public sealed record PerformanceResultSaveResult(string Directory);
 [JsonSerializable(typeof(NookInfo[]))]
 [JsonSerializable(typeof(NookListResult))]
 [JsonSerializable(typeof(SpawnParams))]
+[JsonSerializable(typeof(WorkspaceContextParams))]
+[JsonSerializable(typeof(WorkspaceContextResult))]
 [JsonSerializable(typeof(HookEmitParams))]
 [JsonSerializable(typeof(DictationAudioPayload))]
 [JsonSerializable(typeof(DictationSessionParams))]

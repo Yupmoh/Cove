@@ -61,6 +61,7 @@ internal static class ScopeEnforcement
             "cove://commands/nook.checkpoint" => true,
             ControlProtocolRoutes.NookSubscribe => true,
             "cove://commands/nook.scope.get" => true,
+            "cove://commands/workspace.context" => true,
             "cove://commands/send_to_agent" => true,
             "cove://commands/agent.message" => true,
             "cove://commands/canvas.action" => true,
@@ -255,6 +256,14 @@ internal static class ScopeEnforcement
         ControlRequest request,
         AgentMessageRouter? agentRouter)
     {
+        if (request.Uri == "cove://commands/workspace.context"
+            && request.Params is not JsonElement
+            {
+                ValueKind: JsonValueKind.Object
+            })
+        {
+            return request.CallerNookId;
+        }
         if (request.Params is not JsonElement
             {
                 ValueKind: JsonValueKind.Object
@@ -316,12 +325,15 @@ internal static class ScopeEnforcement
                 ?? agentTarget;
         }
 
-        return TryGetString(
+        var target = TryGetString(
                 element,
                 "nookId",
                 out var targetNookId)
             ? targetNookId
             : null;
+        return request.Uri == "cove://commands/workspace.context"
+            ? target ?? request.CallerNookId
+            : target;
     }
 
     private static bool TryGetString(

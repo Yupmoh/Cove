@@ -89,7 +89,8 @@ public sealed class EngineDispatchContext
         CancellationToken cancellationToken = default,
         Func<CancellationToken, bool>? forwardWindowFocus = null,
         Func<RestorationSummaryEvent?>? getRestorationSummary = null,
-        DateTimeOffset? engineStartedAtUtc = null)
+        DateTimeOffset? engineStartedAtUtc = null,
+        Func<long>? getWorkspaceRevision = null)
     {
         Request = request;
         Nooks = nooks;
@@ -157,6 +158,7 @@ public sealed class EngineDispatchContext
         ForwardWindowFocus = forwardWindowFocus;
         GetRestorationSummary = getRestorationSummary;
         EngineStartedAtUtc = engineStartedAtUtc;
+        GetWorkspaceRevision = getWorkspaceRevision;
     }
 
     public ControlRequest Request { get; }
@@ -225,6 +227,7 @@ public sealed class EngineDispatchContext
     public Func<CancellationToken, bool>? ForwardWindowFocus { get; }
     public Func<RestorationSummaryEvent?>? GetRestorationSummary { get; }
     public DateTimeOffset? EngineStartedAtUtc { get; }
+    public Func<long>? GetWorkspaceRevision { get; }
     public System.Func<ControlRequest, System.Threading.Tasks.Task<ControlResponse?>>? Redrive { get; set; }
 
     public ControlResponse Ok<T>(T data, JsonTypeInfo<T> typeInfo)

@@ -102,6 +102,18 @@ public sealed class CommandsCatalogueTests
     }
 
     [Fact]
+    public void Catalogue_WorkspaceContextCliVerbPresent()
+    {
+        Assert.Contains(
+            CoveCommandRegistry.Catalogue,
+            entry => entry.Command == "workspace context"
+                && entry.Source == "cli");
+        Assert.Equal(
+            "WorkspaceCommands",
+            HandlerOwner("workspace context"));
+    }
+
+    [Fact]
     public async Task Commands_UsesDaemonExtensionCatalogueAndPreservesJsonOrdering()
     {
         var root = TestDirectory.Create("cc-");

@@ -794,7 +794,8 @@ internal sealed class EngineRuntime : IAsyncDisposable
             cancellationToken,
             Events.TryForwardFocus,
             () => Events.RestorationSummary,
-            StartedAtUtc);
+            StartedAtUtc,
+            () => Events.WorkspaceRevision);
     }
 
     public Task ShutdownAsync()

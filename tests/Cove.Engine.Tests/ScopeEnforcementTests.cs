@@ -54,7 +54,8 @@ public sealed class ScopeEnforcementTests
         "cove://commands/browser.scroll",
         "cove://commands/browser.wait",
         "cove://commands/browser.get",
-        "cove://commands/browser.is"
+        "cove://commands/browser.is",
+        "cove://commands/workspace.context"
     };
 
     public static TheoryData<string> ExplicitDomainCommandUris => new()
@@ -213,5 +214,47 @@ public sealed class ScopeEnforcementTests
             Assert.True(response!.Ok);
         }
         finally { if (!string.IsNullOrEmpty(nook)) nooks.Kill(nook); }
+    }
+
+    [Fact]
+    public void WorkspaceContext_NoExplicitTarget_DefaultsToCaller()
+    {
+        var scopeStore = new NookScopeStore(NewDir(), NullLogger.Instance);
+        scopeStore.SetScope("caller-nook", McpScope.SameTab);
+        var request = new Cove.Protocol.ControlRequest(
+            "1",
+            "cove://commands/workspace.context",
+            CallerNookId: "caller-nook");
+
+        var response = ScopeEnforcement.Check(
+            request,
+            scopeStore,
+            null,
+            null,
+            null);
+
+        Assert.Null(response);
+    }
+
+    [Fact]
+    public void WorkspaceContext_ExplicitForeignTarget_EnforcesScope()
+    {
+        var scopeStore = new NookScopeStore(NewDir(), NullLogger.Instance);
+        scopeStore.SetScope("caller-nook", McpScope.SameTab);
+        var request = new Cove.Protocol.ControlRequest(
+            "1",
+            "cove://commands/workspace.context",
+            JsonDocument.Parse("""{"nookId":"foreign-nook"}""").RootElement.Clone(),
+            CallerNookId: "caller-nook");
+
+        var response = ScopeEnforcement.Check(
+            request,
+            scopeStore,
+            null,
+            null,
+            null);
+
+        Assert.NotNull(response);
+        Assert.Equal("access_denied", response!.Error?.Code);
     }
 }
