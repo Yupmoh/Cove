@@ -208,6 +208,7 @@ internal sealed class EngineEventRouter
         return uri == "cove://commands/layout.mutate"
             || uri is "cove://commands/nook.spawn"
                 or "cove://commands/nook.kill"
+                or "cove://commands/nook.close"
                 or "cove://commands/nook.open"
                 or "cove://commands/nook.rename"
                 or "cove://commands/nook.restart"

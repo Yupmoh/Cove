@@ -33,6 +33,7 @@ public sealed class EngineEventRouterTests
     [InlineData("cove://commands/nook.restart", true)]
     [InlineData("cove://commands/agent.launch", true)]
     [InlineData("cove://commands/nook.open", true)]
+    [InlineData("cove://commands/nook.close", true)]
     [InlineData("cove://commands/nook.write", false)]
     [InlineData("cove://commands/nook.read", false)]
     [InlineData("cove://commands/nook.list", false)]

@@ -200,6 +200,7 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/memory.supersede` | core |  |
 | `cove://commands/nook-types.list` | core |  |
 | `cove://commands/nook.checkpoint` | core |  |
+| `cove://commands/nook.close` | core |  |
 | `cove://commands/nook.kill` | core |  |
 | `cove://commands/nook.list` | core |  |
 | `cove://commands/nook.open` | core |  |
@@ -402,6 +403,7 @@ Generated from the command registry. Do not edit by hand.
 | `memory show` | cli |  |
 | `memory supersede` | cli |  |
 | `migrate` | cli |  |
+| `nook close` | cli |  |
 | `nook list` | cli |  |
 | `nook open` | cli |  |
 | `nook restart` | cli |  |
@@ -501,4 +503,4 @@ Generated from the command registry. Do not edit by hand.
 | `viewer open` | cli |  |
 | `workspace context` | cli |  |
 
-Total: 496 commands
+Total: 498 commands

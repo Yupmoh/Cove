@@ -38,6 +38,23 @@ internal static class NookCommands
             json);
     }
 
+    [CoveCommand("nook close")]
+    public static Task<int> NookClose(CommandContext ctx)
+    {
+        var nookId = FirstPositional(ctx.Args);
+        if (nookId is null)
+        {
+            ctx.Stderr.WriteLine("usage: cove nook close <nook-id>");
+            return Task.FromResult(1);
+        }
+        var json = JsonSerializer.Serialize(
+            new NookRefParams(nookId),
+            CoveJsonContext.Default.NookRefParams);
+        return ctx.RouteCoreWithParamsAsync(
+            "cove://commands/nook.close",
+            json);
+    }
+
     [CoveCommand("nook restart")]
     public static Task<int> NookRestart(CommandContext ctx)
     {

@@ -801,6 +801,10 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/nook.close",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/nook.kill",
     "source": "core"
   },
@@ -1609,6 +1613,10 @@
   },
   {
     "command": "migrate",
+    "source": "cli"
+  },
+  {
+    "command": "nook close",
     "source": "cli"
   },
   {

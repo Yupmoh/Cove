@@ -416,6 +416,14 @@ public sealed class LayoutService
                     shore.ActiveNookId = leaves.Count > 0 ? leaves[0].NookId : null;
                 }
             }
+            if (bucket.FocusedNookId == nookId)
+            {
+                bucket.FocusedNookId =
+                    bucket.ActiveShoreId is { } activeShoreId
+                    && bucket.Shores.TryGetValue(activeShoreId, out var activeShore)
+                        ? activeShore.ActiveNookId
+                        : null;
+            }
         }
         OnChanged?.Invoke();
     }

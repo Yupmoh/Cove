@@ -132,6 +132,8 @@ internal static class ScopeEnforcement
             ScopePolicy.NookAllowed,
         "cove://commands/nook.checkpoint" =>
             ScopePolicy.TargetScoped,
+        "cove://commands/nook.close" =>
+            ScopePolicy.TargetScoped,
         "cove://commands/nook.kill" =>
             ScopePolicy.TargetScoped,
         "cove://commands/nook.list" =>
