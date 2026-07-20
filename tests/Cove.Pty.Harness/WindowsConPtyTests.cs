@@ -255,6 +255,7 @@ public sealed class WindowsConPtyTests
 
         Assert.Equal(1, Volatile.Read(ref resourcesClosed));
         Assert.Equal(new[] { new IntPtr(202), new IntPtr(101) }, closedHandles);
+        Assert.Equal(17, session.WaitForExit());
         Assert.True(outputRead.IsClosed);
         Assert.True(inputWrite.IsClosed);
     }

@@ -64,6 +64,20 @@ public sealed class NookSpawnCommandTests
         Assert.Equal(1, resolver.Calls);
     }
 
+    [Fact]
+    public void Spawn_EmptyCommandUsesResolvedShell()
+    {
+        var host = new CapturingHost();
+        var resolver = new FakeShellResolver("powershell.exe");
+        using var registry = new NookRegistry(host, NullLogger.Instance, shellResolver: resolver);
+
+        registry.Spawn(new SpawnParams("", [], "/tmp"));
+
+        var request = Assert.Single(host.Requests);
+        Assert.Equal("powershell.exe", request.Command);
+        Assert.Equal(1, resolver.Calls);
+    }
+
     [Theory]
     [InlineData("powershell.exe", "-NoLogo", "-Command")]
     [InlineData("pwsh", "-NoLogo", "-Command")]

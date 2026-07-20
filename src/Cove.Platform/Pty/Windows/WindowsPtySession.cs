@@ -187,7 +187,17 @@ public sealed class WindowsPtySession : IPtySession
 
     public int WaitForExit()
     {
-        _exitEvent.Wait();
+        if (!HasExited)
+        {
+            try
+            {
+                _exitEvent.Wait();
+            }
+            catch (ObjectDisposedException) when (HasExited)
+            {
+                // Dispose may release the event after the watcher publishes the exit state.
+            }
+        }
         return _exitCode;
     }
 

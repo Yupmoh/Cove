@@ -29,7 +29,7 @@ public sealed class ConPtyDiagnosticMatrix
             ("B", "inherit parent env, no CREATE_UNICODE_ENVIRONMENT", "cmd.exe", cmdArgs, CaptureMilliseconds, new ConPtyDiagnosticOptions { InheritParentEnvironment = true, IncludeUnicodeEnvironmentFlag = false }),
             ("C", "inherit parent env, keep CREATE_UNICODE_ENVIRONMENT", "cmd.exe", cmdArgs, CaptureMilliseconds, new ConPtyDiagnosticOptions { InheritParentEnvironment = true, IncludeUnicodeEnvironmentFlag = true }),
             ("D", "production env, literal command line (no quoting)", "cmd.exe", cmdArgs, CaptureMilliseconds, new ConPtyDiagnosticOptions { CommandLineOverride = "cmd.exe /c echo hello" }),
-            ("E", "production path, explicitly zeroed stdio fields", "cmd.exe", cmdArgs, CaptureMilliseconds, new ConPtyDiagnosticOptions { ExplicitZeroStdHandles = true }),
+
             ("F", "explicit non-inheritable pipe security attributes", "cmd.exe", cmdArgs, CaptureMilliseconds, new ConPtyDiagnosticOptions { ExplicitNonInheritablePipes = true }),
             ("G", "EchoCon-faithful: keep conpty-side pipe ends alive until close", "cmd.exe", cmdArgs, CaptureMilliseconds, new ConPtyDiagnosticOptions { KeepConptySideHandles = true }),
             ("H", "no watcher close: only dispose closes the pseudoconsole", "cmd.exe", cmdArgs, CaptureMilliseconds, new ConPtyDiagnosticOptions { SuppressWatcherClose = true }),

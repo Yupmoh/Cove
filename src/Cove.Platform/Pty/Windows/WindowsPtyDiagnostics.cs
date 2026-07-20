@@ -10,7 +10,7 @@ internal sealed class ConPtyDiagnosticOptions
     public bool InheritParentEnvironment { get; init; }
     public bool IncludeUnicodeEnvironmentFlag { get; init; } = true;
     public string? CommandLineOverride { get; init; }
-    public bool ExplicitZeroStdHandles { get; init; }
+
     public bool ExplicitNonInheritablePipes { get; init; }
     public bool KeepConptySideHandles { get; init; }
     public bool SuppressWatcherClose { get; init; }

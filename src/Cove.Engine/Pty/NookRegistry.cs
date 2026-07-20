@@ -86,7 +86,7 @@ public sealed class NookRegistry : IDisposable, Cove.Engine.Agents.INookWriter
             command = invocation.Command;
             args = invocation.Args;
         }
-        else if (command is null)
+        else if (string.IsNullOrWhiteSpace(command))
         {
             command = _shellResolver.ResolveDefaultShell();
         }

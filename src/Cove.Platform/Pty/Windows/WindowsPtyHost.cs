@@ -60,16 +60,10 @@ public sealed class WindowsPtyHost : IPtyHost
         }
 
         var size = new ConPtyNative.Coord { X = (short)cols, Y = (short)rows };
-        uint pseudoConsoleFlags = ConPtyNative.PSEUDOCONSOLE_PASSTHROUGH_MODE;
+        uint pseudoConsoleFlags = 0;
         if (options.InheritCursor)
             pseudoConsoleFlags |= ConPtyNative.PSEUDOCONSOLE_INHERIT_CURSOR;
         int hr = ConPtyNative.CreatePseudoConsole(size, inputRead, outputWrite, pseudoConsoleFlags, out IntPtr pseudoConsole);
-        if (hr != 0 && (pseudoConsoleFlags & ConPtyNative.PSEUDOCONSOLE_PASSTHROUGH_MODE) != 0)
-        {
-            logger.WinPseudoConsolePassthroughUnsupported(request.Command, hr);
-            pseudoConsoleFlags &= ~ConPtyNative.PSEUDOCONSOLE_PASSTHROUGH_MODE;
-            hr = ConPtyNative.CreatePseudoConsole(size, inputRead, outputWrite, pseudoConsoleFlags, out pseudoConsole);
-        }
         bool pseudoConsoleValid = pseudoConsole != IntPtr.Zero;
         if (!options.KeepConptySideHandles)
         {
@@ -98,15 +92,12 @@ public sealed class WindowsPtyHost : IPtyHost
             var startupInfo = new ConPtyNative.StartupInfoEx
             {
                 cb = Unsafe.SizeOf<ConPtyNative.StartupInfoEx>(),
+                dwFlags = ConPtyNative.STARTF_USESTDHANDLES,
+                hStdInput = IntPtr.Zero,
+                hStdOutput = IntPtr.Zero,
+                hStdError = IntPtr.Zero,
                 lpAttributeList = attributeList,
             };
-            if (options.ExplicitZeroStdHandles)
-            {
-                startupInfo.dwFlags = 0;
-                startupInfo.hStdInput = IntPtr.Zero;
-                startupInfo.hStdOutput = IntPtr.Zero;
-                startupInfo.hStdError = IntPtr.Zero;
-            }
 
             string commandLine;
             if (options.CommandLineOverride is not null)
