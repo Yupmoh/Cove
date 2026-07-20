@@ -809,6 +809,10 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/nook.open",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/nook.read",
     "source": "core"
   },
@@ -1609,6 +1613,10 @@
   },
   {
     "command": "nook list",
+    "source": "cli"
+  },
+  {
+    "command": "nook open",
     "source": "cli"
   },
   {

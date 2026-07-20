@@ -10,6 +10,33 @@ internal static class NookCommands
         public static Task<int> NookList(CommandContext ctx)
             => ctx.RouteCoreAsync("cove://commands/nook.list");
 
+    [CoveCommand("nook open")]
+    public static Task<int> NookOpen(CommandContext ctx)
+    {
+        var nookType = FirstPositional(ctx.Args);
+        if (nookType is null)
+        {
+            ctx.Stderr.WriteLine("usage: cove nook open terminal");
+            return Task.FromResult(1);
+        }
+        var parameters = new NookOpenParams(
+            nookType,
+            ArgValue(ctx.Args, "--command"),
+            ArgValues(ctx.Args, "--arg"),
+            ArgValue(ctx.Args, "--cwd"),
+            ArgValue(ctx.Args, "--relative-to"),
+            ArgValue(ctx.Args, "--placement") ?? "right",
+            ArgValue(ctx.Args, "--bay-id"),
+            IntValue(ctx.Args, "--cols") ?? 80,
+            IntValue(ctx.Args, "--rows") ?? 24);
+        var json = JsonSerializer.Serialize(
+            parameters,
+            CoveJsonContext.Default.NookOpenParams);
+        return ctx.RouteCoreWithParamsAsync(
+            "cove://commands/nook.open",
+            json);
+    }
+
     [CoveCommand("nook restart")]
     public static Task<int> NookRestart(CommandContext ctx)
     {
@@ -103,6 +130,11 @@ internal static class NookCommands
             "--arg",
             "--cwd",
             "--resume-fallback",
+            "--relative-to",
+            "--placement",
+            "--bay-id",
+            "--cols",
+            "--rows",
         ]);
         for (var index = 0; index < args.Length; index++)
         {
@@ -130,6 +162,15 @@ internal static class NookCommands
             ? args[index + 1]
             : null;
     }
+
+    private static int? IntValue(
+        string[] args,
+        string flag) =>
+        int.TryParse(
+            ArgValue(args, flag),
+            out var value)
+            ? value
+            : null;
 
     private static string[] ArgValues(
         string[] args,

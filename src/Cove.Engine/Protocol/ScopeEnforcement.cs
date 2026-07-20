@@ -136,6 +136,8 @@ internal static class ScopeEnforcement
             ScopePolicy.TargetScoped,
         "cove://commands/nook.list" =>
             ScopePolicy.ControlOnly,
+        "cove://commands/nook.open" =>
+            ScopePolicy.PlacementScoped,
         "cove://commands/nook.read" =>
             ScopePolicy.TargetScoped,
         "cove://commands/nook.rename" =>
@@ -245,7 +247,7 @@ internal static class ScopeEnforcement
             return CheckSelf(request);
         if (policy == ScopePolicy.PlacementScoped)
         {
-            return CheckAgentLaunch(
+            return CheckPlacement(
                 request,
                 scopeStore,
                 layout);
@@ -432,7 +434,7 @@ internal static class ScopeEnforcement
                 "command is restricted to the caller nook");
     }
 
-    private static ControlResponse? CheckAgentLaunch(
+    private static ControlResponse? CheckPlacement(
         ControlRequest request,
         NookScopeStore scopeStore,
         LayoutService? layout)
@@ -443,26 +445,42 @@ internal static class ScopeEnforcement
                 request.Id,
                 "layout service is unavailable");
         }
-        if (request.Params is not JsonElement element
-            || element.Deserialize(
-                CoveJsonContext.Default.AgentLaunchParams)
-                is not { } parameters)
+        if (request.Params is not JsonElement element)
+            return Invalid(request.Id, "placement params are required");
+        string? requestedRelativeNookId;
+        string? requestedBayId;
+        string placement;
+        if (request.Uri == "cove://commands/agent.launch")
         {
-            return Invalid(
-                request.Id,
-                "agent launch params are required");
+            var parameters = element.Deserialize(
+                CoveJsonContext.Default.AgentLaunchParams);
+            if (parameters is null)
+                return Invalid(request.Id, "agent launch params are required");
+            requestedRelativeNookId = parameters.RelativeToNookId;
+            requestedBayId = parameters.BayId;
+            placement = parameters.Placement;
         }
-        if (parameters.Placement is not (
+        else
+        {
+            var parameters = element.Deserialize(
+                CoveJsonContext.Default.NookOpenParams);
+            if (parameters is null)
+                return Invalid(request.Id, "nook open params are required");
+            requestedRelativeNookId = parameters.RelativeToNookId;
+            requestedBayId = parameters.BayId;
+            placement = parameters.Placement;
+        }
+        if (placement is not (
             "left" or "right" or "above" or "below"
             or "new-shore"))
         {
             return Invalid(
                 request.Id,
-                "agent launch placement is invalid");
+                "nook placement is invalid");
         }
         var callerNookId = request.CallerNookId!;
         var relativeNookId =
-            parameters.RelativeToNookId ?? callerNookId;
+            requestedRelativeNookId ?? callerNookId;
         var relativeLocation =
             layout.ResolveNookLocation(relativeNookId);
         if (relativeLocation.BayId is null
@@ -472,9 +490,9 @@ internal static class ScopeEnforcement
                 request.Id,
                 "relative nook is not placed");
         }
-        if (parameters.BayId is not null
+        if (requestedBayId is not null
             && !string.Equals(
-                parameters.BayId,
+                requestedBayId,
                 relativeLocation.BayId,
                 StringComparison.Ordinal))
         {
@@ -486,12 +504,12 @@ internal static class ScopeEnforcement
             request.Id,
             callerNookId,
             relativeLocation.BayId,
-            parameters.Placement == "new-shore"
+            placement == "new-shore"
                 ? null
                 : relativeLocation.ShoreId,
             scopeStore,
             layout,
-            "agent launch placement exceeds caller scope");
+            "nook placement exceeds caller scope");
     }
 
     private static ControlResponse? CheckAgentList(

@@ -107,6 +107,22 @@ public sealed record WorkspaceContextResult(
     long LayoutRevision,
     string? Cwd,
     string EffectiveAccessScope);
+public sealed record NookOpenParams(
+    string NookType,
+    string? Command,
+    string[] Args,
+    string? Cwd = null,
+    string? RelativeToNookId = null,
+    string Placement = "right",
+    string? BayId = null,
+    int Cols = 80,
+    int Rows = 24);
+public sealed record NookOpenResult(
+    string NookId,
+    string NookType,
+    string BayId,
+    string ShoreId,
+    string Placement);
 public sealed record AgentLaunchParams(
     string Mode,
     string Adapter,
@@ -585,6 +601,8 @@ public sealed record PerformanceResultSaveResult(string Directory);
 [JsonSerializable(typeof(SpawnParams))]
 [JsonSerializable(typeof(WorkspaceContextParams))]
 [JsonSerializable(typeof(WorkspaceContextResult))]
+[JsonSerializable(typeof(NookOpenParams))]
+[JsonSerializable(typeof(NookOpenResult))]
 [JsonSerializable(typeof(AgentLaunchParams))]
 [JsonSerializable(typeof(AgentLaunchResult))]
 [JsonSerializable(typeof(NookRestartParams))]
