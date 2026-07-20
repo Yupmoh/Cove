@@ -183,12 +183,22 @@ public sealed class LayoutService
         return shoreId;
     }
 
-    public void SplitNook(string shoreId, string targetNookId, SplitOrientation orient, NookLeaf newLeaf)
+    public void SplitNook(
+        string shoreId,
+        string targetNookId,
+        SplitOrientation orient,
+        NookLeaf newLeaf,
+        bool before = false)
     {
         lock (_sync)
         {
             var (bucket, shore) = GetShoreOrThrow(shoreId);
-            shore.Root = MosaicOps.Split(shore.Root, targetNookId, orient, newLeaf);
+            shore.Root = MosaicOps.Split(
+                shore.Root,
+                targetNookId,
+                orient,
+                newLeaf,
+                before: before);
             shore.ActiveNookId = newLeaf.NookId;
             bucket.ActiveShoreId = shoreId;
         }

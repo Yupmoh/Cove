@@ -107,6 +107,28 @@ public sealed record WorkspaceContextResult(
     long LayoutRevision,
     string? Cwd,
     string EffectiveAccessScope);
+public sealed record AgentLaunchParams(
+    string Mode,
+    string Adapter,
+    string Profile = "default",
+    string? SessionId = null,
+    string? Cwd = null,
+    string? RelativeToNookId = null,
+    string Placement = "right",
+    string? BayId = null,
+    string? Name = null,
+    bool Yolo = false,
+    int Cols = 80,
+    int Rows = 24,
+    string AccessScope = "same-bay");
+public sealed record AgentLaunchResult(
+    string NookId,
+    string Adapter,
+    string? SessionId,
+    string BayId,
+    string ShoreId,
+    string Placement,
+    bool Resumed);
 public sealed record NookRenameParams(string NookId, string Title);
 public sealed record NookReadParams(string NookId, long Offset = 0, int MaxBytes = 65536);
 public sealed record NookCheckpointParams(string NookId, string DataBase64, long Offset, int Cols, int Rows, int ScrollbackLines);
@@ -544,6 +566,8 @@ public sealed record PerformanceResultSaveResult(string Directory);
 [JsonSerializable(typeof(SpawnParams))]
 [JsonSerializable(typeof(WorkspaceContextParams))]
 [JsonSerializable(typeof(WorkspaceContextResult))]
+[JsonSerializable(typeof(AgentLaunchParams))]
+[JsonSerializable(typeof(AgentLaunchResult))]
 [JsonSerializable(typeof(HookEmitParams))]
 [JsonSerializable(typeof(DictationAudioPayload))]
 [JsonSerializable(typeof(DictationSessionParams))]

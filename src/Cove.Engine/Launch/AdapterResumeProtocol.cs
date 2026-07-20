@@ -57,14 +57,6 @@ public sealed class AdapterResumeProtocol : IAdapterResume
         throw new ResumeFailedException($"adapter {adapter} build_resume_command failed (exit {result.ExitCode}): {result.Stderr}");
     }
 
-    public ResumeCommand BuildResumeCommand(string sessionId, LauncherOverrides overrides)
-    {
-        var firstAdapter = _manifestStore.LoadAll().FirstOrDefault();
-        if (firstAdapter is null)
-            throw new ResumeFailedException("no adapters installed");
-        return BuildResumeCommandAsync(firstAdapter.Name, sessionId, overrides).GetAwaiter().GetResult();
-    }
-
     public Task WaitForReadiness(string sessionId, System.Threading.CancellationToken cancellationToken)
         => Task.CompletedTask;
 

@@ -14,13 +14,18 @@ public sealed class AdapterResumeProtocolTests
     private static string WriteFixture(string name)
     {
         var root = Path.Combine(Path.GetTempPath(), "cove-resume-" + Guid.NewGuid().ToString("N"));
+        CopyFixture(root, name);
+        return root;
+    }
+
+    private static void CopyFixture(string root, string name)
+    {
         var dir = Path.Combine(root, name);
         Directory.CreateDirectory(dir);
         var src = Path.Combine(Directory.GetCurrentDirectory(), "..", "..", "..", "..", "..",
             "tests", "fixtures", "adapters", name);
         foreach (var f in Directory.GetFiles(src))
             File.Copy(f, Path.Combine(dir, Path.GetFileName(f)), true);
-        return root;
     }
 
     [Fact]
@@ -65,14 +70,18 @@ public sealed class AdapterResumeProtocolTests
     }
 
     [Fact]
-    public void BuildResumeCommand_Sync_DelegatesToAsync()
+    public async Task BuildResumeCommandAsync_UsesRequestedAdapter()
     {
-        var root = WriteFixture("test-v2");
+        var root = WriteFixture("test-v1");
+        CopyFixture(root, "test-v2");
         var store = new AdapterManifestStore(root);
         var runner = new MethodRunner();
         var proto = new AdapterResumeProtocol(store, runner);
 
-        var cmd = proto.BuildResumeCommand("sess-1", new LauncherOverrides { WorkingDir = "/tmp" });
+        var cmd = await proto.BuildResumeCommandAsync(
+            "test-v2",
+            "sess-1",
+            new LauncherOverrides { WorkingDir = "/tmp" });
 
         Assert.NotNull(cmd);
         Assert.Equal("test-v2", cmd.Command);

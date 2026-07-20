@@ -62,6 +62,7 @@ public sealed class ScopeEnforcementTests
     {
         "cove://commands/nook.list",
         "cove://commands/nook.spawn",
+        "cove://commands/agent.launch",
         "cove://commands/nook.scope.set",
         "cove://commands/browser.create",
         "cove://commands/browser.automation.result",

@@ -13,7 +13,11 @@ public sealed class AgentResumeTests
         public bool FailBuild { get; set; }
         public int ReadinessCalls { get; private set; }
 
-        public ResumeCommand BuildResumeCommand(string sessionId, LauncherOverrides overrides)
+        public Task<ResumeCommand> BuildResumeCommandAsync(
+            string adapter,
+            string sessionId,
+            LauncherOverrides overrides,
+            CancellationToken cancellationToken)
         {
             if (FailBuild)
                 throw new ResumeFailedException("adapter build failed");
@@ -22,7 +26,8 @@ public sealed class AgentResumeTests
                 args.Add("--dangerously-skip-permissions");
             foreach (var env in overrides.Env)
                 args.Add($"--env={env.Key}={env.Value}");
-            return new ResumeCommand("agent", args, overrides.WorkingDir ?? "");
+            return Task.FromResult(
+                new ResumeCommand("agent", args, overrides.WorkingDir ?? ""));
         }
 
         public async Task WaitForReadiness(string sessionId, CancellationToken cancellationToken)
@@ -48,7 +53,7 @@ public sealed class AgentResumeTests
     {
         var adapter = new FakeAdapter { Ready = true, Reaped = false };
         var svc = new AgentResumeService(adapter);
-        var state = await svc.ResumeAsync("sess-1", Overrides(yolo: true, "/repo"), cancellationToken: default);
+        var state = await svc.ResumeAsync("claude-code", "sess-1", Overrides(yolo: true, "/repo"), cancellationToken: default);
 
         Assert.Equal(AgentResumeState.Succeeded, state.State);
         Assert.NotNull(state.Command);
@@ -63,7 +68,7 @@ public sealed class AgentResumeTests
     {
         var adapter = new FakeAdapter { Ready = false };
         var svc = new AgentResumeService(adapter);
-        var state = await svc.ResumeAsync("sess-1", Overrides(), cancellationToken: default);
+        var state = await svc.ResumeAsync("claude-code", "sess-1", Overrides(), cancellationToken: default);
 
         Assert.Equal(AgentResumeState.Failed, state.State);
         Assert.NotNull(state.Nudge);
@@ -77,7 +82,7 @@ public sealed class AgentResumeTests
         var adapter = new FakeAdapter { Reaped = true, Ready = true };
         var svc = new AgentResumeService(adapter);
         var overrides = Overrides(yolo: true, "/repo");
-        var state = await svc.ResumeAsync("sess-1", overrides, cancellationToken: default);
+        var state = await svc.ResumeAsync("claude-code", "sess-1", overrides, cancellationToken: default);
 
         Assert.Equal(AgentResumeState.Succeeded, state.State);
         Assert.NotNull(state.Command);
@@ -90,7 +95,7 @@ public sealed class AgentResumeTests
     {
         var adapter = new FakeAdapter { FailBuild = true };
         var svc = new AgentResumeService(adapter);
-        var state = await svc.ResumeAsync("sess-1", Overrides(), cancellationToken: default);
+        var state = await svc.ResumeAsync("claude-code", "sess-1", Overrides(), cancellationToken: default);
 
         Assert.Equal(AgentResumeState.Failed, state.State);
         Assert.NotNull(state.Nudge);
@@ -104,7 +109,7 @@ public sealed class AgentResumeTests
         using var cts = new CancellationTokenSource();
         cts.Cancel();
 
-        var state = await svc.ResumeAsync("sess-1", Overrides(), cts.Token);
+        var state = await svc.ResumeAsync("claude-code", "sess-1", Overrides(), cts.Token);
 
         Assert.NotEqual(AgentResumeState.Succeeded, state.State);
     }

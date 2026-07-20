@@ -26,7 +26,11 @@ public sealed record AgentResumeResult(AgentResumeState State, ResumeCommand? Co
 
 public interface IAdapterResume
 {
-    ResumeCommand BuildResumeCommand(string sessionId, LauncherOverrides overrides);
+    Task<ResumeCommand> BuildResumeCommandAsync(
+        string adapter,
+        string sessionId,
+        LauncherOverrides overrides,
+        CancellationToken cancellationToken);
     Task WaitForReadiness(string sessionId, CancellationToken cancellationToken);
     bool IsSessionReaped(string sessionId);
 }
@@ -37,7 +41,11 @@ public sealed class AgentResumeService
 
     public AgentResumeService(IAdapterResume adapter) => _adapter = adapter;
 
-    public async Task<AgentResumeResult> ResumeAsync(string sessionId, LauncherOverrides overrides, CancellationToken cancellationToken)
+    public async Task<AgentResumeResult> ResumeAsync(
+        string adapter,
+        string sessionId,
+        LauncherOverrides overrides,
+        CancellationToken cancellationToken)
     {
         try
         {
@@ -63,7 +71,11 @@ public sealed class AgentResumeService
             ResumeCommand command;
             try
             {
-                command = _adapter.BuildResumeCommand(sessionId, overrides);
+                command = await _adapter.BuildResumeCommandAsync(
+                    adapter,
+                    sessionId,
+                    overrides,
+                    cancellationToken).ConfigureAwait(false);
             }
             catch (ResumeFailedException ex)
             {

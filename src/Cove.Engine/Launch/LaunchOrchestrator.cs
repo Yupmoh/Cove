@@ -135,6 +135,7 @@ public sealed class LaunchOrchestrator
         if (_resumeService is not null)
         {
             return await _resumeService.ResumeAsync(
+                profile.Adapter,
                 sessionId,
                 overrides,
                 cancellationToken).ConfigureAwait(false);

@@ -126,6 +126,7 @@ internal sealed class EngineEventRouter
             || uri is "cove://commands/nook.spawn"
                 or "cove://commands/nook.kill"
                 or "cove://commands/nook.rename"
+                or "cove://commands/agent.launch"
             || IsVisibleMutationGroup(uri, "cove://commands/bay.", "list")
             || IsVisibleMutationGroup(uri, "cove://commands/shore.", "list")
             || IsVisibleMutationGroup(uri, "cove://commands/wing.", "list");

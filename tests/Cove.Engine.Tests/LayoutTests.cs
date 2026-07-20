@@ -29,6 +29,24 @@ public sealed class LayoutTests
     }
 
     [Fact]
+    public void SplitNook_BeforePlacesNewLeafFirst()
+    {
+        var svc = new LayoutService();
+        var shoreId = svc.CreateShore("shore", Leaf("a"));
+
+        svc.SplitNook(
+            shoreId,
+            "a",
+            SplitOrientation.Column,
+            Leaf("b"),
+            before: true);
+
+        var split = Assert.IsType<SplitNode>(svc.GetRoot(shoreId));
+        Assert.Equal("b", Assert.IsType<NookLeaf>(split.ChildA).NookId);
+        Assert.Equal("a", Assert.IsType<NookLeaf>(split.ChildB).NookId);
+    }
+
+    [Fact]
     public void Close_Reflows_SiblingReplacesParent()
     {
         var a = Leaf("a");

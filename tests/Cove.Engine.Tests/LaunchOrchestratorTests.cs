@@ -138,10 +138,15 @@ public sealed class LaunchOrchestratorTests
     private sealed class StubResumeAdapter : IAdapterResume
     {
         public bool BuildResumeCalled;
-        public ResumeCommand BuildResumeCommand(string sessionId, LauncherOverrides overrides)
+        public Task<ResumeCommand> BuildResumeCommandAsync(
+            string adapter,
+            string sessionId,
+            LauncherOverrides overrides,
+            CancellationToken cancellationToken)
         {
             BuildResumeCalled = true;
-            return new ResumeCommand("agent", new[] { "--resume", sessionId }, "");
+            return Task.FromResult(
+                new ResumeCommand("agent", new[] { "--resume", sessionId }, ""));
         }
 
         public Task WaitForReadiness(string sessionId, System.Threading.CancellationToken cancellationToken) => Task.CompletedTask;

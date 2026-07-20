@@ -27,7 +27,7 @@ public sealed class NonRestoredContractTests
     {
         var adapter = new TestAdapters.ReapedFakeAdapter();
         var svc = new AgentResumeService(adapter);
-        var state = await svc.ResumeAsync("sess-1", new LauncherOverrides { Yolo = true, WorkingDir = "/repo" }, CancellationToken.None);
+        var state = await svc.ResumeAsync("claude-code", "sess-1", new LauncherOverrides { Yolo = true, WorkingDir = "/repo" }, CancellationToken.None);
 
         Assert.Equal(AgentResumeState.Succeeded, state.State);
         Assert.NotNull(state.Command);
@@ -50,12 +50,17 @@ internal static class TestAdapters
 {
     public sealed class ReapedFakeAdapter : IAdapterResume
     {
-        public ResumeCommand BuildResumeCommand(string sessionId, LauncherOverrides overrides)
+        public Task<ResumeCommand> BuildResumeCommandAsync(
+            string adapter,
+            string sessionId,
+            LauncherOverrides overrides,
+            CancellationToken cancellationToken)
         {
             var args = new List<string> { "--resume", sessionId };
             if (overrides.Yolo)
                 args.Add("--dangerously-skip-permissions");
-            return new ResumeCommand("agent", args, overrides.WorkingDir ?? "");
+            return Task.FromResult(
+                new ResumeCommand("agent", args, overrides.WorkingDir ?? ""));
         }
 
         public Task WaitForReadiness(string sessionId, CancellationToken cancellationToken) => Task.CompletedTask;

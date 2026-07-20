@@ -201,6 +201,7 @@ internal static class ScopeEnforcement
             "cove://commands/hook.emit" => true,
             "cove://commands/nook.list" => true,
             "cove://commands/nook.spawn" => true,
+            "cove://commands/agent.launch" => true,
             "cove://commands/browser.create" => true,
             "cove://commands/knowledge.ping" => true,
             "cove://commands/note.create" => true,

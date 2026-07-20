@@ -35,6 +35,16 @@ public sealed class NookScopeStore
         }
     }
 
+    public void ClearScope(string nookId)
+    {
+        lock (_lock)
+        {
+            if (!_scopes.Remove(nookId))
+                return;
+            Save();
+        }
+    }
+
     private void Load()
     {
         if (!File.Exists(_path)) return;
