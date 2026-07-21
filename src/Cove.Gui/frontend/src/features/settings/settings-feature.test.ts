@@ -84,10 +84,37 @@ function fixture(withKeybindings = false) {
   const clickBindingButton = (): void => {
     body.querySelector("button")?.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
   };
-  return { window, root, body, focusActiveNook, invoke, clickBindingButton, feature };
+  return { window, root, tabs, body, close, focusActiveNook, invoke, clickBindingButton, feature };
 }
 
 describe("SettingsFeature", () => {
+  it("renders grouped accessible tabs and a framed page with a stable auto-apply footer", async () => {
+    const { window, tabs, body, feature } = fixture();
+
+    feature.open("theme");
+    await vi.waitFor(() => expect(tabs.querySelectorAll('[role="tab"]').length).toBeGreaterThan(0));
+    expect(tabs.getAttribute("role")).toBe("tablist");
+    expect(tabs.querySelectorAll(".set-nav-group-label").length).toBeGreaterThan(0);
+    const selected = tabs.querySelector('[role="tab"][aria-selected="true"]') as unknown as HTMLElement | null;
+    expect(selected?.tabIndex).toBe(0);
+    expect(selected?.querySelector("svg")).not.toBeNull();
+    expect(body.querySelectorAll(".set-page")).toHaveLength(1);
+    expect(body.querySelector(".set-page-header")).not.toBeNull();
+    expect(body.querySelector(".set-page-scroll")).not.toBeNull();
+    expect(body.querySelector(".set-page-footer")).not.toBeNull();
+
+    selected?.dispatchEvent(new window.KeyboardEvent("keydown", { key: "End", bubbles: true }) as unknown as Event);
+    const allTabs = [...tabs.querySelectorAll('[role="tab"]')] as unknown as HTMLElement[];
+    expect(allTabs[allTabs.length - 1].tabIndex).toBe(0);
+  });
+
+  it("uses classes instead of inline Settings layout and appearance styles", () => {
+    const source = createSettingsFeature.toString();
+    expect(source).not.toContain("style.cssText");
+    expect(source).not.toContain('style="');
+    expect(source).not.toMatch(/className = "(?:diag|perf)/);
+  });
+
   it("owns overlay open, close, and disposal listeners", async () => {
     const { root, focusActiveNook, feature } = fixture();
 

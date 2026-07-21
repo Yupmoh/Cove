@@ -1,6 +1,7 @@
 import { FrontendCommand } from "../../app/frontend-command";
 import { LifecycleScope, type ComponentHandle } from "../../app/lifecycle";
-import { orderSettingsTabs, settingsTabLabel, resolveActiveSettingsTab } from "../../settings-tabs";
+import { orderSettingsTabs, settingsTabMetadata, resolveActiveSettingsTab } from "../../settings-tabs";
+import { iconSvg } from "../../icons";
 import { adapterStatusMeta, toolsSubtitle, retentionChipVisible, retentionChipLabel, type ToolsAdapter } from "../../tools-tab";
 import {
   deriveProfileSlug, isValidProfileSlug, profilePickerLabel, selectedLauncherProfile, launcherProfileChoices, envMapFromRows,
@@ -89,6 +90,8 @@ interface ConfigSchemaEntry { key: string; label: string; tab: string; control: 
 let configSchema: ConfigSchemaEntry[] = [];
 
 let activeSettingsTab: string | null = null;
+let renderGeneration = 0;
+let previousFocus: HTMLElement | null = null;
 
 async function loadConfigSchema(): Promise<void> {
   try {
@@ -100,6 +103,8 @@ async function loadConfigSchema(): Promise<void> {
 }
 
 function openSettings(tab?: string): void {
+  const focused = document.activeElement;
+  previousFocus = focused && focused !== document.body && "focus" in focused ? focused as HTMLElement : null;
   if (tab) activeSettingsTab = tab;
   if (configSchema.length === 0) {
     void loadConfigSchema().then(() => renderSettings());
@@ -107,12 +112,14 @@ function openSettings(tab?: string): void {
     renderSettings();
   }
   settingsEl.classList.add("open");
+  settingsEl.focus();
 }
 
 function closeSettings(): void {
   cancelKeybindRecording();
   settingsEl.classList.remove("open");
-  dependencies.focusActiveNook();
+  if (previousFocus?.isConnected) previousFocus.focus();
+  else dependencies.focusActiveNook();
 }
 
 function isRealSetting(e: ConfigSchemaEntry): boolean {
@@ -120,44 +127,95 @@ function isRealSetting(e: ConfigSchemaEntry): boolean {
 }
 
 function renderSettings(): void {
+  const generation = ++renderGeneration;
   const schemaTabs = [...new Set(configSchema.filter(isRealSetting).map((e) => e.tab))].sort();
   const tabs = orderSettingsTabs(schemaTabs);
   if (tabs.length === 0) {
     setTabsEl.innerHTML = "";
-    setBodyEl.innerHTML = `<div style="padding:20px;color:var(--muted);text-align:center;">No settings available</div>`;
+    setBodyEl.innerHTML = '<div class="set-page"><div class="set-page-scroll"><div class="set-empty">No settings available</div></div><div class="set-page-footer"></div></div>';
     return;
   }
   activeSettingsTab = resolveActiveSettingsTab(tabs, activeSettingsTab);
 
   setTabsEl.innerHTML = "";
+  setTabsEl.setAttribute("role", "tablist");
+  setTabsEl.setAttribute("aria-label", "Settings categories");
+  let currentGroup = "";
   for (const tab of tabs) {
-    const el = document.createElement("div");
+    const metadata = settingsTabMetadata(tab);
+    if (metadata.group !== currentGroup) {
+      currentGroup = metadata.group;
+      const group = document.createElement("div");
+      group.className = "set-nav-group-label";
+      group.textContent = currentGroup;
+      setTabsEl.appendChild(group);
+    }
+    const el = document.createElement("button");
+    el.type = "button";
     el.className = "set-nav-item" + (tab === activeSettingsTab ? " active" : "");
-    const dot = document.createElement("span");
-    dot.className = "set-nav-dot";
+    el.id = `set-tab-${tab}`;
+    el.setAttribute("role", "tab");
+    el.setAttribute("aria-selected", String(tab === activeSettingsTab));
+    el.setAttribute("aria-controls", `set-panel-${tab}`);
+    el.tabIndex = tab === activeSettingsTab ? 0 : -1;
+    const tabIcon = document.createElement("span");
+    tabIcon.className = "set-nav-icon";
+    tabIcon.innerHTML = iconSvg(metadata.icon);
     const label = document.createElement("span");
-    label.textContent = settingsTabLabel(tab);
-    el.appendChild(dot);
+    label.className = "set-nav-label";
+    label.textContent = metadata.label;
+    el.appendChild(tabIcon);
     el.appendChild(label);
     el.addEventListener("click", () => { activeSettingsTab = tab; renderSettings(); });
+    el.addEventListener("keydown", (event) => navigateSettingsTabs(event as KeyboardEvent, tabs, tab));
     setTabsEl.appendChild(el);
   }
 
   setBodyEl.innerHTML = "";
+  if (!activeSettingsTab) return;
+  const metadata = settingsTabMetadata(activeSettingsTab);
+  const page = document.createElement("section");
+  page.className = "set-page";
+  page.id = `set-panel-${activeSettingsTab}`;
+  page.setAttribute("role", "tabpanel");
+  page.setAttribute("aria-labelledby", `set-tab-${activeSettingsTab}`);
+  const header = document.createElement("header");
+  header.className = "set-page-header";
+  const pageIcon = document.createElement("span");
+  pageIcon.className = "set-page-icon";
+  pageIcon.innerHTML = iconSvg(metadata.icon);
+  const identity = document.createElement("div");
+  identity.className = "set-page-identity";
+  const heading = document.createElement("h2");
+  heading.textContent = metadata.label;
+  const description = document.createElement("p");
+  description.textContent = metadata.description;
+  identity.append(heading, description);
+  header.append(pageIcon, identity);
+  const scroll = document.createElement("div");
+  scroll.className = "set-page-scroll";
+  const content = document.createElement("div");
+  content.className = "set-page-content";
+  scroll.appendChild(content);
+  const footer = document.createElement("footer");
+  footer.className = "set-page-footer";
+  page.append(header, scroll, footer);
+  setBodyEl.appendChild(page);
+  renderAutoApplyFooter(footer);
   if (activeSettingsTab === "theme") {
-    renderThemeEditor(setBodyEl);
+    renderThemeEditor(content, footer, generation, activeSettingsTab);
     return;
   }
   if (activeSettingsTab === "keyboard") {
-    renderKeyboardEditor(setBodyEl);
+    renderKeyboardEditor(content, generation, activeSettingsTab);
     return;
   }
   if (activeSettingsTab === "tools") {
-    void renderToolsTab(setBodyEl);
+    void renderToolsTab(content);
     return;
   }
   if (activeSettingsTab === "dictation") {
-    onboardingFeature.renderDictationTab(setBodyEl);
+    onboardingFeature.renderDictationTab(content);
     return;
   }
   const entries = configSchema.filter((e) => e.tab === activeSettingsTab && (e.control === "section" || isRealSetting(e)));
@@ -165,14 +223,23 @@ function renderSettings(): void {
     if (entry.control === "section") {
       const header = document.createElement("div");
       header.className = "set-section-header";
-      header.style.cssText = "padding:12px 0 4px;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border);";
-      header.textContent = entry.label;
-      setBodyEl.appendChild(header);
+      const sectionTitle = document.createElement("span");
+      sectionTitle.textContent = entry.label;
+      header.appendChild(sectionTitle);
+      if (entry.description) {
+        const sectionDescription = document.createElement("span");
+        sectionDescription.className = "set-section-description";
+        sectionDescription.textContent = entry.description;
+        header.appendChild(sectionDescription);
+      }
+      content.appendChild(header);
       continue;
     }
     const row = document.createElement("div");
     row.className = "set-row";
     const label = document.createElement("label");
+    const controlId = `set-control-${entry.key.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+    label.htmlFor = controlId;
     const labelText = document.createElement("span");
     labelText.textContent = entry.label;
     label.appendChild(labelText);
@@ -184,18 +251,64 @@ function renderSettings(): void {
     }
     row.appendChild(label);
 
-    void loadSettingValue(entry, row);
-    setBodyEl.appendChild(row);
+    void loadSettingValue(entry, row, controlId, generation, activeSettingsTab);
+    content.appendChild(row);
   }
-  if (activeSettingsTab === "diagnostics") renderDiagnosticsExtras(setBodyEl);
-  if (activeSettingsTab === "updates") updaterFeature.renderSettings(setBodyEl);
-  if (activeSettingsTab === "audio") renderAudioExtras(setBodyEl);
+  if (activeSettingsTab === "diagnostics") renderDiagnosticsExtras(content);
+  if (activeSettingsTab === "updates") updaterFeature.renderSettings(content);
+  if (activeSettingsTab === "audio") renderAudioExtras(content);
+  groupSettingsContent(content);
+}
+
+function navigateSettingsTabs(event: KeyboardEvent, tabs: string[], tab: string): void {
+  const keys = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End"];
+  if (!keys.includes(event.key)) {
+    if ((event.key === "Enter" || event.key === " ") && activeSettingsTab !== tab) { event.preventDefault(); activeSettingsTab = tab; renderSettings(); }
+    return;
+  }
+  event.preventDefault();
+  const current = tabs.indexOf(tab);
+  const next = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : (current + (event.key === "ArrowUp" || event.key === "ArrowLeft" ? -1 : 1) + tabs.length) % tabs.length;
+  for (const button of setTabsEl.querySelectorAll<HTMLElement>('[role="tab"]')) button.tabIndex = -1;
+  const target = setTabsEl.querySelector<HTMLElement>(`#set-tab-${tabs[next]}`);
+  if (target) { target.tabIndex = 0; target.focus(); target.scrollIntoView({ block: "nearest", inline: "nearest" }); }
+}
+
+function renderAutoApplyFooter(footer: HTMLElement): void {
+  const status = document.createElement("span");
+  status.className = "set-footer-status";
+  status.textContent = "Changes apply immediately";
+  const done = document.createElement("button");
+  done.type = "button";
+  done.className = "set-action set-action-primary";
+  done.textContent = "Done";
+  done.addEventListener("click", closeSettings);
+  footer.replaceChildren(status, done);
+}
+
+function groupSettingsContent(content: HTMLElement): void {
+  const nodes = [...content.children];
+  if (nodes.length === 0) return;
+  content.replaceChildren();
+  let group: HTMLElement | null = null;
+  for (const node of nodes) {
+    if (node.classList.contains("set-section-header") || !group) {
+      group = document.createElement("section");
+      group.className = "set-group";
+      const title = node.classList.contains("set-section-header") ? node : document.createElement("div");
+      if (!node.classList.contains("set-section-header")) { title.className = "set-section-header"; title.textContent = "General"; }
+      group.appendChild(title);
+      content.appendChild(group);
+      if (node.classList.contains("set-section-header")) continue;
+    }
+    group.appendChild(node);
+  }
 }
 
 function renderAudioExtras(container: HTMLElement): void {
   const header = document.createElement("div");
+  header.className = "tools-profiles-header";
   header.className = "set-section-header";
-  header.style.cssText = "padding:12px 0 4px;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border);";
   header.textContent = "Sound";
   container.appendChild(header);
 
@@ -211,16 +324,14 @@ function renderAudioExtras(container: HTMLElement): void {
   label.appendChild(desc);
 
   const controls = document.createElement("div");
-  controls.style.cssText = "display:flex;align-items:center;gap:8px;";
   const preview = document.createElement("button");
-  preview.className = "diag-btn";
-  preview.style.marginTop = "0";
+  preview.className = "set-utility-btn";
   preview.textContent = "Preview";
   preview.addEventListener("click", () => playChime("done"));
   const toggle = document.createElement("button");
   const paint = (): void => {
     const on = agentChimesEnabled();
-    toggle.className = "diag-toggle" + (on ? " on" : "");
+    toggle.className = "set-utility-toggle" + (on ? " on" : "");
     toggle.textContent = on ? "On" : "Off";
     preview.disabled = !on;
   };
@@ -246,20 +357,16 @@ async function renderToolsTab(container: HTMLElement): Promise<void> {
 
   const actions = document.createElement("div");
   actions.className = "tools-actions";
-  actions.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;";
   const rescanBtn = document.createElement("button");
-  rescanBtn.className = "diag-btn";
-  rescanBtn.style.marginTop = "0";
+  rescanBtn.className = "set-utility-btn";
   rescanBtn.textContent = "Re-scan";
   rescanBtn.addEventListener("click", () => void doRescanAdapters(container, rescanBtn));
   const addBtn = document.createElement("button");
-  addBtn.className = "diag-btn";
-  addBtn.style.marginTop = "0";
+  addBtn.className = "set-utility-btn";
   addBtn.textContent = "Add adapter from folder…";
   addBtn.addEventListener("click", () => void doAddAdapterFromFolder(container));
   const wizardBtn = document.createElement("button");
-  wizardBtn.className = "diag-btn";
-  wizardBtn.style.marginTop = "0";
+  wizardBtn.className = "set-utility-btn";
   wizardBtn.textContent = "Re-run setup wizard";
   wizardBtn.addEventListener("click", () => onboardingFeature.rerun());
   actions.appendChild(rescanBtn);
@@ -270,6 +377,7 @@ async function renderToolsTab(container: HTMLElement): Promise<void> {
   let adapters: ToolsAdapter[];
   try {
     const result = await invoke<ToolsListResponse>(FrontendCommand.AdapterToolsList, {});
+    if (!isCurrentPageDestination(container, "tools")) return;
     adapters = result.adapters ?? [];
   } catch (err) {
     console.warn("adapter.tools-list failed for tools tab", err);
@@ -292,6 +400,10 @@ async function renderToolsTab(container: HTMLElement): Promise<void> {
   container.appendChild(list);
 }
 
+function isCurrentPageDestination(container: HTMLElement, tab: string): boolean {
+  return container.isConnected && activeSettingsTab === tab && container.closest(`#set-panel-${tab}`) !== null;
+}
+
 function buildToolsCard(a: ToolsAdapter, container: HTMLElement): HTMLElement {
   const card = document.createElement("div");
   card.className = "tools-card";
@@ -299,7 +411,6 @@ function buildToolsCard(a: ToolsAdapter, container: HTMLElement): HTMLElement {
   if (a.iconSvg) {
     const icon = document.createElement("span");
     icon.className = "tools-icon";
-    icon.style.cssText = "width:18px;height:18px;display:inline-flex;color:" + (a.accent || "var(--accent)") + ";";
     icon.innerHTML = a.iconSvg;
     const svg = icon.querySelector("svg");
     if (svg) { svg.setAttribute("width", "18"); svg.setAttribute("height", "18"); }
@@ -307,7 +418,6 @@ function buildToolsCard(a: ToolsAdapter, container: HTMLElement): HTMLElement {
   } else {
     const swatch = document.createElement("span");
     swatch.className = "tools-accent";
-    swatch.style.background = a.accent || "var(--accent)";
     card.appendChild(swatch);
   }
 
@@ -326,10 +436,8 @@ function buildToolsCard(a: ToolsAdapter, container: HTMLElement): HTMLElement {
   status.className = "tools-status";
   const dot = document.createElement("span");
   dot.className = "tools-dot";
-  dot.style.background = meta.cssColor;
   const statusLabel = document.createElement("span");
   statusLabel.textContent = meta.label;
-  statusLabel.style.color = meta.cssColor;
   status.appendChild(dot);
   status.appendChild(statusLabel);
   titleRow.appendChild(status);
@@ -342,14 +450,12 @@ function buildToolsCard(a: ToolsAdapter, container: HTMLElement): HTMLElement {
 
   const manifestRow = document.createElement("div");
   manifestRow.className = "tools-manifest";
-  manifestRow.style.cssText = "display:flex;align-items:center;gap:8px;justify-content:space-between;";
   const manifestName = document.createElement("span");
   manifestName.textContent = a.bundled ? `${a.name} · bundled` : a.name;
   manifestRow.appendChild(manifestName);
   if (a.removable) {
     const removeBtn = document.createElement("button");
-    removeBtn.className = "diag-btn";
-    removeBtn.style.cssText = "margin-top:0;padding:2px 8px;font-size:11px;";
+    removeBtn.className = "set-utility-btn";
     removeBtn.textContent = "Remove";
     removeBtn.addEventListener("click", () => openRemoveAdapterDialog(a, container));
     manifestRow.appendChild(removeBtn);
@@ -384,25 +490,22 @@ async function resolveLauncherProfileSlug(adapter: string): Promise<string> {
 async function buildProfilesSection(a: ToolsAdapter, container: HTMLElement): Promise<HTMLElement> {
   const section = document.createElement("div");
   section.className = "tools-profiles";
-  section.style.cssText = "margin-top:10px;border-top:1px solid var(--border);padding-top:8px;";
 
   const header = document.createElement("div");
-  header.style.cssText = "display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;";
   const label = document.createElement("span");
   label.className = "tools-subtitle";
   label.textContent = "Launch profiles";
   header.appendChild(label);
 
   const newBtn = document.createElement("button");
-  newBtn.className = "diag-btn";
-  newBtn.style.cssText = "margin-top:0;padding:2px 8px;font-size:11px;";
+  newBtn.className = "set-utility-btn";
   newBtn.textContent = "New profile";
   newBtn.addEventListener("click", () => openProfileEditor(a, null, () => renderToolsTab(container)));
   header.appendChild(newBtn);
   section.appendChild(header);
 
   const listEl = document.createElement("div");
-  listEl.style.cssText = "display:flex;flex-direction:column;gap:4px;";
+  listEl.className = "tools-profiles-list";
   section.appendChild(listEl);
 
   try {
@@ -434,7 +537,7 @@ function renderProfileList(
   }
   for (const p of profiles) {
     const row = document.createElement("div");
-    row.style.cssText = "display:flex;align-items:center;gap:6px;font-size:12px;";
+    row.className = "tools-profile-row";
     const radio = document.createElement("input");
     radio.type = "radio";
     radio.name = `profile-radio-${a.name}`;
@@ -446,19 +549,17 @@ function renderProfileList(
     });
     row.appendChild(radio);
     const name = document.createElement("span");
+    name.className = "tools-profile-name";
     name.textContent = profilePickerLabel(p);
-    name.style.flex = "1";
     row.appendChild(name);
     const editBtn = document.createElement("button");
-    editBtn.className = "diag-btn";
-    editBtn.style.cssText = "margin-top:0;padding:1px 6px;font-size:11px;";
+    editBtn.className = "set-utility-btn";
     editBtn.textContent = "Edit";
     editBtn.addEventListener("click", () => openProfileEditor(a, p.slug, () => renderToolsTab(container)));
     row.appendChild(editBtn);
     if (profiles.length > 1) {
       const delBtn = document.createElement("button");
-      delBtn.className = "diag-btn";
-      delBtn.style.cssText = "margin-top:0;padding:1px 6px;font-size:11px;";
+      delBtn.className = "set-utility-btn";
       delBtn.textContent = "Delete";
       delBtn.addEventListener("click", async () => {
         await invoke(FrontendCommand.LaunchProfileDelete, { adapter: a.name, slug: p.slug });
@@ -476,14 +577,13 @@ function openProfileEditor(
   onSaved: (savedSlug: string) => void | Promise<void>,
 ): void {
   const overlay = document.createElement("div");
-  overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000;";
+  overlay.className = "settings-dialog-overlay";
   const dialog = document.createElement("div");
   dialog.className = "settings-dialog";
-  dialog.style.cssText = "background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:16px;min-width:380px;max-width:520px;display:flex;flex-direction:column;gap:10px;";
   dialog.addEventListener("click", (e) => e.stopPropagation());
 
   const title = document.createElement("div");
-  title.style.fontWeight = "600";
+  title.className = "settings-dialog-title";
   title.textContent = slug ? `Edit profile · ${slug}` : `New profile · ${a.name}`;
   dialog.appendChild(title);
 
@@ -506,8 +606,8 @@ function openProfileEditor(
   envLabel.textContent = "Environment variables (KEY=VALUE, one per line)";
   dialog.appendChild(envLabel);
   const envArea = document.createElement("textarea");
+  envArea.className = "settings-dialog-textarea";
   envArea.rows = 4;
-  envArea.style.cssText = "width:100%;font-family:var(--font-mono,monospace);font-size:12px;background:var(--bg-alt);color:var(--fg);border:1px solid var(--border);border-radius:4px;padding:4px;";
   dialog.appendChild(envArea);
 
   const argsLabel = document.createElement("div");
@@ -515,14 +615,14 @@ function openProfileEditor(
   argsLabel.textContent = "Extra CLI args (one per line)";
   dialog.appendChild(argsLabel);
   const argsArea = document.createElement("textarea");
+  argsArea.className = "settings-dialog-textarea";
   argsArea.rows = 3;
-  argsArea.style.cssText = "width:100%;font-family:var(--font-mono,monospace);font-size:12px;background:var(--bg-alt);color:var(--fg);border:1px solid var(--border);border-radius:4px;padding:4px;";
   dialog.appendChild(argsArea);
 
   const defaultCb = document.createElement("input");
   defaultCb.type = "checkbox";
   const defaultLabel = document.createElement("label");
-  defaultLabel.style.cssText = "display:flex;align-items:center;gap:6px;font-size:12px;";
+  defaultLabel.className = "settings-dialog-check";
   defaultLabel.appendChild(defaultCb);
   const defaultText = document.createElement("span");
   defaultText.textContent = "Set as default profile";
@@ -530,17 +630,17 @@ function openProfileEditor(
   dialog.appendChild(defaultLabel);
 
   const errorEl = document.createElement("div");
-  errorEl.style.cssText = "color:#e0a44a;font-size:11px;min-height:14px;";
+  errorEl.className = "settings-dialog-error";
   dialog.appendChild(errorEl);
 
   const buttonRow = document.createElement("div");
-  buttonRow.style.cssText = "display:flex;gap:8px;justify-content:flex-end;";
+  buttonRow.className = "settings-dialog-actions";
   const cancelBtn = document.createElement("button");
-  cancelBtn.className = "diag-btn";
+  cancelBtn.className = "set-utility-btn";
   cancelBtn.textContent = "Cancel";
   cancelBtn.addEventListener("click", () => overlay.remove());
   const saveBtn = document.createElement("button");
-  saveBtn.className = "diag-btn";
+  saveBtn.className = "set-utility-btn";
   saveBtn.textContent = slug ? "Save" : "Create";
   saveBtn.addEventListener("click", async () => {
     errorEl.textContent = "";
@@ -636,22 +736,22 @@ async function loadProfileIntoEditor(adapter: string, slug: string, f: EditorFie
 
 function textRow(parent: HTMLElement, label: string, value: string, placeholder: string, hint?: string): HTMLInputElement {
   const row = document.createElement("div");
-  row.style.cssText = "display:flex;flex-direction:column;gap:2px;";
+  row.className = "settings-dialog-field";
   const lab = document.createElement("label");
   lab.className = "tools-subtitle";
   lab.textContent = label;
   row.appendChild(lab);
   if (hint) {
     const hintEl = document.createElement("div");
-    hintEl.style.cssText = "font-size:10.5px;color:var(--muted);opacity:0.85;";
+    hintEl.className = "settings-dialog-hint";
     hintEl.textContent = hint;
     row.appendChild(hintEl);
   }
   const input = document.createElement("input");
+  input.className = "settings-dialog-input";
   input.type = "text";
   input.value = value;
   input.placeholder = placeholder;
-  input.style.cssText = "width:100%;background:var(--bg-alt);color:var(--fg);border:1px solid var(--border);border-radius:4px;padding:4px;font-size:12px;";
   row.appendChild(input);
   parent.appendChild(row);
   return input;
@@ -660,7 +760,6 @@ function textRow(parent: HTMLElement, label: string, value: string, placeholder:
 function buildRetentionChip(a: ToolsAdapter, container: HTMLElement): HTMLElement {
   const chip = document.createElement("div");
   chip.className = "tools-retention";
-  chip.style.cssText = "display:flex;align-items:center;gap:8px;margin-top:6px;";
   const label = document.createElement("span");
   label.className = "set-desc";
   label.textContent = retentionChipLabel(a.retention);
@@ -669,13 +768,11 @@ function buildRetentionChip(a: ToolsAdapter, container: HTMLElement): HTMLElemen
   if (a.retention.editable) {
     const input = document.createElement("input");
     input.type = "text";
-    input.className = "diag-input";
-    input.style.cssText = "width:64px;padding:2px 6px;margin:0;";
+    input.className = "set-utility-input";
     input.value = a.retention.value ?? "";
     input.placeholder = a.retention.recommended ?? "";
     const save = document.createElement("button");
-    save.className = "diag-btn";
-    save.style.cssText = "margin-top:0;padding:2px 8px;font-size:11px;";
+    save.className = "set-utility-btn";
     save.textContent = "Extend";
     save.addEventListener("click", () => void doSetRetention(a.name, input.value, container));
     chip.appendChild(input);
@@ -720,18 +817,16 @@ async function doAddAdapterFromFolder(container: HTMLElement): Promise<void> {
 function openRemoveAdapterDialog(a: ToolsAdapter, container: HTMLElement): void {
   const scrim = document.createElement("div");
   scrim.className = "modal-scrim open";
-  scrim.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;z-index:9999;";
   const box = document.createElement("div");
-  box.style.cssText = "background:var(--surface,#1e1e2e);border:1px solid var(--border);border-radius:10px;padding:18px;width:320px;max-width:90vw;";
+  box.className = "settings-confirm-dialog";
   const title = document.createElement("div");
-  title.style.cssText = "font-weight:600;margin-bottom:8px;";
+  title.className = "settings-dialog-title";
   title.textContent = `Remove ${a.displayName || a.name}?`;
   const desc = document.createElement("div");
   desc.className = "set-desc";
-  desc.style.marginBottom = "12px";
   desc.textContent = "This deletes the adapter folder. Bundled adapters are not affected.";
   const purgeLabel = document.createElement("label");
-  purgeLabel.style.cssText = "display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:14px;";
+  purgeLabel.className = "settings-dialog-check";
   const purge = document.createElement("input");
   purge.type = "checkbox";
   const purgeText = document.createElement("span");
@@ -739,14 +834,12 @@ function openRemoveAdapterDialog(a: ToolsAdapter, container: HTMLElement): void 
   purgeLabel.appendChild(purge);
   purgeLabel.appendChild(purgeText);
   const btnRow = document.createElement("div");
-  btnRow.style.cssText = "display:flex;gap:8px;justify-content:flex-end;";
+  btnRow.className = "settings-dialog-actions";
   const cancel = document.createElement("button");
-  cancel.className = "diag-btn";
-  cancel.style.marginTop = "0";
+  cancel.className = "set-utility-btn";
   cancel.textContent = "Cancel";
   const confirm = document.createElement("button");
-  confirm.className = "diag-btn";
-  confirm.style.marginTop = "0";
+  confirm.className = "set-utility-btn";
   confirm.textContent = "Remove";
   const close = (): void => scrim.remove();
   cancel.addEventListener("click", close);
@@ -790,7 +883,6 @@ async function doSetRetention(name: string, value: string, container: HTMLElemen
 function diagnosticsSectionHeader(text: string): HTMLElement {
   const header = document.createElement("div");
   header.className = "set-section-header";
-  header.style.cssText = "padding:12px 0 4px;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border);";
   header.textContent = text;
   return header;
 }
@@ -809,7 +901,7 @@ function renderDiagnosticsExtras(container: HTMLElement): void {
   hudLabel.appendChild(hudLabelText);
   hudLabel.appendChild(hudDesc);
   const hudToggle = document.createElement("button");
-  hudToggle.className = "diag-toggle" + (perfHudState.enabled ? " on" : "");
+  hudToggle.className = "set-utility-toggle" + (perfHudState.enabled ? " on" : "");
   hudToggle.textContent = perfHudState.enabled ? "On" : "Off";
   hudToggle.addEventListener("click", () => doTogglePerfHud());
   hudRow.appendChild(hudLabel);
@@ -818,36 +910,35 @@ function renderDiagnosticsExtras(container: HTMLElement): void {
 
   container.appendChild(diagnosticsSectionHeader("Snapshot inspector"));
   const snapCaption = document.createElement("div");
-  snapCaption.className = "diag-caption";
+  snapCaption.className = "set-utility-caption";
   snapCaption.textContent = "Capture a live diagnostics snapshot from the engine, or paste an exported one (a single object or an array — the same JSON the engine writes to diagnostics-snapshots.json inside a performance bundle).";
   container.appendChild(snapCaption);
 
   const textarea = document.createElement("textarea");
-  textarea.className = "diag-input";
+  textarea.className = "set-utility-input";
   textarea.placeholder = '{ "takenAt": "…", "managedMemoryBytes": … }';
   container.appendChild(textarea);
 
   const snapActions = document.createElement("div");
-  snapActions.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;";
   container.appendChild(snapActions);
 
   const renderBtn = document.createElement("button");
-  renderBtn.className = "diag-btn";
+  renderBtn.className = "set-utility-btn";
   renderBtn.textContent = "Inspect snapshot";
   snapActions.appendChild(renderBtn);
 
   const takeBtn = document.createElement("button");
-  takeBtn.className = "diag-btn";
+  takeBtn.className = "set-utility-btn";
   takeBtn.textContent = "Take snapshot";
   snapActions.appendChild(takeBtn);
 
   const loadBtn = document.createElement("button");
-  loadBtn.className = "diag-btn";
+  loadBtn.className = "set-utility-btn";
   loadBtn.textContent = "Load snapshots";
   snapActions.appendChild(loadBtn);
 
   const output = document.createElement("div");
-  output.className = "diag-snap";
+  output.className = "set-utility-snap";
   container.appendChild(output);
 
   renderBtn.addEventListener("click", () => renderSnapshotInspection(textarea.value, output));
@@ -859,7 +950,7 @@ function renderDiagnosticsExtras(container: HTMLElement): void {
 
   container.appendChild(diagnosticsSectionHeader("Not yet available"));
   const note = document.createElement("div");
-  note.className = "diag-note";
+  note.className = "set-utility-note";
   note.textContent = "In-page flame graphs are not available yet: a bundle's optional trace is a binary .nettrace with no in-webview parser or viewer — open it in an external profiler such as PerfView or dotnet-trace. Per-nook element inspection is available now from any browser nook menu (DevTools).";
   container.appendChild(note);
 }
@@ -887,7 +978,7 @@ async function doLoadSnapshots(textarea: HTMLTextAreaElement, output: HTMLElemen
 function showSnapshotError(output: HTMLElement, message: string): void {
   output.innerHTML = "";
   const err = document.createElement("div");
-  err.className = "diag-error";
+  err.className = "set-utility-error";
   err.textContent = message;
   output.appendChild(err);
 }
@@ -896,31 +987,31 @@ function renderPerfBundles(container: HTMLElement): void {
   let state: PerfBundlesState = initialPerfBundlesState();
 
   const caption = document.createElement("div");
-  caption.className = "diag-caption";
+  caption.className = "set-utility-caption";
   caption.textContent = "Create a performance bundle to package the engine's diagnostics snapshots into a shareable .zip, then manage the saved bundles below.";
   container.appendChild(caption);
 
   const createBtn = document.createElement("button");
-  createBtn.className = "diag-btn";
+  createBtn.className = "set-utility-btn";
   container.appendChild(createBtn);
 
   const errorEl = document.createElement("div");
-  errorEl.className = "diag-error";
+  errorEl.className = "set-utility-error";
   container.appendChild(errorEl);
 
   const listEl = document.createElement("div");
-  listEl.className = "diag-snap";
+  listEl.className = "set-utility-snap";
   container.appendChild(listEl);
 
   const paint = (): void => {
     createBtn.textContent = state.creating ? "Creating…" : "Create bundle";
     createBtn.disabled = state.creating;
     errorEl.textContent = state.error ?? "";
-    errorEl.style.display = state.error ? "block" : "none";
     renderPerfBundleList(state, listEl, run);
   };
 
   const run = (next: PerfBundlesState): void => {
+    if (!listEl.isConnected || activeSettingsTab !== "diagnostics") return;
     state = next;
     paint();
   };
@@ -957,7 +1048,7 @@ function renderPerfBundleList(state: PerfBundlesState, listEl: HTMLElement, run:
   const rows = bundleRows(state);
   if (rows.length === 0) {
     const empty = document.createElement("div");
-    empty.className = "diag-caption";
+    empty.className = "set-utility-caption";
     empty.textContent = PERF_BUNDLES_EMPTY_TEXT;
     listEl.appendChild(empty);
     return;
@@ -965,38 +1056,33 @@ function renderPerfBundleList(state: PerfBundlesState, listEl: HTMLElement, run:
 
   for (const row of rows) {
     const card = document.createElement("div");
-    card.className = "diag-snap-card";
-    card.style.cssText = "display:flex;gap:12px;align-items:center;justify-content:space-between;";
+    card.className = "set-utility-snap-card";
 
     const info = document.createElement("div");
-    info.style.cssText = "min-width:0;flex:1;";
     const name = document.createElement("div");
-    name.style.cssText = "font-size:12px;color:var(--fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
     name.textContent = row.name;
     name.title = row.bundlePath;
     const meta = document.createElement("div");
-    meta.style.cssText = "font-size:11px;color:var(--muted);";
     meta.textContent = `${row.createdAtLabel} · ${row.sizeLabel} · ${row.detail}`;
     info.appendChild(name);
     info.appendChild(meta);
     card.appendChild(info);
 
     const actions = document.createElement("div");
-    actions.style.cssText = "display:flex;gap:6px;flex-shrink:0;";
     if (row.confirmingDelete) {
       const confirm = document.createElement("button");
-      confirm.className = "diag-btn";
+      confirm.className = "set-utility-btn";
       confirm.textContent = "Confirm";
       confirm.addEventListener("click", () => void doDeleteBundle(state, row.bundlePath, run));
       const cancel = document.createElement("button");
-      cancel.className = "diag-btn";
+      cancel.className = "set-utility-btn";
       cancel.textContent = "Cancel";
       cancel.addEventListener("click", () => run(cancelDelete(state)));
       actions.appendChild(confirm);
       actions.appendChild(cancel);
     } else {
       const del = document.createElement("button");
-      del.className = "diag-btn";
+      del.className = "set-utility-btn";
       del.textContent = "Delete";
       del.addEventListener("click", () => run(requestDelete(state, row.bundlePath)));
       actions.appendChild(del);
@@ -1021,7 +1107,7 @@ function renderSnapshotInspection(text: string, output: HTMLElement): void {
   const result = parseSnapshotExport(text);
   if (!result.ok) {
     const err = document.createElement("div");
-    err.className = "diag-error";
+    err.className = "set-utility-error";
     err.textContent = result.error ?? "Could not read snapshot.";
     output.appendChild(err);
     return;
@@ -1029,7 +1115,7 @@ function renderSnapshotInspection(text: string, output: HTMLElement): void {
 
   const summary = summarizeSnapshots(result.snapshots);
   const summaryEl = document.createElement("div");
-  summaryEl.className = "diag-caption";
+  summaryEl.className = "set-utility-caption";
   summaryEl.textContent = `${summary.count} snapshot${summary.count === 1 ? "" : "s"} · peak managed memory ${formatSnapshotBytes(summary.peakManagedMemoryBytes)}`;
   output.appendChild(summaryEl);
 
@@ -1038,10 +1124,10 @@ function renderSnapshotInspection(text: string, output: HTMLElement): void {
 
 function appendSnapshotCard(snapshot: DiagnosticsSnapshot, output: HTMLElement): void {
   const card = document.createElement("div");
-  card.className = "diag-snap-card";
+  card.className = "set-utility-snap-card";
   for (const row of snapshotRows(snapshot)) {
     const rowEl = document.createElement("div");
-    rowEl.className = "diag-snap-row";
+    rowEl.className = "set-utility-snap-row";
     const key = document.createElement("span");
     key.className = "k";
     key.textContent = row.label;
@@ -1055,14 +1141,16 @@ function appendSnapshotCard(snapshot: DiagnosticsSnapshot, output: HTMLElement):
   output.appendChild(card);
 }
 
-async function loadSettingValue(entry: ConfigSchemaEntry, row: HTMLElement): Promise<void> {
+async function loadSettingValue(entry: ConfigSchemaEntry, row: HTMLElement, controlId: string, generation: number, tab: string): Promise<void> {
   let currentValue = "";
   try {
     const res = await invoke<{ value: string } | null>(FrontendCommand.ConfigGet, { key: entry.key });
     currentValue = res?.value ?? "";
   } catch { void 0; }
 
+  if (generation !== renderGeneration || activeSettingsTab !== tab || !row.isConnected) return;
   const input = createSettingControl(entry, currentValue);
+  input.id = controlId;
   input.addEventListener("change", () => void saveSetting(entry.key, input));
   row.appendChild(input);
 }
@@ -1077,7 +1165,6 @@ function createSettingControl(entry: ConfigSchemaEntry, value: string): HTMLInpu
       select.appendChild(o);
     }
     select.value = value;
-    select.style.cssText = "width:140px;";
     return select;
   }
   if (entry.type === "bool" || entry.control === "toggle") {
@@ -1085,14 +1172,12 @@ function createSettingControl(entry: ConfigSchemaEntry, value: string): HTMLInpu
     const t = document.createElement("option"); t.value = "true"; t.textContent = "On"; select.appendChild(t);
     const f = document.createElement("option"); f.value = "false"; f.textContent = "Off"; select.appendChild(f);
     select.value = value === "true" ? "true" : "false";
-    select.style.cssText = "width:120px;";
     return select;
   }
   if (entry.type === "int" || entry.type === "double") {
     const input = document.createElement("input");
     input.type = "number";
     input.value = value;
-    input.style.cssText = "width:120px;";
     return input;
   }
   const input = document.createElement("input");
@@ -1185,21 +1270,24 @@ function revertThemeVars(): void {
   }
 }
 
-function renderThemeEditor(container: HTMLElement): void {
-  void loadThemeData().then(() => renderThemeEditorBody(container));
-  container.innerHTML = `<div style="padding:20px;color:var(--muted);text-align:center;">Loading themes…</div>`;
+function renderThemeEditor(container: HTMLElement, footer: HTMLElement, generation: number, tab: string): void {
+  void loadThemeData().then(() => {
+    if (generation !== renderGeneration || activeSettingsTab !== tab || !container.isConnected) return;
+    renderThemeEditorBody(container, footer);
+  });
+  container.innerHTML = '<div class="set-empty">Loading themes…</div>';
 }
 
-function renderThemeEditorBody(container: HTMLElement): void {
+function renderThemeEditorBody(container: HTMLElement, footer: HTMLElement = setBodyEl.querySelector<HTMLElement>(".set-page-footer") ?? document.createElement("footer")): void {
   container.innerHTML = "";
 
   const dropdownRow = document.createElement("div");
-  dropdownRow.style.cssText = "padding:12px 0;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);";
+  dropdownRow.className = "set-theme-picker";
   const dropdownLabel = document.createElement("span");
+  dropdownLabel.className = "set-theme-picker-label";
   dropdownLabel.textContent = "Active theme";
-  dropdownLabel.style.cssText = "font-size:12px;color:var(--muted);";
   const dropdown = document.createElement("select");
-  dropdown.style.cssText = "background:var(--panel-2);border:1px solid var(--border);color:var(--fg);border-radius:6px;padding:4px 8px;min-width:160px;";
+  dropdown.className = "set-control set-control-wide";
   const noneOpt = document.createElement("option");
   noneOpt.value = ""; noneOpt.textContent = "— none —"; dropdown.appendChild(noneOpt);
   for (const t of themeList) {
@@ -1213,15 +1301,15 @@ function renderThemeEditorBody(container: HTMLElement): void {
   dropdownRow.appendChild(dropdown);
 
   const deleteBtn = document.createElement("button");
+  deleteBtn.className = "set-action set-action-destructive";
   deleteBtn.textContent = "Delete";
-  deleteBtn.style.cssText = "margin-left:auto;background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;";
   deleteBtn.disabled = !canDelete(themeActiveName ?? "", themeCustomNames);
   deleteBtn.addEventListener("click", () => void onThemeDelete(themeActiveName ?? ""));
   dropdownRow.appendChild(deleteBtn);
   container.appendChild(dropdownRow);
 
   const editorHeader = document.createElement("div");
-  editorHeader.style.cssText = "padding:12px 0 4px;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;";
+  editorHeader.className = "set-section-header";
   editorHeader.textContent = "Edit & preview";
   container.appendChild(editorHeader);
 
@@ -1230,9 +1318,9 @@ function renderThemeEditorBody(container: HTMLElement): void {
   const nameLabel = document.createElement("label");
   nameLabel.textContent = "Theme name";
   const nameInput = document.createElement("input");
+  nameInput.className = "set-control set-control-wide";
   nameInput.type = "text";
   nameInput.value = themeDraft.name;
-  nameInput.style.cssText = "background:var(--panel-2);border:1px solid var(--border);color:var(--fg);border-radius:6px;padding:4px 8px;width:180px;";
   nameInput.addEventListener("input", () => { themeDraft.name = nameInput.value; updateThemePreview(); });
   nameLabel.appendChild(nameInput);
   nameRow.appendChild(nameLabel);
@@ -1243,9 +1331,9 @@ function renderThemeEditorBody(container: HTMLElement): void {
   const typeLabel = document.createElement("label");
   typeLabel.textContent = "Type";
   const typeSelect = document.createElement("select");
+  typeSelect.className = "set-control";
   for (const tp of ["dark", "light"]) { const o = document.createElement("option"); o.value = tp; o.textContent = tp; typeSelect.appendChild(o); }
   typeSelect.value = themeDraft.type;
-  typeSelect.style.cssText = "background:var(--panel-2);border:1px solid var(--border);color:var(--fg);border-radius:6px;padding:4px 8px;width:120px;";
   typeSelect.addEventListener("change", () => { themeDraft.type = typeSelect.value; updateThemePreview(); });
   typeLabel.appendChild(typeSelect);
   typeRow.appendChild(typeLabel);
@@ -1253,22 +1341,20 @@ function renderThemeEditorBody(container: HTMLElement): void {
 
   for (const field of THEME_COLOR_FIELDS) {
     const row = document.createElement("div");
-    row.className = "set-row";
-    row.style.cssText = "flex-direction:row;align-items:center;gap:10px;";
+    row.className = "set-row set-theme-color-row";
     const label = document.createElement("label");
-    label.style.cssText = "flex-direction:column;gap:2px;flex:1;";
     const labelText = document.createElement("span");
     labelText.textContent = field.label;
     label.appendChild(labelText);
     if (field.desc) { const d = document.createElement("span"); d.className = "set-desc"; d.textContent = field.desc; label.appendChild(d); }
     const colorInput = document.createElement("input");
+    colorInput.className = "set-color-control";
     colorInput.type = "color";
     colorInput.value = (themeDraft as unknown as Record<string, string>)[field.key];
-    colorInput.style.cssText = "width:40px;height:28px;border:1px solid var(--border);border-radius:6px;background:transparent;cursor:pointer;";
     const hexInput = document.createElement("input");
+    hexInput.className = "set-control set-code-control";
     hexInput.type = "text";
     hexInput.value = (themeDraft as unknown as Record<string, string>)[field.key];
-    hexInput.style.cssText = "background:var(--panel-2);border:1px solid var(--border);color:var(--fg);border-radius:6px;padding:4px 8px;width:100px;font-family:monospace;";
     colorInput.addEventListener("input", () => {
       (themeDraft as unknown as Record<string, string>)[field.key] = colorInput.value;
       hexInput.value = colorInput.value;
@@ -1285,22 +1371,25 @@ function renderThemeEditorBody(container: HTMLElement): void {
 
   const contrastInfo = document.createElement("div");
   contrastInfo.id = "theme-contrast";
-  contrastInfo.style.cssText = "padding:8px 0;font-size:11px;color:var(--muted);";
+  contrastInfo.className = "set-contrast";
   container.appendChild(contrastInfo);
 
   const actions = document.createElement("div");
-  actions.style.cssText = "padding:12px 0;display:flex;gap:10px;";
+  actions.className = "set-footer-actions";
   const saveBtn = document.createElement("button");
+  saveBtn.className = "set-action set-action-primary";
+  saveBtn.dataset.setAction = "theme-save";
   saveBtn.textContent = "Save as custom";
-  saveBtn.style.cssText = "background:var(--accent);border:none;color:#000;border-radius:6px;padding:6px 14px;font-size:12px;cursor:pointer;font-weight:600;";
+  saveBtn.disabled = !canSaveDraft(themeDraft);
   saveBtn.addEventListener("click", () => void onThemeSave());
   const resetBtn = document.createElement("button");
+  resetBtn.className = "set-action set-action-secondary";
   resetBtn.textContent = "Reset preview";
-  resetBtn.style.cssText = "background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:6px 14px;font-size:12px;cursor:pointer;";
   resetBtn.addEventListener("click", () => { revertThemeVars(); if (themeActiveName) { const t = themeList.find((x) => x.name === themeActiveName); if (t) { themeDraft = draftFromTheme(t); } } else { themeDraft = { ...DEFAULT_DRAFT }; } renderThemeEditorBody(container); });
   actions.appendChild(saveBtn);
   actions.appendChild(resetBtn);
-  container.appendChild(actions);
+  footer.replaceChildren(actions);
+  groupSettingsContent(container);
 }
 
 function updateThemePreview(): void {
@@ -1311,22 +1400,22 @@ function updateThemePreview(): void {
     const fgBg = contrastRatio(themeDraft.terminalForeground, themeDraft.terminalBackground);
     const tier = contrastTier(fgBg);
     contrastEl.textContent = `Terminal contrast: ${fgBg.toFixed(2)}:1 (${tier === "fail" ? "below AA" : tier})`;
-    contrastEl.style.color = tier === "fail" ? "#e06c75" : "var(--muted)";
   }
-  const saveBtn = document.querySelector("#set-body button");
-  if (saveBtn && saveBtn.textContent === "Save as custom") {
+  const saveBtn = setBodyEl.querySelector<HTMLButtonElement>('[data-set-action="theme-save"]');
+  if (saveBtn) {
+    saveBtn.disabled = !canSaveDraft(themeDraft);
     saveBtn.setAttribute("data-valid", canSaveDraft(themeDraft) ? "1" : "0");
   }
 }
 
 async function onThemeSelect(name: string): Promise<void> {
-  if (!name) { themeActiveName = null; revertThemeVars(); renderThemeEditor(setBodyEl); return; }
+  if (!name) { themeActiveName = null; revertThemeVars(); renderCurrentThemeEditor(); return; }
   try {
     const res = await invoke<{ theme: ThemeDto }>(FrontendCommand.ThemeSetActive, { name });
     themeActiveName = name;
     if (res.theme) { themeDraft = draftFromTheme(res.theme); applyThemeVars(res.theme); }
     await loadThemeData();
-    renderThemeEditorBody(setBodyEl);
+    renderCurrentThemeEditor();
   } catch { void 0; }
 }
 
@@ -1337,7 +1426,7 @@ async function onThemeSave(): Promise<void> {
     await invoke(FrontendCommand.ThemeSetActive, { name: themeDraft.name });
     themeActiveName = themeDraft.name;
     await loadThemeData();
-    renderThemeEditorBody(setBodyEl);
+    renderCurrentThemeEditor();
   } catch { void 0; }
 }
 
@@ -1347,8 +1436,14 @@ async function onThemeDelete(name: string): Promise<void> {
     await invoke(FrontendCommand.ThemeDeleteCustom, { name });
     if (themeActiveName === name) { themeActiveName = null; revertThemeVars(); }
     await loadThemeData();
-    renderThemeEditorBody(setBodyEl);
+    renderCurrentThemeEditor();
   } catch { void 0; }
+}
+
+function renderCurrentThemeEditor(): void {
+  const content = setBodyEl.querySelector<HTMLElement>(".set-page-content");
+  const footer = setBodyEl.querySelector<HTMLElement>(".set-page-footer");
+  if (activeSettingsTab === "theme" && content?.isConnected && footer?.isConnected) renderThemeEditorBody(content, footer);
 }
 
 let keybindList: KeybindDto[] = [];
@@ -1380,9 +1475,12 @@ async function loadKeybindData(): Promise<void> {
   } catch { keybindList = []; keybindConflicts = []; }
 }
 
-function renderKeyboardEditor(container: HTMLElement): void {
-  void loadKeybindData().then(() => renderKeyboardEditorBody(container));
-  container.innerHTML = `<div style="padding:20px;color:var(--muted);text-align:center;">Loading keybindings…</div>`;
+function renderKeyboardEditor(container: HTMLElement, generation: number, tab: string): void {
+  void loadKeybindData().then(() => {
+    if (generation !== renderGeneration || activeSettingsTab !== tab || !container.isConnected) return;
+    renderKeyboardEditorBody(container);
+  });
+  container.innerHTML = '<div class="set-empty">Loading keybindings…</div>';
 }
 
 function renderKeyboardEditorBody(container: HTMLElement): void {
@@ -1392,7 +1490,7 @@ function renderKeyboardEditorBody(container: HTMLElement): void {
 
   if (keybindConflicts.length > 0) {
     const warn = document.createElement("div");
-    warn.style.cssText = "padding:8px 12px;margin-bottom:8px;background:color-mix(in srgb, #e06c75 15%, transparent);border:1px solid #e06c75;border-radius:6px;font-size:11px;color:#e5a0a8;";
+    warn.className = "set-warning";
     warn.textContent = `Conflicts: ${keybindConflicts.join(", ")} — two actions share the same chord`;
     container.appendChild(warn);
   }
@@ -1400,16 +1498,13 @@ function renderKeyboardEditorBody(container: HTMLElement): void {
   for (const cat of categories) {
     const header = document.createElement("div");
     header.className = "set-section-header";
-    header.style.cssText = "padding:12px 0 4px;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border);";
     header.textContent = cat.name;
     container.appendChild(header);
 
     for (const row of cat.rows) {
       const rowEl = document.createElement("div");
-      rowEl.className = "set-row";
-      rowEl.style.cssText = "flex-direction:row;align-items:center;gap:10px;";
+      rowEl.className = "set-row set-keyboard-row";
       const label = document.createElement("label");
-      label.style.cssText = "flex-direction:column;gap:2px;flex:1;";
       const labelText = document.createElement("span");
       labelText.textContent = row.description ?? row.action;
       label.appendChild(labelText);
@@ -1420,15 +1515,15 @@ function renderKeyboardEditorBody(container: HTMLElement): void {
       rowEl.appendChild(label);
 
       const chordBtn = document.createElement("button");
+      chordBtn.className = "set-key-control" + (row.hasConflict ? " has-conflict" : "") + (keybindRecordingAction === row.action ? " is-recording" : "");
       chordBtn.textContent = chordDisplay(row.chord);
-      chordBtn.style.cssText = `background:var(--panel-2);border:1px solid ${row.hasConflict ? "#e06c75" : "var(--border)"};color:var(--fg);border-radius:6px;padding:4px 10px;font-size:11px;font-family:monospace;min-width:80px;cursor:pointer;${keybindRecordingAction === row.action ? "outline:2px solid var(--accent);" : ""}`;
       if (keybindRecordingAction === row.action) { chordBtn.textContent = "Press keys…"; }
       chordBtn.addEventListener("click", () => { keybindRecordingAction = keybindRecordingAction === row.action ? null : row.action; renderKeyboardEditorBody(container); });
       rowEl.appendChild(chordBtn);
 
       const clearBtn = document.createElement("button");
+      clearBtn.className = "set-action set-action-icon";
       clearBtn.textContent = "×";
-      clearBtn.style.cssText = "background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:4px 8px;font-size:13px;cursor:pointer;";
       clearBtn.addEventListener("click", () => void onKeybindClear(row.chord, container));
       rowEl.appendChild(clearBtn);
 
@@ -1438,7 +1533,7 @@ function renderKeyboardEditorBody(container: HTMLElement): void {
 
   if (keybindRecordingAction) {
     const hint = document.createElement("div");
-    hint.style.cssText = "padding:8px 0;font-size:11px;color:var(--muted);";
+    hint.className = "set-recording-hint";
     hint.textContent = `Recording for "${keybindRecordingAction}" — press a key combination, Esc to cancel.`;
     container.appendChild(hint);
     const escHandler = (e: KeyboardEvent): void => {
@@ -1456,6 +1551,7 @@ function renderKeyboardEditorBody(container: HTMLElement): void {
     settingsEl.addEventListener("keydown", escHandler, true);
     keybindRecordingDisposer = () => settingsEl.removeEventListener("keydown", escHandler, true);
   }
+  groupSettingsContent(container);
 }
 
 function captureChord(e: KeyboardEvent): string {
@@ -1502,7 +1598,15 @@ async function onKeybindClear(chord: string, container: HTMLElement): Promise<vo
   if (!closeButton) throw new Error("Missing settings close button");
   lifecycle.listen(closeButton, "click", closeSettings);
   lifecycle.listen(settingsEl, "keydown", (event) => {
-    if ((event as KeyboardEvent).key === "Escape") closeSettings();
+    const keyboardEvent = event as KeyboardEvent;
+    if (keyboardEvent.key === "Escape") { closeSettings(); return; }
+    if (keyboardEvent.key !== "Tab") return;
+    const focusable = [...settingsEl.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')].filter((element) => element.getClientRects().length > 0 || element === document.activeElement);
+    if (focusable.length === 0) { keyboardEvent.preventDefault(); settingsEl.focus(); return; }
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (keyboardEvent.shiftKey && document.activeElement === first) { keyboardEvent.preventDefault(); last.focus(); }
+    else if (!keyboardEvent.shiftKey && document.activeElement === last) { keyboardEvent.preventDefault(); first.focus(); }
   });
 
   async function start(): Promise<void> {

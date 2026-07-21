@@ -1,21 +1,23 @@
 import { describe, it, expect } from "vitest";
-import { orderSettingsTabs, settingsTabLabel, resolveActiveSettingsTab } from "./settings-tabs";
+import { orderSettingsTabs, settingsTabLabel, settingsTabMetadata, resolveActiveSettingsTab } from "./settings-tabs";
 
 describe("orderSettingsTabs", () => {
   it("prepends theme and keyboard when schema has neither", () => {
-    expect(orderSettingsTabs(["appearance", "audio"])).toEqual(["theme", "keyboard", "appearance", "audio", "dictation", "tools"]);
+    expect(orderSettingsTabs(["appearance", "audio"])).toEqual(["theme", "appearance", "keyboard", "dictation", "tools", "audio"]);
   });
 
-  it("prepends only keyboard when schema already has theme", () => {
-    expect(orderSettingsTabs(["theme", "appearance"])).toEqual(["theme", "keyboard", "theme", "appearance", "dictation", "tools"]);
+  it("does not duplicate theme when schema already has theme", () => {
+    expect(orderSettingsTabs(["theme", "appearance"])).toEqual(["theme", "appearance", "keyboard", "dictation", "tools"]);
   });
 
   it("prepends only theme when schema already has keyboard", () => {
-    expect(orderSettingsTabs(["keyboard", "appearance"])).toEqual(["theme", "keyboard", "appearance", "dictation", "tools"]);
+    expect(orderSettingsTabs(["keyboard", "appearance"])).toEqual(["theme", "appearance", "keyboard", "dictation", "tools"]);
   });
 
-  it("keeps schema order when it already has theme and keyboard", () => {
-    expect(orderSettingsTabs(["theme", "keyboard", "appearance"])).toEqual(["theme", "keyboard", "appearance", "dictation", "tools"]);
+  it("uses canonical group order and preserves unknown tabs once", () => {
+    expect(orderSettingsTabs(["unknown", "keyboard", "theme", "keyboard", "terminal", "bay", "updates", "diagnostics"])).toEqual([
+      "bay", "theme", "keyboard", "terminal", "dictation", "tools", "updates", "diagnostics", "unknown",
+    ]);
   });
 
   it("appends dictation and tools when absent", () => {
@@ -31,6 +33,16 @@ describe("orderSettingsTabs", () => {
 
   it("synthesizes theme and keyboard from an empty schema", () => {
     expect(orderSettingsTabs([])).toEqual(["theme", "keyboard", "dictation", "tools"]);
+  });
+});
+
+describe("settingsTabMetadata", () => {
+  it("provides canonical groups, labels, descriptions, and existing icon ids", () => {
+    expect(settingsTabMetadata("bay")).toEqual(expect.objectContaining({ group: "Workspace", label: "Bay", icon: "bays" }));
+    expect(settingsTabMetadata("theme")).toEqual(expect.objectContaining({ group: "Experience", label: "Theme", icon: "image" }));
+    expect(settingsTabMetadata("tools")).toEqual(expect.objectContaining({ group: "Tools", label: "Tools", icon: "agents" }));
+    expect(settingsTabMetadata("diagnostics")).toEqual(expect.objectContaining({ group: "System", label: "Diagnostics", icon: "inspect" }));
+    expect(settingsTabMetadata("mystery")).toEqual({ group: "Other", label: "Mystery", icon: "gear", description: "Configure Mystery settings." });
   });
 });
 

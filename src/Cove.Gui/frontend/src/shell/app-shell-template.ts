@@ -69,14 +69,18 @@ export function mountPaletteTemplate(document: Document): HTMLElement {
 }
 
 export function mountSettingsTemplate(document: Document): HTMLElement {
-  const title = dom(document, "span", { text: "Settings" });
-  const close = dom(document, "span", { id: "set-close", className: "x", text: "×" });
-  const head = dom(document, "div", { className: "set-head" }, [title, close]);
+  const title = dom(document, "span", { id: "set-title", text: "Settings" });
+  const description = dom(document, "span", { id: "set-description", className: "set-dialog-description", text: "Configure your Cove workspace and experience." });
+  const heading = dom(document, "div", { className: "set-head-copy" }, [title, description]);
+  const close = dom(document, "button", { id: "set-close", className: "x", text: "×", attributes: { type: "button", "aria-label": "Close Settings" } });
+  const head = dom(document, "div", { className: "set-head" }, [heading, close]);
   const navigation = dom(document, "nav", { id: "set-tabs", className: "set-nav" });
-  const body = dom(document, "div", { id: "set-body", className: "set-body" });
+  const scroll = dom(document, "div", { className: "set-page-scroll" });
+  const footer = dom(document, "div", { className: "set-page-footer" });
+  const body = dom(document, "div", { id: "set-body", className: "set-body" }, [scroll, footer]);
   const main = dom(document, "div", { className: "set-main" }, [navigation, body]);
   const box = dom(document, "div", { className: "set-box set-box--nav" }, [head, main]);
-  return dom(document, "div", { id: "settings" }, [box]);
+  return dom(document, "div", { id: "settings", attributes: { role: "dialog", "aria-modal": "true", "aria-labelledby": "set-title", "aria-describedby": "set-description", tabindex: "-1" } }, [box]);
 }
 
 export function mountWorkspaceCreationTemplate(document: Document): HTMLElement {
