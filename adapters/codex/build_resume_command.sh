@@ -57,7 +57,7 @@ flag_string() {
 }
 
 bin="$(resolve_binary codex /opt/homebrew/bin/codex /usr/local/bin/codex)"
-args=("$bin" "--dangerously-bypass-hook-trust")
+args=("$bin" "--dangerously-bypass-hook-trust" "--config" "features.hooks=true")
 if flag_true "dangerouslySkipPermissions"; then
   args+=("--yolo")
 fi

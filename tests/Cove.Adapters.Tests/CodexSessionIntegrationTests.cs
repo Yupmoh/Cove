@@ -94,7 +94,7 @@ public sealed class CodexSessionIntegrationTests
     [ExternalTheory(TestOperatingSystem.Unix, "bash", "sqlite3")]
     [InlineData("build_launch_command.sh", null)]
     [InlineData("build_resume_command.sh", "thread-1")]
-    public async Task BuildCommand_BypassesTrustForInstalledCoveHook(string script, string? sessionId)
+    public async Task BuildCommand_EnablesHooksAndBypassesTrustForInstalledCoveHook(string script, string? sessionId)
     {
         var runner = new MethodRunner();
         var args = sessionId is null ? Array.Empty<string>() : new[] { sessionId };
@@ -122,6 +122,8 @@ public sealed class CodexSessionIntegrationTests
         using var document = JsonDocument.Parse(result.Stdout);
         var command = document.RootElement.GetProperty("command").EnumerateArray().Select(value => value.GetString()).ToArray();
         Assert.Contains("--dangerously-bypass-hook-trust", command);
+        Assert.Contains("features.hooks=true", command);
+        Assert.Single(command, value => value == "features.hooks=true");
         if (sessionId is not null)
         {
             Assert.Contains("resume", command);
