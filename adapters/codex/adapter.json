@@ -22,10 +22,12 @@
   },
   "hooks": {
     "session-start": "cove://hooks/codex/session-start",
-    "session-end": "cove://hooks/codex/session-end",
     "user-prompt-submit": "cove://hooks/codex/user-prompt-submit",
     "pre-tool-use": "cove://hooks/codex/pre-tool-use",
     "post-tool-use": "cove://hooks/codex/post-tool-use",
+    "permission-request": "cove://hooks/codex/permission-request",
+    "subagent-start": "cove://hooks/codex/subagent-start",
+    "subagent-stop": "cove://hooks/codex/subagent-stop",
     "stop": "cove://hooks/codex/stop"
   },
   "methods": {

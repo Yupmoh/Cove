@@ -199,33 +199,154 @@ public sealed class CodexSessionIntegrationTests
     }
 
     [ExternalFact(TestOperatingSystem.Unix, "bash")]
-    public async Task HooksInstaller_AddsAndRemovesCoveSessionStartHook()
+    public async Task HooksInstaller_ReconcilesEverySupportedHookAndPreservesUserHooks()
     {
         var root = Path.Combine(Path.GetTempPath(), "cove-codex-hooks-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
         try
         {
+            var hooksPath = Path.Combine(root, "hooks.json");
+            File.WriteAllText(hooksPath, """
+                {"hooks":{"SessionStart":[{"matcher":"startup","hooks":[{"type":"command","command":"user-start"}]}],"PreToolUse":[{"matcher":"Read","hooks":[{"type":"command","command":"user-tool"}]}],"Stop":[{"hooks":[{"type":"command","command":"user-stop"}]}]}}
+                """);
             var runner = new MethodRunner();
             var env = new Dictionary<string, string> { ["CODEX_HOME"] = root };
             var install = await runner.RunAsync(AdapterDir, "hooks.sh", new[] { "install" }, TimeSpan.FromSeconds(20), env);
             Assert.True(install.ExitCode == 0, $"exit={install.ExitCode} stderr='{install.Stderr}' stdout='{install.Stdout}'");
+            var firstInstall = File.ReadAllText(hooksPath);
+            var reinstall = await runner.RunAsync(AdapterDir, "hooks.sh", new[] { "install" }, TimeSpan.FromSeconds(20), env);
+            Assert.True(reinstall.ExitCode == 0, $"exit={reinstall.ExitCode} stderr='{reinstall.Stderr}' stdout='{reinstall.Stdout}'");
+            Assert.Equal(firstInstall, File.ReadAllText(hooksPath));
 
-            var hooksPath = Path.Combine(root, "hooks.json");
             using (var installed = JsonDocument.Parse(File.ReadAllText(hooksPath)))
             {
-                var command = installed.RootElement
-                    .GetProperty("hooks")
-                    .GetProperty("SessionStart")[0]
-                    .GetProperty("hooks")[0]
-                    .GetProperty("command")
-                    .GetString();
-                Assert.Contains("cove-hooks.sh", command);
+                var hooks = installed.RootElement.GetProperty("hooks");
+                foreach (var eventName in SupportedHookEvents)
+                    Assert.Equal(1, CountCoveCommands(hooks.GetProperty(eventName)));
+                Assert.Equal("user-start", hooks.GetProperty("SessionStart")[0].GetProperty("hooks")[0].GetProperty("command").GetString());
+                Assert.Equal("user-tool", hooks.GetProperty("PreToolUse")[0].GetProperty("hooks")[0].GetProperty("command").GetString());
+                Assert.Equal("user-stop", hooks.GetProperty("Stop")[0].GetProperty("hooks")[0].GetProperty("command").GetString());
             }
 
             var uninstall = await runner.RunAsync(AdapterDir, "hooks.sh", new[] { "uninstall" }, TimeSpan.FromSeconds(20), env);
             Assert.True(uninstall.ExitCode == 0, $"exit={uninstall.ExitCode} stderr='{uninstall.Stderr}' stdout='{uninstall.Stdout}'");
             using var removed = JsonDocument.Parse(File.ReadAllText(hooksPath));
-            Assert.Empty(removed.RootElement.GetProperty("hooks").GetProperty("SessionStart").EnumerateArray());
+            var removedHooks = removed.RootElement.GetProperty("hooks");
+            foreach (var eventName in SupportedHookEvents)
+                Assert.Equal(0, CountCoveCommands(removedHooks.GetProperty(eventName)));
+            Assert.Equal("user-start", removedHooks.GetProperty("SessionStart")[0].GetProperty("hooks")[0].GetProperty("command").GetString());
+            Assert.Equal("user-tool", removedHooks.GetProperty("PreToolUse")[0].GetProperty("hooks")[0].GetProperty("command").GetString());
+            Assert.Equal("user-stop", removedHooks.GetProperty("Stop")[0].GetProperty("hooks")[0].GetProperty("command").GetString());
+        }
+        finally { TestDirectory.Delete(root); }
+    }
+
+    [ExternalTheory(TestOperatingSystem.Unix, "bash", "jq")]
+    [InlineData("SessionStart", "session-start")]
+    [InlineData("UserPromptSubmit", "user-prompt-submit")]
+    [InlineData("PreToolUse", "pre-tool-use")]
+    [InlineData("PostToolUse", "post-tool-use")]
+    [InlineData("PermissionRequest", "permission-request")]
+    [InlineData("SubagentStart", "subagent-start")]
+    [InlineData("SubagentStop", "subagent-stop")]
+    [InlineData("Stop", "stop")]
+    public async Task HookCommand_ForwardsOfficialEventAndOriginalEnvelope(string hookEventName, string coveEvent)
+    {
+        var payload = JsonSerializer.Serialize(new { session_id = "session-1", hook_event_name = hookEventName, tool_name = "Read", nested = new { value = 7 } });
+        var result = await RunHookAsync(payload);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Empty(result.Stderr);
+        using var invocation = JsonDocument.Parse(result.Invocation);
+        Assert.Equal(coveEvent, invocation.RootElement.GetProperty("arguments")[2].GetString());
+        Assert.Equal("codex", invocation.RootElement.GetProperty("arguments")[4].GetString());
+        Assert.Equal("nook-1", invocation.RootElement.GetProperty("arguments")[6].GetString());
+        using var expected = JsonDocument.Parse(payload);
+        Assert.True(JsonElement.DeepEquals(expected.RootElement, invocation.RootElement.GetProperty("stdin")));
+    }
+
+    [ExternalTheory(TestOperatingSystem.Unix, "bash", "jq")]
+    [InlineData("{\"session_id\":\"session-1\"}", "no hook_event_name")]
+    [InlineData("{\"session_id\":\"session-1\",\"hook_event_name\":\"SessionEnd\"}", "unknown hook_event_name")]
+    [InlineData("not-json", "invalid JSON")]
+    public async Task HookCommand_RejectsInvalidOrUnsupportedPayloadNonFatally(string payload, string diagnostic)
+    {
+        var result = await RunHookAsync(payload);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains(diagnostic, result.Stderr);
+        Assert.Empty(result.Invocation);
+    }
+
+    [ExternalTheory(TestOperatingSystem.Unix, "bash", "sqlite3", "jq")]
+    [InlineData("build_launch_command.sh", null)]
+    [InlineData("build_resume_command.sh", "thread-1")]
+    public async Task BuildCommand_ReconcilesStaleHooksWithoutChangingFlags(string script, string? sessionId)
+    {
+        var root = Path.Combine(Path.GetTempPath(), "cove-codex-reconcile-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            File.WriteAllText(Path.Combine(root, "hooks.json"), "{\"hooks\":{\"SessionStart\":[]}}");
+            if (sessionId is not null)
+            {
+                var sqlite = TestPrerequisite.FindExecutable("sqlite3");
+                Assert.NotNull(sqlite);
+                using var process = Process.Start(new ProcessStartInfo(sqlite) { UseShellExecute = false, ArgumentList = { Path.Combine(root, "state_5.sqlite"), $"CREATE TABLE threads (id TEXT); INSERT INTO threads VALUES ('{sessionId}');" } });
+                Assert.NotNull(process);
+                await process.WaitForExitAsync();
+                Assert.Equal(0, process.ExitCode);
+            }
+            const string flags = "{\"dangerouslySkipPermissions\":true,\"model\":\"model-x\",\"effort\":\"high\"}";
+            var args = sessionId is null ? new[] { flags } : new[] { sessionId, flags };
+            var result = await new MethodRunner().RunAsync(AdapterDir, script, args, TimeSpan.FromSeconds(20), new Dictionary<string, string> { ["CODEX_HOME"] = root });
+
+            Assert.True(result.ExitCode == 0, $"exit={result.ExitCode} stderr='{result.Stderr}' stdout='{result.Stdout}'");
+            using var commandDocument = JsonDocument.Parse(result.Stdout);
+            var command = commandDocument.RootElement.GetProperty("command").EnumerateArray().Select(value => value.GetString()).ToArray();
+            Assert.Contains("--yolo", command);
+            Assert.Contains("model-x", command);
+            Assert.Contains("model_reasoning_effort=\"high\"", command);
+            using var hooksDocument = JsonDocument.Parse(File.ReadAllText(Path.Combine(root, "hooks.json")));
+            foreach (var eventName in SupportedHookEvents)
+                Assert.Equal(1, CountCoveCommands(hooksDocument.RootElement.GetProperty("hooks").GetProperty(eventName)));
+        }
+        finally { TestDirectory.Delete(root); }
+    }
+
+    private static readonly string[] SupportedHookEvents = ["SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "PermissionRequest", "SubagentStart", "SubagentStop", "Stop"];
+
+    private static int CountCoveCommands(JsonElement groups) => groups.EnumerateArray().Sum(group => group.GetProperty("hooks").EnumerateArray().Count(hook => hook.GetProperty("command").GetString()!.Contains("COVE_HOOK_MARKER=cove-runtime-hook", StringComparison.Ordinal)));
+
+    private static async Task<(int ExitCode, string Stderr, string Invocation)> RunHookAsync(string payload)
+    {
+        var root = Path.Combine(Path.GetTempPath(), "cove-codex-bridge-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var fakeCli = Path.Combine(root, "cove");
+            var invocationPath = Path.Combine(root, "invocation.json");
+            File.WriteAllText(fakeCli, "#!/usr/bin/env bash\njq -n --argjson arguments \"$(printf '%s\\n' \"$@\" | jq -R . | jq -s .)\" --arg stdin \"$(cat)\" '{arguments:$arguments,stdin:($stdin|fromjson)}' > \"$INVOCATION_PATH\"\n");
+            using (var chmod = Process.Start("/bin/chmod", new[] { "+x", fakeCli }))
+            {
+                Assert.NotNull(chmod);
+                await chmod.WaitForExitAsync();
+                Assert.Equal(0, chmod.ExitCode);
+            }
+            var start = new ProcessStartInfo("/bin/bash") { RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
+            start.ArgumentList.Add(Path.Combine(AdapterDir, "cove-hooks.sh"));
+            start.Environment["COVE"] = "1";
+            start.Environment["COVE_CLI_PATH"] = fakeCli;
+            start.Environment["COVE_NOOK_ID"] = "nook-1";
+            start.Environment["INVOCATION_PATH"] = invocationPath;
+            using var process = Process.Start(start)!;
+            await process.StandardInput.WriteAsync(payload);
+            process.StandardInput.Close();
+            var stdout = await process.StandardOutput.ReadToEndAsync();
+            var stderr = await process.StandardError.ReadToEndAsync();
+            await process.WaitForExitAsync();
+            Assert.Empty(stdout);
+            return (process.ExitCode, stderr, File.Exists(invocationPath) ? File.ReadAllText(invocationPath) : string.Empty);
         }
         finally { TestDirectory.Delete(root); }
     }

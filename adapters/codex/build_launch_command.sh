@@ -2,6 +2,12 @@
 set -euo pipefail
 
 FLAGS_JSON="${1:-}"
+ADAPTER_DIR="${COVE_ADAPTER_DIR:-$(cd "$(dirname "$0")" && pwd)}"
+
+if ! "$ADAPTER_DIR/hooks.sh" install; then
+  printf '%s\n' 'cove codex launch failed to reconcile hooks' >&2
+  exit 1
+fi
 
 resolve_binary() {
   local name="$1"; shift

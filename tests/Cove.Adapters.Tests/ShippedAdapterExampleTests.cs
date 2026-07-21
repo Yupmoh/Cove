@@ -64,6 +64,16 @@ public sealed class ShippedAdapterExampleTests
         Assert.Contains("--nook-id \"$COVE_NOOK_ID\"", idleCommand!);
     }
 
+    [Fact]
+    public void CodexManifest_DeclaresEverySupportedLiveHook()
+    {
+        using var document = System.Text.Json.JsonDocument.Parse(File.ReadAllText(Path.Combine(AdaptersRoot, "codex", "adapter.json")));
+        var hooks = document.RootElement.GetProperty("hooks").EnumerateObject().Select(property => property.Name).Order().ToArray();
+        var expected = new[] { "permission-request", "post-tool-use", "pre-tool-use", "session-start", "stop", "subagent-start", "subagent-stop", "user-prompt-submit" }.Order().ToArray();
+        Assert.Equal(expected, hooks);
+        Assert.DoesNotContain("session-end", hooks);
+    }
+
     [Theory]
     [InlineData("claude-code", "~/.claude/skills/cove/SKILL.md")]
     [InlineData("codex", "~/.agents/skills/cove/SKILL.md")]

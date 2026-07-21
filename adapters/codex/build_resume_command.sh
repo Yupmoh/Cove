@@ -4,6 +4,12 @@ set -euo pipefail
 SESSION_ID="${1:?Usage: build_resume_command.sh <session_id> [flags_json]}"
 FLAGS_JSON="${2:-}"
 ROOT="${CODEX_HOME:-$HOME/.codex}"
+ADAPTER_DIR="${COVE_ADAPTER_DIR:-$(cd "$(dirname "$0")" && pwd)}"
+
+if ! "$ADAPTER_DIR/hooks.sh" install; then
+  printf '%s\n' 'cove codex resume failed to reconcile hooks' >&2
+  exit 1
+fi
 
 session_known=0
 if command -v sqlite3 >/dev/null 2>&1; then
