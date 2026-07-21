@@ -33,8 +33,14 @@ describe("adapterIconSvg", () => {
     expect(adapterIconSvg("omp")).toContain("/adapter-icons/omp.svg");
   });
 
-  it("does not borrow another brand for an unsupported adapter", () => {
-    expect(adapterIconSvg("opencode")).toBe(ICONS.agents);
+  it("uses distinct marks for every installable adapter", () => {
+    const installable = ["cursor-agent", "hermes", "openclaw", "opencode", "pi"];
+    for (const adapter of installable) {
+      expect(adapterIconSvg(adapter)).toContain("adapter-icon");
+      expect(adapterIconSvg(adapter)).not.toBe(ICONS.agents);
+    }
+    expect(new Set(installable.map(adapterIconSvg)).size).toBe(installable.length);
+    expect(adapterIconSvg("unsupported")).toBe(ICONS.agents);
   });
 });
 

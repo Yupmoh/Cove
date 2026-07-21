@@ -73,10 +73,19 @@ function adapterMask(path: string, label: string): string {
   return `<span class="adapter-icon adapter-icon-mask" style="--adapter-mask:url('${path}')" role="img" aria-label="${label}"></span>`;
 }
 
+function adapterGlyph(label: string, body: string): string {
+  return `<svg class="adapter-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="${label}">${body}</svg>`;
+}
+
 const ADAPTER_ICONS: Record<string, string> = {
   "claude-code": adapterMask("/adapter-icons/claude.png", "Claude Code"),
   codex: adapterMask("/adapter-icons/codex.png", "Codex"),
   omp: adapterImage("/adapter-icons/omp.svg", "Oh My Pi"),
+  "cursor-agent": adapterGlyph("Cursor Agent", '<path d="M5 3.5l14 8.2-6.3 1.6-3.2 6.2z" fill="currentColor" stroke="none"/><path d="M12.5 13.4l5.2 5.2"/>'),
+  hermes: adapterGlyph("Hermes", '<path d="M6.5 5v14M17.5 5v14M6.5 12h11"/><path d="M4 7l2.5-2M20 7l-2.5-2"/>'),
+  openclaw: adapterGlyph("OpenClaw", '<path d="M7 18c-2.8-2.5-2.8-6.5-.5-9M12 19c-3-3.2-3-8.8 0-12M17 18c2.8-2.5 2.8-6.5.5-9"/><path d="M6.5 9L4 6M12 7V3.5M17.5 9L20 6"/>'),
+  opencode: adapterGlyph("opencode", '<path d="M9.5 5L4 12l5.5 7M14.5 5l5.5 7-5.5 7"/>'),
+  pi: adapterGlyph("pi", '<path d="M4.5 7.5h15M8 7.5v11M16 7.5v7.8c0 2.2 1.2 3.2 3 3.2"/>'),
 };
 
 export function adapterIconSvg(adapterName: string): string {

@@ -3,6 +3,7 @@ export interface LauncherAdapter {
   displayName: string;
   accent: string;
   binary: string;
+  iconSvg?: string;
   version?: string;
   status?: string;
   updateCommand?: string;
@@ -46,6 +47,7 @@ export interface HarnessInstallRow {
   description: string;
   command: string;
   accent: string;
+  iconSvg: string;
 }
 
 export function harnessInstallRows(adapters: LauncherAdapter[]): HarnessInstallRow[] {
@@ -56,6 +58,7 @@ export function harnessInstallRows(adapters: LauncherAdapter[]): HarnessInstallR
       label: a.displayName || a.name,
       description: (a.description ?? "").trim(),
       command: (a.installCommand ?? "").trim(),
+      iconSvg: a.iconSvg ?? "",
       accent: a.accent,
     }))
     .sort((x, y) => x.label.localeCompare(y.label));

@@ -26,7 +26,7 @@ public static class AdapterListCommands
                 binaryPath = detection.BinaryPath;
             }
             var realPath = ResolveRealPath(binaryPath);
-            items.Add(new AdapterListItemDto(manifest.Name, manifest.DisplayName, manifest.Accent, manifest.Binary, status, version, binaryPath, ResolveUpdateCommand(manifest, realPath), ResolveUninstallCommand(manifest, realPath), ResolveInstallCommand(manifest), manifest.Description));
+            items.Add(new AdapterListItemDto(manifest.Name, manifest.DisplayName, manifest.Accent, manifest.Binary, status, version, binaryPath, ResolveUpdateCommand(manifest, realPath), ResolveUninstallCommand(manifest, realPath), ResolveInstallCommand(manifest), manifest.Description, AdapterToolsCommands.LoadIcon(manifestStore, manifest)));
         }
 
         return Task.FromResult(ctx.Ok(new AdapterListResult(items), CoveJsonContext.Default.AdapterListResult));

@@ -23,6 +23,7 @@ public sealed class AdapterListStatusTests
     public async Task AdapterList_WithLauncher_IncludesStatus()
     {
         var root = WriteFixture("test-v2");
+        File.WriteAllText(Path.Combine(root, "test-v2", "icon.svg"), "<svg xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M0 0h1v1z\"/></svg>");
         var store = new AdapterManifestStore(root);
         var orch = LaunchTestFactory.Create(store, new MethodRunner(), new BinaryDiscoveryService());
 
@@ -36,6 +37,7 @@ public sealed class AdapterListStatusTests
         var first = adapters[0];
         Assert.True(first.TryGetProperty("status", out var status));
         Assert.Equal("missing", status.GetString());
+        Assert.Contains("<svg", first.GetProperty("iconSvg").GetString(), StringComparison.Ordinal);
     }
 
     [Fact]

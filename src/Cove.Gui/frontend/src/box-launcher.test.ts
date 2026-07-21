@@ -185,11 +185,11 @@ describe("harnessInstallRows", () => {
     expect(rows.map((r) => r.label)).toEqual(["Alpha", "zeta"]);
   });
 
-  it("carries description, trimmed command, and accent", () => {
+  it("carries description, trimmed command, accent, and the canonical adapter icon", () => {
     const rows = harnessInstallRows([
-      adapter({ name: "pi", status: "missing", installCommand: " curl -fsSL x | sh ", description: "Minimal agent.", accent: "#abc" }),
+      adapter({ name: "pi", status: "missing", installCommand: " curl -fsSL x | sh ", description: "Minimal agent.", accent: "#abc", iconSvg: '<svg data-adapter-icon="pi"></svg>' }),
     ]);
-    expect(rows[0]).toEqual({ name: "pi", label: "X", description: "Minimal agent.", command: "curl -fsSL x | sh", accent: "#abc" });
+    expect(rows[0]).toEqual({ name: "pi", label: "X", description: "Minimal agent.", command: "curl -fsSL x | sh", accent: "#abc", iconSvg: '<svg data-adapter-icon="pi"></svg>' });
   });
 
   it("defaults missing descriptions to empty", () => {

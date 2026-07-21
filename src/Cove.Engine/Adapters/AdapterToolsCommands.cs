@@ -210,7 +210,7 @@ public static class AdapterToolsCommands
         return new ToolsRetentionDto(true, !string.IsNullOrEmpty(retention.WriteScript), false, null, recommended);
     }
 
-    private static string? LoadIcon(AdapterManifestStore store, AdapterManifest manifest)
+    internal static string? LoadIcon(AdapterManifestStore store, AdapterManifest manifest)
     {
         if (string.IsNullOrEmpty(manifest.Icon))
             return null;

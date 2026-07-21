@@ -11,7 +11,7 @@ import {
 import type { EngineEventPayloads } from "../../app/engine-event-router";
 import type { ComponentHandle } from "../../app/lifecycle";
 
-function fixture(recentResults: Array<{ sessions: Array<Record<string, unknown>> } | Error> = []) {
+function fixture(recentResults: Array<{ sessions: Array<Record<string, unknown>> } | Error> = [], adapters: Array<Record<string, unknown>> = [{ name: "claude", displayName: "Claude", accent: "#fff", binary: "claude" }]) {
   const window = new Window();
   const root = window.document.createElement("div");
   const agents = window.document.createElement("div");
@@ -19,9 +19,7 @@ function fixture(recentResults: Array<{ sessions: Array<Record<string, unknown>>
   const handlers = new Map<keyof EngineEventPayloads, Set<(payload: never) => void>>();
   const invoke = vi.fn(async (command: string, args?: Record<string, unknown>) => {
     if (command === "app.adapterList") {
-      return JSON.stringify({
-        adapters: [{ name: "claude", displayName: "Claude", accent: "#fff", binary: "claude" }],
-      });
+      return JSON.stringify({ adapters });
     }
     if (command === "app.callEngine" && args?.uri === "cove://commands/session.recent") {
       const result = recentResults.shift() ?? { sessions: [] };
@@ -111,11 +109,13 @@ describe("LauncherFeature", () => {
       accent: "#fff",
       binary: "/bin/claude",
       binaryPath: "/resolved/claude",
+      iconSvg: '<svg data-adapter-icon="claude"></svg>',
     }])).toEqual([{
       name: "claude",
       displayName: "Claude",
       accent: "#fff",
       binary: "/bin/claude",
+      iconSvg: '<svg data-adapter-icon="claude"></svg>',
       version: "",
       status: "",
       updateCommand: "",
@@ -123,6 +123,20 @@ describe("LauncherFeature", () => {
       uninstallCommand: "",
       description: "",
     }]);
+  });
+
+  it("renders canonical Settings adapter icons in the install modal", async () => {
+    const canonicalIcon = '<svg data-adapter-icon="pi"></svg>';
+    const { document, feature } = fixture([], [
+      { name: "claude", displayName: "Claude", accent: "#fff", binary: "claude", status: "detected" },
+      { name: "pi", displayName: "Pi", accent: "#abc", binary: "pi", status: "missing", installCommand: "install pi", iconSvg: canonicalIcon },
+    ]);
+
+    await feature.load();
+    const launcher = feature.render(null, null);
+    (launcher.querySelector(".cl-install-card") as unknown as HTMLElement).click();
+
+    expect(document.querySelector(".hi-badge")?.innerHTML).toBe(canonicalIcon);
   });
 
   it("owns launcher open, close, and persistent listeners", async () => {

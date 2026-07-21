@@ -14,8 +14,8 @@
 .hi-card::before { content: ""; position: absolute; inset: 0; border-radius: inherit; background: radial-gradient(130% 150% at 0% 0%, color-mix(in srgb, var(--card-accent, var(--accent)) 9%, transparent), transparent 55%); opacity: 0; transition: opacity 0.16s; pointer-events: none; }
 .hi-card:hover { border-color: color-mix(in srgb, var(--card-accent, var(--accent)) 55%, var(--border)); transform: translateY(-1px); }
 .hi-card:hover::before { opacity: 1; }
-.hi-badge { width: 38px; height: 38px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border-radius: 10px; background: color-mix(in srgb, var(--card-accent, var(--accent)) 14%, transparent); border: 1px solid color-mix(in srgb, var(--card-accent, var(--accent)) 35%, var(--border)); }
-.hi-badge svg, .hi-badge .adapter-icon { width: 22px; height: 22px; display: block; }
+.hi-badge { width: 36px; height: 36px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; overflow: hidden; border-radius: 9px; background: color-mix(in srgb, var(--card-accent, var(--accent)) 15%, transparent); color: var(--card-accent, var(--accent)); }
+.hi-badge svg, .hi-badge img, .hi-badge .adapter-icon { width: 22px; height: 22px; object-fit: contain; display: block; }
 .hi-body { flex: 1; min-width: 0; }
 .hi-name { font-size: 13.5px; font-weight: 650; color: var(--fg); }
 .hi-desc { margin-top: 2px; font-size: 11.5px; line-height: 1.45; color: var(--muted); }

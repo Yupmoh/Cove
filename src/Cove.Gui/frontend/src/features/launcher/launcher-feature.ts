@@ -49,6 +49,7 @@ export interface AdapterInfo {
   accent: string;
   binary: string;
   status?: string | null;
+  iconSvg?: string | null;
   version?: string | null;
   binaryPath?: string | null;
   updateCommand?: string | null;
@@ -127,6 +128,7 @@ export function mapLauncherAdapters(adapters: AdapterInfo[] | null | undefined):
     displayName: adapter.displayName,
     accent: adapter.accent,
     binary: adapter.binary,
+    iconSvg: adapter.iconSvg ?? "",
     version: adapter.version ?? "",
     status: adapter.status ?? "",
     updateCommand: adapter.updateCommand ?? "",
@@ -759,7 +761,8 @@ function openHarnessInstallModal(): void {
 
     const badge = document.createElement("span");
     badge.className = "hi-badge";
-    badge.innerHTML = adapterIconSvg(row.name);
+    badge.innerHTML = row.iconSvg || adapterIconSvg(row.name);
+    badge.setAttribute("aria-hidden", "true");
 
     const body = document.createElement("div");
     body.className = "hi-body";
