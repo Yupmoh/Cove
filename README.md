@@ -49,6 +49,18 @@ open Cove.app
 The `xattr` step (or right-click → Open once) clears Gatekeeper for the
 unsigned build. Cove starts its own engine and opens a live terminal.
 
+Private Apple Silicon builds can be produced locally with:
+
+```
+COVE_VERSION=0.4.0-local scripts/package-macos-app.sh osx-arm64 artifacts/macos-local
+cd artifacts/macos-local && shasum -a 256 -c Cove-0.4.0-local-osx-arm64.zip.sha256
+```
+
+The resulting ZIP is ad-hoc signed and includes its SHA-256 checksum, but it is
+not notarized. A private tester must use right-click → Open once or clear the
+download quarantine before the first launch. Official releases will use Apple
+Developer ID signing and notarization.
+
 ## Run the desktop GUI (from source)
 
 The graphical bay is a native-webview terminal that renders a real shell
