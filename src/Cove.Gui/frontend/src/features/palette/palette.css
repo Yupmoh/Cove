@@ -4,6 +4,8 @@
   background: rgba(17, 17, 27, 0.55); align-items: flex-start; justify-content: center; z-index: 50;
 }
 #palette.open { display: flex; }
+#palette.open { animation: cove-fade-in 140ms ease-out; }
+#palette.open .pal-box { animation: cove-surface-pop-in 180ms ease-out; }
 .pal-box {
   margin-top: 12vh; width: 520px; max-width: 90vw;
   background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
@@ -18,3 +20,7 @@
 .pal-item.sel { background: var(--panel-2); }
 .pal-item .ic { color: var(--accent); width: 16px; text-align: center; }
 .pal-item .key { margin-left: auto; color: var(--muted); font-size: 11px; }
+
+@media (prefers-reduced-motion: reduce) {
+  #palette.open, #palette.open .pal-box { animation: none; opacity: 1; transform: none; }
+}

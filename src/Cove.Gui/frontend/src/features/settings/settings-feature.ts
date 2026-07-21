@@ -1,7 +1,7 @@
 import { FrontendCommand } from "../../app/frontend-command";
 import { LifecycleScope, type ComponentHandle } from "../../app/lifecycle";
 import { orderSettingsTabs, settingsTabMetadata, resolveActiveSettingsTab } from "../../settings-tabs";
-import { iconSvg } from "../../icons";
+import { adapterIconSvg, iconSvg } from "../../icons";
 import { adapterStatusMeta, toolsSubtitle, retentionChipVisible, retentionChipLabel, projectToolsAdapters, type ToolsAdapter } from "../../tools-tab";
 import {
   deriveProfileSlug, isValidProfileSlug, profilePickerLabel, selectedLauncherProfile, launcherProfileChoices, envMapFromRows,
@@ -220,6 +220,7 @@ function renderSettings(): void {
   }
   if (activeSettingsTab === "dictation") {
     onboardingFeature.renderDictationTab(content);
+    groupSettingsContent(content);
     return;
   }
   const entries = configSchema.filter((e) => e.tab === activeSettingsTab && (e.control === "section" || isRealSetting(e)));
@@ -458,9 +459,9 @@ function buildToolsCard(a: ToolsAdapter, container: HTMLElement, installed: bool
 
   const icon = document.createElement("span");
   icon.className = "tools-icon";
-  icon.innerHTML = a.iconSvg || iconSvg("agents");
-  const svg = icon.querySelector("svg");
-  if (svg) svg.setAttribute("aria-hidden", "true");
+  icon.innerHTML = a.iconSvg || adapterIconSvg(a.name);
+  const iconGraphic = icon.querySelector("svg, img, .adapter-icon-mask");
+  if (iconGraphic) iconGraphic.setAttribute("aria-hidden", "true");
   card.appendChild(icon);
 
   const body = document.createElement("div");
@@ -992,6 +993,7 @@ function renderDiagnosticsExtras(container: HTMLElement): void {
   container.appendChild(textarea);
 
   const snapActions = document.createElement("div");
+  snapActions.className = "set-utility-actions";
   container.appendChild(snapActions);
 
   const renderBtn = document.createElement("button");

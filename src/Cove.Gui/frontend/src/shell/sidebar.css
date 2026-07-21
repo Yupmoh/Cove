@@ -21,6 +21,8 @@
 .sb-mode.active { color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); }
 .sb-mode.stub { opacity: 0.55; }
 .sb-content { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; order: 1; }
+.dual-sidebar:not(.collapsed) .sb-content { animation: sidebar-open-in 180ms ease-out; }
+@keyframes sidebar-open-in { from { opacity: 0; transform: translateX(-7px); } to { opacity: 1; transform: translateX(0); } }
 .side-left .sb-content { background: radial-gradient(ellipse 130% 58% at 52% 12%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 72%), var(--bg); }
 .dual-sidebar.collapsed .sb-content, .dual-sidebar.collapsed .sb-resize { display: none; }
 .sb-reopen { display: none; }
@@ -59,3 +61,7 @@
 .tree-row .tw-dot { width: 6px; height: 6px; border-radius: 50%; background: #45475a; flex-shrink: 0; }
 .tree-row .tw-label { flex: 1; overflow: hidden; text-overflow: ellipsis; }
 .tree-row .tw-count { font-size: 10px; color: var(--muted); }
+
+@media (prefers-reduced-motion: reduce) {
+  .dual-sidebar:not(.collapsed) .sb-content { animation: none; opacity: 1; transform: none; }
+}

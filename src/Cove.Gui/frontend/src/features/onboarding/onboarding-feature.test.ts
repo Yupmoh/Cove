@@ -257,6 +257,20 @@ describe("OnboardingFeature", () => {
     expect(window.document.activeElement).toBe(prior);
   });
 
+  it("renders Dictation Settings exclusively with shared setting primitives", async () => {
+    const { window, feature } = fixture();
+    const container = window.document.createElement("div");
+    window.document.body.appendChild(container);
+
+    feature.renderDictationTab(container as unknown as HTMLElement);
+    await settleOnboarding();
+
+    expect(container.querySelectorAll("[style]")).toHaveLength(0);
+    expect(container.querySelectorAll(".set-section-header")).toHaveLength(2);
+    expect(container.querySelectorAll(".set-row")).toHaveLength(3);
+    expect(container.querySelectorAll(".ob-dictation-info, .ob-model-status")).toHaveLength(0);
+  });
+
   it("uses a body-only scroll and fixed-footer class contract without inline or diagnostics styling", async () => {
     const { root, feature } = fixture({
       adapters: [{ name: "pi", displayName: "A very long tool name that must not expand the dialog", status: "missing", description: "A long description that needs to wrap inside the available width", installCommand: "install pi" }],

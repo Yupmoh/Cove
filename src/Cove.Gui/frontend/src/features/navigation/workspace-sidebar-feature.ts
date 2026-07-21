@@ -4,7 +4,7 @@ import { nextBayName, type BayBoxInput } from "../../bay-boxes";
 import { buildBayTree, bayTreeEmptyMessage, NOOK_TYPE_LABELS, type TreeLeaf, type TreeShoreInput, type TreeRow } from "../../bay-tree";
 import { buildAgentRows, mapAgentState, agentCardsEqual, AGENT_STATE_META, type AgentCard, type AgentState } from "../../agents-model";
 import { resolveActiveBayId, bayAccent, sortFsEntries, joinPath, mergeFsStatus, scmChipText, parseCollapsedCardIds, serializeCollapsedCardIds, toggleCardCollapsed, type FsEntry, type FsStatusEntry, type BayCardEntry, type ScmSummary } from "../../bay-cards";
-import { BAY_ICON_CHOICES, bayGlyph } from "../../bay-icons";
+import { BAY_ICON_CHOICES, bayMark } from "../../bay-icons";
 import { buildEmptyState } from "../../empty-states";
 import { detectChimes, playChime, chimesEnabledFrom, chimePrefValue, AGENT_CHIMES_STORAGE_KEY } from "../../chime";
 import { adapterIconSvg, fileIcon, iconSvg, iconForNookType } from "../../icons";
@@ -689,7 +689,7 @@ function wireBayCardDrag(el: HTMLElement, handle: HTMLElement, wid: string): voi
   });
 }
 
-function buildBayIconGrid(selected: string | null, onSelect: (emoji: string | null) => void): HTMLElement {
+function buildBayIconGrid(selected: string | null, onSelect: (markId: string | null) => void): HTMLElement {
   const grid = document.createElement("div");
   grid.className = "ws-icon-grid";
   const cells: HTMLElement[] = [];
@@ -703,7 +703,11 @@ function buildBayIconGrid(selected: string | null, onSelect: (emoji: string | nu
       cell.appendChild(dot);
       cell.title = "No icon";
     } else {
-      cell.textContent = value;
+      const mark = BAY_ICON_CHOICES.find((choice) => choice.id === value);
+      if (mark) {
+        cell.innerHTML = mark.svg;
+        cell.title = mark.label;
+      }
     }
     cell.addEventListener("click", () => {
       selected = value;
@@ -715,7 +719,7 @@ function buildBayIconGrid(selected: string | null, onSelect: (emoji: string | nu
     grid.appendChild(cell);
   };
   addCell(null);
-  for (const emoji of BAY_ICON_CHOICES) addCell(emoji);
+  for (const mark of BAY_ICON_CHOICES) addCell(mark.id);
   return grid;
 }
 
@@ -736,9 +740,10 @@ function openBayIconPopover(anchor: HTMLElement, ws: BayCardEntry): void {
   closeBayIconPopover();
   const pop = document.createElement("div");
   pop.className = "ws-icon-popover";
-  pop.appendChild(buildBayIconGrid(bayGlyph(ws.icon), (emoji) => {
+  const selectedMark = bayMark(ws.icon);
+  pop.appendChild(buildBayIconGrid(selectedMark?.id ?? null, (markId) => {
     closeBayIconPopover();
-    void changeBayIcon(ws.id, emoji);
+    void changeBayIcon(ws.id, markId);
   }));
   pop.style.cssText = "position:fixed;left:-9999px;top:-9999px;";
   document.body.appendChild(pop);
@@ -754,9 +759,9 @@ function openBayIconPopover(anchor: HTMLElement, ws: BayCardEntry): void {
   setTimeout(() => { if (bayIconPopoverAway) document.addEventListener("mousedown", bayIconPopoverAway, true); }, 0);
 }
 
-async function changeBayIcon(wsId: string, emoji: string | null): Promise<void> {
+async function changeBayIcon(wsId: string, markId: string | null): Promise<void> {
   try {
-    if (emoji) await invoke(FrontendCommand.BaySetIcon, { id: wsId, kind: "emoji", value: emoji });
+    if (markId) await invoke(FrontendCommand.BaySetIcon, { id: wsId, kind: "mark", value: markId });
     else await invoke(FrontendCommand.BaySetIcon, { id: wsId, kind: "", value: "" });
     await loadBayBoxes();
   } catch (e) {
@@ -770,10 +775,11 @@ function bayCardHead(ws: BayCardEntry, mini: boolean): HTMLElement {
   head.className = "ws-card-head";
   const swatch = document.createElement("span");
   swatch.className = "ws-card-swatch";
-  const glyph = bayGlyph(ws.icon);
-  if (glyph) {
+  const mark = bayMark(ws.icon);
+  if (mark) {
     swatch.classList.add("has-glyph");
-    swatch.textContent = glyph;
+    swatch.innerHTML = mark.svg;
+    swatch.title = mark.label;
   }
   head.appendChild(swatch);
   const titles = document.createElement("div");

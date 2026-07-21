@@ -109,7 +109,7 @@ export class BayCreateFeature implements ComponentHandle {
         try {
           await this.dependencies.invoke(FrontendCommand.BaySetIcon, {
             id: created.id,
-            kind: "emoji",
+            kind: "mark",
             value: this.selectedIcon,
           });
         } catch (iconError) {

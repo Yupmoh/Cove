@@ -439,11 +439,10 @@ function dictationPrefRow(key: string, title: string, hint: string): HTMLElement
   const row = document.createElement("div");
   row.className = "set-row";
   const label = document.createElement("label");
-  label.className = "ob-pref-copy";
   const name = document.createElement("span");
   name.textContent = title;
   const sub = document.createElement("span");
-  sub.className = "ob-pref-hint";
+  sub.className = "set-desc";
   sub.textContent = hint;
   label.appendChild(name);
   label.appendChild(sub);
@@ -458,16 +457,16 @@ function dictationPrefRow(key: string, title: string, hint: string): HTMLElement
 
 let dictationModelError: string | null = null;
 
-function buildDictationModelControls(container: HTMLElement): void {
+function buildDictationModelControls(container: HTMLElement, settingsMode = false): void {
   const status = document.createElement("div");
-  status.className = "ob-model-status";
-  const text = document.createElement("span");
-  text.className = "ob-model-copy";
+  status.className = settingsMode ? "set-row" : "ob-model-status";
+  const text = document.createElement(settingsMode ? "label" : "span");
+  if (!settingsMode) text.className = "ob-model-copy";
   text.textContent = "Speech model: checking…";
   const btn = document.createElement("button");
-  btn.className = "ob-model-action";
+  btn.className = settingsMode ? "set-action set-action-secondary" : "ob-model-action";
   btn.textContent = "Download now";
-  btn.classList.add("ob-hidden");
+  btn.hidden = true;
   status.appendChild(text);
   status.appendChild(btn);
   container.appendChild(status);
@@ -477,10 +476,10 @@ function buildDictationModelControls(container: HTMLElement): void {
     if (!status.isConnected) return;
     if (s.modelReady) {
       text.textContent = "Speech model: Parakeet TDT 0.6B v3 — downloaded";
-      btn.classList.add("ob-hidden");
+      btn.hidden = true;
     } else {
       text.textContent = "Speech model: Parakeet TDT 0.6B v3 (487 MB) — not downloaded";
-      btn.classList.remove("ob-hidden");
+      btn.hidden = false;
     }
   };
   void refresh();
@@ -493,7 +492,7 @@ function buildDictationModelControls(container: HTMLElement): void {
       text.textContent = `Speech model: download failed — ${msg}`;
       btn.disabled = false;
       btn.textContent = "Retry";
-      btn.classList.remove("ob-hidden");
+      btn.hidden = false;
     };
     void invokeNative(FrontendCommand.AppDictationEnsureModel, {}).catch((e) => {
       console.warn("dictation model download failed", e);
@@ -522,13 +521,22 @@ function buildDictationModelControls(container: HTMLElement): void {
 
 function renderDictationTab(container: HTMLElement): void {
   container.innerHTML = "";
-  const info = document.createElement("p");
-  info.className = "ob-dictation-info";
-  info.textContent = "Hold F9 — or hold Space in a terminal or text field — to dictate. Speech is recognized on this machine with NVIDIA Parakeet; audio never leaves it. Words stream in live and settle when you release.";
-  container.appendChild(info);
+  const controlsHeader = document.createElement("div");
+  controlsHeader.className = "set-section-header";
+  const controlsTitle = document.createElement("span");
+  controlsTitle.textContent = "Dictation controls";
+  const controlsDescription = document.createElement("span");
+  controlsDescription.className = "set-section-description";
+  controlsDescription.textContent = "Hold F9, or hold Space in a terminal or text field. Recognition stays on this machine.";
+  controlsHeader.append(controlsTitle, controlsDescription);
+  container.appendChild(controlsHeader);
   container.appendChild(dictationPrefRow(DICTATION_SPACE_KEY, "Hold Space to dictate", "Long-press Space (~300 ms) starts dictation; a quick tap still types a space."));
   container.appendChild(dictationPrefRow(DICTATION_LIVE_TYPING_KEY, "Type live preview into the focused target", "Off shows the running transcript in the status pill only; text lands on release."));
-  buildDictationModelControls(container);
+  const modelHeader = document.createElement("div");
+  modelHeader.className = "set-section-header";
+  modelHeader.textContent = "Speech model";
+  container.appendChild(modelHeader);
+  buildDictationModelControls(container, true);
 }
 
 function renderDictationStep(body: HTMLElement): void {

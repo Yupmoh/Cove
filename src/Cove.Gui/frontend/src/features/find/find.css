@@ -1,6 +1,10 @@
 
 #findbar { position: fixed; top: 40px; right: 24px; display: none; align-items: center; gap: 4px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 4px 6px; z-index: 40; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
-#findbar.open { display: flex; }
+#findbar.open { display: flex; animation: cove-surface-pop-in 150ms ease-out; }
 #find-input { background: transparent; border: none; outline: none; color: var(--fg); font-size: 12px; width: 160px; padding: 4px; }
 #findbar button { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 12px; padding: 2px 6px; border-radius: 4px; }
 #findbar button:hover { color: var(--fg); background: var(--border); }
+
+@media (prefers-reduced-motion: reduce) {
+  #findbar.open { animation: none; opacity: 1; transform: none; }
+}

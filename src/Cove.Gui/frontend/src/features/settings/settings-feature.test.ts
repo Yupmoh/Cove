@@ -2,7 +2,7 @@ import { Window } from "happy-dom";
 import { describe, expect, it, vi } from "vitest";
 import { createSettingsFeature, type SettingsFeatureDependencies } from "./settings-feature";
 
-function fixture(withKeybindings = false, toolsAdapters: unknown[] | null = null) {
+function fixture(withKeybindings = false, toolsAdapters: unknown[] | null = null, schemaEntries: unknown[] | null = null, renderDictationTab = vi.fn()) {
   const window = new Window();
   const root = window.document.createElement("div");
   const tabs = window.document.createElement("div");
@@ -13,6 +13,7 @@ function fixture(withKeybindings = false, toolsAdapters: unknown[] | null = null
   window.document.body.appendChild(root);
   const focusActiveNook = vi.fn();
   const invoke = vi.fn(async <T>(command: string) => {
+    if (command === "cove://commands/config.schema" && schemaEntries !== null) return { entries: schemaEntries } as T;
     if (command === "cove://commands/config.schema" && toolsAdapters !== null) {
       return { entries: [{ key: "tools.adapters", label: "Tools", tab: "tools", control: "text", description: null, type: "string", options: null }] } as T;
     }
@@ -71,7 +72,7 @@ function fixture(withKeybindings = false, toolsAdapters: unknown[] | null = null
 
     applyTerminalTheme: vi.fn(),
     focusActiveNook,
-    renderDictationTab: vi.fn(),
+    renderDictationTab,
     rerunOnboarding: vi.fn(),
     renderUpdates: vi.fn(),
     setAgentChimesEnabled: vi.fn(),
@@ -95,15 +96,33 @@ describe("SettingsFeature", () => {
   it("renders launcher-aligned installed, available, and unavailable tool groups", async () => {
     const retention = { present: false, editable: false, hidden: false, value: null, recommended: null };
     const make = (name: string, status: string, installHint: string) => ({ name, displayName: name, accent: "#123456", binary: name, status, version: "1.0", binaryPath: `/bin/${name}`, iconSvg: null, installHint, bundled: true, removable: false, retention });
-    const { body, feature } = fixture(false, [make("ready", "detected", ""), make("get-me", "missing", "install it"), make("blocked", "missing", "")]);
+    const { body, feature } = fixture(false, [make("codex", "detected", ""), make("get-me", "missing", "install it"), make("blocked", "missing", "")]);
 
     feature.open("tools");
     await vi.waitFor(() => expect(body.querySelectorAll(".tools-card")).toHaveLength(3));
     expect([...body.querySelectorAll(".tools-section-title")].map((node) => node.textContent)).toEqual(["Installed · 1", "Available to install · 1", "Unavailable · 1"]);
     expect(body.querySelector(".tools-card")?.getAttribute("style")).toContain("--adapter-accent");
-    expect(body.querySelector(".tools-icon svg")?.getAttribute("aria-hidden")).toBe("true");
+    expect(body.querySelector(".tools-icon .adapter-icon-mask")?.getAttribute("aria-hidden")).toBe("true");
     expect(body.querySelector(".tools-card")?.getAttribute("role")).toBe("article");
     expect(body.querySelector(".tools-actions button")?.textContent).toBe("Rescan");
+  });
+
+  it("keeps diagnostics utilities inside spaced setting groups", async () => {
+    const { body, feature, invoke } = fixture();
+    vi.mocked(invoke).mockImplementation(async (command) => {
+      if (command === "cove://commands/config.schema") {
+        return { entries: [{ key: "diagnostics.enabled", label: "Diagnostics", tab: "diagnostics", control: "boolean", description: null, type: "boolean", options: null }] } as never;
+      }
+      if (command === "cove://commands/config.get") return { value: false } as never;
+      if (command === "cove://commands/perf.bundle.list") return { bundles: [] } as never;
+      return {} as never;
+    });
+
+    feature.open("diagnostics");
+    await vi.waitFor(() => expect(body.querySelector(".set-utility-input")).not.toBeNull());
+    expect(body.querySelector(".set-utility-input")?.closest(".set-group")).not.toBeNull();
+    expect(body.querySelector(".set-utility-actions")).not.toBeNull();
+    expect(body.querySelector(".set-utility-note")?.closest(".set-group")).not.toBeNull();
   });
 
   it("keeps stale tool results from replacing a newly selected page", async () => {
@@ -119,6 +138,27 @@ describe("SettingsFeature", () => {
     await Promise.resolve();
     expect(body.querySelector("#set-panel-theme")).not.toBeNull();
     expect(body.querySelector(".tools-empty")).toBeNull();
+  });
+
+  it("groups custom Settings renderers before displaying their content", async () => {
+    const renderDictationTab = vi.fn((container: HTMLElement) => {
+      const header = container.ownerDocument.createElement("div");
+      header.className = "set-section-header";
+      header.textContent = "Dictation controls";
+      const row = container.ownerDocument.createElement("div");
+      row.className = "set-row";
+      container.append(header, row);
+    });
+    const schema = [{ key: "dictation.enabled", label: "Dictation", tab: "dictation", control: "boolean", description: null, type: "boolean", options: null }];
+    const { body, feature } = fixture(false, null, schema, renderDictationTab);
+
+    feature.open("dictation");
+    await vi.waitFor(() => expect(renderDictationTab).toHaveBeenCalled());
+
+    const content = body.querySelector(".set-page-content");
+    expect(content?.children).toHaveLength(1);
+    expect(content?.firstElementChild?.classList.contains("set-group")).toBe(true);
+    expect(content?.querySelector(".set-row")?.closest(".set-group")).not.toBeNull();
   });
 
   it("uses shared Settings primitives without diagnostic or inline layout classes for Tools", () => {

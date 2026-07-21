@@ -299,9 +299,17 @@ function applySettings() {
   fitAll();
 }
 
+function armNookOpening(el: HTMLElement): void {
+  const finish = () => el.classList.remove("nook-opening");
+  el.classList.add("nook-opening");
+  el.addEventListener("animationend", finish, { once: true });
+  window.setTimeout(finish, 220);
+}
+
 function makeNook(nookId: string, since: number): NookView {
   const el = document.createElement("div");
   el.className = "nook";
+  armNookOpening(el);
   el.style.flexGrow = "1";
   const header = document.createElement("div");
   header.className = "nook-header";
@@ -337,6 +345,9 @@ function makeNook(nookId: string, since: number): NookView {
   el.appendChild(header);
   const host = document.createElement("div");
   host.className = "term-host";
+  host.addEventListener("mousedown", (event) => {
+    if ((event.target as Element | null)?.closest?.(".xterm-viewport")) event.stopPropagation();
+  }, true);
   el.appendChild(host);
   const resetOnReplay = shouldResetReplay({ locallySpawned: locallySpawnedNookIds.has(nookId), renderedBefore: renderedStreamNookIds.has(nookId) });
   renderedStreamNookIds.add(nookId);
@@ -467,7 +478,11 @@ function makeNook(nookId: string, since: number): NookView {
 
   pv = { nookId, session, el, title: "", customTitle: "", headerTitleEl: titleSpan, closeMenu: () => closeOwnedMenu() };
 
-  el.addEventListener("mousedown", () => { workspaceSidebar.acknowledgeAgentAttention(nookId); focusNook(nookId); });
+  el.addEventListener("mousedown", (event) => {
+    if ((event.target as Element | null)?.closest?.(".xterm-viewport")) return;
+    workspaceSidebar.acknowledgeAgentAttention(nookId);
+    focusNook(nookId);
+  });
   const setTitle = () => { titleSpan.textContent = pv.customTitle || pv.title || "shell"; };
   const isHeaderControl = (target: EventTarget | null): boolean =>
     (target as Element | null)?.closest?.("button, input, textarea, select, a, [contenteditable='true']") !== null;

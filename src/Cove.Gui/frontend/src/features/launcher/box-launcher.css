@@ -14,7 +14,10 @@ img.cl-brand-img { height: 20px; width: auto; display: block; -webkit-user-drag:
 .cl-hint { font-size: 10px; letter-spacing: 0.01em; color: var(--muted); background: color-mix(in srgb, var(--panel-2) 70%, transparent); border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; white-space: nowrap; }
 .cl-section-label { font-size: 9.5px; font-weight: 700; letter-spacing: 0.9px; text-transform: uppercase; color: color-mix(in srgb, var(--muted) 78%, transparent); padding: 4px 2px 0; }
 .cl-harness-row { display: grid; gap: 12px; justify-content: center; }
-.cl-card { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 15px 16px; min-height: 116px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; cursor: pointer; color: var(--fg); transition: border-color 140ms ease-out, transform 120ms ease-out, background 140ms ease-out; }
+.cl-card { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 15px 16px; min-height: 116px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; cursor: pointer; color: var(--fg); animation: cl-choice-in 180ms ease-out backwards; transition: border-color 140ms ease-out, transform 120ms ease-out, background 140ms ease-out; }
+.cl-card:nth-child(2) { animation-delay: 30ms; }
+.cl-card:nth-child(3) { animation-delay: 60ms; }
+.cl-card:nth-child(n + 4) { animation-delay: 90ms; }
 .cl-card::before { content: ""; position: absolute; inset: 0; border-radius: inherit; background: radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, var(--card-accent, var(--accent)) 10%, transparent), transparent 60%); opacity: 0; transition: opacity 0.16s; pointer-events: none; }
 .cl-card:hover { border-color: color-mix(in srgb, var(--card-accent, var(--accent)) 55%, var(--border)); transform: translateY(-2px); }
 .cl-card:hover::before { opacity: 1; }
@@ -47,7 +50,7 @@ img.cl-brand-img { height: 20px; width: auto; display: block; -webkit-user-drag:
   border: 1px solid color-mix(in srgb, var(--card-accent, var(--accent)) 34%, transparent);
   transition: background 0.14s, color 0.14s;
 }
-.cl-card.selected .cl-card-badge { background: var(--card-accent, var(--accent)); color: #11111b; border-color: transparent; }
+.cl-card.selected .cl-card-badge { background: var(--card-accent, var(--accent)); color: #11111b; border-color: transparent; animation: cl-badge-select 180ms ease-out; }
 .cl-card-badge svg, .cl-card-badge .adapter-icon { width: 22px; height: 22px; display: block; }
 .cl-card-name { font-size: 13.5px; font-weight: 650; line-height: 1.2; }
 .cl-card-status { display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--muted); }
@@ -113,7 +116,11 @@ img.cl-brand-img { height: 20px; width: auto; display: block; -webkit-user-drag:
 .cl-profile-plus { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--border); font-size: 11px; line-height: 1; flex-shrink: 0; color: var(--muted); transition: border-color 0.12s, color 0.12s; }
 .cl-profile-new:hover .cl-profile-plus { border-color: color-mix(in srgb, var(--card-accent, var(--accent)) 65%, var(--border)); color: var(--card-accent, var(--accent)); }
 .cl-tool-row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
-.cl-tool { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; width: 88px; height: 82px; background: var(--panel); border: 1px solid var(--border); border-radius: 11px; cursor: pointer; color: var(--fg); transition: border-color 140ms ease-out, transform 120ms ease-out, background 140ms ease-out; }
+.cl-tool { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; width: 88px; height: 82px; background: var(--panel); border: 1px solid var(--border); border-radius: 11px; cursor: pointer; color: var(--fg); animation: cl-choice-in 180ms ease-out backwards; transition: border-color 140ms ease-out, transform 120ms ease-out, background 140ms ease-out; }
+.cl-tool:nth-child(2) { animation-delay: 25ms; }
+.cl-tool:nth-child(3) { animation-delay: 50ms; }
+.cl-tool:nth-child(4) { animation-delay: 75ms; }
+.cl-tool:nth-child(n + 5) { animation-delay: 100ms; }
 .cl-tool:hover { border-color: color-mix(in srgb, var(--tool-accent, var(--accent)) 55%, var(--border)); transform: translateY(-2px); background: color-mix(in srgb, var(--tool-accent, var(--accent)) 6%, var(--panel)); }
 .cl-tool.selected { border-color: var(--tool-accent, var(--accent)); box-shadow: inset 0 0 0 1px var(--tool-accent, var(--accent)), 0 8px 22px -14px var(--tool-accent, var(--accent)); }
 .cl-tool-ic { line-height: 0; }
@@ -124,8 +131,12 @@ img.cl-brand-img { height: 20px; width: auto; display: block; -webkit-user-drag:
 .cl-tool.selected .cl-tool-key { color: #11111b; background: var(--tool-accent, var(--accent)); }
 .cl-tool.selected .cl-tool-key { color: var(--tool-accent, var(--accent)); }
 
+@keyframes cl-choice-in { from { opacity: 0; transform: translateY(8px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes cl-badge-select { 0% { transform: scale(0.82) rotate(-7deg); } 70% { transform: scale(1.08) rotate(2deg); } 100% { transform: scale(1) rotate(0); } }
+
 @media (prefers-reduced-motion: reduce) {
   .cl-tip.driving .cl-tip-text { animation: none; transform: none; }
+  .cl-card, .cl-tool, .cl-card-badge { animation: none; opacity: 1; }
   .cl-dock { animation: none; opacity: 1; transform: none; }
   .cl-resume-dd.open .cl-resume-menu { animation: none; opacity: 1; transform: none; }
   .cl-card, .cl-card:hover, .cl-card.selected, .cl-install-card:hover, .cl-tool, .cl-tool:hover, .cl-tool.selected { transform: none; }

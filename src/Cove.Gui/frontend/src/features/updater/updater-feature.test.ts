@@ -24,6 +24,10 @@ describe("UpdaterFeature", () => {
     expect(onStagedChanged).toHaveBeenLastCalledWith(true);
     expect(container.querySelector("#cove-update-btn")?.textContent).toContain("2.0.0");
     expect((container.querySelector("#cove-update-notes") as unknown as HTMLAnchorElement).href).toBe("https://example.test/release");
+    expect(container.querySelectorAll("[style]")).toHaveLength(0);
+    expect(container.querySelector(".set-section-header")).not.toBeNull();
+    expect(container.querySelector(".set-row label")).not.toBeNull();
+    expect(container.querySelector("#cove-update-btn")?.classList.contains("set-action-primary")).toBe(true);
   });
 
   it("renders and starts idempotently", async () => {
