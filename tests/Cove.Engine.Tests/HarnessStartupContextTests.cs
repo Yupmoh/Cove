@@ -33,7 +33,8 @@ public sealed class HarnessStartupContextTests
         Assert.Equal("codex", command.Command);
         Assert.Equal("-c", command.Args[0]);
         Assert.Equal("developer_instructions=\"Cove says \\u0022hello\\u0022.\\nUse C:\\\\work.\"", command.Args[1]);
-        Assert.Equal(["resume", "session-1"], command.Args[2..]);
+        Assert.Equal(["resume", "session-1"], command.Args[^2..]);
+        Assert.Contains("shell_environment_policy.set.COVE_NOOK_ID=\"nook-1\"", command.Args);
     }
 
     [Fact]
@@ -49,9 +50,77 @@ public sealed class HarnessStartupContextTests
             environment);
 
         Assert.Equal("cmd.exe", command.Command);
-        Assert.Equal(
-            ["/d", "/s", "/c", @"C:\Users\test\npm\codex.cmd", "-c", "developer_instructions=\"Cove control\"", "resume", "session-1"],
-            command.Args);
+        Assert.Equal(["/d", "/s", "/c", @"C:\Users\test\npm\codex.cmd"], command.Args[..4]);
+        Assert.Equal("-c", command.Args[4]);
+        Assert.Equal("developer_instructions=\"Cove control\"", command.Args[5]);
+        Assert.Equal(["resume", "session-1"], command.Args[^2..]);
+        Assert.Contains("shell_environment_policy.set.COVE_NOOK_ID=\"nook-1\"", command.Args);
+    }
+
+    [Fact]
+    public void Apply_AddsExactPerNookCodexEnvironmentAfterUserOverrides()
+    {
+        using var fixture = new Fixture();
+        var environment = fixture.Environment();
+        environment["COVE_DATA_DIR"] = "C:\\Cove “δ”\tline\nnext";
+        environment["UNRELATED_SECRET"] = "private";
+        var userOverride = "shell_environment_policy.set.COVE_NOOK_ID=\"wrong\"";
+
+        var command = fixture.Context.Apply(
+            "codex",
+            "codex",
+            ["--config", userOverride, "resume", "session-1"],
+            environment);
+
+        var correctIdentity = "shell_environment_policy.set.COVE_NOOK_ID=\"nook-1\"";
+        Assert.True(Array.IndexOf(command.Args, correctIdentity) > Array.IndexOf(command.Args, userOverride));
+        Assert.True(Array.IndexOf(command.Args, correctIdentity) < Array.IndexOf(command.Args, "resume"));
+        Assert.Contains("shell_environment_policy.set.COVE_DATA_DIR=\"C:\\\\Cove “δ”\\tline\\nnext\"", command.Args);
+        Assert.DoesNotContain(command.Args, value => value.Contains("UNRELATED_SECRET", StringComparison.Ordinal));
+        Assert.Single(command.Args, value => value == correctIdentity);
+    }
+
+    [Fact]
+    public void Apply_OmitsEmptyCodexTaskContext()
+    {
+        using var fixture = new Fixture();
+        var environment = fixture.Environment();
+
+        var command = fixture.Context.Apply("codex", "codex", [], environment);
+
+        Assert.DoesNotContain(command.Args, value => value.Contains("COVE_TASK_ID", StringComparison.Ordinal));
+        Assert.DoesNotContain(command.Args, value => value.Contains("COVE_TASK_RUN_ID", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Apply_RejectsMissingCodexIdentityBeforeLaunch()
+    {
+        using var fixture = new Fixture();
+        var environment = fixture.Environment();
+        environment.Remove("COVE_NOOK_TOKEN");
+
+        var error = Assert.Throws<InvalidOperationException>(
+            () => fixture.Context.Apply("codex", "codex", [], environment));
+
+        Assert.Contains("COVE_NOOK_TOKEN", error.Message);
+    }
+
+    [Fact]
+    public void Apply_UsesEachSpawnEnvironmentIdentityIndependently()
+    {
+        using var fixture = new Fixture();
+        var firstEnvironment = fixture.Environment();
+        var secondEnvironment = fixture.Environment();
+        secondEnvironment["COVE_NOOK_ID"] = "nook-2";
+        secondEnvironment["COVE_NOOK_TOKEN"] = "token-2";
+
+        var first = fixture.Context.Apply("codex", "codex", [], firstEnvironment);
+        var second = fixture.Context.Apply("codex", "codex", [], secondEnvironment);
+
+        Assert.Contains("shell_environment_policy.set.COVE_NOOK_ID=\"nook-1\"", first.Args);
+        Assert.Contains("shell_environment_policy.set.COVE_NOOK_TOKEN=\"token-1\"", first.Args);
+        Assert.Contains("shell_environment_policy.set.COVE_NOOK_ID=\"nook-2\"", second.Args);
+        Assert.Contains("shell_environment_policy.set.COVE_NOOK_TOKEN=\"token-2\"", second.Args);
     }
 
     [Fact]
@@ -193,9 +262,17 @@ public sealed class HarnessStartupContextTests
         public Dictionary<string, string> Environment() => new(StringComparer.Ordinal)
         {
             ["COVE"] = "1",
-            ["COVE_NOOK_ID"] = "nook-1",
-            ["COVE_SKILL_PATH"] = SkillPath,
+            ["COVE_CHANNEL"] = "dev",
             ["COVE_CLI_PATH"] = CliPath,
+            ["COVE_DATA_DIR"] = Path.Combine(Home, "data"),
+            ["COVE_NOOK_ID"] = "nook-1",
+            ["COVE_NOOK_TOKEN"] = "token-1",
+            ["COVE_BAY_ID"] = "bay-1",
+            ["COVE_SHORE_ID"] = "shore-1",
+            ["COVE_HOOK_PORT"] = "",
+            ["COVE_SKILL_PATH"] = SkillPath,
+            ["COVE_TASK_ID"] = "",
+            ["COVE_TASK_RUN_ID"] = "",
         };
 
         public void Dispose()

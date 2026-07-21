@@ -1,5 +1,6 @@
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using System.Text;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging;
 using ZLogger;
@@ -11,6 +12,29 @@ public sealed record HarnessStartupCommand(string Command, string[] Args);
 public sealed class HarnessStartupContext
 {
     private const string CoveOpenClawBaseConfig = "COVE_OPENCLAW_BASE_CONFIG";
+    private static readonly string[] CodexManagedEnvironmentKeys =
+    [
+        "COVE",
+        "COVE_CHANNEL",
+        "COVE_CLI_PATH",
+        "COVE_DATA_DIR",
+        "COVE_NOOK_ID",
+        "COVE_NOOK_TOKEN",
+        "COVE_BAY_ID",
+        "COVE_SHORE_ID",
+        "COVE_HOOK_PORT",
+        "COVE_SKILL_PATH",
+        "COVE_ADAPTER_DIR",
+        "COVE_TASK_ID",
+        "COVE_TASK_RUN_ID",
+    ];
+    private static readonly string[] CodexRequiredEnvironmentKeys =
+    [
+        "COVE_CHANNEL",
+        "COVE_CLI_PATH",
+        "COVE_NOOK_ID",
+        "COVE_NOOK_TOKEN",
+    ];
     private readonly string _homeDirectory;
     private readonly ILogger _logger;
 
@@ -28,23 +52,29 @@ public sealed class HarnessStartupContext
     {
         if (!KnownAdapter(adapter))
             return new HarnessStartupCommand(command, args.ToArray());
-        if (!environment.TryGetValue("COVE_SKILL_PATH", out var skillPath)
-            || string.IsNullOrWhiteSpace(skillPath)
-            || !File.Exists(skillPath))
+        if (string.Equals(adapter, "codex", StringComparison.Ordinal))
+            ValidateCodexEnvironment(environment);
+
+        var hasSkill = environment.TryGetValue("COVE_SKILL_PATH", out var skillPath)
+            && !string.IsNullOrWhiteSpace(skillPath)
+            && File.Exists(skillPath);
+        if (!hasSkill)
         {
             _logger.HarnessSkillMissing(adapter, skillPath ?? "");
-            return new HarnessStartupCommand(command, args.ToArray());
+            return string.Equals(adapter, "codex", StringComparison.Ordinal)
+                ? ConfigureCodex(command, args, environment, null)
+                : new HarnessStartupCommand(command, args.ToArray());
         }
 
         try
         {
             return adapter switch
             {
-                "claude-code" => InsertFlag(command, args, "--append-system-prompt-file", skillPath),
-                "codex" => InsertFlag(command, args, "-c", CodexInstructions(File.ReadAllText(skillPath))),
-                "omp" or "pi" => InsertFlag(command, args, "--append-system-prompt", skillPath),
+                "claude-code" => InsertFlag(command, args, "--append-system-prompt-file", skillPath!),
+                "codex" => ConfigureCodex(command, args, environment, File.ReadAllText(skillPath!)),
+                "omp" or "pi" => InsertFlag(command, args, "--append-system-prompt", skillPath!),
                 "hermes" => InsertFlag(command, args, "--skills", "cove"),
-                "opencode" => ConfigureOpenCode(command, args, environment, skillPath),
+                "opencode" => ConfigureOpenCode(command, args, environment, skillPath!),
                 "cursor-agent" => ConfigureCursor(command, args, environment),
                 "openclaw" => ConfigureOpenClaw(command, args, environment),
                 _ => new HarnessStartupCommand(command, args.ToArray()),
@@ -105,6 +135,101 @@ public sealed class HarnessStartupContext
     {
         var encoded = JsonEncodedText.Encode(skill, JavaScriptEncoder.Default).ToString();
         return "developer_instructions=\"" + encoded + "\"";
+    }
+    private static HarnessStartupCommand ConfigureCodex(
+        string command,
+        IReadOnlyList<string> args,
+        IReadOnlyDictionary<string, string> environment,
+        string? skill)
+    {
+        var configured = skill is null
+            ? new HarnessStartupCommand(command, args.ToArray())
+            : InsertFlag(command, args, "-c", CodexInstructions(skill));
+        foreach (var key in CodexManagedEnvironmentKeys)
+        {
+            if (!environment.TryGetValue(key, out var value))
+                continue;
+            if ((key == "COVE_TASK_ID" || key == "COVE_TASK_RUN_ID")
+                && string.IsNullOrEmpty(value))
+                continue;
+            configured = InsertCodexConfig(
+                configured.Command,
+                configured.Args,
+                "shell_environment_policy.set." + key + "=" + TomlBasicString(value));
+        }
+        return configured;
+    }
+
+    private static void ValidateCodexEnvironment(IReadOnlyDictionary<string, string> environment)
+    {
+        foreach (var key in CodexRequiredEnvironmentKeys)
+            if (!environment.TryGetValue(key, out var value)
+                || string.IsNullOrWhiteSpace(value))
+                throw new InvalidOperationException("managed Codex environment missing " + key);
+    }
+
+    private static HarnessStartupCommand InsertCodexConfig(
+        string command,
+        IReadOnlyList<string> args,
+        string value)
+    {
+        for (var index = 0; index + 1 < args.Count; index++)
+            if (string.Equals(args[index], "-c", StringComparison.Ordinal)
+                && string.Equals(args[index + 1], value, StringComparison.Ordinal))
+                return new HarnessStartupCommand(command, args.ToArray());
+
+        var insertion = args.Count;
+        var commandStart = CommandShimInsertion(command, args);
+        for (var index = commandStart; index < args.Count; index++)
+        {
+            if (!string.Equals(args[index], "resume", StringComparison.Ordinal))
+                continue;
+            insertion = index;
+            break;
+        }
+        var result = new string[args.Count + 2];
+        for (var index = 0; index < insertion; index++)
+            result[index] = args[index];
+        result[insertion] = "-c";
+        result[insertion + 1] = value;
+        for (var index = insertion; index < args.Count; index++)
+            result[index + 2] = args[index];
+        return new HarnessStartupCommand(command, result);
+    }
+
+    private static string TomlBasicString(string value)
+    {
+        const string hex = "0123456789ABCDEF";
+        var result = new StringBuilder(value.Length + 2);
+        result.Append('"');
+        foreach (var character in value)
+        {
+            switch (character)
+            {
+                case '\\': result.Append("\\\\"); break;
+                case '"': result.Append("\\\""); break;
+                case '\b': result.Append("\\b"); break;
+                case '\t': result.Append("\\t"); break;
+                case '\n': result.Append("\\n"); break;
+                case '\f': result.Append("\\f"); break;
+                case '\r': result.Append("\\r"); break;
+                default:
+                    if (character < 0x20 || character == 0x7F)
+                    {
+                        result.Append("\\u");
+                        result.Append(hex[(character >> 12) & 0xF]);
+                        result.Append(hex[(character >> 8) & 0xF]);
+                        result.Append(hex[(character >> 4) & 0xF]);
+                        result.Append(hex[character & 0xF]);
+                    }
+                    else
+                    {
+                        result.Append(character);
+                    }
+                    break;
+            }
+        }
+        return result.Append('"').ToString();
     }
 
     private HarnessStartupCommand ConfigureOpenCode(
