@@ -22,14 +22,12 @@ internal static class Program
         var version = CoveBuild.InformationalVersion;
         var page = Environment.GetEnvironmentVariable("COVE_GUI_PAGE");
         var startPath = string.IsNullOrEmpty(page) ? "" : "/" + page;
-        var guiPort = GuiLaunchOptions.ResolveLoopbackPort(Environment.GetEnvironmentVariable("COVE_GUI_PORT"), channel);
+        var requestedGuiPort = GuiLaunchOptions.ResolveLoopbackPort(Environment.GetEnvironmentVariable("COVE_GUI_PORT"), channel);
 
         using var loggerFactory = GuiLogging.CreateFactory();
         var fileSystem = SystemPlatformFileSystem.Instance;
         GuiEngineLauncher.Logger = loggerFactory.CreateLogger("Cove.Gui.GuiEngineLauncher");
         var startupLog = loggerFactory.CreateLogger("Cove.Gui.Program");
-        var url = $"http://localhost:{guiPort}{startPath}";
-        startupLog.AppStarting(channel, version, url, Environment.GetEnvironmentVariable("COVE_ENGINE") ?? "bundled");
 
         Func<CancellationToken, Task<Stream>> dial = ct => GuiEngineLauncher.ConnectOrSpawnAsync(channel, ct);
         var webRoot = Path.Combine(AppContext.BaseDirectory, "wwwroot");
@@ -37,8 +35,10 @@ internal static class Program
         var mediaLeases = new MediaLeaseRegistry(
             TimeSpan.FromHours(8),
             fileSystem: fileSystem);
-        var server = new LoopbackServer(webRoot, dial, version, channel, startupLog, port: guiPort, capability: capability, mediaLeases: mediaLeases, fileSystem: fileSystem);
+        var server = new LoopbackServer(webRoot, dial, version, channel, startupLog, port: requestedGuiPort, capability: capability, mediaLeases: mediaLeases, fileSystem: fileSystem);
         server.Start();
+        var url = $"http://localhost:{server.Port}{startPath}";
+        startupLog.AppStarting(channel, version, url, Environment.GetEnvironmentVariable("COVE_ENGINE") ?? "bundled");
         var capSeparator = url.Contains('?') ? "&" : "?";
         var authorizedUrl = $"{url}{capSeparator}__cap={capability}";
 

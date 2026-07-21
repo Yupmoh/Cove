@@ -7,8 +7,8 @@ public sealed class GuiLaunchOptionsTests
 {
     [Theory]
     [InlineData(null, "dev", 7420)]
-    [InlineData("", "stable", 7421)]
-    [InlineData(" ", "stable", 7421)]
+    [InlineData("", "stable", 0)]
+    [InlineData(" ", "stable", 0)]
     [InlineData(null, "preview", 7420)]
     public void ResolveLoopbackPort_DefaultsByChannel(string? value, string channel, int expected)
     {
