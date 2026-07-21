@@ -25,6 +25,20 @@ public sealed class EngineEventRouterTests
         Assert.Equal("cove://commands/nook.rename", second.Uri);
     }
 
+    [Fact]
+    public async Task RecentSessionChanges_EmitTypedMonotonicRevisionedEvents()
+    {
+        await using var harness = await RouterHarness.CreateAsync();
+
+        harness.Router.PublishRecentSessionsChanged();
+        var first = await harness.ReadRecentSessionsChangedAsync();
+        harness.Router.PublishRecentSessionsChanged();
+        var second = await harness.ReadRecentSessionsChangedAsync();
+
+        Assert.Equal(1, first.Revision);
+        Assert.Equal(2, second.Revision);
+    }
+
     [Theory]
     [InlineData("cove://commands/layout.mutate", true)]
     [InlineData("cove://commands/nook.spawn", true)]
@@ -108,6 +122,23 @@ public sealed class EngineEventRouterTests
                     continue;
                 return controlEvent.Payload.Deserialize(
                     CoveJsonContext.Default.WorkspaceChangedEvent)!;
+            }
+        }
+
+        public async Task<SessionRecentsChangedEvent> ReadRecentSessionsChangedAsync()
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            while (true)
+            {
+                var frame = await _receiver.ReadFrameAsync(cts.Token);
+                Assert.NotNull(frame);
+                if (frame.Value.Header.Type != FrameType.Event)
+                    continue;
+                var controlEvent = ControlCodec.DecodeEvent(frame.Value.Payload);
+                if (controlEvent.Channel != "session.recents.changed")
+                    continue;
+                return controlEvent.Payload.Deserialize(
+                    CoveJsonContext.Default.SessionRecentsChangedEvent)!;
             }
         }
 

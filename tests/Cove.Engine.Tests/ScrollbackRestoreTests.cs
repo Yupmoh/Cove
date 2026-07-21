@@ -190,5 +190,23 @@ public sealed class ScrollbackRestoreTests
             reg.Dispose();
         }
     }
+    [PlatformFact(TestOperatingSystem.Unix)]
+    public void StoreTerminalCheckpoint_UsesInclusiveRingCapacityBoundary()
+    {
+        var host = PtyHostFactory.Create(NullLogger.Instance);
+        var reg = new NookRegistry(host, NullLogger.Instance);
+        try
+        {
+            reg.RespawnAs("nook-boundary-valid", "/bin/sh", new[] { "-c", "sleep 1" }, "/tmp", 80, 24, new byte[PtyConstants.DefaultRingCapacityBytes]);
+            Assert.True(reg.StoreTerminalCheckpoint("nook-boundary-valid", Encoding.UTF8.GetBytes("STATE"), 0, 80, 24, 10000));
+
+            reg.RespawnAs("nook-boundary-expired", "/bin/sh", new[] { "-c", "sleep 1" }, "/tmp", 80, 24, new byte[PtyConstants.DefaultRingCapacityBytes + 1]);
+            Assert.False(reg.StoreTerminalCheckpoint("nook-boundary-expired", Encoding.UTF8.GetBytes("STATE"), 0, 80, 24, 10000));
+        }
+        finally
+        {
+            reg.Dispose();
+        }
+    }
 
 }

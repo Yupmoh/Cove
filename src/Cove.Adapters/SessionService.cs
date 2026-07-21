@@ -78,7 +78,13 @@ public sealed class SessionService
             {
                 var (ok, sessions) = await FetchSessionsAsync(adapter, adapterDir, cwd, CancellationToken.None).ConfigureAwait(false);
                 if (ok)
+                {
+                    var changed = !_cache.TryGetValue(key, out var previous)
+                        || !previous.sessions.SequenceEqual(sessions);
                     _cache[key] = (sessions, _time.GetUtcNow());
+                    if (changed)
+                        _backgroundRefreshCompleted?.Invoke();
+                }
             }
             catch (Exception ex)
             {
@@ -87,7 +93,6 @@ public sealed class SessionService
             finally
             {
                 _refreshing.TryRemove(key, out _);
-                _backgroundRefreshCompleted?.Invoke();
             }
         });
     }

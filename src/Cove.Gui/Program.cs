@@ -43,6 +43,8 @@ internal static class Program
 
         var link = new EngineLink(dial, version, channel);
         link.SetLogger(loggerFactory.CreateLogger<EngineLink>());
+        var checkpointLink = link.CreateBackgroundLink();
+        checkpointLink.SetLogger(loggerFactory.CreateLogger("Cove.Gui.EngineLink.Checkpoint"));
 
         var app = RynApplication.CreateBuilder()
             .ConfigureOptions(o =>
@@ -67,7 +69,12 @@ internal static class Program
                 s.AddSingleton(provider => new DictationHost(
                     provider.GetRequiredService<ILogger<DictationHost>>(),
                     link.RequestAsync));
-                s.AddSingleton<CoveGuiCommands>();
+                s.AddSingleton(provider => new CoveGuiCommands(
+                    link,
+                    checkpointLink,
+                    provider.GetRequiredService<ILogger<CoveGuiCommands>>(),
+                    provider.GetRequiredService<DictationHost>(),
+                    mediaLeases));
                 s.AddRynCommands();
                 s.AddCoveGuiCommands();
                 s.AddRynMenuBar();
@@ -105,6 +112,19 @@ internal static class Program
             {
                 startupLog.GuiResourceDisposalFailed(
                     "dictation",
+                    ex.Message);
+            }
+            try
+            {
+                checkpointLink.DisposeAsync()
+                    .AsTask()
+                    .GetAwaiter()
+                    .GetResult();
+            }
+            catch (Exception ex)
+            {
+                startupLog.GuiResourceDisposalFailed(
+                    "checkpoint-engine-link",
                     ex.Message);
             }
             try

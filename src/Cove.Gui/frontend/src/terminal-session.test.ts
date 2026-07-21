@@ -80,11 +80,25 @@ function socket(): TestSocket {
   };
 }
 
-function relayFrame(offset: number, raw: number[]): ArrayBuffer {
+function relayFrame(offset: number, raw: ArrayLike<number>): ArrayBuffer {
   const frame = new ArrayBuffer(8 + raw.length);
   new DataView(frame).setBigUint64(0, BigInt(offset), true);
   new Uint8Array(frame, 8).set(raw);
   return frame;
+}
+
+function deferred<T = unknown>(): {
+  promise: Promise<T>;
+  resolve(value: T): void;
+  reject(reason: unknown): void;
+} {
+  let resolve!: (value: T) => void;
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((accept, decline) => {
+    resolve = accept;
+    reject = decline;
+  });
+  return { promise, resolve, reject };
 }
 
 describe("TerminalSession", () => {
@@ -554,6 +568,214 @@ describe("TerminalSession", () => {
     expect([session.receivedOffset, session.committedOffset, session.acknowledgedOffset]).toEqual([2, 2, 0]);
 
     session.dispose();
+    vi.unstubAllGlobals();
+  });
+  it("waits for a true quiet period before serializing sustained output", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("location", { host: "localhost" });
+    vi.stubGlobal("WebSocket", { OPEN: 1, CLOSING: 2, CLOSED: 3 });
+    const owned = resources();
+    vi.mocked(owned.serialize.serialize).mockReturnValue("serialized vt");
+    const liveSocket = socket();
+    const deps = dependencies(owned);
+    deps.invoke = vi.fn(async <T>() => ({} as T));
+    vi.mocked(deps.createSocket).mockReturnValue(liveSocket as unknown as WebSocket);
+    const session = new TerminalSession(
+      "nook-1",
+      0,
+      { isConnected: true } as HTMLElement,
+      {} as HTMLElement,
+      deps,
+      false,
+    );
+
+    session.connect();
+    liveSocket.onmessage?.({ data: JSON.stringify({ t: "base", off: 0, head: 0, modes: "" }) } as MessageEvent);
+    for (let offset = 0; offset < 5; offset += 1) {
+      liveSocket.onmessage?.({ data: relayFrame(offset, [65]) } as MessageEvent);
+      await vi.advanceTimersByTimeAsync(900);
+    }
+
+    expect(owned.serialize.serialize).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(99);
+    expect(owned.serialize.serialize).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(owned.serialize.serialize).toHaveBeenCalledOnce();
+    expect(deps.invoke).toHaveBeenCalledWith("app.nookCheckpoint", {
+      nookId: "nook-1",
+      serializedVt: "serialized vt",
+      offset: 5,
+      cols: 80,
+      rows: 24,
+      scrollbackLines: 9000,
+    });
+
+    session.dispose();
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("checkpoints at each accepted 4 MiB safety watermark", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("location", { host: "localhost" });
+    vi.stubGlobal("WebSocket", { OPEN: 1, CLOSING: 2, CLOSED: 3 });
+    const owned = resources();
+    const liveSocket = socket();
+    const deps = dependencies(owned);
+    deps.invoke = vi.fn(async <T>() => ({} as T));
+    vi.mocked(deps.createSocket).mockReturnValue(liveSocket as unknown as WebSocket);
+    const session = new TerminalSession(
+      "nook-1",
+      0,
+      { isConnected: true } as HTMLElement,
+      {} as HTMLElement,
+      deps,
+      false,
+    );
+
+    session.connect();
+    liveSocket.onmessage?.({ data: JSON.stringify({ t: "base", off: 0, head: 0, modes: "" }) } as MessageEvent);
+    liveSocket.onmessage?.({ data: relayFrame(0, new Uint8Array(4 * 1024 * 1024)) } as MessageEvent);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(owned.serialize.serialize).toHaveBeenCalledOnce();
+    expect(deps.invoke).toHaveBeenCalledOnce();
+    liveSocket.onmessage?.({
+      data: relayFrame(4 * 1024 * 1024, new Uint8Array(4 * 1024 * 1024 - 1)),
+    } as MessageEvent);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(deps.invoke).toHaveBeenCalledOnce();
+    liveSocket.onmessage?.({
+      data: relayFrame(8 * 1024 * 1024 - 1, [1]),
+    } as MessageEvent);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(deps.invoke).toHaveBeenCalledTimes(2);
+
+    session.dispose();
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("prevents overlapping checkpoint requests and runs one trailing attempt", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("location", { host: "localhost" });
+    vi.stubGlobal("WebSocket", { OPEN: 1, CLOSING: 2, CLOSED: 3 });
+    const owned = resources();
+    const liveSocket = socket();
+    const firstCheckpoint = deferred();
+    const deps = dependencies(owned);
+    deps.invoke = vi.fn(() => firstCheckpoint.promise);
+    vi.mocked(deps.createSocket).mockReturnValue(liveSocket as unknown as WebSocket);
+    const session = new TerminalSession(
+      "nook-1",
+      0,
+      { isConnected: true } as HTMLElement,
+      {} as HTMLElement,
+      deps,
+      false,
+    );
+
+    session.connect();
+    liveSocket.onmessage?.({ data: JSON.stringify({ t: "base", off: 0, head: 0, modes: "" }) } as MessageEvent);
+    liveSocket.onmessage?.({ data: relayFrame(0, [65]) } as MessageEvent);
+    await vi.advanceTimersByTimeAsync(1000);
+    liveSocket.onmessage?.({ data: relayFrame(1, [66]) } as MessageEvent);
+    liveSocket.onmessage?.({ data: relayFrame(2, [67]) } as MessageEvent);
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(deps.invoke).toHaveBeenCalledOnce();
+    firstCheckpoint.resolve({});
+    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(deps.invoke).toHaveBeenCalledTimes(2);
+
+    session.dispose();
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("defers ordinary checkpointing while terminal input is pending and recent", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("location", { host: "localhost" });
+    vi.stubGlobal("WebSocket", { OPEN: 1, CLOSING: 2, CLOSED: 3 });
+    let onData: ((data: string) => void) | undefined;
+    const owned = resources();
+    owned.term.onData = vi.fn((handler: (data: string) => void) => {
+      onData = handler;
+      return { dispose: vi.fn() };
+    }) as TerminalSessionResources["term"]["onData"];
+    const liveSocket = socket();
+    const input = deferred<void>();
+    const deps = dependencies(owned);
+    deps.invoke = vi.fn(async <T>() => ({} as T));
+    deps.write = vi.fn(() => input.promise);
+    vi.mocked(deps.createSocket).mockReturnValue(liveSocket as unknown as WebSocket);
+    const session = new TerminalSession(
+      "nook-1",
+      0,
+      { isConnected: true } as HTMLElement,
+      {} as HTMLElement,
+      deps,
+      false,
+    );
+
+    session.connect();
+    liveSocket.onmessage?.({ data: JSON.stringify({ t: "base", off: 0, head: 0, modes: "" }) } as MessageEvent);
+    liveSocket.onmessage?.({ data: relayFrame(0, [65]) } as MessageEvent);
+    onData?.("x");
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(owned.serialize.serialize).not.toHaveBeenCalled();
+
+    input.resolve();
+    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(999);
+    expect(owned.serialize.serialize).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(owned.serialize.serialize).toHaveBeenCalledOnce();
+
+    session.dispose();
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("keeps the last accepted offset authoritative after checkpoint rejection", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("location", { host: "localhost" });
+    vi.stubGlobal("WebSocket", { OPEN: 1, CLOSING: 2, CLOSED: 3 });
+    const owned = resources();
+    const liveSocket = socket();
+    const firstCheckpoint = deferred();
+    const deps = dependencies(owned);
+    deps.invoke = vi.fn()
+      .mockImplementationOnce(() => firstCheckpoint.promise)
+      .mockResolvedValue({});
+    vi.mocked(deps.createSocket).mockReturnValue(liveSocket as unknown as WebSocket);
+    const session = new TerminalSession(
+      "nook-1",
+      0,
+      { isConnected: true } as HTMLElement,
+      {} as HTMLElement,
+      deps,
+      false,
+    );
+
+    session.connect();
+    liveSocket.onmessage?.({ data: JSON.stringify({ t: "base", off: 0, head: 0, modes: "" }) } as MessageEvent);
+    liveSocket.onmessage?.({ data: relayFrame(0, new Uint8Array(4 * 1024 * 1024)) } as MessageEvent);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(deps.invoke).toHaveBeenCalledOnce();
+
+    firstCheckpoint.reject(undefined);
+    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(deps.invoke).toHaveBeenCalledTimes(2);
+    expect(deps.warn).toHaveBeenCalledWith("terminal checkpoint failed", {
+      nookId: "nook-1",
+      error: "undefined",
+    });
+
+    session.dispose();
+    vi.useRealTimers();
     vi.unstubAllGlobals();
   });
 });

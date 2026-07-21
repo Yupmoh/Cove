@@ -10,6 +10,8 @@ import { FrontendCommand } from "./app/frontend-command";
 import type { NookWrite } from "./write-queue";
 
 const CREDIT_THRESHOLD = 131072;
+const CHECKPOINT_QUIET_MS = 1000;
+const CHECKPOINT_SAFETY_BYTES = 4 * 1024 * 1024;
 type TimeoutHandle = ReturnType<typeof globalThis.setTimeout>;
 type IntervalHandle = ReturnType<typeof globalThis.setInterval>;
 
@@ -76,6 +78,13 @@ export class TerminalSession {
   private replayCommittedCursorOffset: number;
   private replayAcknowledgedCursorOffset: number;
   private reconnectCursorOffset: number;
+  private acceptedCheckpointOffset: number;
+  private checkpointInFlight = false;
+  private checkpointDirty = false;
+  private lastCheckpointActivityAt = 0;
+  private pendingTerminalInput = 0;
+  private lastTerminalInputAt = Number.NEGATIVE_INFINITY;
+  private pendingTerminalWrites = 0;
 
   constructor(
     readonly nookId: string,
@@ -109,6 +118,7 @@ export class TerminalSession {
     this.replayCommittedCursorOffset = since;
     this.replayAcknowledgedCursorOffset = since;
     this.reconnectCursorOffset = since;
+    this.acceptedCheckpointOffset = since;
     this.replayTargetOffset = since;
     this.resetOnReplay = resetOnReplay;
     this.observe(host);
@@ -263,17 +273,18 @@ export class TerminalSession {
       this.advanceReceivedOffset(nextOffset);
       this.keyboard.push(raw);
       const controlEpoch = this.controlEpoch;
-      const commit = () => {
-        if (!current() || this.controlEpoch !== controlEpoch) return;
+      this.pendingTerminalWrites += 1;
+      this.term.write(raw, () => {
+        this.pendingTerminalWrites -= 1;
+        if (!current() || this.controlEpoch !== controlEpoch) {
+          if (this.pendingTerminalWrites === 0 && this.checkpointDirty) this.armCheckpointTimer();
+          return;
+        }
         this.replayCommittedCursorOffset = nextOffset;
         this.reconnectCursorOffset = nextOffset;
         this.advanceCommittedOffset(nextOffset);
         if (this.replayCommittedCursorOffset - this.replayAcknowledgedCursorOffset >= CREDIT_THRESHOLD) sendAck();
         this.scheduleCheckpoint();
-      };
-      this.term.write(raw, () => {
-        if (!current() || this.controlEpoch !== controlEpoch) return;
-        commit();
         if (this.replaying && nextOffset >= this.replayTargetOffset) this.finishReplay();
       });
     };
@@ -462,33 +473,114 @@ export class TerminalSession {
   }
 
   private scheduleCheckpoint(): void {
-    if (this.checkpointTimer !== null || this.disposed) return;
-    const controlEpoch = this.controlEpoch;
+    if (this.disposed || this.exited) return;
+    this.checkpointDirty = true;
+    this.lastCheckpointActivityAt = Date.now();
+    this.armCheckpointTimer();
+  }
+
+  private armCheckpointTimer(): void {
+    this.clearCheckpointTimer();
+    if (
+      !this.checkpointDirty
+      || this.checkpointInFlight
+      || this.disposed
+      || this.exited
+    ) return;
+    const now = Date.now();
+    const safetyDue = this.replayCommittedCursorOffset - this.acceptedCheckpointOffset >= CHECKPOINT_SAFETY_BYTES;
+    const outputDueAt = safetyDue ? now : this.lastCheckpointActivityAt + CHECKPOINT_QUIET_MS;
+    const inputDueAt = this.lastTerminalInputAt + CHECKPOINT_QUIET_MS;
+    const delay = Math.max(0, outputDueAt, inputDueAt) - now;
     const checkpointTimer = globalThis.setTimeout(() => {
       if (this.checkpointTimer !== checkpointTimer) return;
       this.checkpointTimer = null;
-      if (
-        this.controlEpoch !== controlEpoch
-        || this.replaying
-        || this.restoringCheckpoint
-        || this.replayCursorOffset !== this.replayCommittedCursorOffset
-        || this.exited
-        || this.disposed
-      ) return;
-      const settings = this.dependencies.settings();
-      const dataBase64 = toBase64Utf8(this.serialize.serialize());
-      void this.dependencies.invoke(FrontendCommand.AppNookCheckpoint, {
-        nookId: this.nookId,
-        dataBase64,
-        offset: this.replayCommittedCursorOffset,
-        cols: this.term.cols,
-        rows: this.term.rows,
-        scrollbackLines: settings.scrollback,
-      }).catch((error: unknown) => {
-        this.dependencies.warn("terminal checkpoint failed", { nookId: this.nookId, error: String(error) });
-      });
-    }, 1000);
+      this.startCheckpoint();
+    }, delay);
     this.checkpointTimer = checkpointTimer;
+  }
+
+  private startCheckpoint(): void {
+    if (
+      !this.checkpointDirty
+      || this.checkpointInFlight
+      || this.replaying
+      || this.restoringCheckpoint
+      || this.replayCursorOffset !== this.replayCommittedCursorOffset
+      || this.receivedCounter !== this.committedCounter
+      || this.pendingTerminalWrites !== 0
+      || this.pendingTerminalInput !== 0
+      || this.exited
+      || this.disposed
+    ) return;
+    const now = Date.now();
+    const safetyDue = this.replayCommittedCursorOffset - this.acceptedCheckpointOffset >= CHECKPOINT_SAFETY_BYTES;
+    const inputDueAt = this.lastTerminalInputAt + CHECKPOINT_QUIET_MS;
+    const outputDueAt = this.lastCheckpointActivityAt + CHECKPOINT_QUIET_MS;
+    if (now < inputDueAt || (!safetyDue && now < outputDueAt)) {
+      this.armCheckpointTimer();
+      return;
+    }
+    const settings = this.dependencies.settings();
+    const offset = this.replayCommittedCursorOffset;
+    const cols = this.term.cols;
+    const rows = this.term.rows;
+    const scrollbackLines = settings.scrollback;
+    const serializedVt = this.serialize.serialize();
+    this.checkpointDirty = false;
+    this.checkpointInFlight = true;
+    let request: Promise<unknown>;
+    try {
+      request = this.dependencies.invoke(FrontendCommand.AppNookCheckpoint, {
+        nookId: this.nookId,
+        serializedVt,
+        offset,
+        cols,
+        rows,
+        scrollbackLines,
+      });
+    } catch (error) {
+      this.settleCheckpoint(offset, false, error);
+      return;
+    }
+    void request.then(
+      () => this.settleCheckpoint(offset, true),
+      (error: unknown) => this.settleCheckpoint(offset, false, error),
+    );
+  }
+
+  private settleCheckpoint(offset: number, accepted: boolean, error?: unknown): void {
+    this.checkpointInFlight = false;
+    if (accepted) {
+      this.acceptedCheckpointOffset = Math.max(this.acceptedCheckpointOffset, offset);
+    } else {
+      this.checkpointDirty = true;
+      this.dependencies.warn("terminal checkpoint failed", { nookId: this.nookId, error: String(error) });
+    }
+    if (this.checkpointDirty) this.armCheckpointTimer();
+  }
+
+  private writeTerminalInput(data: string): void {
+    this.pendingTerminalInput += 1;
+    this.lastTerminalInputAt = Date.now();
+    this.clearCheckpointTimer();
+    let request: Promise<unknown>;
+    try {
+      request = this.dependencies.write(this.nookId, toBase64Utf8(data));
+    } catch {
+      this.settleTerminalInput();
+      return;
+    }
+    void request.then(
+      () => this.settleTerminalInput(),
+      () => this.settleTerminalInput(),
+    );
+  }
+
+  private settleTerminalInput(): void {
+    this.pendingTerminalInput -= 1;
+    this.lastTerminalInputAt = Date.now();
+    if (this.pendingTerminalInput === 0 && this.checkpointDirty) this.armCheckpointTimer();
   }
 
   private bindTerminalHandlers(): void {
@@ -496,7 +588,7 @@ export class TerminalSession {
     this.handlersBound = true;
     this.term.onData((data) => {
       if (this.replaying) return;
-      void this.dependencies.write(this.nookId, toBase64Utf8(data));
+      this.writeTerminalInput(data);
     });
     this.term.onResize(({ cols, rows }) => {
       if (this.restoringCheckpoint) return;
@@ -514,7 +606,7 @@ export class TerminalSession {
         return true;
       }
       if (event.shiftKey && event.key === "Enter") {
-        void this.dependencies.write(this.nookId, toBase64Utf8(shiftEnterSequence(this.keyboard.encoding())));
+        this.writeTerminalInput(shiftEnterSequence(this.keyboard.encoding()));
         return false;
       }
       if (!event.metaKey || event.altKey || event.ctrlKey) return true;
@@ -524,7 +616,7 @@ export class TerminalSession {
           const selection = this.term.getSelection();
           if (selection && navigator.clipboard) void navigator.clipboard.writeText(selection);
         } else {
-          void this.dependencies.write(this.nookId, toBase64Utf8("\u0003"));
+          this.writeTerminalInput("\u0003");
         }
         return false;
       }
@@ -535,21 +627,21 @@ export class TerminalSession {
       if (key === "v") {
         if (navigator.clipboard?.readText) {
           void navigator.clipboard.readText().then((text) => {
-            if (text) void this.dependencies.write(this.nookId, toBase64Utf8(text));
+            if (text) this.writeTerminalInput(text);
           });
         }
         return false;
       }
       if (event.key === "ArrowLeft") {
-        void this.dependencies.write(this.nookId, toBase64Utf8("\u0001"));
+        this.writeTerminalInput("\u0001");
         return false;
       }
       if (event.key === "ArrowRight") {
-        void this.dependencies.write(this.nookId, toBase64Utf8("\u0005"));
+        this.writeTerminalInput("\u0005");
         return false;
       }
       if (event.key === "Backspace") {
-        void this.dependencies.write(this.nookId, toBase64Utf8("\u0015"));
+        this.writeTerminalInput("\u0015");
         return false;
       }
       return true;

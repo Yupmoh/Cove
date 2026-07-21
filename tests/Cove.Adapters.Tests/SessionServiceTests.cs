@@ -88,7 +88,7 @@ public sealed class SessionServiceTests
     }
 
     [ExternalFact(TestOperatingSystem.Unix, "bash")]
-    public async Task ListRecentSessions_ServesStaleImmediately_ThenRefreshesInBackground()
+    public async Task ListRecentSessions_ChangedBackgroundRefresh_NotifiesOnce()
     {
         var dir = NewDir();
         try
@@ -97,10 +97,15 @@ public sealed class SessionServiceTests
             echo '{"sessions":[{"id":"v1","cwd":"/repo","lastActive":"2024-01-01T00:00:00Z"}]}'
             """);
             var refreshed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var refreshCount = 0;
             var svc = new SessionService(
                 new MethodRunner(),
                 cacheTtl: TimeSpan.Zero,
-                backgroundRefreshCompleted: () => refreshed.TrySetResult());
+                backgroundRefreshCompleted: () =>
+                {
+                    Interlocked.Increment(ref refreshCount);
+                    refreshed.TrySetResult();
+                });
 
             var first = await svc.ListRecentSessionsAsync(dir, "/repo");
             Assert.Equal("v1", Assert.Single(first).Id);
@@ -114,44 +119,74 @@ public sealed class SessionServiceTests
 
             await AsyncTest.CompletesWithinAsync(refreshed.Task, TimeSpan.FromSeconds(10), "background refresh never completed");
             Assert.Equal("v2", Assert.Single(await svc.ListRecentSessionsAsync(dir, "/repo")).Id);
+            await Task.Delay(200);
+            Assert.Equal(1, Volatile.Read(ref refreshCount));
         }
         finally { TestDirectory.Delete(dir); }
     }
 
     [ExternalFact(TestOperatingSystem.Unix, "bash")]
-    public async Task ListRecentSessions_FailedBackgroundRefresh_KeepsStaleAndRecovers()
+    public async Task ListRecentSessions_UnchangedBackgroundRefresh_DoesNotNotify()
     {
         var dir = NewDir();
         try
         {
+            var completed = Path.Combine(dir, "completed");
             WriteScript(dir, "list_recent_sessions.sh", """
             echo '{"sessions":[{"id":"v1","cwd":"/repo","lastActive":"2024-01-01T00:00:00Z"}]}'
             """);
             var refreshCount = 0;
-            var failedRefresh = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            var recoveredRefresh = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var svc = new SessionService(
                 new MethodRunner(),
                 cacheTtl: TimeSpan.Zero,
-                backgroundRefreshCompleted: () =>
-                {
-                    if (Interlocked.Increment(ref refreshCount) == 1)
-                        failedRefresh.TrySetResult();
-                    else
-                        recoveredRefresh.TrySetResult();
-                });
+                backgroundRefreshCompleted: () => Interlocked.Increment(ref refreshCount));
             Assert.Equal("v1", Assert.Single(await svc.ListRecentSessionsAsync(dir, "/repo")).Id);
 
-            WriteScript(dir, "list_recent_sessions.sh", "exit 1");
-            Assert.Equal("v1", Assert.Single(await svc.ListRecentSessionsAsync(dir, "/repo")).Id);
-            await AsyncTest.CompletesWithinAsync(failedRefresh.Task, TimeSpan.FromSeconds(10), "failed background refresh never completed");
-
-            WriteScript(dir, "list_recent_sessions.sh", """
-            echo '{"sessions":[{"id":"v3","cwd":"/repo","lastActive":"2024-03-01T00:00:00Z"}]}'
+            WriteScript(dir, "list_recent_sessions.sh", $$"""
+            trap 'touch "{{completed}}"' EXIT
+            echo '{"sessions":[{"id":"v1","cwd":"/repo","lastActive":"2024-01-01T00:00:00Z"}]}'
             """);
             Assert.Equal("v1", Assert.Single(await svc.ListRecentSessionsAsync(dir, "/repo")).Id);
-            await AsyncTest.CompletesWithinAsync(recoveredRefresh.Task, TimeSpan.FromSeconds(10), "recovery refresh never completed");
-            Assert.Equal("v3", Assert.Single(await svc.ListRecentSessionsAsync(dir, "/repo")).Id);
+            await AsyncTest.EventuallyAsync(
+                () => File.Exists(completed),
+                TimeSpan.FromSeconds(10),
+                "unchanged background refresh never completed");
+            await Task.Delay(200);
+
+            Assert.Equal(0, Volatile.Read(ref refreshCount));
+        }
+        finally { TestDirectory.Delete(dir); }
+    }
+
+    [ExternalFact(TestOperatingSystem.Unix, "bash")]
+    public async Task ListRecentSessions_FailedBackgroundRefresh_KeepsStaleWithoutNotifying()
+    {
+        var dir = NewDir();
+        try
+        {
+            var completed = Path.Combine(dir, "completed");
+            WriteScript(dir, "list_recent_sessions.sh", """
+            echo '{"sessions":[{"id":"v1","cwd":"/repo","lastActive":"2024-01-01T00:00:00Z"}]}'
+            """);
+            var refreshCount = 0;
+            var svc = new SessionService(
+                new MethodRunner(),
+                cacheTtl: TimeSpan.Zero,
+                backgroundRefreshCompleted: () => Interlocked.Increment(ref refreshCount));
+            Assert.Equal("v1", Assert.Single(await svc.ListRecentSessionsAsync(dir, "/repo")).Id);
+
+            WriteScript(dir, "list_recent_sessions.sh", $$"""
+            trap 'touch "{{completed}}"' EXIT
+            exit 1
+            """);
+            Assert.Equal("v1", Assert.Single(await svc.ListRecentSessionsAsync(dir, "/repo")).Id);
+            await AsyncTest.EventuallyAsync(
+                () => File.Exists(completed),
+                TimeSpan.FromSeconds(10),
+                "failed background refresh never completed");
+            await Task.Delay(200);
+
+            Assert.Equal(0, Volatile.Read(ref refreshCount));
         }
         finally { TestDirectory.Delete(dir); }
     }

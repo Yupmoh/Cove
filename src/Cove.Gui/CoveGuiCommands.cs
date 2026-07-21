@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text;
 using Cove.Protocol;
 using Microsoft.Extensions.Logging;
 using Ryn.Ipc;
@@ -9,12 +10,24 @@ public sealed class CoveGuiCommands
 {
     private const int MaxFrontendMessageLength = 2000;
     private readonly EngineLink _link;
+    private readonly EngineLink _checkpointLink;
     private readonly ILogger<CoveGuiCommands> _log;
     private readonly DictationHost _dictation;
     private readonly MediaLeaseRegistry _mediaLeases;
     public CoveGuiCommands(EngineLink link, ILogger<CoveGuiCommands> log, DictationHost dictation, MediaLeaseRegistry mediaLeases)
+        : this(link, link, log, dictation, mediaLeases)
+    {
+    }
+
+    public CoveGuiCommands(
+        EngineLink link,
+        EngineLink checkpointLink,
+        ILogger<CoveGuiCommands> log,
+        DictationHost dictation,
+        MediaLeaseRegistry mediaLeases)
     {
         _link = link;
+        _checkpointLink = checkpointLink;
         _log = log;
         _dictation = dictation;
         _mediaLeases = mediaLeases;
@@ -102,10 +115,11 @@ public sealed class CoveGuiCommands
     }
 
     [RynCommand("app.nookCheckpoint")]
-    public async ValueTask<string> NookCheckpoint(string nookId, string dataBase64, long offset, int cols, int rows, int scrollbackLines, CancellationToken ct)
+    public async ValueTask<string> NookCheckpoint(string nookId, string serializedVt, long offset, int cols, int rows, int scrollbackLines, CancellationToken ct)
     {
+        var dataBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(serializedVt));
         var p = JsonSerializer.SerializeToElement(new NookCheckpointParams(nookId, dataBase64, offset, cols, rows, scrollbackLines), CoveJsonContext.Default.NookCheckpointParams);
-        return await Call("cove://commands/nook.checkpoint", p, ct);
+        return await Call(_checkpointLink, "cove://commands/nook.checkpoint", p, ct);
     }
 
     [RynCommand("app.nookKill")]
@@ -235,10 +249,13 @@ public sealed class CoveGuiCommands
         }
         return r.Data is { } d ? d.GetRawText() : "{}";
     }
-    private async ValueTask<string> Call(string uri, JsonElement? p, CancellationToken ct)
+    private ValueTask<string> Call(string uri, JsonElement? p, CancellationToken ct)
+        => Call(_link, uri, p, ct);
+
+    private async ValueTask<string> Call(EngineLink link, string uri, JsonElement? p, CancellationToken ct)
     {
         _log.CommandInvoked(uri);
-        var r = await _link.RequestAsync(uri, p, ct);
+        var r = await link.RequestAsync(uri, p, ct);
         if (!r.Ok)
         {
             var error = r.Error?.Message ?? r.Error?.Code ?? "engine_error";

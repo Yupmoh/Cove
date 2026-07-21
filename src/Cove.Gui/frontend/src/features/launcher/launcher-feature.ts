@@ -1,5 +1,7 @@
 import { FrontendCommand } from "../../app/frontend-command";
 import { LifecycleScope } from "../../app/lifecycle";
+import type { EngineEventPayloads } from "../../app/engine-event-router";
+import type { ComponentHandle } from "../../app/lifecycle";
 import { invoke } from "../../invoke";
 import {
   buildAdapterTiles,
@@ -70,8 +72,16 @@ interface ContextMenuItem {
   danger?: boolean;
 }
 
+export interface LauncherEventRegistrar {
+  register<K extends keyof EngineEventPayloads>(
+    channel: K,
+    handler: (payload: EngineEventPayloads[K]) => void,
+  ): ComponentHandle;
+}
+
 export interface LauncherFeatureDependencies {
   document: Document;
+  engineEvents?: LauncherEventRegistrar;
   root: HTMLElement;
   agentsRoot: HTMLElement;
   workspace: WorkspaceStore;
@@ -271,38 +281,106 @@ let launcherRecents: RecentSessionRow[] = [];
 
 interface SessionRecentResult { sessions: RecentSessionRow[]; }
 
+const RECENTS_FALLBACK_MS = 30_000;
+let launcherRecentsRevision = 0;
+let recentsRefreshScheduled = false;
+let recentsRefreshRunning = false;
+let recentsRefreshTrailing = false;
+let recentsRefreshPromise: Promise<void> | null = null;
+let resolveRecentsRefresh: (() => void) | null = null;
+let launcherDisposed = false;
+
 async function loadLauncherAdapters(): Promise<void> {
   try {
     const result = await invoke<AdapterListResult>(FrontendCommand.AppAdapterList, {});
     launcherAdapters = mapLauncherAdapters(result.adapters);
   } catch { launcherAdapters = []; }
-  await Promise.all([loadLauncherRecents(), loadLauncherProfiles()]);
+  await loadLauncherProfiles();
   if ((workspace.snapshot?.shores ?? []).length === 0) renderShore();
 }
 
-let launcherRecentsCwd: string | null = null;
-
-let launcherRecentsAt = 0;
+function repaintMountedLaunchers(): void {
+  for (const wrap of document.querySelectorAll<HTMLElement>(".box-launcher")) {
+    const ctx: LauncherContext = {
+      targetShoreId: wrap.dataset.shoreId || null,
+      targetPlaceholderId: wrap.dataset.placeholderId || null,
+    };
+    paintBoxLauncher(wrap, ctx);
+  }
+}
 
 async function loadLauncherRecents(): Promise<void> {
   const cwd = activeProjectDir();
   try {
-    const res = await invoke<SessionRecentResult>(FrontendCommand.SessionRecent, { cwd, limit: 0 });
-    launcherRecents = res.sessions ?? [];
-  } catch (err) {
-    console.warn("session.recent failed", cwd, err);
-    launcherRecents = [];
+    const result = await invoke<SessionRecentResult>(FrontendCommand.SessionRecent, { cwd, limit: 0 });
+    if (launcherDisposed || cwd !== activeProjectDir()) return;
+    const next = result.sessions ?? [];
+    const changed = JSON.stringify(next) !== JSON.stringify(launcherRecents);
+    launcherRecents = next;
+    if (changed) repaintMountedLaunchers();
+  } catch (error) {
+    console.warn("session.recent failed", cwd, error);
   }
-  launcherRecentsCwd = cwd;
-  launcherRecentsAt = Date.now();
 }
 
-async function refreshLauncherRecents(): Promise<void> {
-  if (activeProjectDir() === launcherRecentsCwd && Date.now() - launcherRecentsAt < 4000) return;
-  const before = JSON.stringify(launcherRecents);
-  await loadLauncherRecents();
-  if (JSON.stringify(launcherRecents) !== before) renderShore();
+async function runLauncherRecentsRefresh(): Promise<void> {
+  recentsRefreshScheduled = false;
+  recentsRefreshRunning = true;
+  do {
+    recentsRefreshTrailing = false;
+    await loadLauncherRecents();
+  } while (recentsRefreshTrailing && !launcherDisposed);
+  recentsRefreshRunning = false;
+  const resolve = resolveRecentsRefresh;
+  resolveRecentsRefresh = null;
+  recentsRefreshPromise = null;
+  resolve?.();
 }
+
+function refreshLauncherRecents(): Promise<void> {
+  if (launcherDisposed) return Promise.resolve();
+  if (recentsRefreshRunning) {
+    recentsRefreshTrailing = true;
+    return recentsRefreshPromise ?? Promise.resolve();
+  }
+  if (recentsRefreshScheduled) return recentsRefreshPromise ?? Promise.resolve();
+  recentsRefreshScheduled = true;
+  recentsRefreshPromise = new Promise<void>((resolve) => {
+    resolveRecentsRefresh = resolve;
+  });
+  queueMicrotask(() => {
+    if (launcherDisposed) {
+      recentsRefreshScheduled = false;
+      const resolve = resolveRecentsRefresh;
+      resolveRecentsRefresh = null;
+      recentsRefreshPromise = null;
+      resolve?.();
+      return;
+    }
+    void runLauncherRecentsRefresh();
+  });
+  return recentsRefreshPromise;
+}
+
+function registerRecentsEvents(): void {
+  if (!dependencies.engineEvents) return;
+  const changed = dependencies.engineEvents.register("session.recents.changed", (event) => {
+    if (event.revision <= launcherRecentsRevision) return;
+    launcherRecentsRevision = event.revision;
+    void refreshLauncherRecents();
+  });
+  const reconnected = dependencies.engineEvents.register("engine.reconnected", () => {
+    launcherRecentsRevision = 0;
+    void refreshLauncherRecents();
+  });
+  lifecycle.own(() => changed.dispose());
+  lifecycle.own(() => reconnected.dispose());
+}
+
+registerRecentsEvents();
+lifecycle.interval(() => {
+  if (document.querySelector(".box-launcher")) void refreshLauncherRecents();
+}, RECENTS_FALLBACK_MS);
 
 const launcherProfiles = new Map<string, LaunchProfileListItem[]>();
 
@@ -389,7 +467,7 @@ function activateLauncherSelection(ctx: LauncherContext, harness: LauncherTile[]
 }
 
 function renderBoxLauncher(targetShoreId: string | null, targetPlaceholderId: string | null): HTMLElement {
-  void refreshLauncherRecents();
+  const coldMount = document.querySelector(".box-launcher") === null;
   void refreshLauncherProfiles();
   const ctx: LauncherContext = { targetShoreId, targetPlaceholderId };
   const wrap = document.createElement("div");
@@ -406,6 +484,7 @@ function renderBoxLauncher(targetShoreId: string | null, targetPlaceholderId: st
   });
   launcherObservers.add(ro);
   ro.observe(wrap);
+  if (coldMount) void refreshLauncherRecents();
   wrap.addEventListener("keydown", (e) => {
     if (e.key === "Shift") wrap.classList.add("show-keys");
     handleLauncherKey(e, wrap, ctx);
@@ -1069,12 +1148,13 @@ function renderDetailDock(ctx: LauncherContext, tile: LauncherTile): HTMLElement
     render: renderBoxLauncher,
     load: loadLauncherAdapters,
     refreshRecents: refreshLauncherRecents,
-    invalidateRecents: () => { launcherRecentsAt = 0; },
+    invalidateRecents: () => { void refreshLauncherRecents(); },
     buildAdapterLaunch,
     launchHarnessShellTask,
     yolo: launcherYolo,
     yoloKey: launcherYoloKey,
     async dispose() {
+      launcherDisposed = true;
       launcherEl.classList.remove("open");
       if (adapterRedetectTimer !== null) window.clearInterval(adapterRedetectTimer);
       if (launcherTipTimer !== null) window.clearInterval(launcherTipTimer);

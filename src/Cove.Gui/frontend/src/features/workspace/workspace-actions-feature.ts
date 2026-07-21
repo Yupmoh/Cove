@@ -99,7 +99,6 @@ async function reload(): Promise<BaySnapshot> {
   if (generation !== reloadGeneration) return snapshot;
   applyLayoutSnapshot(snapshot);
   void hydrateNookTitles(generation);
-  void launcherFeature.refreshRecents();
   return snapshot;
 }
 

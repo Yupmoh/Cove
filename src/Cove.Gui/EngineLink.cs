@@ -45,6 +45,9 @@ public sealed class EngineLink : IAsyncDisposable
 
     public void SetEngineEventHandler(System.Action<string, JsonElement> handler) { _onEngineEvent = handler; }
 
+    public EngineLink CreateBackgroundLink()
+        => new(_dial, _clientVersion, _channel, _providedControlToken);
+
     public async Task<ControlResponse> RequestAsync(string uri, JsonElement? paramsEl, CancellationToken ct)
     {
         var s = await EnsureConnectedAsync(ct);

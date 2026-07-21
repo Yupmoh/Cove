@@ -179,7 +179,8 @@ internal sealed class EngineRuntime : IAsyncDisposable
             HarnessUpdateChecker.CreateNpm(logger));
         var sessionService = new SessionService(
             new MethodRunner(logger: logger),
-            logger: logger);
+            logger: logger,
+            backgroundRefreshCompleted: events.PublishRecentSessionsChanged);
         var registryCachePath = Path.Combine(
             dataDir,
             "adapters",

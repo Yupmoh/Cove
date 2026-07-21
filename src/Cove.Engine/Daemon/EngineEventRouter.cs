@@ -14,6 +14,7 @@ internal sealed class EngineEventRouter
     private readonly Queue<IpcEventEntry> _ipcEvents = new();
     private RestorationSummaryEvent? _restorationSummary;
     private long _workspaceRevision;
+    private long _recentSessionsRevision;
     private bool _ipcMonitoring;
 
     public EngineEventRouter(CancellationToken shutdownToken)
@@ -23,6 +24,7 @@ internal sealed class EngineEventRouter
 
     public RestorationSummaryEvent? RestorationSummary => Volatile.Read(ref _restorationSummary);
     public long WorkspaceRevision => Interlocked.Read(ref _workspaceRevision);
+    public long RecentSessionsRevision => Interlocked.Read(ref _recentSessionsRevision);
     public bool HasGuiClients
     {
         get
@@ -136,6 +138,15 @@ internal sealed class EngineEventRouter
                 new WorkspaceChangedEvent(revision, uri),
                 CoveJsonContext.Default.WorkspaceChangedEvent);
         }
+    }
+
+    public void PublishRecentSessionsChanged()
+    {
+        var revision = Interlocked.Increment(ref _recentSessionsRevision);
+        Broadcast(
+            "session.recents.changed",
+            new SessionRecentsChangedEvent(revision),
+            CoveJsonContext.Default.SessionRecentsChangedEvent);
     }
 
     public void Broadcast<T>(string channel, T payload, JsonTypeInfo<T> typeInfo)

@@ -229,6 +229,7 @@ const settingsFeature = createSettingsFeature({
 
 const launcherFeature = createLauncherFeature({
   document,
+  engineEvents: applicationEvents,
   root: launcherEl,
   agentsRoot: launchAgentsEl,
   workspace,

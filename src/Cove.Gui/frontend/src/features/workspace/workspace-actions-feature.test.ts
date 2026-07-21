@@ -34,6 +34,7 @@ describe("WorkspaceActionsFeature", () => {
     const window = new Window();
     const workspace = new WorkspaceStore();
     const render = vi.fn();
+    const refreshRecents = vi.fn(async () => {});
     const invoke = vi.fn(async (command: string) => {
       if (command === "app.layoutGet") return snapshot();
       if (command === "app.nookList") return { nooks: [] };
@@ -50,7 +51,7 @@ describe("WorkspaceActionsFeature", () => {
       },
       shoreTabsFeature: { render: vi.fn(), setActiveWing: vi.fn() },
       workspaceSidebar: { render: vi.fn() },
-      launcherFeature: { refreshRecents: vi.fn(async () => {}) },
+      launcherFeature: { refreshRecents },
       invoke,
       runAction: vi.fn(),
     } as unknown as WorkspaceActionsDependencies;
@@ -59,6 +60,7 @@ describe("WorkspaceActionsFeature", () => {
     await feature.reload();
     expect(workspace.snapshot?.id).toBe("bay-1");
     expect(render).toHaveBeenCalledOnce();
+    expect(refreshRecents).not.toHaveBeenCalled();
     expect(feature.safeReplaceTarget("shore-1", "nook-1")).toBeNull();
 
     feature.dispose();
