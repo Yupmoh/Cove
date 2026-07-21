@@ -72,6 +72,22 @@ public sealed class NookLiveHandlerTests
         Array.Copy(all, head, count);
         return head;
     }
+    private static async Task<bool> ClosesWithoutStreamEndAsync(
+        FrameConnection conn, ulong streamId, CancellationToken ct)
+    {
+        while (true)
+        {
+            Frame? frame = await conn.ReadFrameAsync(ct);
+            if (frame is null)
+                return true;
+            if (frame.Value.Header.Type == FrameType.StreamEnd
+                && frame.Value.Header.StreamId == streamId)
+            {
+                return false;
+            }
+        }
+    }
+
 
     private static JsonElement WriteParamsJson(string nookId, string dataBase64)
     {
@@ -239,6 +255,64 @@ public sealed class NookLiveHandlerTests
         SubscribeResult continued = await SubscribeAsync(reconnect, nookId, 1, ct);
         Assert.Equal(1ul, continued.BaseOffset);
         Assert.Equal("", continued.TerminalCheckpointBase64);
+    }
+
+    [PlatformFact(TestOperatingSystem.Unix)]
+    public async Task NookRestart_ClosesStaleSubscriptionWithoutStreamEnd_AndReplacementStreams()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        CancellationToken ct = cts.Token;
+        await using var h = await DaemonTestHarness.StartAsync();
+        await using FrameConnection ctl = await h.ConnectAsync("cli");
+        string nookId = await SpawnAsync(
+            ctl, "/bin/cat", Array.Empty<string>(), 80, 24, ct);
+        await using FrameConnection stale = await h.ConnectAsync("gui");
+        SubscribeResult staleSubscription = await SubscribeAsync(
+            stale, nookId, 0, ct);
+        JsonElement restartParams = JsonSerializer.SerializeToElement(
+            new NookRestartParams(
+                nookId,
+                "command",
+                true,
+                "/bin/cat",
+                Array.Empty<string>()),
+            CoveJsonContext.Default.NookRestartParams);
+
+        ControlResponse restarted = await RequestAsync(
+            ctl,
+            "restart",
+            "cove://commands/nook.restart",
+            restartParams,
+            ct);
+
+        Assert.True(restarted.Ok, restarted.Error?.Message);
+        Assert.True(await ClosesWithoutStreamEndAsync(
+            stale,
+            staleSubscription.StreamId,
+            ct));
+        await using FrameConnection replacement = await h.ConnectAsync("gui");
+        SubscribeResult replacementSubscription = await SubscribeAsync(
+            replacement, nookId, 0, ct);
+        const string marker = "COVE_RESTART_STREAM_OK";
+        ControlResponse written = await RequestAsync(
+            ctl,
+            "restart-write",
+            "cove://commands/nook.write",
+            WriteParamsJson(
+                nookId,
+                Convert.ToBase64String(Encoding.ASCII.GetBytes(marker + "\n"))),
+            ct);
+        Assert.True(written.Ok, written.Error?.Message);
+        byte[] echoed = await ReadRawAsync(
+            replacement,
+            replacementSubscription.StreamId,
+            marker.Length,
+            ct);
+        Assert.Equal(marker, Encoding.ASCII.GetString(echoed));
+        NookInfo replacementInfo = Assert.Single(
+            await ListAsync(ctl, ct),
+            candidate => candidate.NookId == nookId);
+        Assert.True(replacementInfo.Alive);
     }
 
     [PlatformFact(TestOperatingSystem.Unix)]

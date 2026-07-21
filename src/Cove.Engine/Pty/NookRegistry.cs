@@ -413,6 +413,10 @@ public sealed class NookRegistry : IDisposable, Cove.Engine.Agents.INookWriter
     internal bool TryGetStreamState(string nookId, out NookStreamState state) =>
         _terminalState.TryGetStreamState(nookId, out state);
 
+    internal bool IsCurrentStreamSession(string nookId, long sessionId) =>
+        _sessions.TryGet(nookId, out var session)
+        && session.Session.SessionId == sessionId;
+
     internal bool Contains(string nookId) => _sessions.Contains(nookId);
 
     public void Dispose() => _sessions.Dispose();

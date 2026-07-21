@@ -219,6 +219,12 @@ internal sealed class NookStreamRouter
                 {
                     if (!childMarked && streamState.HasCompleted())
                     {
+                        if (!_nooks.IsCurrentStreamSession(
+                                parameters.NookId,
+                                streamState.SessionId))
+                        {
+                            break;
+                        }
                         sender.MarkChildExited(streamState.ExitCode());
                         childMarked = true;
                     }
