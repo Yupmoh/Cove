@@ -55,6 +55,18 @@ describe("PaletteFeature", () => {
     expect(root.classList.contains("open")).toBe(true);
   });
 
+  it("distinguishes loading from an empty search result", async () => {
+    const { root, feature, input, window } = fixture();
+
+    feature.open();
+    expect(root.querySelector(".pal-loading")?.textContent).toBe("Loading…");
+    await vi.waitFor(() => expect(root.querySelector(".pal-loading")).toBeNull());
+
+    input.value = "missing-command";
+    input.dispatchEvent(new window.Event("input"));
+    expect(root.querySelector(".pal-no-results")?.textContent).toBe("No results");
+  });
+
   it("loads palette tasks from the default scope", async () => {
     const { feature, invoke } = fixture();
 

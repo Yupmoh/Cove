@@ -1,5 +1,6 @@
 import { FrontendCommand } from "../../app/frontend-command";
 import { LifecycleScope, type ComponentHandle } from "../../app/lifecycle";
+import { createSurfaceMotion, type SurfaceMotion } from "../../app/surface-motion";
 
 export interface BayCreateDependencies {
   document: Document;
@@ -19,9 +20,11 @@ export interface BayCreateDependencies {
 export class BayCreateFeature implements ComponentHandle {
   private readonly lifecycle = new LifecycleScope();
   private selectedIcon: string | null = null;
+  private readonly surfaceMotion: SurfaceMotion;
 
   constructor(private readonly dependencies: BayCreateDependencies) {
     const { document, root } = dependencies;
+    this.surfaceMotion = createSurfaceMotion(root);
     this.lifecycle.listen(this.required(document, "wsc-close"), "click", () => this.close());
     this.lifecycle.listen(this.required(document, "wsc-cancel"), "click", () => this.close());
     this.lifecycle.listen(this.required(document, "wsc-browse"), "click", () => { void this.browse(); });
@@ -48,16 +51,16 @@ export class BayCreateFeature implements ComponentHandle {
     error.textContent = "";
     this.selectedIcon = null;
     this.renderIconGrid();
-    root.classList.add("open");
+    this.surfaceMotion.open();
     nameInput.focus();
   }
 
   close(): void {
-    this.dependencies.root.classList.remove("open");
+    this.surfaceMotion.close();
   }
 
   async dispose(): Promise<void> {
-    this.close();
+    this.surfaceMotion.dispose();
     await this.lifecycle.dispose();
   }
 

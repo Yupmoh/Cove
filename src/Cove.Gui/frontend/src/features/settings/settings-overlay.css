@@ -1,10 +1,14 @@
 #settings { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; padding: 16px; box-sizing: border-box; background: rgba(17, 17, 27, 0.55); z-index: 50; }
 #settings.open { display: flex; animation: set-backdrop-in 160ms ease-out; }
 #settings.open .set-box { animation: set-panel-in 160ms ease-out; }
+#settings.closing { display: flex; pointer-events: none; animation: set-backdrop-out 140ms ease-in forwards; }
+#settings.closing .set-box { animation: set-panel-out 140ms ease-in forwards; }
 @keyframes set-backdrop-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes set-panel-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes set-backdrop-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes set-panel-out { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(4px); } }
 @media (prefers-reduced-motion: reduce) {
-  #settings.open { animation: none; opacity: 1; }
-  #settings.open .set-box { animation: none; opacity: 1; transform: none; }
+  #settings.open, #settings.closing { animation: none; opacity: 1; }
+  #settings.open .set-box, #settings.closing .set-box { animation: none; opacity: 1; transform: none; }
 }
 @media (max-width: 360px) { #settings { padding: 8px; } }

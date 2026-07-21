@@ -1,5 +1,6 @@
 import { FrontendCommand } from "../../app/frontend-command";
 import { LifecycleScope, type ComponentHandle } from "../../app/lifecycle";
+import { createSurfaceMotion } from "../../app/surface-motion";
 import { orderSettingsTabs, settingsTabMetadata, resolveActiveSettingsTab } from "../../settings-tabs";
 import { adapterIconSvg, iconSvg } from "../../icons";
 import { adapterStatusMeta, toolsSubtitle, retentionChipVisible, retentionChipLabel, projectToolsAdapters, type ToolsAdapter } from "../../tools-tab";
@@ -63,6 +64,7 @@ export function createSettingsFeature(dependencies: SettingsFeatureDependencies)
   const document = dependencies.document;
   const storage = dependencies.storage;
   const settingsEl = dependencies.root;
+  const surfaceMotion = createSurfaceMotion(settingsEl);
   const setTabsEl = dependencies.tabs;
   const setBodyEl = dependencies.body;
   const gridEl = dependencies.grid;
@@ -112,14 +114,14 @@ function openSettings(tab?: string): void {
   } else {
     renderSettings();
   }
-  settingsEl.classList.add("open");
+  surfaceMotion.open();
   settingsEl.focus();
 }
 
 function closeSettings(): void {
   ++renderGeneration;
   cancelKeybindRecording();
-  settingsEl.classList.remove("open");
+  surfaceMotion.close();
   if (previousFocus?.isConnected) previousFocus.focus();
   else dependencies.focusActiveNook();
 }
@@ -1698,7 +1700,7 @@ async function onKeybindClear(chord: string, container: HTMLElement): Promise<vo
 
   async function dispose(): Promise<void> {
     cancelKeybindRecording();
-    settingsEl.classList.remove("open");
+    surfaceMotion.dispose();
     for (const overlay of ownedOverlays) overlay.remove();
     ownedOverlays.clear();
     await lifecycle.dispose();

@@ -1,16 +1,31 @@
 @keyframes cove-surface-pop-in { from { opacity: 0; transform: translateY(7px) scale(0.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @keyframes cove-rise-in { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes cove-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes cove-fade-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes cove-surface-pop-out { from { opacity: 1; transform: translateY(0) scale(1); } to { opacity: 0; transform: translateY(4px) scale(0.99); } }
 @keyframes nook-header-open-in { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes nook-open-reveal { from { opacity: 0.9; transform: scale(0.985); } to { opacity: 0; transform: scale(1); } }
+@keyframes nook-reposition { from { transform: translate(var(--nook-shift-x), var(--nook-shift-y)); } to { transform: translate(0, 0); } }
 
 
 
 .nook { border-radius: 11px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14); }
 .nook.nook-opening .nook-header { animation: nook-header-open-in 180ms ease-out; }
 .nook.nook-opening .term-host { animation: cove-fade-in 180ms ease-out; }
+.nook.nook-opening::before { content: ""; position: absolute; inset: 0; z-index: 6; pointer-events: none; border: 1px solid color-mix(in srgb, var(--accent) 48%, var(--border)); border-radius: inherit; background: color-mix(in srgb, var(--panel) 90%, var(--accent) 10%); animation: nook-open-reveal 200ms ease-out forwards; }
+.nook.nook-repositioning { z-index: 4; animation: nook-reposition 180ms ease-out; }
 .nook.focused { border-color: var(--accent-dim); box-shadow: 0 0 0 1px var(--accent-dim), 0 3px 10px rgba(0, 0, 0, 0.18); }
 .nook.agent-running { border-color: color-mix(in srgb, var(--agent-accent, #34c2b0) 62%, var(--border)); box-shadow: 0 0 0 1px color-mix(in srgb, var(--agent-accent, #34c2b0) 32%, transparent), 0 0 18px color-mix(in srgb, var(--agent-accent, #34c2b0) 20%, transparent); }
 .nook.agent-running.focused { box-shadow: 0 0 0 1px color-mix(in srgb, var(--agent-accent, #34c2b0) 48%, transparent), 0 0 22px color-mix(in srgb, var(--agent-accent, #34c2b0) 24%, transparent); }
+.nook.agent-transition-running::after,
+.nook.agent-transition-needs-input::after,
+.nook.agent-transition-done::after,
+.nook.agent-transition-idle::after {
+  content: ""; position: absolute; inset: 0; z-index: 5; pointer-events: none; border-radius: inherit;
+  box-shadow: inset 0 0 0 1px var(--agent-accent), inset 0 0 18px color-mix(in srgb, var(--agent-accent) 22%, transparent);
+  animation: nook-state-arrival 180ms ease-out forwards;
+}
+@keyframes nook-state-arrival { 0% { opacity: 0; } 42% { opacity: 1; } 100% { opacity: 0; } }
 .agent-row { transition: background 0.12s; }
 .tree-row { border-radius: 8px; transition: background 0.1s, color 0.1s; }
 .tree-row.active { box-shadow: none; }
@@ -26,5 +41,6 @@
 #shores-row #shore-tabs { border-radius: 11px; background: color-mix(in srgb, var(--panel) 55%, var(--panel-2)); }
 
 @media (prefers-reduced-motion: reduce) {
-  .nook.nook-opening .nook-header, .nook.nook-opening .term-host, .rtab, .rtab:hover, .rtab.active { animation: none; opacity: 1; transform: none; }
+  .nook.nook-opening::before, .nook.nook-opening .nook-header, .nook.nook-opening .term-host, .nook.nook-repositioning, .rtab, .rtab:hover, .rtab.active { animation: none; opacity: 1; transform: none; }
+  .nook.agent-transition-running::after, .nook.agent-transition-needs-input::after, .nook.agent-transition-done::after, .nook.agent-transition-idle::after { animation: none; opacity: 0; }
 }

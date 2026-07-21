@@ -3,6 +3,8 @@
 #ws-create.open { display: flex; animation: cove-fade-in 140ms ease-out; }
 .wsc-box { margin-top: 8vh; width: 520px; border-radius: 16px; background: color-mix(in srgb, var(--panel) 94%, transparent); box-shadow: 0 26px 80px rgba(0,0,0,.52), inset 0 1px rgba(255,255,255,.025); }
 #ws-create.open .wsc-box { animation: cove-surface-pop-in 180ms ease-out; }
+#ws-create.closing { display: flex; pointer-events: none; animation: cove-fade-out 140ms ease-in forwards; }
+#ws-create.closing .wsc-box { animation: cove-surface-pop-out 140ms ease-in forwards; }
 .wsc-box .ws-icon-grid { grid-template-columns: repeat(7, 32px); justify-content: start; }
 .wsc-box .ws-icon-cell { width: 32px; height: 32px; aspect-ratio: auto; }
 .wsc-box > .set-body { padding: 14px 20px 0; overflow-y: auto; }
@@ -23,5 +25,5 @@
 .wsc-actions button.secondary { color: var(--muted); }
 
 @media (prefers-reduced-motion: reduce) {
-  #ws-create.open, #ws-create.open .wsc-box { animation: none; opacity: 1; transform: none; }
+  #ws-create.open, #ws-create.open .wsc-box, #ws-create.closing, #ws-create.closing .wsc-box { animation: none; opacity: 1; transform: none; }
 }

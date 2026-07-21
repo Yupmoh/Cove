@@ -242,8 +242,15 @@ describe("WorkspaceViewFeature", () => {
     expect(openingNook.classList.contains("nook-opening")).toBe(true);
     openingNook.dispatchEvent(new window.Event("animationend") as unknown as Event);
     expect(openingNook.classList.contains("nook-opening")).toBe(false);
+    vi.spyOn(openingNook, "getBoundingClientRect")
+      .mockReturnValueOnce({ left: 18, top: 24, right: 218, bottom: 224, width: 200, height: 200, x: 18, y: 24, toJSON: () => ({}) } as DOMRect)
+      .mockReturnValueOnce({ left: 118, top: 64, right: 318, bottom: 264, width: 200, height: 200, x: 118, y: 64, toJSON: () => ({}) } as DOMRect);
     feature.render();
-    expect((grid.querySelector(".nook") as unknown as HTMLElement).classList.contains("nook-opening")).toBe(false);
+    const repositionedNook = grid.querySelector(".nook") as unknown as HTMLElement;
+    expect(repositionedNook.classList.contains("nook-opening")).toBe(false);
+    expect(repositionedNook.classList.contains("nook-repositioning")).toBe(true);
+    expect(repositionedNook.style.getPropertyValue("--nook-shift-x")).toBe("-100px");
+    expect(repositionedNook.style.getPropertyValue("--nook-shift-y")).toBe("-40px");
     const terminalHost = grid.querySelector(".term-host") as unknown as HTMLElement;
     const xterm = document.createElement("div") as unknown as HTMLElement;
     xterm.className = "xterm";

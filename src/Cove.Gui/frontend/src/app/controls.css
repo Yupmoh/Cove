@@ -1,3 +1,8 @@
+button:not(:disabled):active,
+[role="button"]:not([aria-disabled="true"]):active { translate: 0 1px; }
+.cove-empty-state { animation: cove-empty-in 150ms ease-out; }
+@keyframes cove-empty-in { from { opacity: 0; translate: 0 3px; } to { opacity: 1; translate: 0 0; } }
+
 
 select {
   -webkit-appearance: none; appearance: none;
@@ -17,7 +22,12 @@ input[type="checkbox"] {
 input[type="checkbox"]:checked { background: var(--accent); border-color: var(--accent); }
 input[type="checkbox"]:checked::after {
   content: ""; position: absolute; left: 4.5px; top: 1.5px; width: 4px; height: 8px;
-  border: solid #11111b; border-width: 0 1.8px 1.8px 0; transform: rotate(45deg);
+  border: solid #11111b; border-width: 0 1.8px 1.8px 0; transform: rotate(45deg); animation: control-check-in 140ms ease-out;
+}
+@keyframes control-check-in { from { opacity: 0; scale: 0.65; } to { opacity: 1; scale: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  button:not(:disabled):active, [role="button"]:not([aria-disabled="true"]):active { translate: none; }
+  input[type="checkbox"]:checked::after, .cove-empty-state { animation: none; opacity: 1; scale: 1; translate: none; }
 }
 body {
   display: flex;

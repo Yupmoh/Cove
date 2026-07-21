@@ -575,13 +575,21 @@ function agentStateByNook(): Map<string, AgentState> {
   return new Map(buildAgentRows(agentCards, needsInputNooks, acknowledgedDoneNooks).map((r) => [r.nookId, r.state]));
 }
 
+const AGENT_TRANSITION_CLASSES = ["agent-transition-running", "agent-transition-needs-input", "agent-transition-done", "agent-transition-idle"];
+
 function syncAgentNookStateClasses(): void {
   const states = agentStateByNook();
   for (const [nookId, nook] of nooks) {
-    nook.el.classList.remove("agent-running", "agent-needs-input", "agent-done", "agent-idle");
+    const previousState = nook.el.dataset.agentState;
+    nook.el.classList.remove("agent-running", "agent-needs-input", "agent-done", "agent-idle", ...AGENT_TRANSITION_CLASSES);
     const state = states.get(nookId);
-    if (!state) continue;
+    if (!state) {
+      delete nook.el.dataset.agentState;
+      continue;
+    }
     nook.el.classList.add(`agent-${state}`);
+    if (previousState && previousState !== state) nook.el.classList.add(`agent-transition-${state}`);
+    nook.el.dataset.agentState = state;
     const agent = agentCards.find((card) => card.nookId === nookId);
     const accent = launcherFeature.adapters.find((adapter) => adapter.name === agent?.adapter)?.accent;
     nook.el.style.setProperty("--agent-accent", accent || AGENT_STATE_META[state].color);

@@ -1,5 +1,6 @@
 import { FrontendCommand } from "../../app/frontend-command";
 import { LifecycleScope } from "../../app/lifecycle";
+import { createSurfaceMotion } from "../../app/surface-motion";
 import { invoke, invokeNative } from "../../invoke";
 import {
   INITIAL_ONBOARDING_STATE,
@@ -66,6 +67,7 @@ export interface OnboardingFeature {
 
 export function createOnboardingFeature(dependencies: OnboardingFeatureDependencies): OnboardingFeature {
   const onboardingEl = dependencies.root;
+  const surfaceMotion = createSurfaceMotion(onboardingEl);
   const document = onboardingEl.ownerDocument;
   const window = document.defaultView ?? globalThis.window;
   const backdropDeps = dependencies.backdrop;
@@ -207,7 +209,7 @@ function renderScanResults(results: HTMLElement, adapters: OnboardingLauncherAda
   results.replaceChildren();
   if (loading) {
     const scanning = document.createElement("p");
-    scanning.className = "ob-scan-message";
+    scanning.className = "ob-scan-message ob-loading";
     scanning.textContent = "Scanning your login shell…";
     results.appendChild(scanning);
     if (!adapters) return;
@@ -575,7 +577,7 @@ async function onOnboardingSkip(): Promise<void> {
 }
 
 async function completeOnboarding(): Promise<void> {
-  onboardingEl.classList.remove("open");
+  surfaceMotion.close();
   for (const [adapter, on] of Object.entries(onboardingState.adapterYolo)) {
     localStorage.setItem(launcherYoloKey(adapter), String(on));
   }
@@ -597,7 +599,7 @@ function rerunOnboarding(): void {
 
 function openOnboarding(): void {
   if (!onboardingEl.classList.contains("open")) previousFocus = document.activeElement as HTMLElement | null;
-  onboardingEl.classList.add("open");
+  surfaceMotion.open();
   renderOnboarding();
   (onboardingEl.querySelector("#ob-step-title") as HTMLElement).focus();
 }
@@ -649,7 +651,7 @@ function onDialogKeyDown(event: KeyboardEvent): void {
     renderDictationTab,
     setDictationModelError(error: string | null): void { dictationModelError = error; },
     async dispose(): Promise<void> {
-      onboardingEl.classList.remove("open");
+      surfaceMotion.dispose();
       scanSequence += 1;
       for (const poll of modelPolls) window.clearInterval(poll);
       modelPolls.clear();

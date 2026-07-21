@@ -1,5 +1,5 @@
 import { Window } from "happy-dom";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createWorkspaceSidebarFeature,
   type WorkspaceSidebarDependencies,
@@ -37,7 +37,7 @@ function fixture() {
     workspace: { snapshot: null, activeShoreId: null, focusedNookId: null },
     workspaceController: { mutate: vi.fn() },
     contextMenu: { openAt: vi.fn() },
-    launcherFeature: { open: vi.fn() },
+    launcherFeature: { open: vi.fn(), adapters: [] },
     nooks: new Map(),
     invoke: vi.fn(async () => ({ cards: [], bays: [], notes: [] })),
     reload: vi.fn(async () => {}),
@@ -66,6 +66,10 @@ function fixture() {
   return { window, document, leftSidebar, leftContent, dependencies };
 }
 
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
 describe("WorkspaceSidebarFeature", () => {
   it("owns sidebar mode rendering and resize listener disposal", async () => {
     const { window, document, leftSidebar, leftContent, dependencies } = fixture();
@@ -92,5 +96,31 @@ describe("WorkspaceSidebarFeature", () => {
     expect(fitCallsAfterDispose).toBe(fitCallsBeforeDispose);
     handle.dispatchEvent(new window.MouseEvent("mousedown"));
     expect(handle.classList.contains("dragging")).toBe(false);
+  });
+  it("adds one-shot agent transition classes only when state changes", async () => {
+    const { document, leftSidebar, dependencies } = fixture();
+    leftSidebar.classList.add("collapsed");
+    vi.stubGlobal("document", document);
+    const nook = document.createElement("div");
+    (dependencies.nooks as unknown as Map<string, { el: HTMLElement }>).set("nook-1", { el: nook as unknown as HTMLElement });
+    const invoke = vi.mocked(dependencies.invoke);
+    invoke
+      .mockResolvedValueOnce({ cards: [{ nookId: "nook-1", adapter: "codex", status: "working" }] })
+      .mockResolvedValueOnce({ cards: [{ nookId: "nook-1", adapter: "codex", status: "done" }] })
+      .mockResolvedValueOnce({ cards: [{ nookId: "nook-1", adapter: "codex", status: "done" }] });
+    const feature = createWorkspaceSidebarFeature(dependencies);
+    feature.setAgentChimesEnabled(false);
+
+    await feature.refreshAgents();
+    expect(nook.dataset.agentState).toBe("running");
+    expect(nook.className).not.toContain("agent-transition");
+
+    await feature.refreshAgents();
+    expect(nook.dataset.agentState).toBe("done");
+    expect(nook.classList.contains("agent-transition-done")).toBe(true);
+
+    nook.classList.remove("agent-transition-done");
+    await feature.refreshAgents();
+    expect(nook.classList.contains("agent-transition-done")).toBe(false);
   });
 });

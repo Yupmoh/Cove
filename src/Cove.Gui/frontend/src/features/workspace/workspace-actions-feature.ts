@@ -125,11 +125,15 @@ async function moveNookToShore(nookId: string, targetShoreId: string): Promise<v
 }
 
 function paintDropOverlay(host: HTMLElement, zone: ReturnType<typeof dropZoneFor>): void {
+  const entering = !dropOverlayEl || dropOverlayEl.parentElement !== host;
   if (!dropOverlayEl) {
     dropOverlayEl = document.createElement("div");
     dropOverlayEl.className = "drop-overlay";
   }
-  if (dropOverlayEl.parentElement !== host) host.appendChild(dropOverlayEl);
+  if (entering) {
+    host.appendChild(dropOverlayEl);
+    dropOverlayEl.classList.add("drop-overlay-entering");
+  }
   const r = zoneOverlayRect(zone);
   dropOverlayEl.style.left = r.left;
   dropOverlayEl.style.top = r.top;
@@ -139,6 +143,23 @@ function paintDropOverlay(host: HTMLElement, zone: ReturnType<typeof dropZoneFor
 
 function clearDropOverlay(): void {
   dropOverlayEl?.remove();
+}
+
+function playNookDropSettle(nookId: string): void {
+  const nook = workspaceView.nooks.get(nookId)?.el;
+  if (!nook) return;
+  const settledNook = nook;
+  settledNook.classList.add("nook-drop-settled");
+  const timer = globalThis.setTimeout(finish, 200);
+  function finish(): void {
+    globalThis.clearTimeout(timer);
+    settledNook.removeEventListener("animationend", onAnimationEnd);
+    settledNook.classList.remove("nook-drop-settled");
+  }
+  function onAnimationEnd(event: AnimationEvent): void {
+    if (event.target === settledNook) finish();
+  }
+  settledNook.addEventListener("animationend", onAnimationEnd);
 }
 
 async function applyNookMove(m: { op: string; nookId: string; targetNookId: string; orientation: string; dir: number }, sourceNookId: string): Promise<void> {
@@ -157,6 +178,7 @@ async function applyNookMove(m: { op: string; nookId: string; targetNookId: stri
       await workspaceController.mutate("moveNook", { shoreId: workspace.activeShoreId, targetNookId: m.targetNookId, nookId: sourceNookId, orientation: m.orientation, dir: m.dir, newNookId: "", name: "" });
     }
     workspaceView.focus(sourceNookId);
+    playNookDropSettle(sourceNookId);
   } catch (err) { console.warn("nook move failed", m.op, err); }
 }
 

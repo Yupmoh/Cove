@@ -1,6 +1,7 @@
 import type { CoveAction } from "../../app/action-registry";
 import { FrontendCommand } from "../../app/frontend-command";
 import { LifecycleScope, type ComponentHandle } from "../../app/lifecycle";
+import { createSurfaceMotion } from "../../app/surface-motion";
 import {
   categoryLabel,
   filterAndSort,
@@ -54,6 +55,7 @@ export interface PaletteFeature extends ComponentHandle {
 const DEFAULT_BAY_ID = "default";
 
 export function createPaletteFeature(dependencies: PaletteFeatureDependencies): PaletteFeature {
+  const surfaceMotion = createSurfaceMotion(dependencies.root);
   const lifecycle = new LifecycleScope();
   const { document, storage, root, input, list } = dependencies;
   let selected = 0;
@@ -81,7 +83,7 @@ export function createPaletteFeature(dependencies: PaletteFeatureDependencies): 
   };
 
   const close = (): void => {
-    root.classList.remove("open");
+    surfaceMotion.close();
     dependencies.focusActiveNook();
   };
 
@@ -223,9 +225,8 @@ export function createPaletteFeature(dependencies: PaletteFeatureDependencies): 
     }
     if (visibleActions.length === 0) {
       const empty = document.createElement("div");
-      empty.className = "pal-empty";
-      empty.style.cssText = "padding:16px;text-align:center;color:var(--muted);font-size:12px;";
-      empty.textContent = cachedItems === null ? "Loading..." : "No results";
+      empty.className = cachedItems === null ? "pal-empty pal-loading" : "pal-empty pal-no-results";
+      empty.textContent = cachedItems === null ? "Loading…" : "No results";
       list.appendChild(empty);
       return;
     }
@@ -259,7 +260,7 @@ export function createPaletteFeature(dependencies: PaletteFeatureDependencies): 
 
   const open = (): void => {
     if (disposed) throw new Error("PaletteFeature is disposed");
-    root.classList.add("open");
+    surfaceMotion.open();
     input.value = "";
     selected = 0;
     cachedItems = null;
@@ -328,7 +329,7 @@ export function createPaletteFeature(dependencies: PaletteFeatureDependencies): 
       generation += 1;
       if (fileSearchTimer !== null) globalThis.clearTimeout(fileSearchTimer);
       fileSearchTimer = null;
-      root.classList.remove("open");
+      surfaceMotion.dispose();
       await lifecycle.dispose();
     },
   };

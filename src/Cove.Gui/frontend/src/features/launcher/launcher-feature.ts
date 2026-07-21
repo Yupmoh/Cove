@@ -2,6 +2,7 @@ import { FrontendCommand } from "../../app/frontend-command";
 import { LifecycleScope } from "../../app/lifecycle";
 import type { EngineEventPayloads } from "../../app/engine-event-router";
 import type { ComponentHandle } from "../../app/lifecycle";
+import { createSurfaceMotion } from "../../app/surface-motion";
 import { invoke } from "../../invoke";
 import {
   buildAdapterTiles,
@@ -142,6 +143,7 @@ export function createLauncherFeature(dependencies: LauncherFeatureDependencies)
   const lifecycle = new LifecycleScope();
   const document = dependencies.document;
   const launcherEl = dependencies.root;
+  const surfaceMotion = createSurfaceMotion(launcherEl);
   const launchAgentsEl = dependencies.agentsRoot;
   const workspace = dependencies.workspace;
   const workspaceController = dependencies.workspaceController;
@@ -161,9 +163,9 @@ export function createLauncherFeature(dependencies: LauncherFeatureDependencies)
   const launcherObservers = new Set<ResizeObserver>();
   const activeModalClosers = new Set<() => void>();
 
-function openLauncher() { launcherEl.classList.add("open"); void loadLauncherAgents(); }
+function openLauncher() { surfaceMotion.open(); void loadLauncherAgents(); }
 
-function closeLauncher() { launcherEl.classList.remove("open"); dependencies.focusActiveNook(); }
+function closeLauncher() { surfaceMotion.close(); dependencies.focusActiveNook(); }
 
 interface AdapterListResult { adapters: AdapterInfo[]; }
 
@@ -1158,7 +1160,7 @@ function renderDetailDock(ctx: LauncherContext, tile: LauncherTile): HTMLElement
     yoloKey: launcherYoloKey,
     async dispose() {
       launcherDisposed = true;
-      launcherEl.classList.remove("open");
+      surfaceMotion.dispose();
       if (adapterRedetectTimer !== null) window.clearInterval(adapterRedetectTimer);
       if (launcherTipTimer !== null) window.clearInterval(launcherTipTimer);
       for (const close of [...activeModalClosers]) close();

@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 const overlay = readFileSync(new URL("./features/settings/settings-overlay.css", import.meta.url), "utf8");
 const settings = readFileSync(new URL("./features/settings/settings.css", import.meta.url), "utf8");
 const launcher = readFileSync(new URL("./features/launcher/box-launcher.css", import.meta.url), "utf8");
+const launcherOverlay = readFileSync(new URL("./features/launcher/launcher.css", import.meta.url), "utf8");
 const visual = readFileSync(new URL("./workspace/visual-refinements.css", import.meta.url), "utf8");
 const palette = readFileSync(new URL("./features/palette/palette.css", import.meta.url), "utf8");
 const find = readFileSync(new URL("./features/find/find.css", import.meta.url), "utf8");
@@ -18,7 +19,10 @@ const dictation = readFileSync(new URL("./features/dictation/dictation.css", imp
 const sidebar = readFileSync(new URL("./shell/sidebar.css", import.meta.url), "utf8");
 const performanceHud = readFileSync(new URL("./features/performance/performance-hud.css", import.meta.url), "utf8");
 const terminalScrollbars = readFileSync(new URL("./workspace/terminal-scrollbars.css", import.meta.url), "utf8");
-const files = [overlay, settings, launcher, visual, palette, find, onboarding, contextMenu, nookMenus, splitChooser, sidebarWorkspaces, workspaceCreate, inspect, dictation, sidebar, performanceHud, terminalScrollbars];
+const controls = readFileSync(new URL("./app/controls.css", import.meta.url), "utf8");
+const nookChrome = readFileSync(new URL("./workspace/nook-chrome.css", import.meta.url), "utf8");
+const notepad = readFileSync(new URL("./features/notepad/notepad.css", import.meta.url), "utf8");
+const files = [overlay, settings, launcher, launcherOverlay, visual, palette, find, onboarding, contextMenu, nookMenus, splitChooser, sidebarWorkspaces, workspaceCreate, inspect, dictation, sidebar, performanceHud, terminalScrollbars, controls, nookChrome, notepad];
 
 function rule(source: string, selector: string): string {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -41,6 +45,11 @@ describe("feature motion accessibility", () => {
     expect(rule(overlay, "@keyframes set-backdrop-in")).toMatch(/opacity:\s*0/);
     expect(rule(overlay, "@keyframes set-panel-in")).toMatch(/opacity:\s*0;\s*transform:\s*translateY\(6px\)/);
     expect(rule(settings, "@keyframes set-page-in")).toMatch(/opacity:\s*0;\s*transform:\s*translateY\(4px\)/);
+  });
+
+  it("keeps Settings at one viewport size with isolated page scrolling", () => {
+    expect(rule(settings, ".set-box")).toContain("height: min(720px, calc(100dvh - 32px))");
+    expect(rule(settings, ".set-page-scroll")).toContain("overflow-y: auto");
   });
 
   it("gives Settings a visible staged page rhythm", () => {
@@ -123,6 +132,8 @@ describe("feature motion accessibility", () => {
     expect(visual).not.toMatch(/\.nook\.nook-opening\s*\{[^}]*animation:/);
     expect(rule(visual, ".nook.nook-opening .nook-header")).toContain("animation: nook-header-open-in 180ms ease-out");
     expect(rule(visual, ".nook.nook-opening .term-host")).toContain("animation: cove-fade-in 180ms ease-out");
+    expect(rule(visual, ".nook.nook-opening::before")).toContain("animation: nook-open-reveal 200ms ease-out forwards");
+    expect(rule(visual, ".nook.nook-repositioning")).toContain("animation: nook-reposition 180ms ease-out");
     expect(rule(terminalScrollbars, ".xterm-viewport")).toContain("pointer-events: auto");
     expect(rule(terminalScrollbars, ".xterm-viewport::-webkit-scrollbar")).toContain("width: 11px");
     const terminalThumb = rule(terminalScrollbars, ".xterm-viewport::-webkit-scrollbar-thumb");
@@ -135,6 +146,35 @@ describe("feature motion accessibility", () => {
     }
   });
 
+  it("animates finite surface exits and cancels every exit under Reduced Motion", () => {
+    expect(rule(overlay, "#settings.closing")).toContain("animation: set-backdrop-out 140ms ease-in forwards");
+    expect(rule(launcherOverlay, "#launcher.closing")).toContain("animation: launcher-backdrop-out 140ms ease-in forwards");
+    expect(rule(onboarding, "#onboarding.closing")).toContain("animation: cove-fade-out 140ms ease-in forwards");
+    expect(rule(palette, "#palette.closing")).toContain("animation: cove-fade-out 140ms ease-in forwards");
+    expect(rule(workspaceCreate, "#ws-create.closing")).toContain("animation: cove-fade-out 140ms ease-in forwards");
+    for (const [source, selector] of [[overlay, "#settings.closing"], [launcherOverlay, "#launcher.closing"], [onboarding, "#onboarding.closing"], [palette, "#palette.closing"], [workspaceCreate, "#ws-create.closing"]] as const) {
+      expect(reduced(source)).toContain(selector);
+      expect(reduced(source)).toMatch(/animation:\s*none/);
+    }
+  });
+
+  it("covers state, drop, control, loading, and empty feedback without layout animation", () => {
+    expect(rule(visual, ".nook.agent-transition-running::after,\n.nook.agent-transition-needs-input::after,\n.nook.agent-transition-done::after,\n.nook.agent-transition-idle::after")).toContain("animation: nook-state-arrival 180ms ease-out forwards");
+    expect(rule(nookChrome, ".drop-overlay-entering")).toContain("animation: drop-preview-in 150ms ease-out");
+    expect(rule(nookChrome, ".nook.nook-drop-settled")).toContain("animation: nook-drop-settle 180ms ease-out");
+    expect(rule(controls, "input[type=\"checkbox\"]:checked::after")).toContain("animation: control-check-in 140ms ease-out");
+    expect(rule(sidebarWorkspaces, ".ws-icon-cell.sel svg, .ws-icon-cell.sel .ws-icon-none-dot")).toContain("animation: ws-icon-confirm 160ms ease-out");
+    expect(rule(onboarding, ".ob-loading::before")).toContain("animation: ob-loading-sheen 1.1s linear infinite");
+    expect(rule(palette, ".pal-no-results")).toContain("animation: pal-result-in 140ms ease-out");
+    expect(rule(settings, ".tools-state-error, .tools-empty")).toContain("animation: tools-result-in 150ms ease-out");
+    expect(rule(controls, ".cove-empty-state")).toContain("animation: cove-empty-in 150ms ease-out");
+    expect(rule(notepad, ".ns-empty")).toContain("animation: ns-empty-in 150ms ease-out");
+    for (const source of [visual, nookChrome, controls, sidebarWorkspaces, onboarding, palette, settings, notepad]) {
+      expect(reduced(source)).toMatch(/animation:\s*none/);
+    }
+    expect(rule(nookChrome, "@keyframes nook-drop-settle")).not.toMatch(/\b(?:width|height|inset|margin|padding|grid|flex)\b/);
+  });
+
   it("rejects unsafe resets, layers, properties, and long finite durations", () => {
     for (const source of files) {
       expect(source).not.toMatch(/(^|[,{}])\s*\*\s*[{,]/m);
@@ -143,9 +183,9 @@ describe("feature motion accessibility", () => {
       expect(source).not.toMatch(/(?:animation|transition)(?:-[a-z]+)?\s*:[^;}\n]*\b(?:width|height|inset|margin|padding|grid|flex|box-shadow|filter|backdrop-filter|scroll)/);
       expect(source).not.toMatch(/(?:animation-library|framer-motion|motion-one)/);
     }
-    const withoutContinuousTip = launcher.replace(/\.cl-tip\.driving \.cl-tip-text\s*\{[^}]+\}/, "");
-    for (const source of [overlay, settings, withoutContinuousTip]) {
-      const durations = [...source.matchAll(/\b(\d*\.?\d+)(ms|s)\b/g)].map((match) => match[2] === "s" ? Number(match[1]) * 1000 : Number(match[1]));
+    for (const source of [overlay, settings, launcher]) {
+      const finiteMotion = source.replace(/animation:\s*[^;}\n]*\binfinite\b[^;}\n]*;?/g, "");
+      const durations = [...finiteMotion.matchAll(/\b(\d*\.?\d+)(ms|s)\b/g)].map((match) => match[2] === "s" ? Number(match[1]) * 1000 : Number(match[1]));
       expect(durations.every((duration) => duration <= 200)).toBe(true);
     }
   });

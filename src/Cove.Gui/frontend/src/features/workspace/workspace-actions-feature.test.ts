@@ -72,6 +72,7 @@ describe("WorkspaceActionsFeature", () => {
     const state = snapshot();
     workspace.applySnapshot(state);
     const mutate = vi.fn(async () => ({}));
+    const movedNook = window.document.createElement("div");
     const dependencies = {
       document: window.document,
       workspace,
@@ -83,6 +84,7 @@ describe("WorkspaceActionsFeature", () => {
         collectLeafIds: () => ["nook-1"],
         activeShore: () => state.shores[0],
         focus: vi.fn(),
+        nooks: new Map([["nook-1", { el: movedNook }]]),
       },
       shoreTabsFeature: { render: vi.fn(), setActiveWing: vi.fn() },
       workspaceSidebar: { render: vi.fn() },
@@ -109,6 +111,34 @@ describe("WorkspaceActionsFeature", () => {
       newNookId: "",
       name: "",
     });
+    expect(movedNook.classList.contains("nook-drop-settled")).toBe(true);
+  });
+
+  it("animates a drop preview only when it enters the host", () => {
+    const window = new Window();
+    const workspace = new WorkspaceStore();
+    const host = window.document.createElement("div");
+    const dependencies = {
+      document: window.document,
+      workspace,
+      workspaceController: { mutate: vi.fn() },
+      workspaceView: {},
+      shoreTabsFeature: {},
+      workspaceSidebar: {},
+      launcherFeature: {},
+      invoke: vi.fn(),
+      runAction: vi.fn(),
+    } as unknown as WorkspaceActionsDependencies;
+    const feature = createWorkspaceActionsFeature(dependencies);
+
+    feature.paintDropOverlay(host as unknown as HTMLElement, { kind: "center" });
+    const overlay = host.querySelector(".drop-overlay");
+    expect(overlay?.classList.contains("drop-overlay-entering")).toBe(true);
+
+    overlay?.classList.remove("drop-overlay-entering");
+    feature.paintDropOverlay(host as unknown as HTMLElement, { kind: "center" });
+    expect(overlay?.classList.contains("drop-overlay-entering")).toBe(false);
+
   });
 
   it("closes native browser ownership through every nook close entry point", async () => {

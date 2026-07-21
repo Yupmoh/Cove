@@ -305,6 +305,48 @@ function armNookOpening(el: HTMLElement): void {
   el.addEventListener("animationend", finish, { once: true });
   window.setTimeout(finish, 220);
 }
+function captureNookRects(): Map<string, { left: number; top: number }> {
+  return new Map([...nooks].flatMap(([nookId, nook]) => {
+    if (nook.el.parentElement === null) return [];
+    const rect = nook.el.getBoundingClientRect();
+    return [[nookId, { left: rect.left, top: rect.top }]];
+  }));
+}
+
+function armNookReposition(el: HTMLElement, shiftX: number, shiftY: number): void {
+  let timer: number | null = null;
+  const finish = (): void => {
+    if (timer !== null) window.clearTimeout(timer);
+    timer = null;
+    el.removeEventListener("animationend", onAnimationEnd);
+    el.classList.remove("nook-repositioning");
+    el.style.removeProperty("--nook-shift-x");
+    el.style.removeProperty("--nook-shift-y");
+  };
+  const onAnimationEnd = (event: AnimationEvent): void => {
+    if (event.target === el) finish();
+  };
+  el.classList.remove("nook-repositioning");
+  el.style.setProperty("--nook-shift-x", `${shiftX}px`);
+  el.style.setProperty("--nook-shift-y", `${shiftY}px`);
+  void el.offsetWidth;
+  el.classList.add("nook-repositioning");
+  el.addEventListener("animationend", onAnimationEnd);
+  timer = window.setTimeout(finish, 220);
+}
+
+function animateNookRepositions(previousRects: ReadonlyMap<string, { left: number; top: number }>): void {
+  for (const [nookId, previous] of previousRects) {
+    const nook = nooks.get(nookId)?.el;
+    if (!nook || nook.parentElement === null) continue;
+    const current = nook.getBoundingClientRect();
+    const shiftX = Math.round(previous.left - current.left);
+    const shiftY = Math.round(previous.top - current.top);
+    if (Math.abs(shiftX) < 1 && Math.abs(shiftY) < 1) continue;
+    armNookReposition(nook, shiftX, shiftY);
+  }
+}
+
 
 function makeNook(nookId: string, since: number): NookView {
   const el = document.createElement("div");
@@ -1184,6 +1226,7 @@ function collectOwnedContentKeys(node: MosaicNode | null, keys: Set<string>): vo
 
 function renderShore(): void {
   const shore = activeShore();
+  const previousNookRects = captureNookRects();
   captureNookViewports();
   renderGeneration += 1;
   activeSplitDragCleanup?.();
@@ -1225,6 +1268,7 @@ function renderShore(): void {
       gridEl.appendChild(empty);
     }
   }
+  animateNookRepositions(previousNookRects);
   reconcileNookStreams();
   for (const [id, pv] of nooks) {
     pv.el.classList.toggle("focused", id === workspace.focusedNookId);

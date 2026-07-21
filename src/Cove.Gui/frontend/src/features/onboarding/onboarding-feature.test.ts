@@ -134,6 +134,7 @@ describe("OnboardingFeature", () => {
     expect(results.getAttribute("aria-busy")).toBe("true");
     expect(results.textContent).toContain("Scanning your login shell…");
     expect(root.textContent?.match(/Scanning your login shell…/g)).toHaveLength(1);
+    expect(results.querySelector(".ob-loading")).not.toBeNull();
     await settleOnboarding();
     expect(results.getAttribute("aria-busy")).toBe("false");
     expect(results.textContent).toContain("Cove couldn’t scan your tools.");

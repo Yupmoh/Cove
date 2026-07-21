@@ -3,8 +3,12 @@
   position: absolute; z-index: 15; pointer-events: none; border-radius: 8px;
   background: color-mix(in srgb, var(--accent) 20%, transparent);
   border: 1.5px solid var(--accent);
-  transition: left 0.08s, top 0.08s, width 0.08s, height 0.08s;
+  transition: background 80ms ease-out, border-color 80ms ease-out;
 }
+.drop-overlay-entering { animation: drop-preview-in 150ms ease-out; }
+.nook.nook-drop-settled { animation: nook-drop-settle 180ms ease-out; }
+@keyframes drop-preview-in { from { opacity: 0; box-shadow: inset 0 0 0 8px color-mix(in srgb, var(--accent) 18%, transparent); } to { opacity: 1; box-shadow: inset 0 0 0 0 transparent; } }
+@keyframes nook-drop-settle { from { outline: 2px solid color-mix(in srgb, var(--accent) 72%, transparent); outline-offset: -2px; } to { outline: 2px solid transparent; outline-offset: 4px; } }
 .nook-header {
   position: relative; flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 3px;
   height: 28px; padding: 0 6px 0 11px;
@@ -25,7 +29,7 @@
   width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; margin-right: 8px;
   background: var(--agent-accent, color-mix(in srgb, var(--muted) 45%, transparent));
   box-shadow: 0 0 6px color-mix(in srgb, var(--agent-accent, transparent) 50%, transparent);
-  transition: background 0.2s, box-shadow 0.2s;
+  transition: background 0.2s;
 }
 .nook-header .pt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; font-weight: 600; letter-spacing: 0.01em; }
 .pmore {
@@ -37,3 +41,7 @@
 .pclose { font-size: 11px; }
 .pclose:hover { background: color-mix(in srgb, #f38ba8 24%, transparent); color: #f38ba8; }
 .psplit svg { width: 12px; height: 12px; display: block; }
+
+@media (prefers-reduced-motion: reduce) {
+  .drop-overlay-entering, .nook.nook-drop-settled { animation: none; }
+}
