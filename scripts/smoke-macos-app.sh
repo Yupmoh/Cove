@@ -14,6 +14,8 @@ GUI="$APP/Contents/MacOS/Cove"
 ENGINE="$APP/Contents/MacOS/cove-engine"
 [ -x "$GUI" ] || { printf 'error: packaged GUI is missing\n' >&2; exit 1; }
 [ -x "$ENGINE" ] || { printf 'error: packaged engine is missing\n' >&2; exit 1; }
+BUNDLE_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")"
+[ -n "$BUNDLE_VERSION" ] || { printf 'error: packaged bundle version is missing\n' >&2; exit 1; }
 
 SMOKE_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/cove-macos-smoke.XXXXXX")"
 DATA_DIR="$SMOKE_ROOT/data"
@@ -93,6 +95,7 @@ done
 
 VERSION_OUTPUT="$("${CLEAN_ENV[@]}" COVE_DATA_DIR="$DATA_DIR" COVE_CHANNEL=dev "$ENGINE" version)"
 printf '%s\n' "$VERSION_OUTPUT" | grep -q 'daemon: connected'
+printf '%s\n' "$VERSION_OUTPUT" | grep -Fq "cli: v$BUNDLE_VERSION (daemon: connected)"
 "${CLEAN_ENV[@]}" COVE_DATA_DIR="$DATA_DIR" COVE_CHANNEL=dev "$ENGINE" daemon status >/dev/null
 if CONTEXT_OUTPUT="$("${CLEAN_ENV[@]}" COVE_DATA_DIR="$DATA_DIR" COVE_CHANNEL=dev "$ENGINE" workspace context --json 2>&1)"; then
   [ -n "$CONTEXT_OUTPUT" ]

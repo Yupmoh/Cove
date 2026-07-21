@@ -27,6 +27,7 @@ public sealed class MacOsPackagingContractTests
 
         Assert.Equal(2, Count(script, "-p:PublishAot=true"));
         Assert.Equal(2, Count(script, "-p:TreatWarningsAsErrors=true"));
+        Assert.Equal(2, Count(script, "-p:MinVerVersionOverride=\"$VERSION\""));
         Assert.Contains("src/Cove.Gui/Cove.Gui.csproj", script);
         Assert.Contains("src/Cove.Cli/Cove.Cli.csproj", script);
         Assert.Contains("cove-engine", script);
@@ -83,6 +84,8 @@ public sealed class MacOsPackagingContractTests
         Assert.Contains("lsof", script);
         Assert.Contains("trap cleanup", script);
         Assert.Contains("MACOS SMOKE OK", script);
+        Assert.Contains("CFBundleShortVersionString", script);
+        Assert.Contains("cli: v$BUNDLE_VERSION (daemon: connected)", script);
         Assert.Contains("GUI_PORT", script);
         Assert.DoesNotContain("kill \"$PORT_PID\"", script);
         Assert.DoesNotContain("scripts/cove-dev.sh", script);

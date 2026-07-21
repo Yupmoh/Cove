@@ -69,6 +69,7 @@ dotnet publish "$ROOT/src/Cove.Gui/Cove.Gui.csproj" \
   --self-contained true \
   -p:PublishAot=true \
   -p:TreatWarningsAsErrors=true \
+  -p:MinVerVersionOverride="$VERSION" \
   -o "$GUI_DIR"
 
 dotnet publish "$ROOT/src/Cove.Cli/Cove.Cli.csproj" \
@@ -77,6 +78,7 @@ dotnet publish "$ROOT/src/Cove.Cli/Cove.Cli.csproj" \
   --self-contained true \
   -p:PublishAot=true \
   -p:TreatWarningsAsErrors=true \
+  -p:MinVerVersionOverride="$VERSION" \
   -o "$ENGINE_DIR"
 
 clang \

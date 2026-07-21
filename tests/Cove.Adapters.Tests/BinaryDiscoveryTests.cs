@@ -39,12 +39,9 @@ public sealed class BinaryDiscoveryTests
         finally { TestDirectory.Delete(binDir); }
     }
 
-    [Fact]
+    [PlatformFact(TestOperatingSystem.Unix)]
     public void Discover_UsesLoginShellPathForShebangInterpreter()
     {
-        if (OperatingSystem.IsWindows())
-            return;
-
         var binDir = NewDir();
         try
         {
@@ -53,8 +50,11 @@ public sealed class BinaryDiscoveryTests
             File.WriteAllText(interpreter, "#!/bin/sh\nexec /bin/sh \"$@\"\n");
             var harness = Path.Combine(binDir, "script-harness");
             File.WriteAllText(harness, "#!/usr/bin/env test-node\necho '5.6.7'\n");
-            System.IO.File.SetUnixFileMode(interpreter, System.IO.UnixFileMode.UserRead | System.IO.UnixFileMode.UserWrite | System.IO.UnixFileMode.UserExecute);
-            System.IO.File.SetUnixFileMode(harness, System.IO.UnixFileMode.UserRead | System.IO.UnixFileMode.UserWrite | System.IO.UnixFileMode.UserExecute);
+            if (!OperatingSystem.IsWindows())
+            {
+                System.IO.File.SetUnixFileMode(interpreter, System.IO.UnixFileMode.UserRead | System.IO.UnixFileMode.UserWrite | System.IO.UnixFileMode.UserExecute);
+                System.IO.File.SetUnixFileMode(harness, System.IO.UnixFileMode.UserRead | System.IO.UnixFileMode.UserWrite | System.IO.UnixFileMode.UserExecute);
+            }
 
             var discovery = new BinaryDiscoveryService();
             var result = discovery.Discover(
