@@ -118,7 +118,7 @@ public sealed class NookRegistryOwnershipTests
                 ["--append-system-prompt-file", skillPath, "--resume", "session-1"],
                 host.Requests[0].Args);
             Assert.Equal("-c", host.Requests[1].Args[0]);
-            Assert.Equal(["resume", "session-2"], host.Requests[1].Args.Skip(2));
+            Assert.Equal(["resume", "session-2"], host.Requests[1].Args.TakeLast(2));
         }
         finally
         {
