@@ -52,8 +52,8 @@ unsigned build. Cove starts its own engine and opens a live terminal.
 Private Apple Silicon builds can be produced locally with:
 
 ```
-COVE_VERSION=0.4.0-local scripts/package-macos-app.sh osx-arm64 artifacts/macos-local
-cd artifacts/macos-local && shasum -a 256 -c Cove-0.4.0-local-osx-arm64.zip.sha256
+COVE_VERSION=0.5.0 scripts/package-macos-app.sh osx-arm64 artifacts/macos-local
+cd artifacts/macos-local && shasum -a 256 -c Cove-0.5.0-osx-arm64.zip.sha256
 ```
 
 The resulting ZIP is ad-hoc signed and includes its SHA-256 checksum, but it is

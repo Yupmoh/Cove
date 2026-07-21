@@ -19,7 +19,7 @@ internal static class Program
     {
         var channelEnv = Environment.GetEnvironmentVariable("COVE_CHANNEL");
         var channel = string.IsNullOrEmpty(channelEnv) ? "stable" : channelEnv;
-        const string version = "0.4.0";
+        var version = CoveBuild.InformationalVersion;
         var page = Environment.GetEnvironmentVariable("COVE_GUI_PAGE");
         var startPath = string.IsNullOrEmpty(page) ? "" : "/" + page;
         var guiPort = GuiLaunchOptions.ResolveLoopbackPort(Environment.GetEnvironmentVariable("COVE_GUI_PORT"));
