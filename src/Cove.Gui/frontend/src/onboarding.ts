@@ -45,7 +45,7 @@ export function partitionOnboardingAdapters<T extends OnboardingAdapter>(adapter
 }
 
 export const ONBOARDING_STEPS: ReadonlyArray<OnboardingStep> = [
-  { id: "harness", title: "Detect your tools", body: "Cove scans your login shell for installed AI coding CLIs. Pick a default bay directory to work in." },
+  { id: "harness", title: "Set up Cove", body: "Review your coding tools and choose where new bays start." },
   { id: "permissions", title: "Permission defaults", body: "Choose which adapters launch with bypass-permissions (YOLO) mode on by default. You can change this per session later." },
   { id: "appearance", title: "Appearance", body: "Set the window backdrop material and colour theme. These apply immediately and are saved to your settings." },
   { id: "sound", title: "Sound & notifications", body: "Agent chimes play a soft tone when an agent finishes or needs input. Toggle them and notifications here." },

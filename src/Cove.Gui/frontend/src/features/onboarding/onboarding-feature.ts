@@ -24,18 +24,15 @@ import {
 import { DICTATION_SPACE_KEY, DICTATION_LIVE_TYPING_KEY, dictationToggleEnabled, modelPollOutcome } from "../../dictation";
 import { coerceMaterial, setBackdropMaterial, BACKDROP_PREF_KEY, type BackdropDeps, type BackdropMaterial } from "../../backdrop";
 import { playChime } from "../../chime";
-import { adapterStatusMeta, type ToolsAdapter } from "../../tools-tab";
 import type { ThemeDto } from "../../theme-editor";
 
 export interface OnboardingLauncherAdapter {
   name: string;
   displayName: string;
   status?: string | null;
+  version?: string | null;
+  description?: string | null;
   installCommand?: string | null;
-}
-
-interface ToolsListResponse {
-  adapters: ToolsAdapter[];
 }
 
 interface AdapterListResult {
@@ -86,6 +83,9 @@ export function createOnboardingFeature(dependencies: OnboardingFeatureDependenc
     window.clearInterval(poll);
     modelPolls.delete(poll);
   };
+  let previousFocus: HTMLElement | null = null;
+  let wizardAdapters: OnboardingLauncherAdapter[] | null = null;
+  let scanSequence = 0;
 
 let onboardingState: OnboardingState = { ...INITIAL_ONBOARDING_STATE };
 
@@ -94,18 +94,20 @@ async function maybeShowOnboarding(): Promise<void> {
     const seen = await invoke<{ value?: string }>(FrontendCommand.AppConfigGet, { key: ONBOARDING_COMPLETED_KEY });
     const hasSeen = onboardingSeenFromConfig(seen.value);
     if (!shouldShowOnboarding(hasSeen)) return;
-    onboardingEl.classList.add("open");
-    renderOnboarding();
+    openOnboarding();
   } catch { void 0; }
 }
 
 function renderOnboarding(): void {
   const step = currentStepData(onboardingState);
-  (onboardingEl.querySelector(".ob-title") as HTMLElement).textContent = step.title;
-  (onboardingEl.querySelector(".ob-progress-bar") as HTMLElement).style.width = `${progressPercent(onboardingState)}%`;
+  const title = onboardingEl.querySelector(".ob-title") as HTMLElement;
+  title.textContent = step.title;
+  (onboardingEl.querySelector(".ob-progress-bar") as HTMLProgressElement).value = progressPercent(onboardingState);
   const body = onboardingEl.querySelector(".ob-body") as HTMLElement;
   body.innerHTML = "";
   const p = document.createElement("p");
+  p.id = "ob-step-description";
+  p.className = "ob-intro";
   p.textContent = step.body;
   body.appendChild(p);
 
@@ -121,91 +123,31 @@ function renderOnboarding(): void {
   nextBtn.textContent = isLastStep(onboardingState) ? "Finish" : "Next";
 }
 
-async function loadWizardAdapters(): Promise<ToolsAdapter[]> {
-  try {
-    const result = await invoke<ToolsListResponse>(FrontendCommand.AdapterToolsList, {});
-    return result.adapters ?? [];
-  } catch (e) {
-    console.warn("wizard adapter list failed", e);
-    return [];
-  }
-}
-
 async function renderHarnessStep(body: HTMLElement): Promise<void> {
-  const grid = document.createElement("div");
-  grid.className = "ob-adapter-list";
-  body.appendChild(grid);
-  const adapters = await loadWizardAdapters();
-  const installed = partitionOnboardingAdapters(adapters).installed;
-  grid.className = "ob-adapter-list" + (installed.length > 4 ? " ob-grid-2" : "");
-  if (installed.length === 0) {
-    const none = document.createElement("div");
-    none.className = "ob-adapter";
-    none.textContent = "No tools detected yet — add one later from Settings → Tools.";
-    grid.appendChild(none);
-  }
-  for (const a of installed) {
-    const el = document.createElement("div");
-    el.className = "ob-adapter";
-    const meta = adapterStatusMeta(a.status);
-    const name = document.createElement("span");
-    name.className = "ob-adapter-name";
-    name.textContent = a.displayName || a.name;
-    const dot = document.createElement("span");
-    dot.className = "tools-dot";
-    dot.style.cssText = `background:${meta.cssColor};margin-left:8px;`;
-    name.appendChild(dot);
-    el.appendChild(name);
-    grid.appendChild(el);
-  }
-
-  try {
-    const listed = await invoke<AdapterListResult>(FrontendCommand.AppAdapterList, {});
-    const installable = partitionOnboardingAdapters(mapLauncherAdapters(listed.adapters)).installable;
-    if (installable.length > 0) {
-      const installLabel = document.createElement("div");
-      installLabel.className = "tools-subtitle";
-      installLabel.style.marginTop = "12px";
-      installLabel.textContent = "Install more harnesses";
-      body.appendChild(installLabel);
-      const installGrid = document.createElement("div");
-      installGrid.className = "ob-adapter-list" + (installable.length > 4 ? " ob-grid-2" : "");
-      for (const a of installable) {
-        const row = document.createElement("div");
-        row.className = "ob-adapter";
-        const rowName = document.createElement("span");
-        rowName.className = "ob-adapter-name";
-        rowName.textContent = a.displayName || a.name;
-        const installBtn = document.createElement("button");
-        installBtn.className = "diag-btn ob-install-btn";
-        installBtn.textContent = "+";
-        installBtn.title = a.installCommand ?? "";
-        installBtn.addEventListener("click", () => {
-          completeOnboarding();
-          void launchHarnessShellTask(a.installCommand ?? "", `Install ${a.displayName || a.name}`);
-        });
-        row.appendChild(rowName);
-        row.appendChild(installBtn);
-        installGrid.appendChild(row);
-      }
-      body.appendChild(installGrid);
-    }
-  } catch (err) {
-    console.warn("onboarding install list failed", err);
-  }
-
+  const results = document.createElement("div");
+  results.className = "ob-scan-results";
+  results.setAttribute("aria-live", "polite");
+  results.setAttribute("aria-busy", "true");
+  body.appendChild(results);
+  renderScanResults(results, wizardAdapters, true);
+  void refreshWizardAdapters(results);
   const dirRow = document.createElement("div");
-  dirRow.style.cssText = "display:flex;gap:8px;align-items:center;margin-top:12px;";
+  dirRow.className = "ob-directory";
+  const dirLabel = document.createElement("label");
+  dirLabel.htmlFor = "ob-default-bay-dir";
+  dirLabel.textContent = "Default bay directory";
+  const dirControls = document.createElement("div");
+  dirControls.className = "ob-directory-controls";
   const dirInput = document.createElement("input");
   dirInput.type = "text";
-  dirInput.className = "diag-input";
-  dirInput.style.cssText = "flex:1;margin:0;padding:4px 8px;";
-  dirInput.placeholder = "Default bay directory";
+  dirInput.id = "ob-default-bay-dir";
+  dirInput.className = "ob-directory-input";
+  dirInput.setAttribute("aria-describedby", "ob-default-bay-help ob-default-bay-error");
   dirInput.value = onboardingState.defaultBayDir ?? "";
   dirInput.addEventListener("input", () => { onboardingState = setDefaultBayDir(onboardingState, dirInput.value.trim() || null); });
   const browse = document.createElement("button");
-  browse.className = "diag-btn";
-  browse.style.marginTop = "0";
+  browse.type = "button";
+  browse.className = "ob-browse";
   browse.textContent = "Browse…";
   browse.addEventListener("click", async () => {
     try {
@@ -214,19 +156,148 @@ async function renderHarnessStep(body: HTMLElement): Promise<void> {
         dirInput.value = picked.trim();
         onboardingState = setDefaultBayDir(onboardingState, picked.trim());
       }
-    } catch (e) { console.warn("wizard folder picker failed", e); }
+    } catch (e) {
+      console.warn("wizard folder picker failed", e);
+      error.textContent = "Couldn’t open the folder picker. Your current directory is unchanged.";
+    }
   });
-  dirRow.appendChild(dirInput);
-  dirRow.appendChild(browse);
+  const help = document.createElement("div");
+  help.id = "ob-default-bay-help";
+  help.className = "ob-directory-help";
+  help.textContent = "New bays start here. You can change this later in Settings.";
+  const error = document.createElement("div");
+  error.id = "ob-default-bay-error";
+  error.className = "ob-directory-error";
+  dirControls.append(dirInput, browse);
+  dirRow.append(dirLabel, dirControls, help, error);
   body.appendChild(dirRow);
+}
+
+async function refreshWizardAdapters(results: HTMLElement): Promise<void> {
+  const sequence = ++scanSequence;
+  results.setAttribute("aria-busy", "true");
+  renderScanResults(results, wizardAdapters, true);
+  try {
+    const listed = await invoke<AdapterListResult>(FrontendCommand.AppAdapterList, {});
+    if (sequence !== scanSequence || !results.isConnected) return;
+    wizardAdapters = mapLauncherAdapters(listed.adapters);
+    results.setAttribute("aria-busy", "false");
+    renderScanResults(results, wizardAdapters, false);
+  } catch (err) {
+    console.warn("wizard adapter list failed", err);
+    if (sequence !== scanSequence || !results.isConnected) return;
+    results.setAttribute("aria-busy", "false");
+    results.replaceChildren();
+    const message = document.createElement("p");
+    message.className = "ob-scan-message";
+    message.textContent = "Cove couldn’t scan your tools.";
+    const retry = document.createElement("button");
+    retry.type = "button";
+    retry.className = "ob-scan-retry";
+    retry.textContent = "Retry";
+    retry.addEventListener("click", () => { void refreshWizardAdapters(results); });
+    results.append(message, retry);
+  }
+}
+
+function renderScanResults(results: HTMLElement, adapters: OnboardingLauncherAdapter[] | null, loading: boolean): void {
+  results.replaceChildren();
+  if (loading) {
+    const scanning = document.createElement("p");
+    scanning.className = "ob-scan-message";
+    scanning.textContent = "Scanning your login shell…";
+    results.appendChild(scanning);
+    if (!adapters) return;
+  }
+  if (!adapters) return;
+  const { installed, installable } = partitionOnboardingAdapters(adapters);
+  const installedSection = document.createElement("section");
+  installedSection.className = "ob-tool-section ob-installed";
+  const installedTitle = document.createElement("h3");
+  installedTitle.textContent = `Installed · ${installed.length}`;
+  installedSection.appendChild(installedTitle);
+  if (installed.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "ob-empty";
+    empty.textContent = "No coding tools detected yet.";
+    installedSection.appendChild(empty);
+  } else {
+    const installedRows = document.createElement("div");
+    installedRows.className = "ob-installed-rows";
+    for (const adapter of installed) {
+      const row = document.createElement("div");
+      row.className = "ob-installed-tool";
+      const mark = document.createElement("span");
+      mark.className = "ob-status-mark";
+      mark.setAttribute("aria-hidden", "true");
+      mark.textContent = "✓";
+      const name = document.createElement("span");
+      name.className = "ob-tool-name";
+      name.textContent = adapter.displayName || adapter.name;
+      row.append(mark, name);
+      if (adapter.version?.trim()) {
+        const version = document.createElement("span");
+        version.className = "ob-tool-version";
+        version.textContent = adapter.version.trim();
+        row.appendChild(version);
+      }
+      installedRows.appendChild(row);
+    }
+    installedSection.appendChild(installedRows);
+  }
+  results.appendChild(installedSection);
+  if (installable.length > 0) {
+    const installableSection = document.createElement("section");
+    installableSection.className = "ob-tool-section ob-installable";
+    const installableTitle = document.createElement("h3");
+    installableTitle.textContent = `Install more · ${installable.length}`;
+    const installableRows = document.createElement("div");
+    installableRows.className = "ob-installable-rows";
+    for (const adapter of installable) installableRows.appendChild(buildInstallableRow(adapter));
+    installableSection.append(installableTitle, installableRows);
+    results.appendChild(installableSection);
+  } else if (installed.length === 0) {
+    const available = document.createElement("p");
+    available.className = "ob-empty ob-all-available";
+    available.textContent = "Every available tool is already installed or has no automatic installer.";
+    results.appendChild(available);
+  }
+}
+
+function buildInstallableRow(adapter: OnboardingLauncherAdapter): HTMLElement {
+  const row = document.createElement("div");
+  row.className = "ob-installable-tool";
+  const details = document.createElement("div");
+  details.className = "ob-tool-details";
+  const name = document.createElement("span");
+  name.className = "ob-tool-name";
+  name.textContent = adapter.displayName || adapter.name;
+  details.appendChild(name);
+  const descriptionText = adapter.description?.trim() || (adapter.status === "broken" ? "Installation needs repair." : "Not installed.");
+  const description = document.createElement("span");
+  description.className = "ob-tool-description";
+  description.textContent = descriptionText;
+  details.appendChild(description);
+  const action = adapter.status === "broken" ? "Reinstall" : "Install";
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "ob-install-btn";
+  button.textContent = action;
+  button.setAttribute("aria-label", `${action} ${adapter.displayName || adapter.name}`);
+  button.addEventListener("click", () => {
+    button.disabled = true;
+    const label = `${action} ${adapter.displayName || adapter.name}`;
+    void completeOnboarding().then(() => launchHarnessShellTask((adapter.installCommand ?? "").trim(), label));
+  });
+  row.append(details, button);
+  return row;
 }
 
 async function renderPermissionsStep(body: HTMLElement): Promise<void> {
   const list = document.createElement("div");
   list.className = "ob-adapter-list";
   body.appendChild(list);
-  const adapters = await loadWizardAdapters();
-  const installed = partitionOnboardingAdapters(adapters).installed;
+  const installed = partitionOnboardingAdapters(wizardAdapters ?? []).installed;
   if (installed.length === 0) {
     const none = document.createElement("div");
     none.className = "ob-adapter";
@@ -237,10 +308,9 @@ async function renderPermissionsStep(body: HTMLElement): Promise<void> {
   for (const a of installed) {
     const row = document.createElement("label");
     row.className = "ob-telemetry-toggle";
-    row.style.cssText = "display:flex;align-items:center;gap:8px;justify-content:space-between;";
     const name = document.createElement("span");
     name.textContent = `${a.displayName || a.name} — bypass permissions (YOLO)`;
-    name.style.fontSize = "12px";
+    name.className = "ob-toggle-copy";
     const cb = document.createElement("input");
     cb.type = "checkbox";
     cb.checked = onboardingState.adapterYolo[a.name] ?? launcherYolo(a.name);
@@ -253,13 +323,12 @@ async function renderPermissionsStep(body: HTMLElement): Promise<void> {
 
 function renderAppearanceStep(body: HTMLElement): void {
   const backdropRow = document.createElement("div");
-  backdropRow.style.cssText = "display:flex;gap:8px;align-items:center;margin-top:10px;";
+  backdropRow.className = "ob-preference-row";
   const backdropLabel = document.createElement("span");
-  backdropLabel.style.cssText = "font-size:12px;min-width:80px;";
+  backdropLabel.className = "ob-preference-label";
   backdropLabel.textContent = "Backdrop";
   const backdropSel = document.createElement("select");
-  backdropSel.className = "diag-input";
-  backdropSel.style.cssText = "margin:0;padding:4px 8px;";
+  backdropSel.className = "ob-preference-input";
   for (const m of ["none", "blur", "acrylic", "mica"]) {
     const opt = document.createElement("option");
     opt.value = m;
@@ -277,13 +346,12 @@ function renderAppearanceStep(body: HTMLElement): void {
   body.appendChild(backdropRow);
 
   const themeRow = document.createElement("div");
-  themeRow.style.cssText = "display:flex;gap:8px;align-items:center;margin-top:10px;";
+  themeRow.className = "ob-preference-row";
   const themeLabel = document.createElement("span");
-  themeLabel.style.cssText = "font-size:12px;min-width:80px;";
+  themeLabel.className = "ob-preference-label";
   themeLabel.textContent = "Theme";
   const themeSel = document.createElement("select");
-  themeSel.className = "diag-input";
-  themeSel.style.cssText = "margin:0;padding:4px 8px;";
+  themeSel.className = "ob-preference-input";
   themeRow.appendChild(themeLabel);
   themeRow.appendChild(themeSel);
   body.appendChild(themeRow);
@@ -307,13 +375,12 @@ function renderAppearanceStep(body: HTMLElement): void {
 function renderSoundStep(body: HTMLElement): void {
   const toggle = document.createElement("label");
   toggle.className = "ob-telemetry-toggle";
-  toggle.style.cssText = "display:flex;align-items:center;gap:8px;";
   const cb = document.createElement("input");
   cb.type = "checkbox";
   cb.checked = onboardingState.agentChimes;
   const label = document.createElement("span");
   label.textContent = "Agent chimes — soft tone when an agent finishes or needs input";
-  label.style.cssText = "font-size:12px;color:var(--fg);";
+  label.className = "ob-toggle-copy";
   cb.addEventListener("change", () => {
     onboardingState = setOnboardingAgentChimes(onboardingState, cb.checked);
     setAgentChimesEnabled(cb.checked);
@@ -339,11 +406,11 @@ function dictationPrefRow(key: string, title: string, hint: string): HTMLElement
   const row = document.createElement("div");
   row.className = "set-row";
   const label = document.createElement("label");
-  label.style.cssText = "display:flex;flex-direction:column;gap:2px;";
+  label.className = "ob-pref-copy";
   const name = document.createElement("span");
   name.textContent = title;
   const sub = document.createElement("span");
-  sub.style.cssText = "font-size:11px;color:var(--muted);";
+  sub.className = "ob-pref-hint";
   sub.textContent = hint;
   label.appendChild(name);
   label.appendChild(sub);
@@ -360,15 +427,14 @@ let dictationModelError: string | null = null;
 
 function buildDictationModelControls(container: HTMLElement): void {
   const status = document.createElement("div");
-  status.style.cssText = "display:flex;gap:10px;align-items:center;margin-top:10px;";
+  status.className = "ob-model-status";
   const text = document.createElement("span");
-  text.style.cssText = "font-size:12px;color:var(--muted);";
+  text.className = "ob-model-copy";
   text.textContent = "Speech model: checking…";
   const btn = document.createElement("button");
-  btn.className = "diag-btn";
-  btn.style.cssText = "margin:0;";
+  btn.className = "ob-model-action";
   btn.textContent = "Download now";
-  btn.style.display = "none";
+  btn.classList.add("ob-hidden");
   status.appendChild(text);
   status.appendChild(btn);
   container.appendChild(status);
@@ -378,10 +444,10 @@ function buildDictationModelControls(container: HTMLElement): void {
     if (!status.isConnected) return;
     if (s.modelReady) {
       text.textContent = "Speech model: Parakeet TDT 0.6B v3 — downloaded";
-      btn.style.display = "none";
+      btn.classList.add("ob-hidden");
     } else {
       text.textContent = "Speech model: Parakeet TDT 0.6B v3 (487 MB) — not downloaded";
-      btn.style.display = "";
+      btn.classList.remove("ob-hidden");
     }
   };
   void refresh();
@@ -394,7 +460,7 @@ function buildDictationModelControls(container: HTMLElement): void {
       text.textContent = `Speech model: download failed — ${msg}`;
       btn.disabled = false;
       btn.textContent = "Retry";
-      btn.style.display = "";
+      btn.classList.remove("ob-hidden");
     };
     void invokeNative(FrontendCommand.AppDictationEnsureModel, {}).catch((e) => {
       console.warn("dictation model download failed", e);
@@ -424,7 +490,7 @@ function buildDictationModelControls(container: HTMLElement): void {
 function renderDictationTab(container: HTMLElement): void {
   container.innerHTML = "";
   const info = document.createElement("p");
-  info.style.cssText = "font-size:12px;color:var(--muted);margin:12px 0;line-height:1.5;";
+  info.className = "ob-dictation-info";
   info.textContent = "Hold F9 — or hold Space in a terminal or text field — to dictate. Speech is recognized on this machine with NVIDIA Parakeet; audio never leaves it. Words stream in live and settle when you release.";
   container.appendChild(info);
   container.appendChild(dictationPrefRow(DICTATION_SPACE_KEY, "Hold Space to dictate", "Long-press Space (~300 ms) starts dictation; a quick tap still types a space."));
@@ -435,14 +501,13 @@ function renderDictationTab(container: HTMLElement): void {
 function renderDictationStep(body: HTMLElement): void {
   const toggle = document.createElement("label");
   toggle.className = "ob-telemetry-toggle";
-  toggle.style.cssText = "display:flex;align-items:center;gap:8px;";
   const cb = document.createElement("input");
   cb.type = "checkbox";
   cb.checked = dictationToggleEnabled(localStorage.getItem(DICTATION_SPACE_KEY));
   cb.addEventListener("change", () => localStorage.setItem(DICTATION_SPACE_KEY, cb.checked ? "true" : "false"));
   const label = document.createElement("span");
   label.textContent = "Hold Space to dictate — a quick tap still types a space (F9 always works)";
-  label.style.cssText = "font-size:12px;color:var(--fg);";
+  label.className = "ob-toggle-copy";
   toggle.appendChild(cb);
   toggle.appendChild(label);
   body.appendChild(toggle);
@@ -480,12 +545,50 @@ async function completeOnboarding(): Promise<void> {
     await invoke(FrontendCommand.AppConfigSet, { key: BACKDROP_PREF_KEY, value: onboardingState.backdrop });
     if (onboardingState.theme) { await invoke(FrontendCommand.AppConfigSet, { key: "theme", value: onboardingState.theme }); }
   } catch (e) { console.warn("onboarding persist failed", e); }
+  restorePreviousFocus();
 }
 
 function rerunOnboarding(): void {
   onboardingState = { ...INITIAL_ONBOARDING_STATE, backdrop: dependencies.getBackdropMaterial(), theme: dependencies.getActiveThemeName(), agentChimes: agentChimesEnabled() };
+  wizardAdapters = null;
+  openOnboarding();
+}
+
+function openOnboarding(): void {
+  if (!onboardingEl.classList.contains("open")) previousFocus = document.activeElement as HTMLElement | null;
   onboardingEl.classList.add("open");
   renderOnboarding();
+  (onboardingEl.querySelector("#ob-step-title") as HTMLElement).focus();
+}
+
+function restorePreviousFocus(): void {
+  previousFocus?.focus();
+  previousFocus = null;
+}
+
+function focusableElements(): HTMLElement[] {
+  return Array.from(onboardingEl.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex="0"]'));
+}
+
+function onDialogKeyDown(event: KeyboardEvent): void {
+  if (!onboardingEl.classList.contains("open")) return;
+  if (event.key === "Escape") {
+    event.preventDefault();
+    void onOnboardingSkip();
+    return;
+  }
+  if (event.key !== "Tab") return;
+  const focusable = focusableElements();
+  if (focusable.length === 0) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
 }
 
   const next = onboardingEl.querySelector(".ob-next");
@@ -495,6 +598,9 @@ function rerunOnboarding(): void {
   lifecycle.listen(next, "click", () => void onOnboardingNext());
   lifecycle.listen(previous, "click", () => onOnboardingPrev());
   lifecycle.listen(skip, "click", () => void onOnboardingSkip());
+  const dialog = onboardingEl.querySelector(".ob-box");
+  if (!dialog) throw new Error("Missing onboarding dialog");
+  lifecycle.listen(dialog, "keydown", (event) => onDialogKeyDown(event as KeyboardEvent));
 
   return {
     maybeShow: maybeShowOnboarding,
@@ -503,9 +609,11 @@ function rerunOnboarding(): void {
     setDictationModelError(error: string | null): void { dictationModelError = error; },
     async dispose(): Promise<void> {
       onboardingEl.classList.remove("open");
+      scanSequence += 1;
       for (const poll of modelPolls) window.clearInterval(poll);
       modelPolls.clear();
       await lifecycle.dispose();
+      restorePreviousFocus();
     },
   };
 }

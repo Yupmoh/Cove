@@ -1,22 +1,70 @@
-
-#onboarding { position: fixed; inset: 0; display: none; background: rgba(17, 17, 27, 0.6); align-items: center; justify-content: center; z-index: 60; }
+#onboarding { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; padding: 16px; background: color-mix(in srgb, var(--panel) 72%, transparent); z-index: 60; }
 #onboarding.open { display: flex; }
-.ob-box { width: 440px; max-width: 90vw; background: var(--panel); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; box-shadow: 0 24px 60px rgba(0,0,0,0.5); }
-.ob-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border); color: var(--fg); font-size: 15px; font-weight: 600; }
-.ob-head .x { cursor: pointer; color: var(--muted); font-weight: 400; font-size: 12px; }
-.ob-progress { height: 3px; background: var(--border); }
-.ob-progress-bar { height: 100%; background: var(--accent); transition: width 0.2s; }
-.ob-body { padding: 20px; color: var(--fg); font-size: 13px; line-height: 1.6; min-height: 100px; }
-.ob-body h3 { margin: 0 0 8px; font-size: 15px; }
-.ob-body p { margin: 0 0 8px; color: var(--muted); }
+.ob-box { display: flex; flex-direction: column; width: min(600px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); min-width: 0; overflow: hidden; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; color: var(--fg); }
+.ob-head { display: flex; align-items: center; justify-content: space-between; flex: 0 0 auto; gap: 16px; padding: 14px 20px 12px; border-bottom: 1px solid var(--border); }
+.ob-title { min-width: 0; margin: 0; color: var(--fg); font-size: 15px; font-weight: 600; line-height: 1.35; }
+.ob-skip { min-height: 36px; padding: 0 8px; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; }
+.ob-progress { flex: 0 0 auto; height: 3px; overflow: hidden; background: var(--border); }
+.ob-progress-bar { display: block; width: 100%; height: 3px; border: 0; appearance: none; }
+.ob-progress-bar::-webkit-progress-bar { background: var(--border); }
+.ob-progress-bar::-webkit-progress-value { background: var(--accent); }
+.ob-progress-bar::-moz-progress-bar { background: var(--accent); }
+.ob-body { flex: 1 1 auto; min-width: 0; min-height: 0; padding: 16px 20px 20px; overflow-x: hidden; overflow-y: auto; color: var(--fg); font-size: 13px; line-height: 1.45; }
+.ob-intro { margin: 0 0 14px; color: var(--muted); }
+.ob-scan-results { min-width: 0; }
+.ob-scan-message, .ob-empty { margin: 0; color: var(--muted); }
+.ob-scan-retry, .ob-install-btn, .ob-browse, .ob-model-action, .ob-actions button { min-height: 36px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel-2); color: var(--fg); font: inherit; font-size: 12px; cursor: pointer; }
+.ob-scan-retry { margin-top: 8px; padding: 0 12px; }
+.ob-tool-section { min-width: 0; }
+.ob-tool-section + .ob-tool-section, .ob-all-available { margin-top: 14px; }
+.ob-tool-section h3 { margin: 0 0 7px; color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; }
+.ob-installed-rows { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; padding: 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel-2); }
+.ob-installed-tool { display: flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; min-height: 36px; padding: 5px 9px; border: 1px solid var(--border); border-radius: 6px; color: var(--fg); }
+.ob-status-mark { flex: 0 0 auto; color: var(--accent); font-size: 11px; }
+.ob-tool-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ob-tool-version { flex: 0 1 auto; min-width: 0; overflow: hidden; color: var(--muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.ob-installable-rows { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; min-width: 0; }
+.ob-installable-tool { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+.ob-tool-details { display: flex; flex: 1 1 auto; flex-direction: column; min-width: 0; }
+.ob-tool-description { min-width: 0; overflow: hidden; color: var(--muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.ob-install-btn { flex: 0 0 auto; min-width: 72px; padding: 0 10px; color: var(--accent); }
+.ob-directory { min-width: 0; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
+.ob-directory > label { display: block; margin-bottom: 6px; color: var(--fg); font-size: 12px; font-weight: 600; }
+.ob-directory-controls { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.ob-directory-input { flex: 1 1 auto; min-width: 0; min-height: 36px; box-sizing: border-box; padding: 7px 9px; border: 1px solid var(--border); border-radius: 6px; outline: none; background: var(--panel-2); color: var(--fg); font: inherit; }
+.ob-browse { flex: 0 0 auto; padding: 0 12px; }
+.ob-directory-help, .ob-directory-error { min-width: 0; margin-top: 5px; overflow-wrap: anywhere; color: var(--muted); font-size: 11px; }
+.ob-directory-error:empty { display: none; }
+.ob-actions { display: flex; flex: 0 0 auto; justify-content: flex-end; gap: 8px; padding: 11px 20px; border-top: 1px solid var(--border); background: var(--panel); }
+.ob-actions button { padding: 0 16px; }
+.ob-prev { color: var(--muted); }
+.ob-next { border-color: var(--accent); background: var(--accent); color: var(--panel); font-weight: 600; }
+.ob-skip:hover, .ob-scan-retry:hover, .ob-install-btn:hover, .ob-browse:hover, .ob-prev:hover { border-color: var(--accent-dim); color: var(--fg); }
+.ob-skip:focus-visible, .ob-scan-retry:focus-visible, .ob-install-btn:focus-visible, .ob-browse:focus-visible, .ob-model-action:focus-visible, .ob-directory-input:focus-visible, .ob-actions button:focus-visible, .ob-body input:focus-visible, .ob-body select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ob-skip:disabled, .ob-scan-retry:disabled, .ob-install-btn:disabled, .ob-browse:disabled, .ob-actions button:disabled { opacity: 0.45; cursor: default; }
 .ob-adapter-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
-.ob-adapter { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; color: var(--fg); font-size: 13px; }
-.ob-adapter.selected { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--panel-2)); }
-.ob-adapter .ob-adapter-name { flex: 1; }
+.ob-adapter { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel-2); color: var(--fg); font-size: 13px; }
+.ob-adapter-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .ob-telemetry-toggle { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
 .ob-telemetry-toggle input { width: 16px; height: 16px; }
-.ob-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--border); }
-.ob-actions button { padding: 6px 16px; border-radius: 6px; font-size: 12px; cursor: pointer; }
-.ob-prev { background: transparent; border: 1px solid var(--border); color: var(--muted); }
-.ob-next { background: var(--accent); border: none; color: #000; font-weight: 600; }
-.ob-prev:disabled { opacity: 0.4; cursor: default; }
+.ob-toggle-copy { min-width: 0; color: var(--fg); font-size: 12px; overflow-wrap: anywhere; }
+.ob-preference-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+.ob-preference-label { min-width: 80px; font-size: 12px; }
+.ob-preference-input { min-height: 36px; min-width: 0; padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel-2); color: var(--fg); }
+.ob-pref-copy { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ob-pref-hint, .ob-model-copy { color: var(--muted); font-size: 11px; }
+.ob-model-status { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.ob-model-action { padding: 0 12px; }
+.ob-dictation-info { margin: 12px 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.ob-hidden { display: none; }
+@media (min-width: 560px) {
+  .ob-installable-rows { grid-template-columns: repeat(2, minmax(240px, 1fr)); }
+}
+@media (max-width: 480px) {
+  #onboarding { padding: 8px; }
+  .ob-box { width: calc(100vw - 16px); max-height: calc(100dvh - 16px); }
+  .ob-head, .ob-body, .ob-actions { padding-right: 16px; padding-left: 16px; }
+  .ob-directory-controls { align-items: stretch; flex-direction: column; }
+  .ob-browse { width: 100%; }
+  .ob-tool-name, .ob-tool-description { overflow: visible; text-overflow: clip; white-space: normal; overflow-wrap: anywhere; }
+}
