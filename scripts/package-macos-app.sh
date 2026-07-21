@@ -85,7 +85,6 @@ clang \
   -shared \
   -pthread \
   -arch arm64 \
-  -Wl,-no_uuid \
   -Wl,-install_name,@rpath/libcove_pty.dylib \
   -o "$ENGINE_DIR/libcove_pty.dylib" \
   "$ROOT/native/cove_pty/cove_pty.c"
@@ -193,6 +192,13 @@ validate_macho() {
     esac
   fi
   [ "$architectures" = "arm64" ] || fail "Mach-O payload has wrong architecture: $path ($architectures)"
+  case "$description" in
+    *"dynamically linked shared library"*)
+      if ! otool -l "$path" | grep -q 'cmd LC_UUID'; then
+        fail "Mach-O dylib is missing LC_UUID: $path"
+      fi
+      ;;
+  esac
   if otool -L "$path" | grep -Eq 'libhostfxr|libcoreclr|libclrjit'; then
     fail "Native-AOT payload depends on a .NET runtime: $path"
   fi

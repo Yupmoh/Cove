@@ -39,8 +39,10 @@ public sealed class MacOsPackagingContractTests
         var script = Read("scripts/package-macos-app.sh");
 
         Assert.Contains("libcove_pty.dylib", script);
-        Assert.Contains("-Wl,-no_uuid", script);
+        Assert.DoesNotContain("-Wl,-no_uuid", script);
         Assert.Contains("@rpath/libcove_pty.dylib", script);
+        Assert.Contains("otool -l", script);
+        Assert.Contains("cmd LC_UUID", script);
         Assert.Contains("libe_sqlite3.dylib", script);
         Assert.Contains("lipo -archs", script);
         Assert.Contains("-thin arm64", script);
