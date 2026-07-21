@@ -180,7 +180,9 @@ public sealed class LaunchOrchestratorProtocolTests
                 File.SetUnixFileMode(fakeBinary, System.IO.UnixFileMode.UserRead | System.IO.UnixFileMode.UserWrite | System.IO.UnixFileMode.UserExecute);
 
             WriteAdapter(root, "simple", "fake-cli", includeBinaryDiscovery: true);
-            var orch = NewOrchestrator(root, loginShellPath: fakeBinaryPath);
+            var orch = NewOrchestrator(
+                root,
+                loginShellPath: fakeBinaryPath + Path.PathSeparator + "/usr/bin:/bin");
             var profile = NewProfile("simple");
             var overrides = new LauncherOverrides { ExtraFlags = new[] { "--verbose" } };
 
@@ -206,7 +208,9 @@ public sealed class LaunchOrchestratorProtocolTests
                 File.SetUnixFileMode(fakeBinary, System.IO.UnixFileMode.UserRead | System.IO.UnixFileMode.UserWrite | System.IO.UnixFileMode.UserExecute);
 
             WriteAdapter(root, "yolo-adapter", "yolo-cli");
-            var orch = NewOrchestrator(root, loginShellPath: fakeBinaryPath);
+            var orch = NewOrchestrator(
+                root,
+                loginShellPath: fakeBinaryPath + Path.PathSeparator + "/usr/bin:/bin");
             var profile = NewProfile("yolo-adapter");
             var overrides = new LauncherOverrides { Yolo = true };
 

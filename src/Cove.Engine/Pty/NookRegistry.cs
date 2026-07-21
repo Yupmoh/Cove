@@ -198,6 +198,9 @@ public sealed class NookRegistry : IDisposable, Cove.Engine.Agents.INookWriter
                 managedEnvironment);
             command = startupCommand.Command;
             args = startupCommand.Args;
+            SpawnEnvironment.PrependCommandDirectory(
+                managedEnvironment,
+                command);
         }
         if (environment is Dictionary<string, string> environmentDictionary
             && _shellDir is { } shellDir)

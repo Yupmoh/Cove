@@ -51,6 +51,29 @@ public sealed class SpawnEnvironment
         env["TERM_PROGRAM"] = "Cove";
     }
 
+    internal static void PrependCommandDirectory(
+        Dictionary<string, string> env,
+        string command)
+    {
+        var commandDirectory = Path.GetDirectoryName(command);
+        if (!string.IsNullOrWhiteSpace(commandDirectory))
+        {
+            var path = env.TryGetValue("PATH", out var configuredPath)
+                ? configuredPath
+                : "";
+            var comparison = OperatingSystem.IsWindows()
+                ? System.StringComparison.OrdinalIgnoreCase
+                : System.StringComparison.Ordinal;
+            var containsCommandDirectory = path
+                .Split(Path.PathSeparator, System.StringSplitOptions.RemoveEmptyEntries)
+                .Any(entry => string.Equals(entry, commandDirectory, comparison));
+            if (!containsCommandDirectory)
+                env["PATH"] = string.IsNullOrEmpty(path)
+                    ? commandDirectory
+                    : commandDirectory + Path.PathSeparator + path;
+        }
+    }
+
     public Dictionary<string, string> Build(string nookId, IReadOnlyDictionary<string, string>? callerEnv, string? nookToken = null)
     {
         var env = new Dictionary<string, string>(System.StringComparer.Ordinal);

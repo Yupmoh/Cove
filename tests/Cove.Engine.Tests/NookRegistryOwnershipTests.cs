@@ -128,6 +128,26 @@ public sealed class NookRegistryOwnershipTests
     }
 
     [Fact]
+    public void SpawnAndRespawn_PrependAdapterCommandDirectoryToPath()
+    {
+        var host = new TrackingHost();
+        using var registry = new NookRegistry(host, NullLogger.Instance, SpawnEnvironment());
+        var command = Path.Combine(Path.DirectorySeparatorChar.ToString(), "adapter", "bin", "omp");
+        var commandDirectory = Path.GetDirectoryName(command)!;
+
+        registry.Spawn(new SpawnParams(command, [], "/tmp", Adapter: "omp"));
+        registry.RespawnAs("nook-resume", command, [], "/tmp", 80, 24, adapter: "omp");
+
+        foreach (var request in host.Requests)
+        {
+            var environment = Assert.IsType<Dictionary<string, string>>(request.Environment);
+            Assert.Equal(
+                commandDirectory + Path.PathSeparator + "/usr/bin:/bin",
+                environment["PATH"]);
+        }
+    }
+
+    [Fact]
     public void RespawnAs_ReplacesAndDisposesThePriorSessionExactlyOnce()
     {
         var host = new TrackingHost();
