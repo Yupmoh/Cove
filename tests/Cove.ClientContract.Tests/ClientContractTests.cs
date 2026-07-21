@@ -328,7 +328,7 @@ public sealed class ClientContractTests
         var data = JsonSerializer.SerializeToElement(
             new HelloResult(
                 ProtocolConstants.SemanticProtocolVersion,
-                "contract-engine",
+                "contract-client",
                 Environment.ProcessId,
                 ContractVectors.Channel),
             CoveJsonContext.Default.HelloResult);

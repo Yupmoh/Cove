@@ -105,6 +105,22 @@ public sealed class EngineLink : IAsyncDisposable
                     _log.EngineHelloRejected(_channel, _endpoint, hello.Error?.Code ?? "unknown");
                     throw new InvalidOperationException($"hello failed: {hello.Error?.Code}");
                 }
+                var helloResult = hello.Data?.Deserialize(
+                    CoveJsonContext.Default.HelloResult);
+                var engineVersion = helloResult?.EngineVersion ?? "";
+                if (!string.Equals(
+                        engineVersion,
+                        _clientVersion,
+                        StringComparison.Ordinal))
+                {
+                    _log.EngineVersionMismatch(
+                        _channel,
+                        _endpoint,
+                        _clientVersion,
+                        engineVersion);
+                    throw new InvalidOperationException(
+                        $"engine version mismatch: expected {_clientVersion}, actual {engineVersion}");
+                }
                 if (readPump.IsCompleted)
                     throw new IOException("control connection closed during hello");
                 _readPumpCts = pumpCts;
@@ -117,7 +133,6 @@ public sealed class EngineLink : IAsyncDisposable
                 }
                 var wasConnected = _everConnected;
                 _everConnected = true;
-                var engineVersion = hello.Data is { } hd && hd.TryGetProperty("engineVersion", out var ev) ? ev.GetString() ?? "" : "";
                 _log.EngineConnected(_channel, _endpoint, engineVersion);
                 if (wasConnected)
                 {

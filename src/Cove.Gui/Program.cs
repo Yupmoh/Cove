@@ -29,7 +29,7 @@ internal static class Program
         GuiEngineLauncher.Logger = loggerFactory.CreateLogger("Cove.Gui.GuiEngineLauncher");
         var startupLog = loggerFactory.CreateLogger("Cove.Gui.Program");
 
-        Func<CancellationToken, Task<Stream>> dial = ct => GuiEngineLauncher.ConnectOrSpawnAsync(channel, ct);
+        Func<CancellationToken, Task<Stream>> dial = ct => GuiEngineLauncher.ConnectOrSpawnAsync(channel, version, ct);
         var webRoot = Path.Combine(AppContext.BaseDirectory, "wwwroot");
         var capability = System.Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
         var mediaLeases = new MediaLeaseRegistry(

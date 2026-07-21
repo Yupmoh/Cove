@@ -40,6 +40,40 @@ public sealed class EngineLinkCredentialTests
         Assert.DoesNotContain(logger.Messages, message => message.Contains("control token missing", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public async Task Mismatched_engine_version_is_rejected_before_application_request()
+    {
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var endpoint = (IPEndPoint)listener.LocalEndpoint;
+
+        try
+        {
+            Task server = ServeMismatchedVersionAsync(listener, cancellation.Token);
+            await using var link = new EngineLink(
+                async ct =>
+                {
+                    var client = new TcpClient();
+                    await client.ConnectAsync(endpoint.Address, endpoint.Port, ct);
+                    return client.GetStream();
+                },
+                "0.5.2",
+                "stable",
+                "test-token");
+
+            var error = await Assert.ThrowsAsync<InvalidOperationException>(
+                () => link.RequestAsync("cove://sys/ping", null, cancellation.Token));
+
+            Assert.Contains("engine version mismatch", error.Message);
+            await server;
+        }
+        finally
+        {
+            listener.Stop();
+        }
+    }
+
     private static async Task<HelloParams> ConnectAndCaptureHelloAsync(ILogger logger)
     {
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(10));
@@ -104,6 +138,28 @@ public sealed class EngineLinkCredentialTests
             0,
             ControlCodec.Encode(new ControlResponse(pingRequest.Id, true)),
             cancellationToken);
+    }
+
+    private static async Task ServeMismatchedVersionAsync(
+        TcpListener listener,
+        CancellationToken cancellationToken)
+    {
+        using TcpClient client = await listener.AcceptTcpClientAsync(cancellationToken);
+        await using var connection = new FrameConnection(client.GetStream());
+
+        Frame helloFrame = (await connection.ReadFrameAsync(cancellationToken))!.Value;
+        ControlRequest helloRequest = ControlCodec.DecodeRequest(helloFrame.Payload);
+        JsonElement helloResult = JsonSerializer.SerializeToElement(
+            new HelloResult(ProtocolConstants.SemanticProtocolVersion, "0.5.1", 1, "stable"),
+            CoveJsonContext.Default.HelloResult);
+        await connection.WriteFrameAsync(
+            FrameType.Response,
+            0,
+            ControlCodec.Encode(new ControlResponse(helloRequest.Id, true, helloResult)),
+            cancellationToken);
+
+        Frame? nextFrame = await connection.ReadFrameAsync(cancellationToken);
+        Assert.Null(nextFrame);
     }
 
     private sealed class CapturingLogger : ILogger

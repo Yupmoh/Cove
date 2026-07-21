@@ -50,6 +50,9 @@ internal static partial class GuiLog
     [ZLoggerMessage(LogLevel.Error, "engine hello rejected channel={channel} endpoint={endpoint} code={code}")]
     public static partial void EngineHelloRejected(this ILogger logger, string channel, string endpoint, string code);
 
+    [ZLoggerMessage(LogLevel.Error, "engine version mismatch channel={channel} endpoint={endpoint} expectedVersion={expectedVersion} engineVersion={engineVersion}")]
+    public static partial void EngineVersionMismatch(this ILogger logger, string channel, string endpoint, string expectedVersion, string engineVersion);
+
     [ZLoggerMessage(LogLevel.Trace, "engine request uri={uri} durationMs={durationMs}")]
     public static partial void EngineRequest(this ILogger logger, string uri, long durationMs);
 
@@ -70,6 +73,15 @@ internal static partial class GuiLog
 
     [ZLoggerMessage(LogLevel.Debug, "engine dial failed channel={channel} target={target} error={error}")]
     public static partial void LauncherDialFailed(this ILogger logger, string channel, string target, string error);
+
+    [ZLoggerMessage(LogLevel.Warning, "engine launcher version mismatch channel={channel} expectedVersion={expectedVersion} engineVersion={engineVersion}")]
+    public static partial void LauncherVersionMismatch(this ILogger logger, string channel, string expectedVersion, string engineVersion);
+
+    [ZLoggerMessage(LogLevel.Warning, "engine launcher handoff requested channel={channel} engineVersion={engineVersion} expectedVersion={expectedVersion}")]
+    public static partial void LauncherHandoffRequested(this ILogger logger, string channel, string engineVersion, string expectedVersion);
+
+    [ZLoggerMessage(LogLevel.Error, "engine launcher compatibility failed channel={channel} target={target} expectedVersion={expectedVersion} error={error}")]
+    public static partial void LauncherCompatibilityFailed(this ILogger logger, string channel, string target, string expectedVersion, string error);
 
     [ZLoggerMessage(LogLevel.Information, "engine spawn channel={channel}")]
     public static partial void LauncherSpawn(this ILogger logger, string channel);
