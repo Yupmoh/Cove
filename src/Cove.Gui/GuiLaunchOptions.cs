@@ -4,10 +4,12 @@ namespace Cove.Gui;
 
 public static class GuiLaunchOptions
 {
-    public static int ResolveLoopbackPort(string? value)
+    public const int StablePort = 7421;
+
+    public static int ResolveLoopbackPort(string? value, string channel)
     {
         if (string.IsNullOrWhiteSpace(value))
-            return LoopbackServer.DefaultPort;
+            return string.Equals(channel, "stable", StringComparison.Ordinal) ? StablePort : LoopbackServer.DefaultPort;
 
         if (!int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var port)
             || port < 1024

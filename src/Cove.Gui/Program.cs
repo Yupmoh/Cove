@@ -22,7 +22,7 @@ internal static class Program
         var version = CoveBuild.InformationalVersion;
         var page = Environment.GetEnvironmentVariable("COVE_GUI_PAGE");
         var startPath = string.IsNullOrEmpty(page) ? "" : "/" + page;
-        var guiPort = GuiLaunchOptions.ResolveLoopbackPort(Environment.GetEnvironmentVariable("COVE_GUI_PORT"));
+        var guiPort = GuiLaunchOptions.ResolveLoopbackPort(Environment.GetEnvironmentVariable("COVE_GUI_PORT"), channel);
 
         using var loggerFactory = GuiLogging.CreateFactory();
         var fileSystem = SystemPlatformFileSystem.Instance;
