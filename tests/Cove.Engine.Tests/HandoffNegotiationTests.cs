@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Cove.Engine.Agents;
+using Cove.Engine.Browser;
 using Cove.Engine.Daemon;
 using Cove.Engine.Hooks;
 using Cove.Engine.Pty;
@@ -164,6 +165,22 @@ public sealed class HandoffNegotiationTests
             ControlCodec.Encode(new ControlRequest("2", "cove://commands/nook.spawn", spawn)), CancellationToken.None);
         var spawnResponse = ControlCodec.DecodeResponse((await conn.ReadFrameAsync(CancellationToken.None))!.Value.Payload);
         Assert.True(spawnResponse.Ok);
+        var browserOpen = JsonSerializer.SerializeToElement(
+            new BrowserOpenParams("browser-1", "https://example.com"),
+            CoveJsonContext.Default.BrowserOpenParams);
+        await conn.WriteFrameAsync(
+            FrameType.Request,
+            0,
+            ControlCodec.Encode(
+                new ControlRequest(
+                    "browser",
+                    "cove://commands/browser.open",
+                    browserOpen)),
+            CancellationToken.None);
+        var browserResponse = ControlCodec.DecodeResponse(
+            (await conn.ReadFrameAsync(CancellationToken.None))!.Value.Payload);
+        Assert.True(browserResponse.Ok);
+
 
         await conn.WriteFrameAsync(FrameType.Request, 0,
             ControlCodec.Encode(new ControlRequest("3", "cove://handoff/begin", null)), CancellationToken.None);
@@ -171,6 +188,11 @@ public sealed class HandoffNegotiationTests
         Assert.True(beginResponse.Ok);
         var begin = beginResponse.Data!.Value.Deserialize(CoveJsonContext.Default.HandoffBeginResult)!;
         Assert.Equal(1, begin.NookCount);
+        var browserState = Assert.Single(begin.BrowserNooks!);
+        Assert.Equal("browser-1", browserState.NookId);
+        Assert.Equal("https://example.com", browserState.CurrentUrl);
+        Assert.Equal(["https://example.com"], browserState.History);
+        Assert.Equal(0, browserState.HistoryIndex);
 
         var received = new List<(HandoffNookRecord Record, int Fd, byte[] Ring)>();
         using (var socket = await ConnectAsync(begin.SocketPath))
@@ -213,6 +235,36 @@ public sealed class HandoffNegotiationTests
         Assert.Equal("conflict", second.Error?.Code);
     }
 
+    [PlatformFact(TestOperatingSystem.Unix)]
+    public async Task AdoptTakenOverNooks_RestoresBrowserState()
+    {
+        await using var fixture = await TransportFixture.CreateAsync(
+            new HandoffTransportTestHooks());
+        var takeover = new HandoffTakeover(
+            Array.Empty<HandoffTakeoverItem>(),
+            [
+                new HandoffBrowserNookDto(
+                    "browser-1",
+                    "https://b.example",
+                    [
+                        "https://a.example",
+                        "https://b.example",
+                        "https://c.example",
+                    ],
+                    1),
+            ]);
+
+        var adopted = fixture.Transport.AdoptTakenOverNooks(takeover);
+
+        Assert.Empty(adopted);
+        var browser = Assert.IsType<BrowserNook>(
+            fixture.Browser.Get("browser-1"));
+        Assert.Equal("https://b.example", browser.CurrentUrl);
+        Assert.Equal(1, browser.HistoryIndex);
+        Assert.True(browser.CanGoBack);
+        Assert.True(browser.CanGoForward);
+    }
+
     private static async Task<Socket> ConnectAsync(string socketPath)
     {
         var socket = new Socket(
@@ -240,11 +292,13 @@ public sealed class HandoffNegotiationTests
         private readonly string _root;
         private readonly ProcessEnvironmentScope _environment;
         private readonly NookRegistry _nooks;
+        private readonly BrowserNookManager _browser;
 
         private TransportFixture(
             string root,
             ProcessEnvironmentScope environment,
             NookRegistry nooks,
+            BrowserNookManager browser,
             HandoffTransport transport,
             string socketPath,
             TaskCompletionSource shutdownRequested)
@@ -252,12 +306,14 @@ public sealed class HandoffNegotiationTests
             _root = root;
             _environment = environment;
             _nooks = nooks;
+            _browser = browser;
             Transport = transport;
             SocketPath = socketPath;
             ShutdownRequested = shutdownRequested;
         }
 
         public HandoffTransport Transport { get; }
+        public BrowserNookManager Browser => _browser;
         public string SocketPath { get; }
         public TaskCompletionSource ShutdownRequested { get; }
 
@@ -276,11 +332,13 @@ public sealed class HandoffNegotiationTests
             var nooks = new NookRegistry(
                 new EmptyPtyHost(),
                 NullLogger.Instance);
+            var browser = new BrowserNookManager();
             var shutdownRequested = new TaskCompletionSource(
                 TaskCreationOptions.RunContinuationsAsynchronously);
             var transport = new HandoffTransport(
                 paths,
                 nooks,
+                browser,
                 new HookEventRouter(),
                 new AgentMessageRouter(),
                 new SessionResumeOrchestrator(),
@@ -292,6 +350,7 @@ public sealed class HandoffNegotiationTests
                 root,
                 environment,
                 nooks,
+                browser,
                 transport,
                 Path.Combine(dataDir.IpcDir, "handoff.sock"),
                 shutdownRequested);

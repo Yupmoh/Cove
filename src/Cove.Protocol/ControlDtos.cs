@@ -296,7 +296,15 @@ public sealed record HandoffNookRecord(
     string? HookStatus,
     HandoffCheckpointDto? Checkpoint,
     string NookToken);
-public sealed record HandoffBeginResult(int NookCount, string SocketPath);
+public sealed record HandoffBrowserNookDto(
+    string NookId,
+    string CurrentUrl,
+    string[] History,
+    int HistoryIndex);
+public sealed record HandoffBeginResult(
+    int NookCount,
+    string SocketPath,
+    System.Collections.Generic.IReadOnlyList<HandoffBrowserNookDto>? BrowserNooks = null);
 
 public sealed record ToolsRetentionDto(bool Present, bool Editable, bool Hidden, string? Value, string? Recommended);
 public sealed record ToolsAdapterDto(
@@ -727,6 +735,7 @@ public sealed record PerformanceResultSaveResult(string Directory);
 [JsonSerializable(typeof(SessionStateDto))]
 [JsonSerializable(typeof(HandoffCheckpointDto))]
 [JsonSerializable(typeof(HandoffNookRecord))]
+[JsonSerializable(typeof(HandoffBrowserNookDto))]
 [JsonSerializable(typeof(HandoffBeginResult))]
 [JsonSerializable(typeof(SessionListResult))]
 [JsonSerializable(typeof(ReplayInfoDto))]

@@ -87,6 +87,7 @@ public sealed class DaemonHost
         await using var handoff = new HandoffTransport(
             _paths,
             runtime.Nooks,
+            runtime.Browser,
             runtime.HookRouter,
             runtime.AgentRouter,
             runtime.Sessions,

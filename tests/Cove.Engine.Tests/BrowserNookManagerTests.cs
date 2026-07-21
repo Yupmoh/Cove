@@ -122,4 +122,31 @@ public sealed class BrowserNookManagerTests
         Assert.Single(unchanged.History);
         Assert.Equal(0, unchanged.HistoryIndex);
     }
+    [Fact]
+    public void SnapshotRestore_PreservesExactNavigationState()
+    {
+        var source = new BrowserNookManager();
+        source.Open("p1", "https://a.example");
+        source.Navigate("p1", "https://b.example");
+        source.Navigate("p1", "https://c.example");
+        source.Back("p1");
+
+        var snapshot = source.Snapshot();
+        var restored = new BrowserNookManager();
+        restored.Restore(snapshot);
+
+        var nook = Assert.IsType<BrowserNook>(restored.Get("p1"));
+        Assert.Equal("https://b.example", nook.CurrentUrl);
+        Assert.Equal(
+            [
+                "https://a.example",
+                "https://b.example",
+                "https://c.example",
+            ],
+            nook.History);
+        Assert.Equal(1, nook.HistoryIndex);
+        Assert.True(nook.CanGoBack);
+        Assert.True(nook.CanGoForward);
+    }
+
 }

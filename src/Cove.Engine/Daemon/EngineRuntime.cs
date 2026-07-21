@@ -69,6 +69,7 @@ internal sealed class EngineRuntime : IAsyncDisposable
     public EngineEventRouter Events { get; }
 
     public NookRegistry Nooks => _components.Nooks;
+    public BrowserNookManager Browser => _components.Browser;
 
     public LayoutService Layout => _components.Layout;
 

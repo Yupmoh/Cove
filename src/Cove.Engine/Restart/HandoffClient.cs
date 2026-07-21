@@ -12,7 +12,9 @@ namespace Cove.Engine.Restart;
 
 public sealed record HandoffTakeoverItem(HandoffNookRecord Record, int Fd, byte[] Ring);
 
-public sealed record HandoffTakeover(IReadOnlyList<HandoffTakeoverItem> Items);
+public sealed record HandoffTakeover(
+    IReadOnlyList<HandoffTakeoverItem> Items,
+    IReadOnlyList<HandoffBrowserNookDto> BrowserNooks);
 
 public static class HandoffClient
 {
@@ -101,7 +103,10 @@ public static class HandoffClient
             }
 
             logger.HandoffReceived(paths.Channel, items.Count);
-            return new HandoffTakeover(items);
+            return new HandoffTakeover(
+                items,
+                begin.BrowserNooks
+                    ?? Array.Empty<HandoffBrowserNookDto>());
         }
         catch (Exception ex)
         {

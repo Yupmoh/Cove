@@ -56,4 +56,42 @@ public sealed class HandoffManifestTests
         Assert.Equal(3, read.BytesCopied);
         Assert.Equal(new byte[] { 9, 9, 7 }, dest.ToArray());
     }
+    [Fact]
+    public void BeginResult_RoundTripsBrowserStateThroughSourceGeneratedJson()
+    {
+        var result = new HandoffBeginResult(
+            2,
+            "/tmp/handoff.sock",
+            [
+                new HandoffBrowserNookDto(
+                    "browser-1",
+                    "https://b.example",
+                    [
+                        "https://a.example",
+                        "https://b.example",
+                        "https://c.example",
+                    ],
+                    1),
+            ]);
+
+        var json = JsonSerializer.SerializeToUtf8Bytes(
+            result,
+            CoveJsonContext.Default.HandoffBeginResult);
+        var restored = JsonSerializer.Deserialize(
+            json,
+            CoveJsonContext.Default.HandoffBeginResult);
+
+        var browser = Assert.Single(restored!.BrowserNooks!);
+        Assert.Equal("browser-1", browser.NookId);
+        Assert.Equal("https://b.example", browser.CurrentUrl);
+        Assert.Equal(
+            [
+                "https://a.example",
+                "https://b.example",
+                "https://c.example",
+            ],
+            browser.History);
+        Assert.Equal(1, browser.HistoryIndex);
+    }
+
 }

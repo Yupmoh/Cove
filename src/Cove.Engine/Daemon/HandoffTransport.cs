@@ -2,6 +2,7 @@ using System.Net.Sockets;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Cove.Engine.Agents;
+using Cove.Engine.Browser;
 using Cove.Engine.Hooks;
 using Cove.Engine.Pty;
 using Cove.Engine.Restart;
@@ -29,6 +30,7 @@ internal sealed class HandoffTransport : IAsyncDisposable
 {
     private readonly DaemonPaths _paths;
     private readonly NookRegistry _nooks;
+    private readonly BrowserNookManager _browser;
     private readonly HookEventRouter _hookRouter;
     private readonly AgentMessageRouter _agentRouter;
     private readonly SessionResumeOrchestrator _sessions;
@@ -59,6 +61,7 @@ internal sealed class HandoffTransport : IAsyncDisposable
     public HandoffTransport(
         DaemonPaths paths,
         NookRegistry nooks,
+        BrowserNookManager browser,
         HookEventRouter hookRouter,
         AgentMessageRouter agentRouter,
         SessionResumeOrchestrator sessions,
@@ -69,6 +72,7 @@ internal sealed class HandoffTransport : IAsyncDisposable
     {
         _paths = paths;
         _nooks = nooks;
+        _browser = browser;
         _hookRouter = hookRouter;
         _agentRouter = agentRouter;
         _sessions = sessions;
@@ -98,6 +102,7 @@ internal sealed class HandoffTransport : IAsyncDisposable
 
     public HashSet<string> AdoptTakenOverNooks(HandoffTakeover takeover)
     {
+        _browser.Restore(takeover.BrowserNooks);
         var adopted = new HashSet<string>(StringComparer.Ordinal);
         foreach (var item in takeover.Items)
         {
@@ -130,7 +135,7 @@ internal sealed class HandoffTransport : IAsyncDisposable
                 info.NookId,
                 item.Record.Adapter ?? "");
         }
-        if (takeover.Items.Count > 0)
+        if (takeover.Items.Count > 0 || takeover.BrowserNooks.Count > 0)
         {
             _events.Broadcast(
                 "state.changed",
@@ -161,11 +166,13 @@ internal sealed class HandoffTransport : IAsyncDisposable
         }
 
         var items = new List<HandoffExportItem>();
+        HandoffBrowserNookDto[] browserNooks;
         Socket? listener = null;
         CancellationTokenSource? serveCts = null;
         var ownsSocketPath = false;
         try
         {
+            browserNooks = _browser.Snapshot();
             var exported = _nooks.ExportForHandoff();
             items.Capacity = exported.Count;
             foreach (var item in exported)
@@ -250,7 +257,10 @@ internal sealed class HandoffTransport : IAsyncDisposable
             requestId,
             true,
             JsonSerializer.SerializeToElement(
-                new HandoffBeginResult(items.Count, socketPath),
+                new HandoffBeginResult(
+                    items.Count,
+                    socketPath,
+                    browserNooks),
                 CoveJsonContext.Default.HandoffBeginResult));
     }
 
