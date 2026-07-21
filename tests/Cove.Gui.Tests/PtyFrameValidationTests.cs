@@ -1,6 +1,9 @@
 using System.Buffers.Binary;
+using System.Net.WebSockets;
+using System.Text;
 using Cove.Gui;
 using Cove.Protocol;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 public sealed class PtyFrameValidationTests
@@ -62,6 +65,47 @@ public sealed class PtyFrameValidationTests
         await serve;
     }
 
+    [Fact]
+    public async Task SubscribeAsync_PreservesAuthoritativeInitialResyncMetadata()
+    {
+        await using var engine = new FakeEngine();
+        var serve = engine.ServeOnceAsync(7, 7, stream => FakeEngine.WriteEnd(stream, 7, 0), authoritativeInitialResync: true);
+        await using var client = await PtyStreamClient.SubscribeAsync(
+            engine.Dial,
+            "0.1.0",
+            "dev",
+            "nook",
+            99,
+            "test-control-token",
+            CancellationToken.None);
+
+        Assert.True(client.AuthoritativeInitialResync);
+        Assert.Equal(7UL, client.BaseOffset);
+        await client.PumpAsync((_, _) => Task.CompletedTask, (_, _) => Task.CompletedTask, (_, _) => Task.CompletedTask, CancellationToken.None);
+        await serve;
+    }
+
+    [Fact]
+    public async Task RunAsync_AuthoritativeInitialResync_SendsExistingResyncControlFirst()
+    {
+        await using var engine = new FakeEngine();
+        var serve = engine.ServeOnceAsync(
+            7,
+            7,
+            stream => FakeEngine.WriteEnd(stream, 7, 0),
+            terminalModePreambleBase64: "bW9kZXM=",
+            authoritativeInitialResync: true,
+            terminalCheckpointBase64: "Y2hlY2twb2ludA==",
+            checkpointCols: 132,
+            checkpointRows: 40);
+        using var socket = new RecordingWebSocket();
+
+        await PtyWsHandler.RunAsync(socket, engine.Dial, "0.1.0", "dev", "nook", 99, "test-control-token", NullLogger.Instance, CancellationToken.None);
+
+        Assert.Equal("{\"t\":\"resync\",\"base\":7,\"modes\":\"bW9kZXM=\",\"checkpoint\":\"Y2hlY2twb2ludA==\",\"checkpointCols\":132,\"checkpointRows\":40}", socket.SentText[0]);
+        await serve;
+    }
+
     private static async Task AssertTruncatedPayloadThrowsInvalidDataException(FrameType type, byte[] payload)
     {
         await using var engine = new FakeEngine();
@@ -92,5 +136,34 @@ public sealed class PtyFrameValidationTests
         payload.CopyTo(frame, ProtocolConstants.HeaderSize);
         await stream.WriteAsync(frame);
         await stream.FlushAsync();
+    }
+
+    private sealed class RecordingWebSocket : WebSocket
+    {
+        private WebSocketState _state = WebSocketState.Open;
+        public List<string> SentText { get; } = [];
+        public override WebSocketCloseStatus? CloseStatus => null;
+        public override string? CloseStatusDescription => null;
+        public override WebSocketState State => _state;
+        public override string? SubProtocol => null;
+        public override void Abort() => _state = WebSocketState.Aborted;
+        public override Task CloseAsync(WebSocketCloseStatus closeStatus, string? statusDescription, CancellationToken cancellationToken)
+        {
+            _state = WebSocketState.Closed;
+            return Task.CompletedTask;
+        }
+        public override Task CloseOutputAsync(WebSocketCloseStatus closeStatus, string? statusDescription, CancellationToken cancellationToken) => CloseAsync(closeStatus, statusDescription, cancellationToken);
+        public override void Dispose() => _state = WebSocketState.Closed;
+        public override Task<WebSocketReceiveResult> ReceiveAsync(ArraySegment<byte> buffer, CancellationToken cancellationToken)
+        {
+            _state = WebSocketState.CloseReceived;
+            return Task.FromResult(new WebSocketReceiveResult(0, WebSocketMessageType.Close, true));
+        }
+        public override Task SendAsync(ArraySegment<byte> buffer, WebSocketMessageType messageType, bool endOfMessage, CancellationToken cancellationToken)
+        {
+            if (messageType == WebSocketMessageType.Text)
+                SentText.Add(Encoding.UTF8.GetString(buffer));
+            return Task.CompletedTask;
+        }
     }
 }

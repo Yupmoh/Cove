@@ -768,12 +768,63 @@ describe("TerminalSession", () => {
     firstCheckpoint.reject(undefined);
     await Promise.resolve();
     await vi.advanceTimersByTimeAsync(0);
+    expect(deps.invoke).toHaveBeenCalledOnce();
+    await vi.advanceTimersByTimeAsync(999);
+    expect(deps.invoke).toHaveBeenCalledOnce();
+    await vi.advanceTimersByTimeAsync(1);
     expect(deps.invoke).toHaveBeenCalledTimes(2);
     expect(deps.warn).toHaveBeenCalledWith("terminal checkpoint failed", {
       nookId: "nook-1",
+      offset: 4194304,
+      code: "",
       error: "undefined",
+      permanent: false,
     });
 
+    session.dispose();
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("accepts an authoritative backward initial resync as a new epoch", () => {
+    vi.stubGlobal("location", { host: "localhost" });
+    vi.stubGlobal("WebSocket", { OPEN: 1, CLOSING: 2, CLOSED: 3 });
+    vi.stubGlobal("requestAnimationFrame", vi.fn(() => 1));
+    vi.stubGlobal("cancelAnimationFrame", vi.fn());
+    const owned = resources();
+    const liveSocket = socket();
+    const deps = dependencies(owned);
+    vi.mocked(deps.createSocket).mockReturnValue(liveSocket as unknown as WebSocket);
+    const session = new TerminalSession("nook-1", 100, { isConnected: true } as HTMLElement, {} as HTMLElement, deps, false);
+
+    session.connect();
+    liveSocket.onmessage?.({ data: JSON.stringify({ t: "resync", base: 10, modes: "", checkpoint: "QQ==", checkpointCols: 80, checkpointRows: 24 }) } as MessageEvent);
+
+    expect(liveSocket.close).not.toHaveBeenCalled();
+    expect(owned.term.reset).toHaveBeenCalledOnce();
+    expect(session.receivedOffset).toBe(10);
+    expect(session.committedOffset).toBe(10);
+    expect(session.acknowledgedOffset).toBe(10);
+    session.dispose();
+    vi.unstubAllGlobals();
+  });
+
+  it("does not hot-loop a permanent checkpoint rejection", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("location", { host: "localhost" });
+    vi.stubGlobal("WebSocket", { OPEN: 1, CLOSING: 2, CLOSED: 3 });
+    const owned = resources();
+    const liveSocket = socket();
+    const deps = dependencies(owned);
+    deps.invoke = vi.fn().mockRejectedValue({ code: "not_found", message: "removed" }) as TerminalSessionDependencies["invoke"];
+    vi.mocked(deps.createSocket).mockReturnValue(liveSocket as unknown as WebSocket);
+    const session = new TerminalSession("nook-1", 0, { isConnected: true } as HTMLElement, {} as HTMLElement, deps, false);
+    session.connect();
+    liveSocket.onmessage?.({ data: JSON.stringify({ t: "base", off: 0, head: 0, modes: "" }) } as MessageEvent);
+    liveSocket.onmessage?.({ data: relayFrame(0, new Uint8Array(4 * 1024 * 1024)) } as MessageEvent);
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(deps.invoke).toHaveBeenCalledOnce();
+    expect(deps.warn).toHaveBeenCalledOnce();
     session.dispose();
     vi.useRealTimers();
     vi.unstubAllGlobals();

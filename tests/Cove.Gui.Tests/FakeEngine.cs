@@ -33,14 +33,18 @@ public sealed class FakeEngine : IAsyncDisposable
         ulong replayUntilOffset,
         Func<Stream, Task> script,
         string terminalModePreambleBase64 = "",
-        bool allowPeerEof = false)
+        bool allowPeerEof = false,
+        bool authoritativeInitialResync = false,
+        string terminalCheckpointBase64 = "",
+        int checkpointCols = 0,
+        int checkpointRows = 0)
     {
         using var conn = await _l.AcceptTcpClientAsync();
         var s = conn.GetStream();
         var hello = await Read(s);
         await WriteResponse(s, ReqId(hello), new HelloResult(1, "0.1.0", 1234, "dev"), CoveJsonContext.Default.HelloResult);
         var sub = await Read(s);
-        await WriteResponse(s, ReqId(sub), new SubscribeResult(1, baseOffset, ProtocolConstants.FlowWindow, replayUntilOffset, terminalModePreambleBase64), CoveJsonContext.Default.SubscribeResult);
+        await WriteResponse(s, ReqId(sub), new SubscribeResult(1, baseOffset, ProtocolConstants.FlowWindow, replayUntilOffset, terminalModePreambleBase64, terminalCheckpointBase64, checkpointCols, checkpointRows, authoritativeInitialResync), CoveJsonContext.Default.SubscribeResult);
         using var readerCancellation = new CancellationTokenSource();
         var streamEndDelivered = allowPeerEof ? 1 : 0;
         var reader = ReadCreditsAsync(s, readerCancellation.Token);

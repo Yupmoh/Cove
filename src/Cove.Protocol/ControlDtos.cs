@@ -88,7 +88,7 @@ public sealed record DictationProgressEvent(double Percent);
 public sealed record DictationModelEvent(bool Ready);
 
 public sealed record SubscribeParams(string NookId, ulong SinceOffset = 0);
-public sealed record SubscribeResult(ulong StreamId, ulong BaseOffset, int Window, ulong ReplayUntilOffset = 0, string TerminalModePreambleBase64 = "", string TerminalCheckpointBase64 = "", int CheckpointCols = 0, int CheckpointRows = 0);
+public sealed record SubscribeResult(ulong StreamId, ulong BaseOffset, int Window, ulong ReplayUntilOffset = 0, string TerminalModePreambleBase64 = "", string TerminalCheckpointBase64 = "", int CheckpointCols = 0, int CheckpointRows = 0, bool AuthoritativeInitialResync = false);
 
 public sealed record WriteParams(ulong StreamId, string DataBase64);
 public sealed record ResizeParams(string NookId, int Cols, int Rows);

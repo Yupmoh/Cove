@@ -25,7 +25,10 @@ public static class PtyWsHandler
                 controlToken,
                 ct);
             ulong browserAcked = client.BaseOffset;
-            await SendText(ws, $"{{\"t\":\"base\",\"off\":{client.BaseOffset},\"head\":{client.ReplayUntilOffset},\"modes\":\"{client.TerminalModePreambleBase64}\",\"checkpoint\":\"{client.TerminalCheckpointBase64}\",\"checkpointCols\":{client.CheckpointCols},\"checkpointRows\":{client.CheckpointRows}}}", ct);
+            var initialControl = client.AuthoritativeInitialResync
+                ? $"{{\"t\":\"resync\",\"base\":{client.BaseOffset},\"modes\":\"{client.TerminalModePreambleBase64}\",\"checkpoint\":\"{client.TerminalCheckpointBase64}\",\"checkpointCols\":{client.CheckpointCols},\"checkpointRows\":{client.CheckpointRows}}}"
+                : $"{{\"t\":\"base\",\"off\":{client.BaseOffset},\"head\":{client.ReplayUntilOffset},\"modes\":\"{client.TerminalModePreambleBase64}\",\"checkpoint\":\"{client.TerminalCheckpointBase64}\",\"checkpointCols\":{client.CheckpointCols},\"checkpointRows\":{client.CheckpointRows}}}";
+            await SendText(ws, initialControl, ct);
 
             using var relayCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             var ackTask = ReceiveAcksAsync(ws, client, browserAcked, relayCts.Token);

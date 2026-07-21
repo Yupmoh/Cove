@@ -15,6 +15,7 @@ public sealed class PtyStreamClient : IAsyncDisposable
     public string TerminalCheckpointBase64 { get; }
     public int CheckpointCols { get; }
     public int CheckpointRows { get; }
+    public bool AuthoritativeInitialResync { get; }
 
     private PtyStreamClient(Stream s, SubscribeResult result)
     {
@@ -26,6 +27,7 @@ public sealed class PtyStreamClient : IAsyncDisposable
         TerminalCheckpointBase64 = result.TerminalCheckpointBase64;
         CheckpointCols = result.CheckpointCols;
         CheckpointRows = result.CheckpointRows;
+        AuthoritativeInitialResync = result.AuthoritativeInitialResync;
     }
 
     public static async Task<PtyStreamClient> SubscribeAsync(

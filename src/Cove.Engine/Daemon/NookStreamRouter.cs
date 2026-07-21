@@ -5,11 +5,14 @@ using Cove.Engine.Protocol;
 using Cove.Engine.Pty;
 using Cove.Protocol;
 using Microsoft.Extensions.Logging;
+using ZLogger;
 
 namespace Cove.Engine.Daemon;
 
-internal sealed class NookStreamRouter
+internal sealed partial class NookStreamRouter
 {
+    [ZLoggerMessage(3024, LogLevel.Warning, "nook subscribe cursor rebased nook={nookId} requestedOffset={requestedOffset} authoritativeBase={authoritativeBase} head={head} tail={tail}")]
+    private static partial void LogInitialCursorRebased(ILogger logger, string nookId, ulong requestedOffset, long authoritativeBase, long head, long tail);
     private readonly DaemonPaths _paths;
     private readonly NookRegistry _nooks;
     private readonly ILogger _logger;
@@ -93,12 +96,18 @@ internal sealed class NookStreamRouter
         var head = streamState.Ring.Head;
         var tail = streamState.Ring.Tail;
         var checkpoint = _nooks.GetTerminalCheckpoint(parameters.NookId);
+        var authoritativeInitialResync = parameters.SinceOffset > (ulong)head;
         var useCheckpoint = checkpoint is not null
-            && ((long)parameters.SinceOffset < checkpoint.Offset
+            && (authoritativeInitialResync
+                || (long)parameters.SinceOffset < checkpoint.Offset
                 || (parameters.SinceOffset == 0 && checkpoint.Offset == 0));
         var baseOffset = useCheckpoint
             ? checkpoint!.Offset
+            : authoritativeInitialResync
+            ? head
             : Math.Clamp((long)parameters.SinceOffset, tail, head);
+        if (authoritativeInitialResync)
+            LogInitialCursorRebased(_logger, parameters.NookId, parameters.SinceOffset, baseOffset, head, tail);
         _logger.SubscribeStarted(parameters.NookId, baseOffset, head, tail);
         var result = new SubscribeResult(
             streamId,
@@ -112,7 +121,8 @@ internal sealed class NookStreamRouter
                         : streamState.ModePreamble())),
             useCheckpoint ? Convert.ToBase64String(checkpoint!.Data) : "",
             useCheckpoint ? checkpoint!.Cols : 0,
-            useCheckpoint ? checkpoint!.Rows : 0);
+            useCheckpoint ? checkpoint!.Rows : 0,
+            authoritativeInitialResync);
         await WriteResponseAsync(
             connection,
             new ControlResponse(

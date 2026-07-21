@@ -255,6 +255,30 @@ public sealed class NookLiveHandlerTests
         SubscribeResult continued = await SubscribeAsync(reconnect, nookId, 1, ct);
         Assert.Equal(1ul, continued.BaseOffset);
         Assert.Equal("", continued.TerminalCheckpointBase64);
+
+        await using FrameConnection rebased = await h.ConnectAsync("gui");
+        SubscribeResult authoritative = await SubscribeAsync(rebased, nookId, ulong.MaxValue, ct);
+        Assert.True(authoritative.AuthoritativeInitialResync);
+        Assert.Equal(1UL, authoritative.BaseOffset);
+        Assert.Equal(Convert.ToBase64String(checkpoint), authoritative.TerminalCheckpointBase64);
+    }
+
+    [PlatformFact(TestOperatingSystem.Unix)]
+    public async Task Subscribe_AheadOfHead_MarksAuthoritativeInitialResync()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        CancellationToken ct = cts.Token;
+        await using var h = await DaemonTestHarness.StartAsync();
+        await using FrameConnection ctl = await h.ConnectAsync("cli");
+        string nookId = await SpawnAsync(ctl, "/bin/sh", new[] { "-c", "printf x; sleep 30" }, 80, 24, ct);
+        await using FrameConnection gui = await h.ConnectAsync("gui");
+        SubscribeResult rebased = await SubscribeAsync(gui, nookId, ulong.MaxValue, ct);
+        Assert.Equal(rebased.ReplayUntilOffset, rebased.BaseOffset);
+        Assert.True(rebased.AuthoritativeInitialResync);
+
+        await using FrameConnection equal = await h.ConnectAsync("gui");
+        SubscribeResult normal = await SubscribeAsync(equal, nookId, rebased.ReplayUntilOffset, ct);
+        Assert.False(normal.AuthoritativeInitialResync);
     }
 
     [PlatformFact(TestOperatingSystem.Unix)]

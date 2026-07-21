@@ -81,6 +81,7 @@ export class TerminalSession {
   private acceptedCheckpointOffset: number;
   private checkpointInFlight = false;
   private checkpointDirty = false;
+  private checkpointRetryNotBefore = 0;
   private lastCheckpointActivityAt = 0;
   private pendingTerminalInput = 0;
   private lastTerminalInputAt = Number.NEGATIVE_INFINITY;
@@ -313,6 +314,10 @@ export class TerminalSession {
 
   pause(): void {
     this.generation += 1;
+    this.checkpointInFlight = false;
+    this.checkpointDirty = false;
+    this.checkpointRetryNotBefore = 0;
+    this.clearCheckpointTimer();
     this.clearAckTimer();
     if (this.reconnectTimer !== null) {
       globalThis.clearTimeout(this.reconnectTimer);
@@ -332,6 +337,8 @@ export class TerminalSession {
     if (this.disposed) return;
     this.disposed = true;
     this.generation += 1;
+    this.checkpointInFlight = false;
+    this.checkpointDirty = false;
     this.clearAckTimer();
     if (this.reconnectTimer !== null) globalThis.clearTimeout(this.reconnectTimer);
     if (this.checkpointTimer !== null) globalThis.clearTimeout(this.checkpointTimer);
@@ -425,6 +432,17 @@ export class TerminalSession {
       const controlEpoch = ++this.controlEpoch;
       this.clearCheckpointTimer();
       this.term.reset();
+      if (message.base < requestedSinceOffset) {
+        this.generation += 1;
+        this.receivedCounter = message.base;
+        this.committedCounter = message.base;
+        this.acknowledgedCounter = message.base;
+        this.reconnectCursorOffset = message.base;
+        this.acceptedCheckpointOffset = message.base;
+        this.checkpointInFlight = false;
+        this.checkpointDirty = false;
+        this.checkpointRetryNotBefore = 0;
+      }
       this.beginReplayEpoch(message.base, message.base);
       this.restoringCheckpoint = false;
       if (message.checkpoint && message.checkpointCols && message.checkpointRows) {
@@ -456,6 +474,9 @@ export class TerminalSession {
     if (message.t !== "end" || processExitAction(this.exited) === "ignore") return;
     this.exited = true;
     this.generation += 1;
+    this.checkpointInFlight = false;
+    this.checkpointDirty = false;
+    this.clearCheckpointTimer();
     try {
       socket.close(1000, "process exited");
     } catch (error) {
@@ -491,7 +512,7 @@ export class TerminalSession {
     const safetyDue = this.replayCommittedCursorOffset - this.acceptedCheckpointOffset >= CHECKPOINT_SAFETY_BYTES;
     const outputDueAt = safetyDue ? now : this.lastCheckpointActivityAt + CHECKPOINT_QUIET_MS;
     const inputDueAt = this.lastTerminalInputAt + CHECKPOINT_QUIET_MS;
-    const delay = Math.max(0, outputDueAt, inputDueAt) - now;
+    const delay = Math.max(0, outputDueAt, inputDueAt, this.checkpointRetryNotBefore) - now;
     const checkpointTimer = globalThis.setTimeout(() => {
       if (this.checkpointTimer !== checkpointTimer) return;
       this.checkpointTimer = null;
@@ -529,6 +550,8 @@ export class TerminalSession {
     const serializedVt = this.serialize.serialize();
     this.checkpointDirty = false;
     this.checkpointInFlight = true;
+    const generation = this.generation;
+    const controlEpoch = this.controlEpoch;
     let request: Promise<unknown>;
     try {
       request = this.dependencies.invoke(FrontendCommand.AppNookCheckpoint, {
@@ -540,22 +563,29 @@ export class TerminalSession {
         scrollbackLines,
       });
     } catch (error) {
-      this.settleCheckpoint(offset, false, error);
+      this.settleCheckpoint(offset, false, error, generation, controlEpoch);
       return;
     }
     void request.then(
-      () => this.settleCheckpoint(offset, true),
-      (error: unknown) => this.settleCheckpoint(offset, false, error),
+      () => this.settleCheckpoint(offset, true, undefined, generation, controlEpoch),
+      (error: unknown) => this.settleCheckpoint(offset, false, error, generation, controlEpoch),
     );
   }
 
-  private settleCheckpoint(offset: number, accepted: boolean, error?: unknown): void {
+  private settleCheckpoint(offset: number, accepted: boolean, error?: unknown, generation = this.generation, controlEpoch = this.controlEpoch): void {
+    if (this.disposed || this.exited || generation !== this.generation || controlEpoch !== this.controlEpoch) return;
     this.checkpointInFlight = false;
     if (accepted) {
       this.acceptedCheckpointOffset = Math.max(this.acceptedCheckpointOffset, offset);
+      this.checkpointRetryNotBefore = 0;
     } else {
-      this.checkpointDirty = true;
-      this.dependencies.warn("terminal checkpoint failed", { nookId: this.nookId, error: String(error) });
+      const context = typeof error === "object" && error !== null ? error as { code?: unknown; message?: unknown } : null;
+      const code = typeof context?.code === "string" ? context.code : "";
+      const message = typeof context?.message === "string" ? context.message : String(error);
+      const permanent = code === "not_found" || code === "invalid_params" || /disposed|disconnected|payload rejected/i.test(message);
+      this.checkpointDirty = !permanent;
+      if (!permanent) this.checkpointRetryNotBefore = Date.now() + 1000;
+      this.dependencies.warn("terminal checkpoint failed", { nookId: this.nookId, offset, code, error: message, permanent });
     }
     if (this.checkpointDirty) this.armCheckpointTimer();
   }
