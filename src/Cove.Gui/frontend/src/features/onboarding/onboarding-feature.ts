@@ -18,6 +18,7 @@ import {
   shouldShowOnboarding,
   onboardingSeenFromConfig,
   ONBOARDING_COMPLETED_KEY,
+  partitionOnboardingAdapters,
   type OnboardingState,
 } from "../../onboarding";
 import { DICTATION_SPACE_KEY, DICTATION_LIVE_TYPING_KEY, dictationToggleEnabled, modelPollOutcome } from "../../dictation";
@@ -135,14 +136,15 @@ async function renderHarnessStep(body: HTMLElement): Promise<void> {
   grid.className = "ob-adapter-list";
   body.appendChild(grid);
   const adapters = await loadWizardAdapters();
-  grid.className = "ob-adapter-list" + (adapters.length > 4 ? " ob-grid-2" : "");
-  if (adapters.length === 0) {
+  const installed = partitionOnboardingAdapters(adapters).installed;
+  grid.className = "ob-adapter-list" + (installed.length > 4 ? " ob-grid-2" : "");
+  if (installed.length === 0) {
     const none = document.createElement("div");
     none.className = "ob-adapter";
     none.textContent = "No tools detected yet — add one later from Settings → Tools.";
     grid.appendChild(none);
   }
-  for (const a of adapters) {
+  for (const a of installed) {
     const el = document.createElement("div");
     el.className = "ob-adapter";
     const meta = adapterStatusMeta(a.status);
@@ -159,7 +161,7 @@ async function renderHarnessStep(body: HTMLElement): Promise<void> {
 
   try {
     const listed = await invoke<AdapterListResult>(FrontendCommand.AppAdapterList, {});
-    const installable = mapLauncherAdapters(listed.adapters).filter((a) => a.status !== "detected" && (a.installCommand ?? "").trim().length > 0);
+    const installable = partitionOnboardingAdapters(mapLauncherAdapters(listed.adapters)).installable;
     if (installable.length > 0) {
       const installLabel = document.createElement("div");
       installLabel.className = "tools-subtitle";
@@ -224,14 +226,15 @@ async function renderPermissionsStep(body: HTMLElement): Promise<void> {
   list.className = "ob-adapter-list";
   body.appendChild(list);
   const adapters = await loadWizardAdapters();
-  if (adapters.length === 0) {
+  const installed = partitionOnboardingAdapters(adapters).installed;
+  if (installed.length === 0) {
     const none = document.createElement("div");
     none.className = "ob-adapter";
     none.textContent = "No adapters to configure yet.";
     list.appendChild(none);
     return;
   }
-  for (const a of adapters) {
+  for (const a of installed) {
     const row = document.createElement("label");
     row.className = "ob-telemetry-toggle";
     row.style.cssText = "display:flex;align-items:center;gap:8px;justify-content:space-between;";

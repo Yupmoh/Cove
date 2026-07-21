@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import * as onboarding from "./onboarding";
 import {
   ONBOARDING_STEPS,
   INITIAL_ONBOARDING_STATE,
@@ -19,6 +20,20 @@ import {
   onboardingSeenFromConfig,
   ONBOARDING_COMPLETED_KEY,
 } from "./onboarding";
+
+interface PartitionAdapter {
+  name: string;
+  displayName: string;
+  status?: string | null;
+  installCommand?: string | null;
+}
+
+const partitionOnboardingAdapters = (onboarding as unknown as {
+  partitionOnboardingAdapters(adapters: PartitionAdapter[]): {
+    installed: PartitionAdapter[];
+    installable: PartitionAdapter[];
+  };
+}).partitionOnboardingAdapters;
 
 describe("ONBOARDING_STEPS", () => {
   it("has the 5 first-run wizard steps in spec order", () => {
@@ -161,5 +176,62 @@ describe("onboardingSeenFromConfig", () => {
 describe("ONBOARDING_COMPLETED_KEY", () => {
   it("is the config key onboarding state persists under", () => {
     expect(ONBOARDING_COMPLETED_KEY).toBe("onboarding.completed");
+  });
+});
+
+describe("partitionOnboardingAdapters", () => {
+  it("projects the mixed bundled catalog to the four detected tools", () => {
+    const adapters: PartitionAdapter[] = [
+      { name: "omp", displayName: "OMP", status: "detected", installCommand: "npm install omp" },
+      { name: "claude-code", displayName: "Claude Code", status: "detected", installCommand: "npm install claude" },
+      { name: "codex", displayName: "Codex", status: "detected", installCommand: "npm install codex" },
+      { name: "pi", displayName: "Pi", status: "detected", installCommand: "npm install pi" },
+      { name: "openclaw", displayName: "OpenClaw", status: "missing", installCommand: "npm install openclaw" },
+      { name: "hermes", displayName: "Hermes", status: "missing", installCommand: "npm install hermes" },
+      { name: "cursor-agent", displayName: "Cursor Agent", status: "missing", installCommand: "curl cursor" },
+      { name: "opencode", displayName: "opencode", status: "missing", installCommand: "npm install opencode" },
+    ];
+
+    expect(partitionOnboardingAdapters(adapters).installed.map((adapter) => adapter.name)).toEqual([
+      "omp",
+      "claude-code",
+      "codex",
+      "pi",
+    ]);
+  });
+
+  it("fails closed for every non-detected status and omits blank install commands", () => {
+    const adapters: PartitionAdapter[] = [
+      { name: "missing", displayName: "Missing", status: "missing", installCommand: " install missing " },
+      { name: "broken", displayName: "Broken", status: "broken", installCommand: "install broken" },
+      { name: "null", displayName: "Null", status: null, installCommand: "install null" },
+      { name: "unknown", displayName: "Unknown", status: "unexpected", installCommand: "install unknown" },
+      { name: "absent", displayName: "Absent", installCommand: "install absent" },
+      { name: "blank", displayName: "Blank", status: "missing", installCommand: "   " },
+    ];
+
+    const result = partitionOnboardingAdapters(adapters);
+
+    expect(result.installed).toEqual([]);
+    expect(result.installable.map((adapter) => adapter.name)).toEqual(["absent", "broken", "missing", "null", "unknown"]);
+    expect(result.installable.find((adapter) => adapter.name === "missing")?.installCommand).toBe("install missing");
+  });
+
+  it("keeps groups disjoint, lets detected win duplicates, and preserves ordering conventions", () => {
+    const adapters: PartitionAdapter[] = [
+      { name: "zeta", displayName: " Zeta ", status: "detected", installCommand: "install zeta" },
+      { name: "shared", displayName: " Shared missing ", status: "missing", installCommand: " install shared " },
+      { name: "beta", displayName: " beta ", status: "missing", installCommand: " install beta " },
+      { name: "alpha", displayName: " Alpha ", status: "missing", installCommand: " install alpha " },
+      { name: "shared", displayName: " Shared detected ", status: "detected", installCommand: "install shared" },
+      { name: "first", displayName: " First ", status: "detected" },
+    ];
+
+    const result = partitionOnboardingAdapters(adapters);
+
+    expect(result.installed.map((adapter) => adapter.name)).toEqual(["zeta", "shared", "first"]);
+    expect(result.installed.map((adapter) => adapter.displayName)).toEqual(["Zeta", "Shared detected", "First"]);
+    expect(result.installable.map((adapter) => adapter.displayName)).toEqual(["Alpha", "beta"]);
+    expect(result.installable.every((adapter) => !result.installed.some((installed) => installed.name === adapter.name))).toBe(true);
   });
 });
