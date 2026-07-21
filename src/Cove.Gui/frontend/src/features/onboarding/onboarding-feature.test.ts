@@ -8,6 +8,7 @@ import { mountOnboardingTemplate } from "./onboarding-template";
 interface FixtureAdapter {
   name: string;
   displayName: string;
+  accent?: string;
   status?: string | null;
   version?: string | null;
   description?: string | null;
@@ -94,8 +95,8 @@ afterEach(async () => {
 describe("OnboardingFeature", () => {
   it("feeds disjoint installed and installable sections from one adapter request and lets detected win", async () => {
     const adapters: FixtureAdapter[] = [
-      { name: "shared", displayName: "Shared missing", status: "missing", installCommand: "install shared" },
-      { name: "codex", displayName: "Codex", status: "detected", version: "1.2.3", installCommand: "install codex" },
+      { name: "shared", displayName: "Shared missing", accent: "", status: "missing", installCommand: "install shared" },
+      { name: "codex", displayName: "Codex", accent: "", status: "detected", version: "1.2.3", installCommand: "install codex" },
       { name: "shared", displayName: "Shared detected", status: "detected", version: "2.0", installCommand: "install shared" },
       { name: "pi", displayName: "Pi", status: "missing", description: "Minimal coding agent", installCommand: "install pi" },
     ];
@@ -114,6 +115,12 @@ describe("OnboardingFeature", () => {
       "Shared detected",
       "Pi",
     ]);
+    expect(root.querySelectorAll(".ob-tool-card")).toHaveLength(3);
+    expect(root.querySelectorAll(".ob-tool-badge")).toHaveLength(3);
+    expect(root.querySelector('.ob-installed-tool[data-adapter="codex"] .adapter-icon')).not.toBeNull();
+    expect(root.querySelector('.ob-installed-tool[data-adapter="codex"] .ob-tool-state')?.textContent).toBe("Ready");
+    expect(root.querySelector('.ob-installable-tool[data-adapter="pi"] .ob-tool-command')?.textContent).toBe("install pi");
+    expect(root.querySelector('.ob-installable-tool[data-adapter="pi"]')?.classList.contains("ob-accent-green")).toBe(true);
   });
 
   it("renders loading, error with retry, no-installed, and no-installable states distinctly", async () => {
@@ -258,6 +265,8 @@ describe("OnboardingFeature", () => {
     await settleOnboarding();
 
     expect(root.querySelector(".ob-box")?.children).toHaveLength(4);
+    expect(root.querySelector(".ob-heading")?.children).toHaveLength(2);
+    expect(root.querySelector(".ob-kicker")?.textContent).toBe("Getting started");
     expect(root.querySelector(".ob-body.ob-scroll-region")).not.toBeNull();
     expect(root.querySelector(".ob-actions.ob-fixed-footer")).not.toBeNull();
     expect(root.querySelector(".ob-directory-controls")).not.toBeNull();

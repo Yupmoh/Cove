@@ -24,11 +24,14 @@ import {
 import { DICTATION_SPACE_KEY, DICTATION_LIVE_TYPING_KEY, dictationToggleEnabled, modelPollOutcome } from "../../dictation";
 import { coerceMaterial, setBackdropMaterial, BACKDROP_PREF_KEY, type BackdropDeps, type BackdropMaterial } from "../../backdrop";
 import { playChime } from "../../chime";
+import { adapterIconSvg } from "../../icons";
+import { adapterAccent, LAUNCHER_ACCENTS } from "../../launcher-model";
 import type { ThemeDto } from "../../theme-editor";
 
 export interface OnboardingLauncherAdapter {
   name: string;
   displayName: string;
+  accent?: string | null;
   status?: string | null;
   version?: string | null;
   description?: string | null;
@@ -226,21 +229,25 @@ function renderScanResults(results: HTMLElement, adapters: OnboardingLauncherAda
     installedRows.className = "ob-installed-rows";
     for (const adapter of installed) {
       const row = document.createElement("div");
-      row.className = "ob-installed-tool";
-      const mark = document.createElement("span");
-      mark.className = "ob-status-mark";
-      mark.setAttribute("aria-hidden", "true");
-      mark.textContent = "✓";
+      row.className = `ob-tool-card ob-installed-tool ${adapterAccentClass(adapter)}`;
+      row.dataset.adapter = adapter.name;
+      const badge = buildAdapterBadge(adapter);
+      const details = document.createElement("div");
+      details.className = "ob-tool-details";
       const name = document.createElement("span");
       name.className = "ob-tool-name";
       name.textContent = adapter.displayName || adapter.name;
-      row.append(mark, name);
+      details.appendChild(name);
       if (adapter.version?.trim()) {
         const version = document.createElement("span");
         version.className = "ob-tool-version";
         version.textContent = adapter.version.trim();
-        row.appendChild(version);
+        details.appendChild(version);
       }
+      const state = document.createElement("span");
+      state.className = "ob-tool-state";
+      state.textContent = "Ready";
+      row.append(badge, details, state);
       installedRows.appendChild(row);
     }
     installedSection.appendChild(installedRows);
@@ -266,7 +273,9 @@ function renderScanResults(results: HTMLElement, adapters: OnboardingLauncherAda
 
 function buildInstallableRow(adapter: OnboardingLauncherAdapter): HTMLElement {
   const row = document.createElement("div");
-  row.className = "ob-installable-tool";
+  row.className = `ob-tool-card ob-installable-tool ${adapterAccentClass(adapter)}`;
+  row.dataset.adapter = adapter.name;
+  const badge = buildAdapterBadge(adapter);
   const details = document.createElement("div");
   details.className = "ob-tool-details";
   const name = document.createElement("span");
@@ -278,6 +287,10 @@ function buildInstallableRow(adapter: OnboardingLauncherAdapter): HTMLElement {
   description.className = "ob-tool-description";
   description.textContent = descriptionText;
   details.appendChild(description);
+  const command = document.createElement("span");
+  command.className = "ob-tool-command";
+  command.textContent = (adapter.installCommand ?? "").trim();
+  details.appendChild(command);
   const action = adapter.status === "broken" ? "Reinstall" : "Install";
   const button = document.createElement("button");
   button.type = "button";
@@ -289,8 +302,28 @@ function buildInstallableRow(adapter: OnboardingLauncherAdapter): HTMLElement {
     const label = `${action} ${adapter.displayName || adapter.name}`;
     void completeOnboarding().then(() => launchHarnessShellTask((adapter.installCommand ?? "").trim(), label));
   });
-  row.append(details, button);
+  row.append(badge, details, button);
   return row;
+}
+
+function buildAdapterBadge(adapter: OnboardingLauncherAdapter): HTMLElement {
+  const badge = document.createElement("span");
+  badge.className = "ob-tool-badge";
+  badge.setAttribute("aria-hidden", "true");
+  badge.innerHTML = adapterIconSvg(adapter.name);
+  const masked = badge.querySelector<HTMLElement>(".adapter-icon-mask");
+  if (masked) {
+    masked.removeAttribute("style");
+    const knownName = adapter.name.toLowerCase();
+    if (knownName === "claude-code" || knownName === "codex") masked.classList.add(`ob-${knownName}-icon`);
+  }
+  return badge;
+}
+
+function adapterAccentClass(adapter: OnboardingLauncherAdapter): string {
+  const accent = adapterAccent(adapter.name, adapter.accent?.trim() ?? "").toLowerCase();
+  const index = LAUNCHER_ACCENTS.findIndex((candidate) => candidate.toLowerCase() === accent);
+  return ["ob-accent-peach", "ob-accent-teal", "ob-accent-green", "ob-accent-blue", "ob-accent-pink"][index] ?? "ob-accent-primary";
 }
 
 async function renderPermissionsStep(body: HTMLElement): Promise<void> {
