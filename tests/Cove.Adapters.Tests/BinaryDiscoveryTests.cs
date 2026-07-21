@@ -40,7 +40,7 @@ public sealed class BinaryDiscoveryTests
     }
 
     [PlatformFact(TestOperatingSystem.Unix)]
-    public void Discover_UsesLoginShellPathForShebangInterpreter()
+    public void Discover_AddsWellKnownCandidateDirectoryToShebangPath()
     {
         var binDir = NewDir();
         try
@@ -58,8 +58,13 @@ public sealed class BinaryDiscoveryTests
 
             var discovery = new BinaryDiscoveryService();
             var result = discovery.Discover(
-                new BinaryDiscovery { Commands = ["script-harness"], VersionFlag = "--version" },
-                loginShellPath: binDir);
+                new BinaryDiscovery
+                {
+                    Commands = ["script-harness"],
+                    WellKnownPaths = [binDir],
+                    VersionFlag = "--version",
+                },
+                loginShellPath: "/usr/bin:/bin");
 
             Assert.Equal(AdapterDetectionState.Detected, result.State);
             Assert.Equal("5.6.7", result.Version);

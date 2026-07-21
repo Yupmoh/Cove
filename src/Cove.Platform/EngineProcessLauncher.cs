@@ -60,6 +60,7 @@ public sealed class SystemEngineProcessLauncher : IEngineProcessLauncher
         startInfo.ArgumentList.Add("run");
         startInfo.ArgumentList.Add("--channel");
         startInfo.ArgumentList.Add(channel);
+        startInfo.Environment["COVE_HANDOFF"] = "1";
         _startProcess(startInfo);
     }
 

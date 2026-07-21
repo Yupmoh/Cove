@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Cove.Platform;
+using Cove.Testing;
 using Xunit;
 
 namespace Cove.Platform.Tests;
@@ -63,8 +64,9 @@ public sealed class ThinClientPlatformSeamTests
     }
 
     [Fact]
-    public void SystemEngineProcessLauncher_CreatesDetachedDaemonRunRequest()
+    public async Task SystemEngineProcessLauncher_CreatesDetachedDaemonRunRequest()
     {
+        await using var environment = await ProcessEnvironmentScope.SetAsync("COVE_HANDOFF", "0");
         var executable = Path.Combine("app", "cove-engine");
         var files = new FakePlatformFileSystem(executable);
         ProcessStartInfo? request = null;
@@ -85,6 +87,7 @@ public sealed class ThinClientPlatformSeamTests
         Assert.False(request.RedirectStandardInput);
         Assert.False(request.RedirectStandardOutput);
         Assert.False(request.RedirectStandardError);
+        Assert.Equal("1", request.Environment["COVE_HANDOFF"]);
     }
 
     [Theory]

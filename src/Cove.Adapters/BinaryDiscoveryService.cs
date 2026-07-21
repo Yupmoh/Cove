@@ -94,15 +94,16 @@ public sealed class BinaryDiscoveryService
                 var isCommandShim = _environment.IsWindows
                     && (binaryPath.EndsWith(".cmd", StringComparison.OrdinalIgnoreCase)
                         || binaryPath.EndsWith(".bat", StringComparison.OrdinalIgnoreCase));
+                var probePath = BuildProbePath(binaryPath, executablePath);
                 var request = new ProcessRunRequest(
                     isCommandShim ? "cmd.exe" : binaryPath,
                     Path.GetDirectoryName(binaryPath) ?? ".",
                     isCommandShim
                         ? ["/d", "/s", "/c", binaryPath, config.VersionFlag]
                         : [config.VersionFlag],
-                    string.IsNullOrEmpty(executablePath)
+                    string.IsNullOrEmpty(probePath)
                         ? null
-                        : new Dictionary<string, string> { ["PATH"] = executablePath },
+                        : new Dictionary<string, string> { ["PATH"] = probePath },
                     TimeSpan.FromSeconds(3));
                 var result = _processRunner.RunAsync(request).GetAwaiter().GetResult();
                 if (!result.Started)
@@ -145,6 +146,21 @@ public sealed class BinaryDiscoveryService
 
     private static IReadOnlyList<string> ResolvePathDirs(string path)
         => path.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries);
+
+    private static string BuildProbePath(string binaryPath, string executablePath)
+    {
+        var directory = Path.GetDirectoryName(binaryPath) ?? "";
+        if (string.IsNullOrEmpty(directory)
+            || ResolvePathDirs(executablePath).Contains(
+                directory,
+                StringComparer.Ordinal))
+        {
+            return executablePath;
+        }
+        return string.IsNullOrEmpty(executablePath)
+            ? directory
+            : directory + Path.PathSeparator + executablePath;
+    }
 
     private static bool IsPosixStylePath(string path)
         => path.StartsWith('/') || (path.Length > 2 && path[0] == '/' && path[2] == '/');
