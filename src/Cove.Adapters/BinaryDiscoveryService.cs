@@ -43,14 +43,14 @@ public sealed class BinaryDiscoveryService
 
         foreach (var command in config.Commands)
             foreach (var directory in pathDirs)
-                if (TryCommand(command, directory, config, "path") is { } found)
+                if (TryCommand(command, directory, config, "path", rawPath) is { } found)
                     return found;
 
         foreach (var directory in config.WellKnownPaths)
         {
             var expanded = ExpandTilde(directory);
             foreach (var command in config.Commands)
-                if (TryCommand(command, expanded, config, "well-known") is { } found)
+                if (TryCommand(command, expanded, config, "well-known", rawPath) is { } found)
                     return found;
         }
 
@@ -58,21 +58,21 @@ public sealed class BinaryDiscoveryService
         return new BinaryDiscoveryResult(AdapterDetectionState.Missing, null, null);
     }
 
-    private BinaryDiscoveryResult? TryCommand(string command, string directory, BinaryDiscovery config, string source)
+    private BinaryDiscoveryResult? TryCommand(string command, string directory, BinaryDiscovery config, string source, string executablePath)
     {
         if (_environment.IsWindows && !Path.HasExtension(command))
         {
             foreach (var extension in WindowsExecutableExtensions)
-                if (TryCandidate(command, Path.Combine(directory, command + extension), config, source) is { } found)
+                if (TryCandidate(command, Path.Combine(directory, command + extension), config, source, executablePath) is { } found)
                     return found;
             return null;
         }
-        if (TryCandidate(command, Path.Combine(directory, command), config, source) is { } exact)
+        if (TryCandidate(command, Path.Combine(directory, command), config, source, executablePath) is { } exact)
             return exact;
         return null;
     }
 
-    private BinaryDiscoveryResult? TryCandidate(string command, string candidate, BinaryDiscovery config, string source)
+    private BinaryDiscoveryResult? TryCandidate(string command, string candidate, BinaryDiscovery config, string source, string executablePath)
     {
         var exists = _fileSystem.FileExists(candidate);
         _logger?.BinaryCandidateTested(command, candidate, exists, source);
@@ -81,10 +81,10 @@ public sealed class BinaryDiscoveryService
         _logger?.BinaryResolved(command, candidate, source);
         if (_environment.IsWindows && IsPosixStylePath(candidate))
             _logger?.BinaryResolvedNonRunnableWindowsPath(command, candidate);
-        return ProbeVersion(candidate, config);
+        return ProbeVersion(candidate, config, executablePath);
     }
 
-    private BinaryDiscoveryResult ProbeVersion(string binaryPath, BinaryDiscovery config)
+    private BinaryDiscoveryResult ProbeVersion(string binaryPath, BinaryDiscovery config, string executablePath)
     {
         string? version = null;
         if (!string.IsNullOrEmpty(config.VersionFlag))
@@ -100,7 +100,9 @@ public sealed class BinaryDiscoveryService
                     isCommandShim
                         ? ["/d", "/s", "/c", binaryPath, config.VersionFlag]
                         : [config.VersionFlag],
-                    null,
+                    string.IsNullOrEmpty(executablePath)
+                        ? null
+                        : new Dictionary<string, string> { ["PATH"] = executablePath },
                     TimeSpan.FromSeconds(3));
                 var result = _processRunner.RunAsync(request).GetAwaiter().GetResult();
                 if (!result.Started)
