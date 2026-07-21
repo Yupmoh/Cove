@@ -182,9 +182,9 @@ public sealed class ShippedAdapterExampleTests
             var modelIndex = Array.IndexOf(arguments, "--model");
             Assert.True(modelIndex >= 0);
             Assert.Equal("model-x", arguments[modelIndex + 1]);
-            var effortIndex = Array.IndexOf(arguments, effortFlag);
-            Assert.True(effortIndex >= 0);
-            Assert.Equal(effortValue, arguments[effortIndex + 1]);
+            Assert.Contains(
+                Enumerable.Range(0, arguments.Length - 1),
+                index => arguments[index] == effortFlag && arguments[index + 1] == effortValue);
             Assert.Contains(requiredFlag, arguments);
         }
     }
