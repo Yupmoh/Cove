@@ -2,7 +2,7 @@ import { FrontendCommand } from "../../app/frontend-command";
 import { LifecycleScope, type ComponentHandle } from "../../app/lifecycle";
 import { orderSettingsTabs, settingsTabMetadata, resolveActiveSettingsTab } from "../../settings-tabs";
 import { iconSvg } from "../../icons";
-import { adapterStatusMeta, toolsSubtitle, retentionChipVisible, retentionChipLabel, type ToolsAdapter } from "../../tools-tab";
+import { adapterStatusMeta, toolsSubtitle, retentionChipVisible, retentionChipLabel, projectToolsAdapters, type ToolsAdapter } from "../../tools-tab";
 import {
   deriveProfileSlug, isValidProfileSlug, profilePickerLabel, selectedLauncherProfile, launcherProfileChoices, envMapFromRows,
   type LaunchProfileListItem, type LaunchProfileDetail, type CreateProfileInput, type UpdateProfileInput,
@@ -92,6 +92,7 @@ let configSchema: ConfigSchemaEntry[] = [];
 let activeSettingsTab: string | null = null;
 let renderGeneration = 0;
 let previousFocus: HTMLElement | null = null;
+let lastToolsAdapters: ToolsAdapter[] | null = null;
 
 async function loadConfigSchema(): Promise<void> {
   try {
@@ -116,6 +117,7 @@ function openSettings(tab?: string): void {
 }
 
 function closeSettings(): void {
+  ++renderGeneration;
   cancelKeybindRecording();
   settingsEl.classList.remove("open");
   if (previousFocus?.isConnected) previousFocus.focus();
@@ -189,7 +191,9 @@ function renderSettings(): void {
   const heading = document.createElement("h2");
   heading.textContent = metadata.label;
   const description = document.createElement("p");
-  description.textContent = metadata.description;
+  description.textContent = activeSettingsTab === "tools"
+    ? "Manage coding harnesses, launch profiles, and installation status."
+    : metadata.description;
   identity.append(heading, description);
   header.append(pageIcon, identity);
   const scroll = document.createElement("div");
@@ -211,7 +215,7 @@ function renderSettings(): void {
     return;
   }
   if (activeSettingsTab === "tools") {
-    void renderToolsTab(content);
+    void renderToolsTab(content, generation);
     return;
   }
   if (activeSettingsTab === "dictation") {
@@ -352,21 +356,24 @@ function renderAudioExtras(container: HTMLElement): void {
 
 interface ToolsListResponse { adapters: ToolsAdapter[]; }
 
-async function renderToolsTab(container: HTMLElement): Promise<void> {
+async function renderToolsTab(container: HTMLElement, generation = renderGeneration): Promise<void> {
   container.innerHTML = "";
 
   const actions = document.createElement("div");
   actions.className = "tools-actions";
   const rescanBtn = document.createElement("button");
-  rescanBtn.className = "set-utility-btn";
-  rescanBtn.textContent = "Re-scan";
-  rescanBtn.addEventListener("click", () => void doRescanAdapters(container, rescanBtn));
+  rescanBtn.type = "button";
+  rescanBtn.className = "set-action set-action-secondary";
+  rescanBtn.textContent = "Rescan";
+  rescanBtn.addEventListener("click", () => void doRescanAdapters(container, rescanBtn, generation));
   const addBtn = document.createElement("button");
-  addBtn.className = "set-utility-btn";
+  addBtn.type = "button";
+  addBtn.className = "set-action set-action-secondary";
   addBtn.textContent = "Add adapter from folder…";
-  addBtn.addEventListener("click", () => void doAddAdapterFromFolder(container));
+  addBtn.addEventListener("click", () => void doAddAdapterFromFolder(container, generation));
   const wizardBtn = document.createElement("button");
-  wizardBtn.className = "set-utility-btn";
+  wizardBtn.type = "button";
+  wizardBtn.className = "set-action set-action-secondary";
   wizardBtn.textContent = "Re-run setup wizard";
   wizardBtn.addEventListener("click", () => onboardingFeature.rerun());
   actions.appendChild(rescanBtn);
@@ -374,52 +381,87 @@ async function renderToolsTab(container: HTMLElement): Promise<void> {
   actions.appendChild(wizardBtn);
   container.appendChild(actions);
 
-  let adapters: ToolsAdapter[];
+  const state = document.createElement("div");
+  state.className = lastToolsAdapters ? "tools-state tools-state-refreshing" : "tools-state tools-state-loading";
+  state.setAttribute("role", "status");
+  state.textContent = lastToolsAdapters ? "Refreshing tools…" : "Loading tools…";
+  container.appendChild(state);
+  if (lastToolsAdapters) renderToolsGroups(container, lastToolsAdapters, generation);
+
   try {
     const result = await invoke<ToolsListResponse>(FrontendCommand.AdapterToolsList, {});
-    if (!isCurrentPageDestination(container, "tools")) return;
-    adapters = result.adapters ?? [];
+    if (!isCurrentToolsDestination(container, generation)) return;
+    lastToolsAdapters = result.adapters ?? [];
+    container.querySelector(".tools-state")?.remove();
+    for (const group of container.querySelectorAll(".tools-section")) group.remove();
+    renderToolsGroups(container, lastToolsAdapters, generation);
   } catch (err) {
     console.warn("adapter.tools-list failed for tools tab", err);
-    const failed = document.createElement("div");
-    failed.className = "tools-empty";
-    failed.textContent = "adapter list unavailable";
-    container.appendChild(failed);
-    return;
+    if (!isCurrentToolsDestination(container, generation)) return;
+    state.className = "tools-state tools-state-error";
+    state.textContent = "Tools could not be refreshed.";
+    const retry = document.createElement("button");
+    retry.type = "button";
+    retry.className = "set-action set-action-secondary";
+    retry.textContent = "Retry";
+    retry.addEventListener("click", () => void renderToolsTab(container));
+    state.appendChild(retry);
   }
+}
+
+function isCurrentToolsDestination(container: HTMLElement, generation: number): boolean {
+  return generation === renderGeneration && container.isConnected && activeSettingsTab === "tools" && container.closest("#set-panel-tools") !== null;
+}
+
+function renderToolsGroups(container: HTMLElement, adapters: ToolsAdapter[], generation: number): void {
+  const groups = projectToolsAdapters(adapters);
+  buildToolsGroup(container, "installed", "Installed", "Ready to launch or needing attention.", groups.installed, true, generation);
+  buildToolsGroup(container, "available", "Available to install", "Catalog tools with an existing installation path.", groups.available, false, generation);
+  if (groups.unavailable.length > 0) buildToolsGroup(container, "unavailable", "Unavailable", "Catalog tools without an installation action on this system.", groups.unavailable, false, generation);
+}
+
+function buildToolsGroup(container: HTMLElement, key: string, title: string, helper: string, adapters: ToolsAdapter[], installed: boolean, generation: number): void {
+  const section = document.createElement("section");
+  section.className = `set-group tools-section tools-section-${key}`;
+  const heading = document.createElement("div");
+  heading.className = "set-section-header";
+  const titleEl = document.createElement("h3");
+  titleEl.className = "tools-section-title";
+  titleEl.id = `tools-section-${key}`;
+  titleEl.textContent = `${title} · ${adapters.length}`;
+  const helperEl = document.createElement("span");
+  helperEl.className = "set-section-description";
+  helperEl.textContent = helper;
+  heading.append(titleEl, helperEl);
+  section.appendChild(heading);
+  const list = document.createElement("div");
+  list.className = "tools-list";
+  list.setAttribute("role", "list");
+  list.setAttribute("aria-labelledby", titleEl.id);
   if (adapters.length === 0) {
     const empty = document.createElement("div");
     empty.className = "tools-empty";
-    empty.textContent = "no adapters installed";
-    container.appendChild(empty);
-    return;
+    empty.textContent = installed ? "No installed tools" : "No tools available to install";
+    list.appendChild(empty);
+  } else {
+    for (const adapter of adapters) list.appendChild(buildToolsCard(adapter, container, installed, generation));
   }
-  const list = document.createElement("div");
-  list.className = "tools-list";
-  for (const a of adapters) list.appendChild(buildToolsCard(a, container));
-  container.appendChild(list);
+  section.appendChild(list);
+  container.appendChild(section);
 }
 
-function isCurrentPageDestination(container: HTMLElement, tab: string): boolean {
-  return container.isConnected && activeSettingsTab === tab && container.closest(`#set-panel-${tab}`) !== null;
-}
-
-function buildToolsCard(a: ToolsAdapter, container: HTMLElement): HTMLElement {
+function buildToolsCard(a: ToolsAdapter, container: HTMLElement, installed: boolean, generation: number): HTMLElement {
   const card = document.createElement("div");
   card.className = "tools-card";
+  card.setAttribute("role", "article");
+  card.style.setProperty("--adapter-accent", a.accent || "var(--accent)");
 
-  if (a.iconSvg) {
-    const icon = document.createElement("span");
-    icon.className = "tools-icon";
-    icon.innerHTML = a.iconSvg;
-    const svg = icon.querySelector("svg");
-    if (svg) { svg.setAttribute("width", "18"); svg.setAttribute("height", "18"); }
-    card.appendChild(icon);
-  } else {
-    const swatch = document.createElement("span");
-    swatch.className = "tools-accent";
-    card.appendChild(swatch);
-  }
+  const icon = document.createElement("span");
+  icon.className = "tools-icon";
+  icon.innerHTML = a.iconSvg || iconSvg("agents");
+  const svg = icon.querySelector("svg");
+  if (svg) svg.setAttribute("aria-hidden", "true");
+  card.appendChild(icon);
 
   const body = document.createElement("div");
   body.className = "tools-body";
@@ -429,11 +471,13 @@ function buildToolsCard(a: ToolsAdapter, container: HTMLElement): HTMLElement {
   const name = document.createElement("span");
   name.className = "tools-name";
   name.textContent = a.displayName || a.name;
+  name.title = name.textContent;
   titleRow.appendChild(name);
 
   const meta = adapterStatusMeta(a.status);
   const status = document.createElement("span");
   status.className = "tools-status";
+  status.dataset.status = meta.label;
   const dot = document.createElement("span");
   dot.className = "tools-dot";
   const statusLabel = document.createElement("span");
@@ -446,6 +490,7 @@ function buildToolsCard(a: ToolsAdapter, container: HTMLElement): HTMLElement {
   const subtitle = document.createElement("div");
   subtitle.className = "tools-subtitle";
   subtitle.textContent = toolsSubtitle(a.status, a.version, a.binaryPath, a.installHint);
+  subtitle.title = subtitle.textContent;
   body.appendChild(subtitle);
 
   const manifestRow = document.createElement("div");
@@ -456,18 +501,26 @@ function buildToolsCard(a: ToolsAdapter, container: HTMLElement): HTMLElement {
   if (a.removable) {
     const removeBtn = document.createElement("button");
     removeBtn.className = "set-utility-btn";
+    removeBtn.type = "button";
     removeBtn.textContent = "Remove";
-    removeBtn.addEventListener("click", () => openRemoveAdapterDialog(a, container));
+    removeBtn.setAttribute("aria-label", `Remove ${a.displayName || a.name}`);
+    removeBtn.addEventListener("click", () => openRemoveAdapterDialog(a, container, generation));
     manifestRow.appendChild(removeBtn);
   }
   body.appendChild(manifestRow);
 
-  if (retentionChipVisible(a.retention)) body.appendChild(buildRetentionChip(a, container));
+  if (retentionChipVisible(a.retention)) body.appendChild(buildRetentionChip(a, container, generation));
 
-  if (a.status === "detected") void buildProfilesSection(a, container).then((el) => body.appendChild(el));
+  if (installed) void buildProfilesSection(a, container, generation).then((el) => {
+    if (isCurrentToolsDestination(container, generation)) body.appendChild(el);
+  });
 
   card.appendChild(body);
   return card;
+}
+
+function isCurrentPageDestination(container: HTMLElement, tab: string): boolean {
+  return container.isConnected && activeSettingsTab === tab && container.closest(`#set-panel-${tab}`) !== null;
 }
 
 const launcherProfileSlugKey = (adapter: string) => `cove:launcher-profile:${adapter}`;
@@ -487,7 +540,7 @@ async function resolveLauncherProfileSlug(adapter: string): Promise<string> {
   }
 }
 
-async function buildProfilesSection(a: ToolsAdapter, container: HTMLElement): Promise<HTMLElement> {
+async function buildProfilesSection(a: ToolsAdapter, container: HTMLElement, generation: number): Promise<HTMLElement> {
   const section = document.createElement("div");
   section.className = "tools-profiles";
 
@@ -498,9 +551,13 @@ async function buildProfilesSection(a: ToolsAdapter, container: HTMLElement): Pr
   header.appendChild(label);
 
   const newBtn = document.createElement("button");
+  newBtn.type = "button";
   newBtn.className = "set-utility-btn";
   newBtn.textContent = "New profile";
-  newBtn.addEventListener("click", () => openProfileEditor(a, null, () => renderToolsTab(container)));
+  newBtn.setAttribute("aria-label", `New profile for ${a.displayName || a.name}`);
+  newBtn.addEventListener("click", () => openProfileEditor(a, null, () => {
+    if (isCurrentToolsDestination(container, generation)) return renderToolsTab(container);
+  }));
   header.appendChild(newBtn);
   section.appendChild(header);
 
@@ -510,7 +567,8 @@ async function buildProfilesSection(a: ToolsAdapter, container: HTMLElement): Pr
 
   try {
     const result = await invoke<ProfileListResult>(FrontendCommand.LaunchProfileList, { adapter: a.name });
-    renderProfileList(a, result.profiles ?? [], listEl, container);
+    if (!isCurrentToolsDestination(container, generation)) return section;
+    renderProfileList(a, result.profiles ?? [], listEl, container, generation);
   } catch (err) {
     console.warn("launch-profile.list failed", a.name, err);
     const note = document.createElement("div");
@@ -526,6 +584,7 @@ function renderProfileList(
   profiles: LaunchProfileListItem[],
   listEl: HTMLElement,
   container: HTMLElement,
+  generation: number,
 ): void {
   listEl.innerHTML = "";
   if (profiles.length === 0) {
@@ -541,6 +600,7 @@ function renderProfileList(
     const radio = document.createElement("input");
     radio.type = "radio";
     radio.name = `profile-radio-${a.name}`;
+    radio.setAttribute("aria-label", `Select ${p.name} profile for ${a.displayName || a.name}`);
     const storedSlug = storage.getItem(launcherProfileSlugKey(a.name));
     radio.checked = storedSlug ? storedSlug === p.slug : p.isDefault;
     radio.addEventListener("change", () => {
@@ -553,16 +613,23 @@ function renderProfileList(
     name.textContent = profilePickerLabel(p);
     row.appendChild(name);
     const editBtn = document.createElement("button");
+    editBtn.type = "button";
     editBtn.className = "set-utility-btn";
     editBtn.textContent = "Edit";
-    editBtn.addEventListener("click", () => openProfileEditor(a, p.slug, () => renderToolsTab(container)));
+    editBtn.setAttribute("aria-label", `Edit ${p.name} profile for ${a.displayName || a.name}`);
+    editBtn.addEventListener("click", () => openProfileEditor(a, p.slug, () => {
+      if (isCurrentToolsDestination(container, generation)) return renderToolsTab(container);
+    }));
     row.appendChild(editBtn);
     if (profiles.length > 1) {
       const delBtn = document.createElement("button");
-      delBtn.className = "set-utility-btn";
+      delBtn.type = "button";
+      delBtn.className = "set-utility-btn set-action-destructive";
       delBtn.textContent = "Delete";
+      delBtn.setAttribute("aria-label", `Delete ${p.name} profile for ${a.displayName || a.name}`);
       delBtn.addEventListener("click", async () => {
         await invoke(FrontendCommand.LaunchProfileDelete, { adapter: a.name, slug: p.slug });
+        if (!isCurrentToolsDestination(container, generation)) return;
         await renderToolsTab(container);
       });
       row.appendChild(delBtn);
@@ -757,7 +824,7 @@ function textRow(parent: HTMLElement, label: string, value: string, placeholder:
   return input;
 }
 
-function buildRetentionChip(a: ToolsAdapter, container: HTMLElement): HTMLElement {
+function buildRetentionChip(a: ToolsAdapter, container: HTMLElement, generation: number): HTMLElement {
   const chip = document.createElement("div");
   chip.className = "tools-retention";
   const label = document.createElement("span");
@@ -774,14 +841,14 @@ function buildRetentionChip(a: ToolsAdapter, container: HTMLElement): HTMLElemen
     const save = document.createElement("button");
     save.className = "set-utility-btn";
     save.textContent = "Extend";
-    save.addEventListener("click", () => void doSetRetention(a.name, input.value, container));
+    save.addEventListener("click", () => void doSetRetention(a.name, input.value, container, generation));
     chip.appendChild(input);
     chip.appendChild(save);
   }
   return chip;
 }
 
-async function doRescanAdapters(container: HTMLElement, btn: HTMLButtonElement): Promise<void> {
+async function doRescanAdapters(container: HTMLElement, btn: HTMLButtonElement, generation: number): Promise<void> {
   btn.disabled = true;
   try {
     await invoke(FrontendCommand.AdapterRescan, {});
@@ -789,12 +856,13 @@ async function doRescanAdapters(container: HTMLElement, btn: HTMLButtonElement):
     console.warn("adapter.rescan failed", e);
     showInAppToast("Re-scan failed", (e as Error).message, () => {});
   } finally {
+    if (!isCurrentToolsDestination(container, generation)) return;
     btn.disabled = false;
     await renderToolsTab(container);
   }
 }
 
-async function doAddAdapterFromFolder(container: HTMLElement): Promise<void> {
+async function doAddAdapterFromFolder(container: HTMLElement, generation: number): Promise<void> {
   let picked: unknown;
   try {
     picked = await invokeNative(FrontendCommand.DialogOpenFolder, { initialPath: activeProjectDir() || "/" });
@@ -802,6 +870,7 @@ async function doAddAdapterFromFolder(container: HTMLElement): Promise<void> {
     console.warn("adapter folder picker failed", e);
     return;
   }
+  if (!isCurrentToolsDestination(container, generation)) return;
   if (picked === null) return;
   const path = typeof picked === "string" ? picked.trim() : "";
   if (!path) { console.warn("adapter folder picker returned nothing", picked); return; }
@@ -811,10 +880,11 @@ async function doAddAdapterFromFolder(container: HTMLElement): Promise<void> {
   } catch (e) {
     showInAppToast("Adapter not added", (e as Error).message, () => {});
   }
+  if (!isCurrentToolsDestination(container, generation)) return;
   await renderToolsTab(container);
 }
 
-function openRemoveAdapterDialog(a: ToolsAdapter, container: HTMLElement): void {
+function openRemoveAdapterDialog(a: ToolsAdapter, container: HTMLElement, generation: number): void {
   const scrim = document.createElement("div");
   scrim.className = "modal-scrim open";
   const box = document.createElement("div");
@@ -846,7 +916,7 @@ function openRemoveAdapterDialog(a: ToolsAdapter, container: HTMLElement): void 
   scrim.addEventListener("mousedown", (e) => { if (e.target === scrim) close(); });
   confirm.addEventListener("click", () => {
     close();
-    void doRemoveAdapter(a.name, purge.checked, container);
+    void doRemoveAdapter(a.name, purge.checked, container, generation);
   });
   btnRow.appendChild(cancel);
   btnRow.appendChild(confirm);
@@ -859,7 +929,7 @@ function openRemoveAdapterDialog(a: ToolsAdapter, container: HTMLElement): void 
   document.body.appendChild(scrim);
 }
 
-async function doRemoveAdapter(name: string, purgeSessions: boolean, container: HTMLElement): Promise<void> {
+async function doRemoveAdapter(name: string, purgeSessions: boolean, container: HTMLElement, generation: number): Promise<void> {
   try {
     const res = await invoke<{ name: string; purgedSessions: number }>(FrontendCommand.AdapterRemove, { name, purgeSessions });
     const suffix = res.purgedSessions > 0 ? ` (${res.purgedSessions} session records purged)` : "";
@@ -867,16 +937,18 @@ async function doRemoveAdapter(name: string, purgeSessions: boolean, container: 
   } catch (e) {
     showInAppToast("Remove failed", (e as Error).message, () => {});
   }
+  if (!isCurrentToolsDestination(container, generation)) return;
   await renderToolsTab(container);
 }
 
-async function doSetRetention(name: string, value: string, container: HTMLElement): Promise<void> {
+async function doSetRetention(name: string, value: string, container: HTMLElement, generation: number): Promise<void> {
   try {
     await invoke(FrontendCommand.AdapterRetentionSet, { name, value: value.trim() });
     showInAppToast("Retention updated", `${name} retention set to ${value.trim()}.`, () => {});
   } catch (e) {
     showInAppToast("Retention not saved", (e as Error).message, () => {});
   }
+  if (!isCurrentToolsDestination(container, generation)) return;
   await renderToolsTab(container);
 }
 

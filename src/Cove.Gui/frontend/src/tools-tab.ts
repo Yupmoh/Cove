@@ -45,6 +45,24 @@ export interface ToolsAdapter {
   retention: ToolsRetention;
 }
 
+export interface ToolsAdapterProjection {
+  installed: ToolsAdapter[];
+  available: ToolsAdapter[];
+  unavailable: ToolsAdapter[];
+}
+
+export function projectToolsAdapters(adapters: readonly ToolsAdapter[]): ToolsAdapterProjection {
+  const installed: ToolsAdapter[] = [];
+  const available: ToolsAdapter[] = [];
+  const unavailable: ToolsAdapter[] = [];
+  for (const adapter of adapters) {
+    if (adapter.status === "detected" || adapter.status === "broken") installed.push(adapter);
+    else if (adapter.installHint.trim()) available.push(adapter);
+    else unavailable.push(adapter);
+  }
+  return { installed, available, unavailable };
+}
+
 export function toolsSubtitle(
   status: string | null | undefined,
   version: string | null | undefined,

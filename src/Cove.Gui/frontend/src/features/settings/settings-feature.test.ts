@@ -2,7 +2,7 @@ import { Window } from "happy-dom";
 import { describe, expect, it, vi } from "vitest";
 import { createSettingsFeature, type SettingsFeatureDependencies } from "./settings-feature";
 
-function fixture(withKeybindings = false) {
+function fixture(withKeybindings = false, toolsAdapters: unknown[] | null = null) {
   const window = new Window();
   const root = window.document.createElement("div");
   const tabs = window.document.createElement("div");
@@ -13,6 +13,10 @@ function fixture(withKeybindings = false) {
   window.document.body.appendChild(root);
   const focusActiveNook = vi.fn();
   const invoke = vi.fn(async <T>(command: string) => {
+    if (command === "cove://commands/config.schema" && toolsAdapters !== null) {
+      return { entries: [{ key: "tools.adapters", label: "Tools", tab: "tools", control: "text", description: null, type: "string", options: null }] } as T;
+    }
+    if (command === "cove://commands/adapter.tools-list" && toolsAdapters !== null) return { adapters: toolsAdapters } as T;
     if (command === "cove://commands/config.schema" && withKeybindings) {
       return {
         entries: [{
@@ -88,6 +92,42 @@ function fixture(withKeybindings = false) {
 }
 
 describe("SettingsFeature", () => {
+  it("renders launcher-aligned installed, available, and unavailable tool groups", async () => {
+    const retention = { present: false, editable: false, hidden: false, value: null, recommended: null };
+    const make = (name: string, status: string, installHint: string) => ({ name, displayName: name, accent: "#123456", binary: name, status, version: "1.0", binaryPath: `/bin/${name}`, iconSvg: null, installHint, bundled: true, removable: false, retention });
+    const { body, feature } = fixture(false, [make("ready", "detected", ""), make("get-me", "missing", "install it"), make("blocked", "missing", "")]);
+
+    feature.open("tools");
+    await vi.waitFor(() => expect(body.querySelectorAll(".tools-card")).toHaveLength(3));
+    expect([...body.querySelectorAll(".tools-section-title")].map((node) => node.textContent)).toEqual(["Installed · 1", "Available to install · 1", "Unavailable · 1"]);
+    expect(body.querySelector(".tools-card")?.getAttribute("style")).toContain("--adapter-accent");
+    expect(body.querySelector(".tools-icon svg")?.getAttribute("aria-hidden")).toBe("true");
+    expect(body.querySelector(".tools-card")?.getAttribute("role")).toBe("article");
+    expect(body.querySelector(".tools-actions button")?.textContent).toBe("Rescan");
+  });
+
+  it("keeps stale tool results from replacing a newly selected page", async () => {
+    let complete!: (value: unknown) => void;
+    const pending = new Promise((resolve) => { complete = resolve; });
+    const { body, tabs, feature, invoke } = fixture(false, []);
+    vi.mocked(invoke).mockImplementation(async (command) => command === "cove://commands/adapter.tools-list" ? await pending as never : ({ entries: [{ key: "tools.adapters", label: "Tools", tab: "tools", control: "text", description: null, type: "string", options: null }, { key: "theme.color", label: "Theme", tab: "theme", control: "text", description: null, type: "string", options: null }] }) as never);
+
+    feature.open("tools");
+    await vi.waitFor(() => expect(tabs.querySelector("#set-tab-theme")).not.toBeNull());
+    (tabs.querySelector("#set-tab-theme") as unknown as HTMLButtonElement).click();
+    complete({ adapters: [] });
+    await Promise.resolve();
+    expect(body.querySelector("#set-panel-theme")).not.toBeNull();
+    expect(body.querySelector(".tools-empty")).toBeNull();
+  });
+
+  it("uses shared Settings primitives without diagnostic or inline layout classes for Tools", () => {
+    const source = createSettingsFeature.toString();
+    expect(source).toContain("tools-section");
+    expect(source).toContain("--adapter-accent");
+    expect(source).not.toContain("style.gridTemplateColumns");
+    expect(source).not.toMatch(/className = "(?:diag|perf)/);
+  });
   it("renders grouped accessible tabs and a framed page with a stable auto-apply footer", async () => {
     const { window, tabs, body, feature } = fixture();
 

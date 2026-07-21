@@ -5,6 +5,7 @@ import {
   toolsSubtitle,
   retentionChipVisible,
   retentionChipLabel,
+  projectToolsAdapters,
   type ToolsRetention,
 } from "./tools-tab";
 
@@ -84,5 +85,27 @@ describe("retentionChipLabel", () => {
 
   it("falls back to default when empty", () => {
     expect(retentionChipLabel({ present: true, editable: false, hidden: false, value: null, recommended: null })).toBe("Retention: default");
+  });
+});
+
+describe("projectToolsAdapters", () => {
+  const retention: ToolsRetention = { present: false, editable: false, hidden: false, value: null, recommended: null };
+  const adapter = (name: string, status: string | null, installHint = ""): import("./tools-tab").ToolsAdapter => ({
+    name, displayName: name, accent: "#abcdef", binary: name, status, version: null, binaryPath: null,
+    iconSvg: null, installHint, bundled: true, removable: false, retention,
+  });
+
+  it("partitions adapters by canonical status in stable exhaustive order", () => {
+    const detected = adapter("detected", "detected", "install detected");
+    const missing = adapter("missing", "missing", "install missing");
+    const broken = adapter("broken", "broken", "install broken");
+    const unknown = adapter("unknown", "future", "install unknown");
+    const unavailable = adapter("unavailable", "missing", "  ");
+    const result = projectToolsAdapters([detected, missing, broken, unknown, unavailable]);
+
+    expect(result.installed).toEqual([detected, broken]);
+    expect(result.available).toEqual([missing, unknown]);
+    expect(result.unavailable).toEqual([unavailable]);
+    expect([...result.installed, ...result.available, ...result.unavailable]).toHaveLength(5);
   });
 });
