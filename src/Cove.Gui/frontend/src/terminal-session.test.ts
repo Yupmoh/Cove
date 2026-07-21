@@ -578,7 +578,7 @@ describe("TerminalSession", () => {
     vi.mocked(owned.serialize.serialize).mockReturnValue("serialized vt");
     const liveSocket = socket();
     const deps = dependencies(owned);
-    deps.invoke = vi.fn(async <T>() => ({} as T));
+    deps.invoke = vi.fn(async () => ({})) as TerminalSessionDependencies["invoke"];
     vi.mocked(deps.createSocket).mockReturnValue(liveSocket as unknown as WebSocket);
     const session = new TerminalSession(
       "nook-1",
@@ -622,7 +622,7 @@ describe("TerminalSession", () => {
     const owned = resources();
     const liveSocket = socket();
     const deps = dependencies(owned);
-    deps.invoke = vi.fn(async <T>() => ({} as T));
+    deps.invoke = vi.fn(async () => ({})) as TerminalSessionDependencies["invoke"];
     vi.mocked(deps.createSocket).mockReturnValue(liveSocket as unknown as WebSocket);
     const session = new TerminalSession(
       "nook-1",
@@ -664,7 +664,7 @@ describe("TerminalSession", () => {
     const liveSocket = socket();
     const firstCheckpoint = deferred();
     const deps = dependencies(owned);
-    deps.invoke = vi.fn(() => firstCheckpoint.promise);
+    deps.invoke = vi.fn(() => firstCheckpoint.promise) as TerminalSessionDependencies["invoke"];
     vi.mocked(deps.createSocket).mockReturnValue(liveSocket as unknown as WebSocket);
     const session = new TerminalSession(
       "nook-1",
@@ -707,7 +707,7 @@ describe("TerminalSession", () => {
     const liveSocket = socket();
     const input = deferred<void>();
     const deps = dependencies(owned);
-    deps.invoke = vi.fn(async <T>() => ({} as T));
+    deps.invoke = vi.fn(async () => ({})) as TerminalSessionDependencies["invoke"];
     deps.write = vi.fn(() => input.promise);
     vi.mocked(deps.createSocket).mockReturnValue(liveSocket as unknown as WebSocket);
     const session = new TerminalSession(

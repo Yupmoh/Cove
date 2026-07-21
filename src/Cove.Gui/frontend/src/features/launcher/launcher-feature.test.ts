@@ -51,7 +51,7 @@ function fixture(recentResults: Array<{ sessions: Array<Record<string, unknown>>
       const channelHandlers = handlers.get(channel) ?? new Set<(payload: never) => void>();
       channelHandlers.add(handler as (payload: never) => void);
       handlers.set(channel, channelHandlers);
-      return { dispose: () => channelHandlers.delete(handler as (payload: never) => void) };
+      return { dispose: () => { channelHandlers.delete(handler as (payload: never) => void); } };
     },
   };
   const emit = <K extends keyof EngineEventPayloads>(
@@ -151,7 +151,7 @@ describe("LauncherFeature", () => {
     vi.useFakeTimers();
     const { document, emit, feature, invoke } = fixture();
     const launcher = feature.render(null, null);
-    document.body.append(launcher);
+    document.body.append(launcher as unknown as typeof document.body);
     const coldRefresh = feature.refreshRecents();
     await vi.runAllTicks();
     await coldRefresh;
@@ -192,7 +192,7 @@ describe("LauncherFeature", () => {
     await vi.runAllTicks();
     expect(recentCalls()).toHaveLength(5);
 
-    document.body.append(launcher);
+    document.body.append(launcher as unknown as typeof document.body);
     await feature.dispose();
     vi.advanceTimersByTime(30_000);
     await vi.runAllTicks();
@@ -215,7 +215,7 @@ describe("LauncherFeature", () => {
     ]);
     await feature.load();
     const launcher = feature.render(null, null);
-    document.body.append(launcher);
+    document.body.append(launcher as unknown as typeof document.body);
     await feature.refreshRecents();
     expect(launcher.textContent).toContain("keep-me");
 
