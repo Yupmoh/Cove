@@ -14,7 +14,7 @@ img.cl-brand-img { height: 20px; width: auto; display: block; -webkit-user-drag:
 .cl-hint { font-size: 10px; letter-spacing: 0.01em; color: var(--muted); background: color-mix(in srgb, var(--panel-2) 70%, transparent); border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; white-space: nowrap; }
 .cl-section-label { font-size: 9.5px; font-weight: 700; letter-spacing: 0.9px; text-transform: uppercase; color: color-mix(in srgb, var(--muted) 78%, transparent); padding: 4px 2px 0; }
 .cl-harness-row { display: grid; gap: 12px; justify-content: center; }
-.cl-card { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 15px 16px; min-height: 116px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; cursor: pointer; color: var(--fg); transition: border-color 0.14s, box-shadow 0.16s, transform 0.12s, background 0.14s; }
+.cl-card { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 15px 16px; min-height: 116px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; cursor: pointer; color: var(--fg); transition: border-color 140ms ease-out, transform 120ms ease-out, background 140ms ease-out; }
 .cl-card::before { content: ""; position: absolute; inset: 0; border-radius: inherit; background: radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, var(--card-accent, var(--accent)) 10%, transparent), transparent 60%); opacity: 0; transition: opacity 0.16s; pointer-events: none; }
 .cl-card:hover { border-color: color-mix(in srgb, var(--card-accent, var(--accent)) 55%, var(--border)); transform: translateY(-2px); }
 .cl-card:hover::before { opacity: 1; }
@@ -64,7 +64,7 @@ img.cl-brand-img { height: 20px; width: auto; display: block; -webkit-user-drag:
   background: color-mix(in srgb, var(--card-accent, var(--accent)) 7%, var(--panel));
   border: 1px solid color-mix(in srgb, var(--card-accent, var(--accent)) 32%, var(--border));
   box-shadow: 0 12px 32px -18px color-mix(in srgb, var(--card-accent, var(--accent)) 70%, transparent);
-  animation: cl-dock-in 0.18s ease; }
+  animation: cl-dock-in 180ms ease-out; }
 @keyframes cl-dock-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
 .cl-dock-id { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .cl-dock-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--card-accent, var(--accent)); box-shadow: 0 0 8px color-mix(in srgb, var(--card-accent, var(--accent)) 70%, transparent); flex-shrink: 0; }
@@ -74,7 +74,7 @@ img.cl-brand-img { height: 20px; width: auto; display: block; -webkit-user-drag:
 .cl-dock-controls { display: flex; align-items: center; gap: 10px; margin-left: auto; flex-wrap: wrap; }
 .cl-yolo-row { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--muted); cursor: pointer; user-select: none; }
 .cl-yolo-row:hover { color: var(--fg); }
-.cl-new-session { display: inline-flex; align-items: center; gap: 8px; height: 32px; font-size: 12px; font-weight: 650; font-family: inherit; color: #11111b; background: var(--card-accent, var(--accent)); border: none; border-radius: 8px; padding: 0 12px; cursor: pointer; transition: filter 0.12s, box-shadow 0.12s; }
+.cl-new-session { display: inline-flex; align-items: center; gap: 8px; height: 32px; font-size: 12px; font-weight: 650; font-family: inherit; color: #11111b; background: var(--card-accent, var(--accent)); border: none; border-radius: 8px; padding: 0 12px; cursor: pointer; }
 .cl-new-session:hover { filter: brightness(1.06); box-shadow: 0 6px 18px -8px var(--card-accent, var(--accent)); }
 .cl-kbd { font-size: 10px; font-weight: 700; padding: 2px 5px; border-radius: 5px; background: color-mix(in srgb, #11111b 22%, transparent); color: inherit; }
 .cl-resume-dd { position: relative; display: flex; }
@@ -82,10 +82,10 @@ img.cl-brand-img { height: 20px; width: auto; display: block; -webkit-user-drag:
 .cl-resume-trigger:hover { border-color: color-mix(in srgb, var(--card-accent, var(--accent)) 55%, var(--border)); }
 .cl-resume-label { text-align: left; }
 .cl-resume-count { color: var(--muted); font-size: 10px; font-weight: 700; background: color-mix(in srgb, var(--panel) 70%, transparent); border-radius: 999px; padding: 1px 7px; }
-.cl-resume-chev { color: var(--muted); font-size: 9px; transition: transform 0.15s; }
+.cl-resume-chev { color: var(--muted); font-size: 9px; transition: transform 150ms ease-out; }
 .cl-resume-dd.open .cl-resume-chev { transform: rotate(180deg); }
 .cl-resume-menu { display: none; position: absolute; top: calc(100% + 6px); right: 0; z-index: 60; flex-direction: column; gap: 1px; min-width: 240px; max-width: 340px; padding: 6px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; max-height: 220px; overflow-y: auto; box-shadow: 0 14px 40px rgba(0,0,0,0.46); }
-.cl-resume-dd.open .cl-resume-menu { display: flex; animation: cl-menu-pop 0.12s ease-out; }
+.cl-resume-dd.open .cl-resume-menu { display: flex; animation: cl-menu-pop 120ms ease-out; }
 @keyframes cl-menu-pop { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
 .cl-resume-filter { width: 100%; box-sizing: border-box; margin-bottom: 4px; padding: 5px 8px; font-size: 11.5px; font-family: inherit; color: var(--fg); background: color-mix(in srgb, var(--panel-2, var(--panel)) 70%, transparent); border: 1px solid var(--border); border-radius: 6px; outline: none; transition: border-color 0.12s; }
 .cl-resume-filter:focus { border-color: color-mix(in srgb, var(--card-accent, var(--accent)) 55%, var(--border)); }
@@ -113,7 +113,7 @@ img.cl-brand-img { height: 20px; width: auto; display: block; -webkit-user-drag:
 .cl-profile-plus { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--border); font-size: 11px; line-height: 1; flex-shrink: 0; color: var(--muted); transition: border-color 0.12s, color 0.12s; }
 .cl-profile-new:hover .cl-profile-plus { border-color: color-mix(in srgb, var(--card-accent, var(--accent)) 65%, var(--border)); color: var(--card-accent, var(--accent)); }
 .cl-tool-row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
-.cl-tool { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; width: 88px; height: 82px; background: var(--panel); border: 1px solid var(--border); border-radius: 11px; cursor: pointer; color: var(--fg); transition: border-color 0.14s, transform 0.12s, background 0.14s; }
+.cl-tool { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; width: 88px; height: 82px; background: var(--panel); border: 1px solid var(--border); border-radius: 11px; cursor: pointer; color: var(--fg); transition: border-color 140ms ease-out, transform 120ms ease-out, background 140ms ease-out; }
 .cl-tool:hover { border-color: color-mix(in srgb, var(--tool-accent, var(--accent)) 55%, var(--border)); transform: translateY(-2px); background: color-mix(in srgb, var(--tool-accent, var(--accent)) 6%, var(--panel)); }
 .cl-tool.selected { border-color: var(--tool-accent, var(--accent)); box-shadow: inset 0 0 0 1px var(--tool-accent, var(--accent)), 0 8px 22px -14px var(--tool-accent, var(--accent)); }
 .cl-tool-ic { line-height: 0; }
@@ -123,3 +123,13 @@ img.cl-brand-img { height: 20px; width: auto; display: block; -webkit-user-drag:
 .cl-tool-key { position: absolute; top: 6px; left: 7px; font-size: 9px; font-weight: 700; color: var(--muted); background: color-mix(in srgb, var(--panel-2) 80%, transparent); border-radius: 4px; min-width: 14px; height: 14px; display: inline-flex; align-items: center; justify-content: center; padding: 0 3px; }
 .cl-tool.selected .cl-tool-key { color: #11111b; background: var(--tool-accent, var(--accent)); }
 .cl-tool.selected .cl-tool-key { color: var(--tool-accent, var(--accent)); }
+
+@media (prefers-reduced-motion: reduce) {
+  .cl-tip.driving .cl-tip-text { animation: none; transform: none; }
+  .cl-dock { animation: none; opacity: 1; transform: none; }
+  .cl-resume-dd.open .cl-resume-menu { animation: none; opacity: 1; transform: none; }
+  .cl-card, .cl-card:hover, .cl-card.selected, .cl-install-card:hover, .cl-tool, .cl-tool:hover, .cl-tool.selected { transform: none; }
+  .cl-card-cta, .cl-card:hover .cl-card-cta, .cl-card.selected .cl-card-cta { transform: none; }
+  .cl-resume-chev, .cl-resume-dd.open .cl-resume-chev { transform: none; }
+  .cl-card:focus-visible, .cl-tool:focus-visible, .cl-resume-trigger:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+}
