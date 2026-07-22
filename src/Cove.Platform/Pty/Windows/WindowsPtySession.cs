@@ -159,6 +159,7 @@ public sealed class WindowsPtySession : IPtySession
     {
         if (Interlocked.Exchange(ref _killed, 1) != 0)
             return;
+        _disposeRequested.Set();
         if (HasExited)
             return;
         _logger.WinKillRequested(SessionId);
@@ -240,6 +241,8 @@ public sealed class WindowsPtySession : IPtySession
         long deadline = exitTicks + PostExitDrainCapMilliseconds;
         while (Volatile.Read(ref _disposed) == 0)
         {
+            if (_disposeRequested.IsSet)
+                break;
             long now = Environment.TickCount64;
             long elapsedSinceExit = now - exitTicks;
             long lastRead = Volatile.Read(ref _lastReadTicks);
