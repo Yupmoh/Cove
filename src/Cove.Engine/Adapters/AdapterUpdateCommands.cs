@@ -19,7 +19,8 @@ public static class AdapterUpdateCommands
             return ctx.Fail("not_ready", "launcher not available");
         var checker = _checker ??= HarnessUpdateChecker.CreateNpm();
 
-        var candidates = new List<(AdapterManifest Manifest, string Installed, string Package, string? BinaryPath)>();
+        var candidates = new List<(AdapterManifest Manifest, string Installed, string Package, string UpdateCommand)>();
+        var lifecycleResolver = new AdapterLifecycleCommandResolver();
         foreach (var manifest in manifestStore.LoadAll())
         {
             if (manifest.PackageIdentity?.Npm is not { } package)
@@ -27,30 +28,38 @@ public static class AdapterUpdateCommands
             var detection = launcher.DescribeAdapterBinary(manifest);
             if (detection.State != AdapterDetectionState.Detected || string.IsNullOrEmpty(detection.Version))
                 continue;
-            candidates.Add((manifest, detection.Version, package, detection.BinaryPath));
+            var realPath = AdapterListCommands.ResolveRealPath(detection.BinaryPath);
+            var lifecycle = lifecycleResolver.Resolve(
+                manifest,
+                detection.State,
+                detection.BinaryPath,
+                realPath);
+            if (lifecycle.Provenance is not ("npm" or "bun")
+                || string.IsNullOrWhiteSpace(lifecycle.UpdateCommand))
+            {
+                continue;
+            }
+            candidates.Add((
+                manifest,
+                detection.Version,
+                package,
+                lifecycle.UpdateCommand));
         }
 
         var latests = await Task.WhenAll(candidates.Select(c => checker.GetLatestVersionAsync(c.Package))).ConfigureAwait(false);
 
         var updates = new List<HarnessUpdateDto>();
-        var lifecycleResolver = new AdapterLifecycleCommandResolver();
         for (var i = 0; i < candidates.Count; i++)
         {
-            var (manifest, installed, _, binaryPath) = candidates[i];
+            var (manifest, installed, _, updateCommand) = candidates[i];
             if (latests[i] is not { } latest || !HarnessUpdateChecker.IsNewer(latest, installed))
                 continue;
-            var realPath = AdapterListCommands.ResolveRealPath(binaryPath);
-            var lifecycle = lifecycleResolver.Resolve(
-                manifest,
-                AdapterDetectionState.Detected,
-                binaryPath,
-                realPath);
             updates.Add(new HarnessUpdateDto(
                 manifest.Name,
                 manifest.DisplayName,
                 installed,
                 latest,
-                lifecycle.UpdateCommand));
+                updateCommand));
         }
 
         return ctx.Ok(new HarnessUpdatesResult(updates), CoveJsonContext.Default.HarnessUpdatesResult);

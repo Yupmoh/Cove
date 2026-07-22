@@ -27,8 +27,43 @@ public sealed class AdapterUpdatesCheckCommandTests
         return binDir;
     }
 
-    private static void WriteAdapter(string root, string name, string binary, string binDir)
+    private static string WriteNpmBinary(
+        string root,
+        string binary,
+        string version,
+        string package)
     {
+        var targetDirectory = Path.Combine(
+            [root, "lib", "node_modules", .. package.Split('/'), "bin"]);
+        Directory.CreateDirectory(targetDirectory);
+        var target = Path.Combine(targetDirectory, binary + ".js");
+        File.WriteAllText(target, "#!/bin/sh\necho " + version + "\n");
+        if (!OperatingSystem.IsWindows())
+        {
+            File.SetUnixFileMode(
+                target,
+                UnixFileMode.UserRead
+                    | UnixFileMode.UserWrite
+                    | UnixFileMode.UserExecute);
+        }
+        var binDirectory = Path.Combine(root, "bin");
+        Directory.CreateDirectory(binDirectory);
+        File.CreateSymbolicLink(Path.Combine(binDirectory, binary), target);
+        return binDirectory;
+    }
+
+    private static void WriteAdapter(
+        string root,
+        string name,
+        string binary,
+        string binDir,
+        string? npmPackage = null)
+    {
+        var packageIdentity = npmPackage is null
+            ? ""
+            : $$"""
+              "packageIdentity": { "npm": "{{npmPackage}}" },
+            """;
         var dir = Path.Combine(root, name);
         Directory.CreateDirectory(dir);
         var manifest = $$"""
@@ -41,6 +76,7 @@ public sealed class AdapterUpdatesCheckCommandTests
           "binary": "{{binary}}",
           "version": "1.0.0",
           "author": "test",
+          {{packageIdentity}}
           "binaryDiscovery": {
             "commands": ["{{binary}}"],
             "wellKnownPaths": ["{{binDir}}"],
@@ -64,8 +100,17 @@ public sealed class AdapterUpdatesCheckCommandTests
     public async Task UpdatesCheck_ReportsNewerUpstreamVersion()
     {
         var root = MakeRoot();
-        var binDir = WriteFakeBinary(root, "cove-fake-codex", "0.0.1");
-        WriteAdapter(root, "codex", "cove-fake-codex", binDir);
+        var binDir = WriteNpmBinary(
+            root,
+            "cove-fake-codex",
+            "0.0.1",
+            "@openai/codex");
+        WriteAdapter(
+            root,
+            "codex",
+            "cove-fake-codex",
+            binDir,
+            "@openai/codex");
         var store = new AdapterManifestStore(root);
         var orch = LaunchTestFactory.Create(store, new MethodRunner(), new BinaryDiscoveryService());
         var fetched = new List<string>();
@@ -90,8 +135,17 @@ public sealed class AdapterUpdatesCheckCommandTests
     public async Task UpdatesCheck_ExcludesUpToDateHarness()
     {
         var root = MakeRoot();
-        var binDir = WriteFakeBinary(root, "cove-fake-codex", "0.0.1");
-        WriteAdapter(root, "codex", "cove-fake-codex", binDir);
+        var binDir = WriteNpmBinary(
+            root,
+            "cove-fake-codex",
+            "0.0.1",
+            "@openai/codex");
+        WriteAdapter(
+            root,
+            "codex",
+            "cove-fake-codex",
+            binDir,
+            "@openai/codex");
         var store = new AdapterManifestStore(root);
         var orch = LaunchTestFactory.Create(store, new MethodRunner(), new BinaryDiscoveryService());
         ConfigureChecker(_ => "0.0.1", []);
@@ -108,8 +162,18 @@ public sealed class AdapterUpdatesCheckCommandTests
     {
         var root = MakeRoot();
         var binDir = WriteFakeBinary(root, "cove-fake-tool", "0.0.1");
-        WriteAdapter(root, "mystery-tool", "cove-fake-tool", binDir);
-        WriteAdapter(root, "opencode", "cove-absent-binary", binDir);
+        WriteAdapter(
+            root,
+            "mystery-tool",
+            "cove-fake-tool",
+            binDir,
+            "mystery-package");
+        WriteAdapter(
+            root,
+            "opencode",
+            "cove-absent-binary",
+            binDir,
+            "opencode-ai");
         var store = new AdapterManifestStore(root);
         var orch = LaunchTestFactory.Create(store, new MethodRunner(), new BinaryDiscoveryService());
         var fetched = new List<string>();
