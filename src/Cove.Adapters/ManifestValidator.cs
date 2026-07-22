@@ -11,6 +11,8 @@ public static class ManifestValidator
     private static readonly Regex NameRegex = new(@"^[a-z0-9-]+$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
     private static readonly Regex AccentRegex = new(@"^#[0-9A-Fa-f]{6}$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
     private static readonly Regex SemverRegex = new(@"^\d+\.\d+\.\d+", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    private static readonly Regex NpmPackageRegex = new(@"^(?:@[a-z0-9][a-z0-9._-]*/)?[a-z0-9][a-z0-9._-]*$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    private static readonly Regex BrewPackageRegex = new(@"^(?!.*(?:^|/)\.\.(?:/|$))[A-Za-z0-9][A-Za-z0-9@+._-]*(?:/[A-Za-z0-9][A-Za-z0-9@+._-]*)*$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
     private static readonly HashSet<string> HookEnvelopeNames = new(StringComparer.Ordinal)
     {
         "sessionStartManifest", "userPromptSubmit", "preToolUse", "postToolUse",
@@ -64,6 +66,22 @@ public static class ManifestValidator
             OptionalNonEmpty(errors, "binaryDiscovery.versionRegex", discovery.VersionRegex);
             if (!string.IsNullOrEmpty(discovery.VersionRegex))
                 ValidateRegex(errors, "binaryDiscovery.versionRegex", discovery.VersionRegex);
+        }
+
+        if (manifest.PackageIdentity is { } packageIdentity)
+        {
+            OptionalPattern(
+                errors,
+                "packageIdentity.npm",
+                packageIdentity.Npm,
+                NpmPackageRegex,
+                "npm package identity must be an exact package name");
+            OptionalPattern(
+                errors,
+                "packageIdentity.brew",
+                packageIdentity.Brew,
+                BrewPackageRegex,
+                "brew package identity must be an exact formula or cask name");
         }
 
         ValidateRecipes(errors, "install", manifest.Install);
@@ -235,6 +253,12 @@ public static class ManifestValidator
         if (string.IsNullOrEmpty(value))
             Add(errors, field, "missing", $"{field} is required");
         else if (!pattern.IsMatch(value))
+            Add(errors, field, "invalid_format", message);
+    }
+
+    private static void OptionalPattern(List<ValidationError> errors, string field, string? value, Regex pattern, string message)
+    {
+        if (value is not null && !pattern.IsMatch(value))
             Add(errors, field, "invalid_format", message);
     }
 

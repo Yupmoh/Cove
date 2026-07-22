@@ -16,6 +16,7 @@
     "versionFlag": "--version",
     "versionRegex": "(\\d+\\.\\d+\\.\\d+)"
   },
+  "packageIdentity": { "npm": "openclaw" },
   "install": {
     "macos": {
       "cmd": "npm install -g --allow-scripts=openclaw openclaw@latest"

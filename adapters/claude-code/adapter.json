@@ -15,6 +15,7 @@
     "versionFlag": "--version",
     "versionRegex": "(\\d+\\.\\d+\\.\\d+)"
   },
+  "packageIdentity": { "npm": "@anthropic-ai/claude-code" },
   "hooks": {
     "session-start": "cove://hooks/claude-code/session-start",
     "session-end": "cove://hooks/claude-code/session-end",

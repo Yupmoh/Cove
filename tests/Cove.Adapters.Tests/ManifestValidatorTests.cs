@@ -33,6 +33,70 @@ public sealed class ManifestValidatorTests
     }
 
     [Fact]
+    public void PackageIdentity_IsOptional()
+    {
+        var manifest = ValidManifest();
+
+        Assert.Null(manifest.PackageIdentity);
+        Assert.Empty(Validate(manifest));
+    }
+
+    [Theory]
+    [InlineData("@openai/codex", null)]
+    [InlineData("opencode-ai", null)]
+    [InlineData(null, "codex")]
+    [InlineData(null, "homebrew/cask/claude-code")]
+    public void PackageIdentity_AcceptsExactManagerIdentifiers(string? npm, string? brew)
+    {
+        var manifest = ValidManifest() with
+        {
+            PackageIdentity = new AdapterPackageIdentity { Npm = npm, Brew = brew },
+        };
+
+        Assert.Empty(Validate(manifest));
+    }
+
+    [Theory]
+    [InlineData("npm", "OpenAI Codex")]
+    [InlineData("npm", "@openai")]
+    [InlineData("npm", "codex;rm")]
+    [InlineData("brew", "codex --force")]
+    [InlineData("brew", "../codex")]
+    public void PackageIdentity_RejectsUnsafeOrDisplayNameValues(string manager, string value)
+    {
+        var identity = manager == "npm"
+            ? new AdapterPackageIdentity { Npm = value }
+            : new AdapterPackageIdentity { Brew = value };
+        var errors = Validate(ValidManifest() with { PackageIdentity = identity });
+
+        Assert.Contains(errors, error => error.Field == $"packageIdentity.{manager}" && error.Code == "invalid_format");
+    }
+
+    [Fact]
+    public void PackageIdentity_RoundTripsThroughSourceGeneratedJson()
+    {
+        var json = """
+        {
+          "sdkVersion": 2,
+          "name": "codex",
+          "displayName": "Codex",
+          "description": "OpenAI CLI",
+          "accent": "#10A37F",
+          "binary": "codex",
+          "version": "0.1.0",
+          "packageIdentity": { "npm": "@openai/codex" },
+          "methods": {}
+        }
+        """;
+
+        var (manifest, errors) = ManifestValidator.Parse(json);
+
+        Assert.Empty(errors);
+        Assert.Equal("@openai/codex", manifest!.PackageIdentity!.Npm);
+        Assert.Null(manifest.PackageIdentity.Brew);
+    }
+
+    [Fact]
     public void SdkVersion_MustBe1or2()
     {
         var errors = Validate(ValidManifest() with { SdkVersion = 3 });

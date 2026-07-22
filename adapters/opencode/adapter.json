@@ -16,6 +16,7 @@
     "versionFlag": "--version",
     "versionRegex": "(\\d+\\.\\d+\\.\\d+)"
   },
+  "packageIdentity": { "npm": "opencode-ai" },
   "install": {
     "macos": {
       "cmd": "npm install -g --allow-scripts=opencode-ai opencode-ai@latest"

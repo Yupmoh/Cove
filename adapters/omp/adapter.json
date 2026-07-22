@@ -14,6 +14,7 @@
     "versionFlag": "--version",
     "versionRegex": "(\\d+\\.\\d+\\.\\d+)"
   },
+  "packageIdentity": { "npm": "@oh-my-pi/pi-coding-agent" },
   "hooks": {
     "session-start": "cove://hooks/omp/session-start",
     "session-end": "cove://hooks/omp/session-end",

@@ -28,6 +28,7 @@ public sealed record AdapterManifest
     public ScreenStateDeclaration? ScreenState { get; init; }
     public IReadOnlyDictionary<string, string> Hooks { get => _hooks ?? EmptyHooks; init => _hooks = value; }
     public string? SkillsDir { get; init; }
+    public AdapterPackageIdentity? PackageIdentity { get; init; }
     public PlatformRecipes? Install { get; init; }
     public PlatformRecipes? Update { get; init; }
     public PlatformRecipes? Uninstall { get; init; }
@@ -96,6 +97,13 @@ public sealed record BinaryDiscovery
     public IReadOnlyList<string> WellKnownPaths { get => _wellKnownPaths ?? []; init => _wellKnownPaths = value; }
     public string? VersionFlag { get; init; }
     public string? VersionRegex { get; init; }
+}
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record AdapterPackageIdentity
+{
+    public string? Npm { get; init; }
+    public string? Brew { get; init; }
 }
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
@@ -200,6 +208,7 @@ public sealed record FooterChipData(string ProfileSlug, bool IsDefault, DateTime
 [JsonSerializable(typeof(AdapterManifest))]
 [JsonSerializable(typeof(AdapterMethod))]
 [JsonSerializable(typeof(BinaryDiscovery))]
+[JsonSerializable(typeof(AdapterPackageIdentity))]
 [JsonSerializable(typeof(AdapterRetention))]
 [JsonSerializable(typeof(RetentionField))]
 [JsonSerializable(typeof(SessionExtractor))]

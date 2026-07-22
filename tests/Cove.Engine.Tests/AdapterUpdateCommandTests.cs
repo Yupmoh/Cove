@@ -1,174 +1,293 @@
 using Cove.Adapters;
 using Cove.Engine.Adapters;
+using Cove.Platform;
+using Cove.Testing;
 using Xunit;
 
 namespace Cove.Engine.Tests;
 
 public sealed class AdapterUpdateCommandTests
 {
-    private static AdapterManifest Manifest(string name, PlatformRecipes? install = null) => new()
-    {
-        SdkVersion = 2,
-        Name = name,
-        DisplayName = name,
-        Description = "test",
-        Accent = "#ffffff",
-        Binary = name,
-        Version = "1.0.0",
-        Methods = new Dictionary<string, AdapterMethod>(),
-        Install = install,
-    };
-
     [Fact]
-    public void BrewCellarBinary_UpdatesThroughBrew()
+    public void BrewCellarUsesPathPackageSegment()
     {
-        var cmd = AdapterListCommands.ResolveUpdateCommand(Manifest("codex"), "/opt/homebrew/Cellar/codex/0.144.4/bin/codex");
-        Assert.Equal("brew upgrade codex", cmd);
+        var result = Resolver().Resolve(
+            Manifest("codex", brew: "declared-codex"),
+            AdapterDetectionState.Detected,
+            "/opt/homebrew/bin/codex",
+            "/opt/homebrew/Cellar/codex/0.144.4/bin/codex");
+
+        Assert.Equal("brew", result.Provenance);
+        Assert.Equal("brew upgrade codex", result.UpdateCommand);
+        Assert.Equal("brew uninstall codex", result.UninstallCommand);
     }
 
     [Fact]
-    public void BrewCaskBinary_UpdatesThroughBrew()
+    public void BrewCaskNormalizesDirectorySeparators()
     {
-        var cmd = AdapterListCommands.ResolveUpdateCommand(Manifest("claude-code"), "/opt/homebrew/Caskroom/claude-code/2.1.198/claude");
-        Assert.Equal("brew upgrade claude-code", cmd);
+        var result = Resolver().Resolve(
+            Manifest("claude-code", brew: "claude-code"),
+            AdapterDetectionState.Detected,
+            "C:\\homebrew\\bin\\claude",
+            "C:\\homebrew\\Caskroom\\claude-code\\2.1.198\\claude.exe");
+
+        Assert.Equal("brew", result.Provenance);
+        Assert.Equal("brew upgrade claude-code", result.UpdateCommand);
     }
 
     [Fact]
-    public void GeminiBrewBinary_UsesItsFormulaName()
+    public void BrewDeclaredIdentityCoversUnavailablePackageSegment()
     {
-        var cmd = AdapterListCommands.ResolveUpdateCommand(Manifest("gemini"), "/usr/local/Cellar/gemini-cli/1.0.0/bin/gemini");
-        Assert.Equal("brew upgrade gemini-cli", cmd);
+        var result = Resolver().Resolve(
+            Manifest("gemini", brew: "gemini-cli"),
+            AdapterDetectionState.Detected,
+            "/opt/homebrew/Cellar/gemini",
+            "/opt/homebrew/Cellar/");
+
+        Assert.Equal("brew", result.Provenance);
+        Assert.Equal("brew upgrade gemini-cli", result.UpdateCommand);
     }
 
     [Fact]
-    public void RenamedBrewFormula_UsesThePathSegmentNotTheAdapterName()
+    public void BunGlobalTargetRequiresDeclaredNpmIdentity()
     {
-        var cmd = AdapterListCommands.ResolveUpdateCommand(Manifest("claude-code"), "/opt/homebrew/Cellar/claude-code-nightly/2.0.0/bin/claude");
-        Assert.Equal("brew upgrade claude-code-nightly", cmd);
+        var environment = new LifecycleRuntimeEnvironment
+        {
+            HomeDirectory = "/Users/test",
+            IsMacOS = true,
+        };
+        var result = Resolver(environment).Resolve(
+            Manifest("omp", npm: "@oh-my-pi/pi-coding-agent"),
+            AdapterDetectionState.Detected,
+            "/Users/test/.bun/bin/omp",
+            "/Users/test/.bun/install/global/node_modules/@oh-my-pi/pi-coding-agent/dist/cli.js");
+
+        Assert.Equal("bun", result.Provenance);
+        Assert.Equal("bun install -g @oh-my-pi/pi-coding-agent@latest", result.UpdateCommand);
+        Assert.Equal("bun remove -g @oh-my-pi/pi-coding-agent", result.UninstallCommand);
     }
 
     [Fact]
-    public void MalformedCellarPath_FallsBackToTheKnownFormulaName()
+    public void UnixGlobalNodeModulesRequiresDeclaredNpmIdentity()
     {
-        var cmd = AdapterListCommands.ResolveUpdateCommand(Manifest("gemini"), "/opt/homebrew/Cellar/");
-        Assert.Equal("brew upgrade gemini-cli", cmd);
+        var result = Resolver().Resolve(
+            Manifest("claude-code", npm: "@anthropic-ai/claude-code"),
+            AdapterDetectionState.Detected,
+            "/opt/homebrew/bin/claude",
+            "/opt/homebrew/lib/node_modules/@anthropic-ai/claude-code/cli.js");
+
+        Assert.Equal("npm", result.Provenance);
+        Assert.Equal(
+            "npm install -g --allow-scripts=@anthropic-ai/claude-code @anthropic-ai/claude-code@latest",
+            result.UpdateCommand);
+        Assert.Equal("npm uninstall -g @anthropic-ai/claude-code", result.UninstallCommand);
     }
 
     [Fact]
-    public void BunGlobalBinary_UpdatesThroughBun()
+    public void WindowsNpmShimRequiresExactAdjacentPackageMetadata()
     {
-        var cmd = AdapterListCommands.ResolveUpdateCommand(Manifest("omp"), "/Users/x/.bun/install/global/node_modules/@oh-my-pi/pi-coding-agent/dist/cli.js");
-        Assert.Equal("bun install -g @oh-my-pi/pi-coding-agent@latest", cmd);
+        var root = NewDirectory();
+        try
+        {
+            var npmRoot = Path.Combine(root, "npm");
+            var shim = Path.Combine(npmRoot, "codex.cmd");
+            var packageDirectory = Path.Combine(npmRoot, "node_modules", "@openai", "codex");
+            Directory.CreateDirectory(packageDirectory);
+            File.WriteAllText(shim, "@echo off");
+            File.WriteAllText(Path.Combine(packageDirectory, "package.json"), "{\"name\":\"@openai/codex\"}");
+            var environment = new LifecycleRuntimeEnvironment
+            {
+                IsWindows = true,
+                Variables = new Dictionary<string, string?> { ["APPDATA"] = root },
+            };
+
+            var result = Resolver(environment).Resolve(
+                Manifest("codex", npm: "@openai/codex"),
+                AdapterDetectionState.Detected,
+                shim,
+                shim);
+
+            Assert.Equal("npm", result.Provenance);
+            Assert.Equal("npm uninstall -g @openai/codex", result.UninstallCommand);
+            Assert.NotNull(result.UpdateCommand);
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
     }
 
     [Fact]
-    public void NpmGlobalBinary_UpdatesThroughNpmAllowingItsInstallScripts()
+    public void CopiedWindowsCommandShimHasUnknownProvenanceAndNoDestructiveCommands()
     {
-        var cmd = AdapterListCommands.ResolveUpdateCommand(Manifest("claude-code"), "/opt/homebrew/lib/node_modules/@anthropic-ai/claude-code/cli.js");
-        Assert.Equal("npm install -g --allow-scripts=@anthropic-ai/claude-code @anthropic-ai/claude-code@latest", cmd);
+        var root = NewDirectory();
+        try
+        {
+            var shim = Path.Combine(root, "copied", "codex.cmd");
+            Directory.CreateDirectory(Path.GetDirectoryName(shim)!);
+            File.WriteAllText(shim, "@echo off");
+            var environment = new LifecycleRuntimeEnvironment
+            {
+                IsWindows = true,
+                Variables = new Dictionary<string, string?> { ["APPDATA"] = Path.Combine(root, "appdata") },
+            };
+
+            var result = Resolver(environment).Resolve(
+                Manifest("codex", npm: "@openai/codex"),
+                AdapterDetectionState.Detected,
+                shim,
+                shim);
+
+            Assert.Equal("unknown", result.Provenance);
+            Assert.Null(result.UpdateCommand);
+            Assert.Null(result.UninstallCommand);
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
     }
 
     [Fact]
-    public void UnknownInstallLocation_FallsBackToNpmPackage()
+    public void WindowsNpmRejectsMismatchedAdjacentPackageMetadata()
     {
-        var cmd = AdapterListCommands.ResolveUpdateCommand(Manifest("codex"), "/usr/local/bin/codex");
-        Assert.Equal("npm install -g --allow-scripts=@openai/codex @openai/codex@latest", cmd);
+        var root = NewDirectory();
+        try
+        {
+            var npmRoot = Path.Combine(root, "npm");
+            var shim = Path.Combine(npmRoot, "codex.cmd");
+            var packageDirectory = Path.Combine(npmRoot, "node_modules", "@openai", "codex");
+            Directory.CreateDirectory(packageDirectory);
+            File.WriteAllText(shim, "@echo off");
+            File.WriteAllText(Path.Combine(packageDirectory, "package.json"), "{\"name\":\"other-package\"}");
+            var environment = new LifecycleRuntimeEnvironment
+            {
+                IsWindows = true,
+                Variables = new Dictionary<string, string?> { ["APPDATA"] = root },
+            };
+
+            var result = Resolver(environment).Resolve(
+                Manifest("codex", npm: "@openai/codex"),
+                AdapterDetectionState.Detected,
+                shim,
+                shim);
+
+            Assert.Equal("unknown", result.Provenance);
+            Assert.Null(result.UpdateCommand);
+            Assert.Null(result.UninstallCommand);
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
     }
 
     [Fact]
-    public void ManifestInstallRecipe_YieldsToDetectedProvenance()
+    public void VerifiedNonShimBinaryWithoutPackageManagerEvidenceIsNative()
     {
-        var install = Recipes("npm install -g opencode-ai@latest");
-        var cmd = AdapterListCommands.ResolveUpdateCommand(Manifest("opencode", install), "/opt/homebrew/Cellar/opencode/1.18.2/bin/opencode");
-        Assert.Equal("brew upgrade opencode", cmd);
+        var result = Resolver().Resolve(
+            Manifest("claude-code", npm: "@anthropic-ai/claude-code"),
+            AdapterDetectionState.Detected,
+            "/Users/test/.claude/local/claude",
+            "/Users/test/.claude/local/claude");
+
+        Assert.Equal("native", result.Provenance);
+        Assert.Null(result.UpdateCommand);
+        Assert.Null(result.UninstallCommand);
     }
 
     [Fact]
-    public void ManifestInstallRecipe_CoversUnknownProvenance()
+    public void MissingAdapterUsesDeclaredNpmIdentityForInstallOnly()
     {
-        var install = Recipes("mise upgrade claude");
-        var cmd = AdapterListCommands.ResolveUpdateCommand(Manifest("claude-code", install), "/Users/x/.claude/local/claude");
-        Assert.Equal("mise upgrade claude", cmd);
+        var result = Resolver().Resolve(
+            Manifest("codex", npm: "@openai/codex"),
+            AdapterDetectionState.Missing,
+            null,
+            null);
+
+        Assert.Equal("unknown", result.Provenance);
+        Assert.Equal(
+            "npm install -g --allow-scripts=@openai/codex @openai/codex@latest",
+            result.InstallCommand);
+        Assert.Null(result.UpdateCommand);
+        Assert.Null(result.UninstallCommand);
+    }
+
+    [PlatformTheory(TestOperatingSystem.MacOS)]
+    [Trait(TestTraits.Category, TestTraits.Platform)]
+    [InlineData("claude-code", "npm")]
+    [InlineData("codex", "npm")]
+    [InlineData("omp", "bun")]
+    [InlineData("pi", "npm")]
+    public void InstalledMacOsAdaptersResolveRealLifecycleProvenance(
+        string adapterName,
+        string expectedProvenance)
+    {
+        var adaptersRoot = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "..", "..", "..", "..", "..",
+            "adapters");
+        var manifest = new AdapterManifestStore(adaptersRoot).Load(adapterName);
+        Assert.NotNull(manifest);
+        var detection = new BinaryDiscoveryService().Discover(manifest!.BinaryDiscovery!);
+        Assert.Equal(AdapterDetectionState.Detected, detection.State);
+        var realPath = AdapterListCommands.ResolveRealPath(detection.BinaryPath);
+
+        var result = Resolver().Resolve(
+            manifest,
+            detection.State,
+            detection.BinaryPath,
+            realPath);
+
+        Assert.Equal(expectedProvenance, result.Provenance);
+        Assert.NotNull(result.UpdateCommand);
+        Assert.NotNull(result.UninstallCommand);
     }
 
     [Fact]
-    public void ExplicitUpdateRecipe_WinsOverProvenance()
+    public void ExplicitRecipesOverrideGeneratedCommandsForEachOperation()
     {
-        var update = Recipes("hermes update");
-        var manifest = Manifest("hermes") with { Update = update };
-        Assert.Equal("hermes update", AdapterListCommands.ResolveUpdateCommand(manifest, "/opt/homebrew/Cellar/hermes/1.0/bin/hermes"));
+        var manifest = Manifest("opencode", npm: "opencode-ai") with
+        {
+            Install = Recipes("custom install"),
+            Update = Recipes("custom update"),
+            Uninstall = Recipes("custom uninstall"),
+        };
+
+        var result = Resolver().Resolve(
+            manifest,
+            AdapterDetectionState.Detected,
+            "/usr/local/bin/opencode",
+            "/usr/local/lib/node_modules/opencode-ai/bin/opencode");
+
+        Assert.Equal("npm", result.Provenance);
+        Assert.Equal("custom install", result.InstallCommand);
+        Assert.Equal("custom update", result.UpdateCommand);
+        Assert.Equal("custom uninstall", result.UninstallCommand);
     }
 
-    [Fact]
-    public void ExplicitUninstallRecipe_EnablesRemovalWithoutProvenance()
-    {
-        var uninstall = Recipes("hermes uninstall");
-        var manifest = Manifest("hermes") with { Uninstall = uninstall };
-        Assert.Equal("hermes uninstall", AdapterListCommands.ResolveUninstallCommand(manifest, "/Users/x/.local/bin/hermes"));
-    }
+    private static AdapterLifecycleCommandResolver Resolver(
+        IRuntimeEnvironment? environment = null)
+        => new(environment: environment);
 
-    [Fact]
-    public void InstallCommand_UsesRecipeNotSelfUpdater()
-    {
-        var install = Recipes("curl https://cursor.com/install -fsS | bash");
-        var update = Recipes("agent update");
-        var manifest = Manifest("cursor-agent") with { Install = install, Update = update };
-        Assert.Equal("curl https://cursor.com/install -fsS | bash", AdapterListCommands.ResolveInstallCommand(manifest));
-        Assert.Equal("agent update", AdapterListCommands.ResolveUpdateCommand(manifest, null));
-    }
-
-    [Fact]
-    public void InstallCommand_FallsBackToKnownNpmPackage()
-    {
-        Assert.Equal("npm install -g --allow-scripts=@openai/codex @openai/codex@latest", AdapterListCommands.ResolveInstallCommand(Manifest("codex")));
-        Assert.Null(AdapterListCommands.ResolveInstallCommand(Manifest("mystery-tool")));
-    }
-
-    [Fact]
-    public void UnknownAdapterOutsideBrew_HasNoUpdateCommand()
-    {
-        Assert.Null(AdapterListCommands.ResolveUpdateCommand(Manifest("mystery-tool"), "/usr/local/bin/mystery-tool"));
-    }
-
-    [Fact]
-    public void UnknownAdapterInsideBrew_StillUpdatesThroughBrew()
-    {
-        var cmd = AdapterListCommands.ResolveUpdateCommand(Manifest("mystery-tool"), "/opt/homebrew/Cellar/mystery-tool/1.0/bin/mystery-tool");
-        Assert.Equal("brew upgrade mystery-tool", cmd);
-    }
-
-    [Fact]
-    public void UninstallBrewBinary_RemovesThroughBrew()
-    {
-        var cmd = AdapterListCommands.ResolveUninstallCommand(Manifest("codex"), "/opt/homebrew/Cellar/codex/0.144.4/bin/codex");
-        Assert.Equal("brew uninstall codex", cmd);
-    }
-
-    [Fact]
-    public void UninstallBunBinary_RemovesThroughBun()
-    {
-        var cmd = AdapterListCommands.ResolveUninstallCommand(Manifest("omp"), "/Users/x/.bun/install/global/node_modules/@oh-my-pi/pi-coding-agent/dist/cli.js");
-        Assert.Equal("bun remove -g @oh-my-pi/pi-coding-agent", cmd);
-    }
-
-    [Fact]
-    public void UninstallNpmBinary_RemovesThroughNpm()
-    {
-        var cmd = AdapterListCommands.ResolveUninstallCommand(Manifest("claude-code"), "/opt/homebrew/lib/node_modules/@anthropic-ai/claude-code/cli.js");
-        Assert.Equal("npm uninstall -g @anthropic-ai/claude-code", cmd);
-    }
-
-    [Fact]
-    public void UninstallUnknownAdapterOutsideBrew_HasNoCommand()
-    {
-        Assert.Null(AdapterListCommands.ResolveUninstallCommand(Manifest("mystery-tool"), "/usr/local/bin/mystery-tool"));
-    }
-
-    [Fact]
-    public void UninstallNativeInstall_HasNoCommand()
-    {
-        Assert.Null(AdapterListCommands.ResolveUninstallCommand(Manifest("claude-code"), "/Users/x/.claude/local/claude"));
-    }
+    private static AdapterManifest Manifest(
+        string name,
+        string? npm = null,
+        string? brew = null)
+        => new()
+        {
+            SdkVersion = 2,
+            Name = name,
+            DisplayName = name,
+            Description = "test",
+            Accent = "#ffffff",
+            Binary = name,
+            Version = "1.0.0",
+            Methods = new Dictionary<string, AdapterMethod>(),
+            PackageIdentity = npm is null && brew is null
+                ? null
+                : new AdapterPackageIdentity { Npm = npm, Brew = brew },
+        };
 
     private static PlatformRecipes Recipes(string command) => new()
     {
@@ -176,4 +295,27 @@ public sealed class AdapterUpdateCommandTests
         Linux = new InstallRecipe { Cmd = command },
         Windows = new InstallRecipe { Cmd = command },
     };
+
+    private static string NewDirectory()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "cove-lifecycle-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(path);
+        return path;
+    }
+
+    private sealed class LifecycleRuntimeEnvironment : IRuntimeEnvironment
+    {
+        public bool IsWindows { get; init; }
+        public bool IsMacOS { get; init; }
+        public bool IsLinux { get; init; }
+        public string? ExecutablePath { get; init; }
+        public string? UserExecutablePath { get; init; }
+        public string? MachineExecutablePath { get; init; }
+        public string? PathExtensions { get; init; }
+        public string HomeDirectory { get; init; } = "/home/test";
+        public string SystemDirectory { get; init; } = "/system32";
+        public IReadOnlyList<string> WindowsGitRoots { get; init; } = [];
+        public IReadOnlyDictionary<string, string?> Variables { get; init; } = new Dictionary<string, string?>();
+        public string? GetEnvironmentVariable(string name) => Variables.GetValueOrDefault(name);
+    }
 }

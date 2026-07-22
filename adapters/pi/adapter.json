@@ -16,6 +16,7 @@
     "versionFlag": "--version",
     "versionRegex": "(\\d+\\.\\d+\\.\\d+)"
   },
+  "packageIdentity": { "npm": "@earendil-works/pi-coding-agent" },
   "install": {
     "macos": {
       "cmd": "npm install -g --ignore-scripts @earendil-works/pi-coding-agent@latest"

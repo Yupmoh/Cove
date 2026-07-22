@@ -20,10 +20,16 @@ public sealed class DeserializedManifestResolverTests
         var store = new AdapterManifestStore(root);
         foreach (var manifest in store.LoadAll())
         {
-            var update = AdapterListCommands.ResolveUpdateCommand(manifest, null);
-            var uninstall = AdapterListCommands.ResolveUninstallCommand(manifest, null);
-            Assert.Null(update);
-            Assert.Null(uninstall);
+            Assert.Null(manifest.PackageIdentity);
+            var result = new AdapterLifecycleCommandResolver().Resolve(
+                manifest,
+                AdapterDetectionState.Missing,
+                null,
+                null);
+            Assert.Equal("unknown", result.Provenance);
+            Assert.Null(result.InstallCommand);
+            Assert.Null(result.UpdateCommand);
+            Assert.Null(result.UninstallCommand);
         }
     }
 }
