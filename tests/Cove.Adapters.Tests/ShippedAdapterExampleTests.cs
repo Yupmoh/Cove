@@ -32,6 +32,34 @@ public sealed class ShippedAdapterExampleTests
         Assert.Contains("list_recent_sessions", manifest.Methods.Keys);
     }
 
+    [Theory]
+    [InlineData("claude-code", "~/.claude/local")]
+    [InlineData("codex", null)]
+    [InlineData("cursor-agent", null)]
+    [InlineData("hermes", null)]
+    [InlineData("omp", null)]
+    [InlineData("openclaw", null)]
+    [InlineData("opencode", null)]
+    [InlineData("pi", null)]
+    public void ShippedManifestsKeepOnlyAdapterSpecificExecutableRoots(
+        string adapterName,
+        string? expectedPath)
+    {
+        var json = File.ReadAllText(Path.Combine(AdaptersRoot, adapterName, "adapter.json"));
+        var (manifest, errors) = ManifestValidator.Parse(json);
+
+        Assert.Empty(errors);
+        Assert.NotNull(manifest);
+        Assert.Equal(expectedPath is null ? [] : [expectedPath], manifest!.BinaryDiscovery!.WellKnownPaths);
+        Assert.DoesNotContain(
+            manifest.BinaryDiscovery.WellKnownPaths,
+            path => path is "/opt/homebrew/bin"
+                or "/usr/local/bin"
+                or "~/.bun/bin"
+                or "~/.npm-global/bin"
+                or "~/.local/bin");
+    }
+
     [Fact]
     public void ClaudeHooksSettings_HasNotificationMatchersForPermissionAndIdle()
     {

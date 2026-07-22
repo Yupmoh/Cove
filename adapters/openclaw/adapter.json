@@ -13,13 +13,6 @@
     "commands": [
       "openclaw"
     ],
-    "wellKnownPaths": [
-      "/opt/homebrew/bin",
-      "/usr/local/bin",
-      "~/.bun/bin",
-      "~/.npm-global/bin",
-      "~/.local/bin"
-    ],
     "versionFlag": "--version",
     "versionRegex": "(\\d+\\.\\d+\\.\\d+)"
   },

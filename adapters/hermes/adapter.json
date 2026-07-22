@@ -13,11 +13,6 @@
     "commands": [
       "hermes"
     ],
-    "wellKnownPaths": [
-      "~/.local/bin",
-      "/opt/homebrew/bin",
-      "/usr/local/bin"
-    ],
     "versionFlag": "--version",
     "versionRegex": "(\\d+\\.\\d+\\.\\d+)"
   },

@@ -11,12 +11,6 @@
   "skillsDir": "~/.agents/skills",
   "binaryDiscovery": {
     "commands": ["codex"],
-    "wellKnownPaths": [
-      "/opt/homebrew/bin",
-      "/usr/local/bin",
-      "~/.bun/bin",
-      "~/.npm-global/bin"
-    ],
     "versionFlag": "--version",
     "versionRegex": "(\\d+\\.\\d+\\.\\d+)"
   },

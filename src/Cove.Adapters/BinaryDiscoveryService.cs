@@ -12,11 +12,11 @@ public sealed record BinaryDiscoveryResult(
 public sealed class BinaryDiscoveryService
 {
     private static readonly Regex DefaultVersionRegex = new(@"(\d+\.\d+\.\d+)", RegexOptions.Compiled | RegexOptions.CultureInvariant);
-    private static readonly string[] WindowsExecutableExtensions = [".exe", ".com", ".cmd", ".bat"];
     private readonly ILogger? _logger;
     private readonly IPlatformFileSystem _fileSystem;
     private readonly IProcessRunner _processRunner;
     private readonly IRuntimeEnvironment _environment;
+    private readonly ExecutableSearchPath _searchPath;
     private string? _cachedPath;
 
     public BinaryDiscoveryService(
@@ -29,13 +29,14 @@ public sealed class BinaryDiscoveryService
         _fileSystem = fileSystem ?? SystemPlatformFileSystem.Instance;
         _processRunner = processRunner ?? new SystemProcessRunner();
         _environment = environment ?? SystemRuntimeEnvironment.Instance;
+        _searchPath = new ExecutableSearchPath(_environment);
     }
 
     public BinaryDiscoveryResult Discover(BinaryDiscovery config, string? loginShellPath = null)
     {
         var source = loginShellPath is not null ? "login-shell" : "process-env";
         var rawPath = loginShellPath ?? _environment.ExecutablePath ?? "";
-        var pathDirs = ResolvePathDirs(rawPath);
+        var pathDirs = _searchPath.Resolve(loginShellPath, config.WellKnownPaths);
         var commands = string.Join(",", config.Commands);
         BinaryDiscoveryResult? broken = null;
 
@@ -44,24 +45,12 @@ public sealed class BinaryDiscoveryService
 
         foreach (var command in config.Commands)
             foreach (var directory in pathDirs)
-                if (TryCommand(command, directory, config, "path", rawPath) is { } found)
+                if (TryCommand(command, directory, config, "search-path", rawPath) is { } found)
                 {
                     if (found.State == AdapterDetectionState.Detected)
                         return found;
                     broken ??= found;
                 }
-
-        foreach (var directory in config.WellKnownPaths)
-        {
-            var expanded = ExpandTilde(directory);
-            foreach (var command in config.Commands)
-                if (TryCommand(command, expanded, config, "well-known", rawPath) is { } found)
-                {
-                    if (found.State == AdapterDetectionState.Detected)
-                        return found;
-                    broken ??= found;
-                }
-        }
 
         if (broken is not null)
             return broken;
@@ -74,7 +63,7 @@ public sealed class BinaryDiscoveryService
         if (_environment.IsWindows && !Path.HasExtension(command))
         {
             BinaryDiscoveryResult? broken = null;
-            foreach (var extension in WindowsExecutableExtensions)
+            foreach (var extension in _searchPath.ExecutableExtensions)
                 if (TryCandidate(command, Path.Combine(directory, command + extension), config, source, executablePath) is { } found)
                 {
                     if (found.State == AdapterDetectionState.Detected)
@@ -151,31 +140,24 @@ public sealed class BinaryDiscoveryService
         return new BinaryDiscoveryResult(state, binaryPath, version);
     }
 
-    private string ExpandTilde(string path)
-    {
-        if (!path.StartsWith('~'))
-            return path;
-        return path.StartsWith("~/", StringComparison.Ordinal)
-            ? Path.Combine(_environment.HomeDirectory, path[2..])
-            : Path.Combine(_environment.HomeDirectory, path[1..]);
-    }
+    private IReadOnlyList<string> ResolvePathDirs(string path)
+        => path.Split(
+            _environment.IsWindows ? ';' : ':',
+            StringSplitOptions.RemoveEmptyEntries);
 
-    private static IReadOnlyList<string> ResolvePathDirs(string path)
-        => path.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries);
-
-    private static string BuildProbePath(string binaryPath, string executablePath)
+    private string BuildProbePath(string binaryPath, string executablePath)
     {
         var directory = Path.GetDirectoryName(binaryPath) ?? "";
         if (string.IsNullOrEmpty(directory)
             || ResolvePathDirs(executablePath).Contains(
                 directory,
-                StringComparer.Ordinal))
+                _environment.IsWindows ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal))
         {
             return executablePath;
         }
         return string.IsNullOrEmpty(executablePath)
             ? directory
-            : directory + Path.PathSeparator + executablePath;
+            : directory + (_environment.IsWindows ? ';' : ':') + executablePath;
     }
 
     private static bool IsPosixStylePath(string path)

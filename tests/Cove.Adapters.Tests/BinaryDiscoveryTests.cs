@@ -169,6 +169,30 @@ public sealed class BinaryDiscoveryTests
         finally { TestDirectory.Delete(home); }
     }
 
+    [PlatformTheory(TestOperatingSystem.MacOS)]
+    [Trait(TestTraits.Category, TestTraits.Platform)]
+    [InlineData("claude-code")]
+    [InlineData("codex")]
+    [InlineData("omp")]
+    [InlineData("pi")]
+    public void Discover_FindsInstalledMacOsAdapterWithRestrictedProcessPath(string adapterName)
+    {
+        var adaptersRoot = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "..", "..", "..", "..", "..",
+            "adapters");
+        var manifest = new AdapterManifestStore(adaptersRoot).Load(adapterName);
+        Assert.NotNull(manifest?.BinaryDiscovery);
+        var discovery = new BinaryDiscoveryService(
+            environment: new RestrictedMacOsRuntimeEnvironment());
+
+        var result = discovery.Discover(manifest!.BinaryDiscovery!);
+
+        Assert.Equal(AdapterDetectionState.Detected, result.State);
+        Assert.NotNull(result.BinaryPath);
+        Assert.False(string.IsNullOrWhiteSpace(result.Version));
+    }
+
     [ExternalFact(TestOperatingSystem.Unix, "bash")]
     public void Discover_HangingVersionProbe_ReturnsWithinTimeout()
     {
@@ -194,11 +218,32 @@ public sealed class BinaryDiscoveryTests
     }
 }
 
+internal sealed class RestrictedMacOsRuntimeEnvironment : IRuntimeEnvironment
+{
+    public bool IsWindows => false;
+    public bool IsMacOS => true;
+    public bool IsLinux => false;
+    public string? ExecutablePath => "/usr/bin:/bin";
+    public string? UserExecutablePath => null;
+    public string? MachineExecutablePath => null;
+    public string? PathExtensions => null;
+    public string HomeDirectory => Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+    public string SystemDirectory => Environment.GetFolderPath(Environment.SpecialFolder.System);
+    public IReadOnlyList<string> WindowsGitRoots => [];
+    public string? GetEnvironmentVariable(string name) => Environment.GetEnvironmentVariable(name);
+}
+
 internal sealed class TestRuntimeEnvironment(string homeDirectory) : IRuntimeEnvironment
 {
     public bool IsWindows => OperatingSystem.IsWindows();
+    public bool IsMacOS => OperatingSystem.IsMacOS();
+    public bool IsLinux => OperatingSystem.IsLinux();
     public string? ExecutablePath => Environment.GetEnvironmentVariable("PATH");
+    public string? UserExecutablePath => null;
+    public string? MachineExecutablePath => null;
+    public string? PathExtensions => Environment.GetEnvironmentVariable("PATHEXT");
     public string HomeDirectory => homeDirectory;
     public string SystemDirectory => Environment.GetFolderPath(Environment.SpecialFolder.System);
     public IReadOnlyList<string> WindowsGitRoots => [];
+    public string? GetEnvironmentVariable(string name) => Environment.GetEnvironmentVariable(name);
 }

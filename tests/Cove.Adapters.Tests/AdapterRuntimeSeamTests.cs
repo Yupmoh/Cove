@@ -100,7 +100,7 @@ public sealed class AdapterRuntimeSeamTests
         var environment = new FakeRuntimeEnvironment
         {
             IsWindows = true,
-            ExecutablePath = staleDirectory + Path.PathSeparator + workingDirectory,
+            ExecutablePath = staleDirectory + ";" + workingDirectory,
         };
         var process = new FakeProcessRunner(
             new ProcessRunResult(true, false, 1, "", "missing runtime", 5),
@@ -118,6 +118,78 @@ public sealed class AdapterRuntimeSeamTests
         Assert.Equal("4.5.6", result.Version);
         Assert.Equal("cmd.exe", process.Requests[0].FileName);
         Assert.Equal(workingExecutable, process.Requests[1].FileName);
+    }
+
+    [Fact]
+    public void BinaryDiscovery_UsesWindowsPathSourcesFallbacksAndPathExtOrder()
+    {
+        var appDataNpm = Path.Combine("/appdata", "npm");
+        var commandShim = Path.Combine(appDataNpm, "test-cli.cmd");
+        var files = new FakePlatformFileSystem(commandShim);
+        var environment = new FakeRuntimeEnvironment
+        {
+            IsWindows = true,
+            ExecutablePath = "/process",
+            UserExecutablePath = "/user",
+            MachineExecutablePath = "/machine",
+            PathExtensions = "CMD;EXE",
+            Variables = new Dictionary<string, string?>
+            {
+                ["APPDATA"] = "/appdata",
+            },
+        };
+        var process = new FakeProcessRunner(new ProcessRunResult(true, false, 0, "test-cli 8.1.0", "", 5));
+        var service = new BinaryDiscoveryService(fileSystem: files, processRunner: process, environment: environment);
+
+        var result = service.Discover(
+            new BinaryDiscovery
+            {
+                Commands = ["test-cli"],
+                VersionFlag = "--version",
+            },
+            loginShellPath: "/login");
+
+        Assert.Equal(AdapterDetectionState.Detected, result.State);
+        Assert.Equal(commandShim, result.BinaryPath);
+        Assert.Equal(
+            [
+                Path.Combine("/login", "test-cli.cmd"),
+                Path.Combine("/login", "test-cli.exe"),
+                Path.Combine("/process", "test-cli.cmd"),
+                Path.Combine("/process", "test-cli.exe"),
+                Path.Combine("/user", "test-cli.cmd"),
+                Path.Combine("/user", "test-cli.exe"),
+                Path.Combine("/machine", "test-cli.cmd"),
+                Path.Combine("/machine", "test-cli.exe"),
+            ],
+            files.Probes.Take(8));
+        Assert.Equal("cmd.exe", Assert.Single(process.Requests).FileName);
+    }
+
+    [Fact]
+    public void BinaryDiscovery_UsesMacOsFallbackBeforeManifestSpecificPath()
+    {
+        var fallbackExecutable = Path.Combine("/opt/homebrew/bin", "test-cli");
+        var manifestExecutable = Path.Combine("/adapter", "test-cli");
+        var files = new FakePlatformFileSystem(fallbackExecutable, manifestExecutable);
+        var environment = new FakeRuntimeEnvironment
+        {
+            IsMacOS = true,
+            ExecutablePath = "/process",
+        };
+        var process = new FakeProcessRunner(new ProcessRunResult(true, false, 0, "test-cli 8.2.0", "", 5));
+        var service = new BinaryDiscoveryService(fileSystem: files, processRunner: process, environment: environment);
+
+        var result = service.Discover(new BinaryDiscovery
+        {
+            Commands = ["test-cli"],
+            WellKnownPaths = ["/adapter"],
+            VersionFlag = "--version",
+        });
+
+        Assert.Equal(AdapterDetectionState.Detected, result.State);
+        Assert.Equal(fallbackExecutable, result.BinaryPath);
+        Assert.DoesNotContain(manifestExecutable, files.Probes);
     }
 
     [Fact]
@@ -239,10 +311,17 @@ public sealed class AdapterRuntimeSeamTests
     private sealed class FakeRuntimeEnvironment : IRuntimeEnvironment
     {
         public bool IsWindows { get; init; }
+        public bool IsMacOS { get; init; }
+        public bool IsLinux { get; init; }
         public string? ExecutablePath { get; init; }
+        public string? UserExecutablePath { get; init; }
+        public string? MachineExecutablePath { get; init; }
+        public string? PathExtensions { get; init; }
         public string HomeDirectory { get; init; } = "/home";
         public string SystemDirectory { get; init; } = "/system32";
         public IReadOnlyList<string> WindowsGitRoots { get; init; } = [];
+        public IReadOnlyDictionary<string, string?> Variables { get; init; } = new Dictionary<string, string?>();
+        public string? GetEnvironmentVariable(string name) => Variables.GetValueOrDefault(name);
     }
 
     private sealed class FakeProcessRunner(params ProcessRunResult[] results) : IProcessRunner

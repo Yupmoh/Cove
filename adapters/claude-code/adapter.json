@@ -11,13 +11,7 @@
   "skillsDir": "~/.claude/skills",
   "binaryDiscovery": {
     "commands": ["claude"],
-    "wellKnownPaths": [
-      "/opt/homebrew/bin",
-      "/usr/local/bin",
-      "~/.claude/local",
-      "~/.bun/bin",
-      "~/.npm-global/bin"
-    ],
+    "wellKnownPaths": ["~/.claude/local"],
     "versionFlag": "--version",
     "versionRegex": "(\\d+\\.\\d+\\.\\d+)"
   },

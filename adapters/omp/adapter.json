@@ -11,12 +11,6 @@
   "skillsDir": "~/.omp/agent/skills",
   "binaryDiscovery": {
     "commands": ["omp"],
-    "wellKnownPaths": [
-      "~/.bun/bin",
-      "/opt/homebrew/bin",
-      "/usr/local/bin",
-      "~/.npm-global/bin"
-    ],
     "versionFlag": "--version",
     "versionRegex": "(\\d+\\.\\d+\\.\\d+)"
   },
