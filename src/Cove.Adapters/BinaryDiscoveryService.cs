@@ -37,6 +37,7 @@ public sealed class BinaryDiscoveryService
         var rawPath = loginShellPath ?? _environment.ExecutablePath ?? "";
         var pathDirs = ResolvePathDirs(rawPath);
         var commands = string.Join(",", config.Commands);
+        BinaryDiscoveryResult? broken = null;
 
         _logger?.BinaryProbeStarted(commands, source, pathDirs.Count, config.WellKnownPaths.Count);
         _logger?.BinaryProbePathContents(source, rawPath);
@@ -44,16 +45,26 @@ public sealed class BinaryDiscoveryService
         foreach (var command in config.Commands)
             foreach (var directory in pathDirs)
                 if (TryCommand(command, directory, config, "path", rawPath) is { } found)
-                    return found;
+                {
+                    if (found.State == AdapterDetectionState.Detected)
+                        return found;
+                    broken ??= found;
+                }
 
         foreach (var directory in config.WellKnownPaths)
         {
             var expanded = ExpandTilde(directory);
             foreach (var command in config.Commands)
                 if (TryCommand(command, expanded, config, "well-known", rawPath) is { } found)
-                    return found;
+                {
+                    if (found.State == AdapterDetectionState.Detected)
+                        return found;
+                    broken ??= found;
+                }
         }
 
+        if (broken is not null)
+            return broken;
         _logger?.BinaryProbeMissing(commands, pathDirs.Count, config.WellKnownPaths.Count);
         return new BinaryDiscoveryResult(AdapterDetectionState.Missing, null, null);
     }
@@ -62,10 +73,15 @@ public sealed class BinaryDiscoveryService
     {
         if (_environment.IsWindows && !Path.HasExtension(command))
         {
+            BinaryDiscoveryResult? broken = null;
             foreach (var extension in WindowsExecutableExtensions)
                 if (TryCandidate(command, Path.Combine(directory, command + extension), config, source, executablePath) is { } found)
-                    return found;
-            return null;
+                {
+                    if (found.State == AdapterDetectionState.Detected)
+                        return found;
+                    broken ??= found;
+                }
+            return broken;
         }
         if (TryCandidate(command, Path.Combine(directory, command), config, source, executablePath) is { } exact)
             return exact;

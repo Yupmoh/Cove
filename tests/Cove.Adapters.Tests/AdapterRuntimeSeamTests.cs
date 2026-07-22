@@ -90,6 +90,37 @@ public sealed class AdapterRuntimeSeamTests
     }
 
     [Fact]
+    public void BinaryDiscovery_SkipsBrokenWindowsShimForRunnableLaterCandidate()
+    {
+        var staleDirectory = "stale";
+        var workingDirectory = "working";
+        var staleShim = Path.Combine(staleDirectory, "test-cli.cmd");
+        var workingExecutable = Path.Combine(workingDirectory, "test-cli.exe");
+        var files = new FakePlatformFileSystem(staleShim, workingExecutable);
+        var environment = new FakeRuntimeEnvironment
+        {
+            IsWindows = true,
+            ExecutablePath = staleDirectory + Path.PathSeparator + workingDirectory,
+        };
+        var process = new FakeProcessRunner(
+            new ProcessRunResult(true, false, 1, "", "missing runtime", 5),
+            new ProcessRunResult(true, false, 0, "test-cli 4.5.6", "", 5));
+        var service = new BinaryDiscoveryService(fileSystem: files, processRunner: process, environment: environment);
+
+        var result = service.Discover(new BinaryDiscovery
+        {
+            Commands = ["test-cli"],
+            VersionFlag = "--version",
+        });
+
+        Assert.Equal(AdapterDetectionState.Detected, result.State);
+        Assert.Equal(workingExecutable, result.BinaryPath);
+        Assert.Equal("4.5.6", result.Version);
+        Assert.Equal("cmd.exe", process.Requests[0].FileName);
+        Assert.Equal(workingExecutable, process.Requests[1].FileName);
+    }
+
+    [Fact]
     public void BashLocator_UsesInjectedRuntimeView()
     {
         var files = new FakePlatformFileSystem("/custom/bin/bash.exe");
@@ -214,13 +245,15 @@ public sealed class AdapterRuntimeSeamTests
         public IReadOnlyList<string> WindowsGitRoots { get; init; } = [];
     }
 
-    private sealed class FakeProcessRunner(ProcessRunResult result) : IProcessRunner
+    private sealed class FakeProcessRunner(params ProcessRunResult[] results) : IProcessRunner
     {
+        private int _nextResult;
         public List<ProcessRunRequest> Requests { get; } = [];
         public Task<ProcessRunResult> RunAsync(ProcessRunRequest request, CancellationToken cancellationToken = default)
         {
             Requests.Add(request);
-            return Task.FromResult(result);
+            var index = Math.Min(_nextResult++, results.Length - 1);
+            return Task.FromResult(results[index]);
         }
     }
 
