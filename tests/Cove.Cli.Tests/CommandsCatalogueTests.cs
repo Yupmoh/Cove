@@ -310,6 +310,9 @@ public sealed class CommandsCatalogueTests
         foreach (var argument in args)
             startInfo.ArgumentList.Add(argument);
         startInfo.Environment["COVE_DATA_DIR"] = root;
+        startInfo.Environment.Remove("COVE_CHANNEL");
+        startInfo.Environment.Remove("COVE_NOOK_ID");
+        startInfo.Environment.Remove("COVE_NOOK_TOKEN");
         return startInfo;
     }
 

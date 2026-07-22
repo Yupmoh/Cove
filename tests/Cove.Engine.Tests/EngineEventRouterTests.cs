@@ -49,6 +49,8 @@ public sealed class EngineEventRouterTests
     [InlineData("cove://commands/nook.open", true)]
     [InlineData("cove://commands/nook.close", true)]
     [InlineData("cove://commands/nook.stack", true)]
+    [InlineData("cove://commands/nook.open-many", true)]
+    [InlineData("cove://commands/nook.close-others", true)]
     [InlineData("cove://commands/nook.write", false)]
     [InlineData("cove://commands/nook.read", false)]
     [InlineData("cove://commands/nook.list", false)]

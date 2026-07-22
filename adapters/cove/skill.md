@@ -95,19 +95,23 @@ Add `--yolo`, `--cols <count>`, `--rows <count>`, or `--access-scope same-tab|sa
 
 ## Open and balance multiple adjacent nooks
 
-Place the first new nook relative to the current nook. For each later open or launch, set `--relative-to` to the previously returned nook ID and use the same placement axis. This produces the requested visual order.
-
-Repeated binary `below` or `right` opens are intentionally local 50/50 splits until balancing is requested. After the final open, balance once with its returned nook ID:
+Use one direct Cove CLI request for an ordered heterogeneous group:
 
 ```sh
-"$COVE_CLI_PATH" nook stack <final-nook-id> --placement below --json
+"$COVE_CLI_PATH" nook open-many \
+  --item '{"nookType":"terminal","command":"yazi"}' \
+  --item '{"nookType":"terminal","command":"lazygit"}' \
+  --item '{"nookType":"browser","url":"https://duckduckgo.com"}' \
+  --item '{"nookType":"agent","adapter":"codex","name":"Codex"}' \
+  --relative-to "$COVE_NOOK_ID" \
+  --placement right \
+  --balance right \
+  --json
 ```
 
-Use `left` or `right` to equalize the horizontal component. Use `above` or `below` to equalize the vertical component. Balancing preserves lane order and running process state.
+Items open in command-line order. The first is relative to `"$COVE_NOOK_ID"` and each later item chains from the previously returned nook. `--balance left|right|above|below` equalizes the completed same-axis stack once. The daemon rolls back every nook created by the request if an open or balance step fails.
 
-For a vertical stack on the right: place the first nook `right` of `"$COVE_NOOK_ID"`, place every later nook `below` the previous returned ID, then run `nook stack <final-nook-id> --placement below --json`.
-
-Each open is atomic, but a sequence of opens is not one transaction. If a later open fails, close only the nooks created for that user request with `nook close`; do not repair the tree through raw layout operations.
+Use only direct Cove CLI commands. Never wrap Cove workspace operations in Python, shell loops, or raw layout mutations.
 
 ## Resume
 
@@ -160,6 +164,14 @@ Close a terminal, agent, or browser nook through the same command:
 ```
 
 The command removes the runtime and layout state together. Never close the current nook unless the user explicitly asks. Re-list agents first when the target came from stale context.
+
+Close every other nook in the current nook's shore with one request:
+
+```sh
+"$COVE_CLI_PATH" nook close-others "$COVE_NOOK_ID" --json
+```
+
+Use `--scope same-bay` only when the request explicitly covers every shore in the bay and the current nook has same-bay access. The kept nook is never closed.
 
 ## Authorization failures
 

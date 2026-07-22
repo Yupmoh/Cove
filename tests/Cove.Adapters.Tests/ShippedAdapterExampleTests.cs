@@ -113,11 +113,10 @@ public sealed class ShippedAdapterExampleTests
         Assert.Contains("--url", skill);
         Assert.Contains("--model", skill);
         Assert.Contains("--effort", skill);
-        Assert.Contains("nook stack", skill);
         Assert.Contains("nook close", skill);
         Assert.Contains("A profile is durable", skill);
-        Assert.Contains("previously returned nook ID", skill);
-        Assert.Contains("After the final open", skill);
+        Assert.Contains("nook open-many", skill);
+        Assert.Contains("nook close-others", skill);
         Assert.Contains("agent message", skill);
         Assert.Contains("agent list", skill);
         Assert.DoesNotContain("exec nook.kill", skill);
@@ -126,6 +125,7 @@ public sealed class ShippedAdapterExampleTests
         Assert.DoesNotContain("manually reload", skill, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("layout.mutate", skill, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("refresh Cove", skill, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("python3", skill, StringComparison.OrdinalIgnoreCase);
     }
 
     [PlatformTheory(TestOperatingSystem.Unix)]

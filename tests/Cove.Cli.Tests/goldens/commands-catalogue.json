@@ -805,6 +805,10 @@
     "source": "core"
   },
   {
+    "command": "cove://commands/nook.close-others",
+    "source": "core"
+  },
+  {
     "command": "cove://commands/nook.kill",
     "source": "core"
   },
@@ -814,6 +818,10 @@
   },
   {
     "command": "cove://commands/nook.open",
+    "source": "core"
+  },
+  {
+    "command": "cove://commands/nook.open-many",
     "source": "core"
   },
   {
@@ -1624,11 +1632,19 @@
     "source": "cli"
   },
   {
+    "command": "nook close-others",
+    "source": "cli"
+  },
+  {
     "command": "nook list",
     "source": "cli"
   },
   {
     "command": "nook open",
+    "source": "cli"
+  },
+  {
+    "command": "nook open-many",
     "source": "cli"
   },
   {

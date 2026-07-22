@@ -125,6 +125,14 @@ public sealed class ScopeEnforcementTests
             ScopePolicy.ControlOnly
         },
         {
+            "cove://commands/nook.open-many",
+            ScopePolicy.PlacementScoped
+        },
+        {
+            "cove://commands/nook.close-others",
+            ScopePolicy.TargetScoped
+        },
+        {
             "cove://commands/agent.launch",
             ScopePolicy.PlacementScoped
         },

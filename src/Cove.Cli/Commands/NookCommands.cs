@@ -38,6 +38,47 @@ internal static class NookCommands
             json);
     }
 
+    [CoveCommand("nook open-many")]
+    public static Task<int> NookOpenMany(CommandContext ctx)
+    {
+        var itemValues = ArgValues(ctx.Args, "--item");
+        var relativeTo = ArgValue(ctx.Args, "--relative-to");
+        var placement = ArgValue(ctx.Args, "--placement");
+        var balance = ArgValue(ctx.Args, "--balance");
+        if (itemValues.Length == 0
+            || string.IsNullOrWhiteSpace(relativeTo)
+            || placement is not ("left" or "right" or "above" or "below" or "new-shore")
+            || balance is not null and not ("left" or "right" or "above" or "below"))
+        {
+            ctx.Stderr.WriteLine(
+                "usage: cove nook open-many --item <json> [--item <json> ...] --relative-to <nook-id> --placement <placement> [--balance <placement>]");
+            return Task.FromResult(1);
+        }
+        var items = new NookOpenManyItem[itemValues.Length];
+        try
+        {
+            for (var index = 0; index < itemValues.Length; index++)
+            {
+                items[index] = JsonSerializer.Deserialize(
+                    itemValues[index],
+                    CoveJsonContext.Default.NookOpenManyItem)
+                    ?? throw new JsonException("nook item is required");
+            }
+        }
+        catch (JsonException)
+        {
+            ctx.Stderr.WriteLine(
+                "usage: cove nook open-many --item <json> [--item <json> ...] --relative-to <nook-id> --placement <placement> [--balance <placement>]");
+            return Task.FromResult(1);
+        }
+        var json = JsonSerializer.Serialize(
+            new NookOpenManyParams(items, relativeTo, placement, balance),
+            CoveJsonContext.Default.NookOpenManyParams);
+        return ctx.RouteCoreWithParamsAsync(
+            "cove://commands/nook.open-many",
+            json);
+    }
+
     [CoveCommand("nook close")]
     public static Task<int> NookClose(CommandContext ctx)
     {
@@ -52,6 +93,26 @@ internal static class NookCommands
             CoveJsonContext.Default.NookRefParams);
         return ctx.RouteCoreWithParamsAsync(
             "cove://commands/nook.close",
+            json);
+    }
+
+    [CoveCommand("nook close-others")]
+    public static Task<int> NookCloseOthers(CommandContext ctx)
+    {
+        var nookId = FirstPositional(ctx.Args);
+        var scope = ArgValue(ctx.Args, "--scope") ?? "same-shore";
+        if (nookId is null
+            || scope is not ("same-shore" or "same-bay"))
+        {
+            ctx.Stderr.WriteLine(
+                "usage: cove nook close-others <keep-nook-id> [--scope <same-shore|same-bay>]");
+            return Task.FromResult(1);
+        }
+        var json = JsonSerializer.Serialize(
+            new NookCloseOthersParams(nookId, scope),
+            CoveJsonContext.Default.NookCloseOthersParams);
+        return ctx.RouteCoreWithParamsAsync(
+            "cove://commands/nook.close-others",
             json);
     }
 
@@ -174,6 +235,9 @@ internal static class NookCommands
             "--cols",
             "--rows",
             "--url",
+            "--item",
+            "--balance",
+            "--scope",
         ]);
         for (var index = 0; index < args.Length; index++)
         {

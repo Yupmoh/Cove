@@ -221,6 +221,8 @@ internal sealed class EngineEventRouter
                 or "cove://commands/nook.kill"
                 or "cove://commands/nook.close"
                 or "cove://commands/nook.open"
+                or "cove://commands/nook.close-others"
+                or "cove://commands/nook.open-many"
                 or "cove://commands/nook.rename"
                 or "cove://commands/nook.restart"
                 or "cove://commands/nook.stack"

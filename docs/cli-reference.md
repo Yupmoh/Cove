@@ -201,9 +201,11 @@ Generated from the command registry. Do not edit by hand.
 | `cove://commands/nook-types.list` | core |  |
 | `cove://commands/nook.checkpoint` | core |  |
 | `cove://commands/nook.close` | core |  |
+| `cove://commands/nook.close-others` | core |  |
 | `cove://commands/nook.kill` | core |  |
 | `cove://commands/nook.list` | core |  |
 | `cove://commands/nook.open` | core |  |
+| `cove://commands/nook.open-many` | core |  |
 | `cove://commands/nook.read` | core |  |
 | `cove://commands/nook.rename` | core |  |
 | `cove://commands/nook.resize` | core |  |
@@ -405,8 +407,10 @@ Generated from the command registry. Do not edit by hand.
 | `memory supersede` | cli |  |
 | `migrate` | cli |  |
 | `nook close` | cli |  |
+| `nook close-others` | cli |  |
 | `nook list` | cli |  |
 | `nook open` | cli |  |
+| `nook open-many` | cli |  |
 | `nook restart` | cli |  |
 | `nook stack` | cli |  |
 | `nook-types list` | cli |  |
@@ -505,4 +509,4 @@ Generated from the command registry. Do not edit by hand.
 | `viewer open` | cli |  |
 | `workspace context` | cli |  |
 
-Total: 500 commands
+Total: 504 commands

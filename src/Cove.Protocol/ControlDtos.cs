@@ -139,6 +139,42 @@ public sealed record NookStackResult(
     string ShoreId,
     string Placement,
     int Nooks);
+public sealed record NookOpenManyItem(
+    string NookType,
+    string? Command = null,
+    string[]? Args = null,
+    string? Cwd = null,
+    int Cols = 80,
+    int Rows = 24,
+    string? Url = null,
+    string? Adapter = null,
+    string? Profile = null,
+    string? Model = null,
+    string? Effort = null,
+    string? Name = null,
+    bool Yolo = false,
+    string AccessScope = "same-bay");
+public sealed record NookOpenManyParams(
+    NookOpenManyItem[] Items,
+    string RelativeToNookId,
+    string Placement,
+    string? Balance = null);
+public sealed record NookManyOpenedResult(
+    string NookId,
+    string NookType,
+    string? Adapter,
+    string BayId,
+    string ShoreId,
+    string Placement);
+public sealed record NookOpenManyResult(
+    NookManyOpenedResult[] Opened,
+    NookStackResult? Balance = null);
+public sealed record NookCloseOthersParams(
+    string NookId,
+    string Scope = "same-shore");
+public sealed record NookCloseOthersResult(
+    string KeptNookId,
+    NookCloseResult[] Closed);
 public sealed record AgentLaunchParams(
     string Mode,
     string Adapter,
@@ -633,6 +669,12 @@ public sealed record PerformanceResultSaveResult(string Directory);
 [JsonSerializable(typeof(NookCloseResult))]
 [JsonSerializable(typeof(NookStackParams))]
 [JsonSerializable(typeof(NookStackResult))]
+[JsonSerializable(typeof(NookOpenManyItem))]
+[JsonSerializable(typeof(NookOpenManyParams))]
+[JsonSerializable(typeof(NookManyOpenedResult))]
+[JsonSerializable(typeof(NookOpenManyResult))]
+[JsonSerializable(typeof(NookCloseOthersParams))]
+[JsonSerializable(typeof(NookCloseOthersResult))]
 [JsonSerializable(typeof(AgentLaunchParams))]
 [JsonSerializable(typeof(AgentLaunchResult))]
 [JsonSerializable(typeof(NookRestartParams))]

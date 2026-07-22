@@ -134,11 +134,15 @@ internal static class ScopeEnforcement
             ScopePolicy.TargetScoped,
         "cove://commands/nook.close" =>
             ScopePolicy.TargetScoped,
+        "cove://commands/nook.close-others" =>
+            ScopePolicy.TargetScoped,
         "cove://commands/nook.kill" =>
             ScopePolicy.TargetScoped,
         "cove://commands/nook.list" =>
             ScopePolicy.ControlOnly,
         "cove://commands/nook.open" =>
+            ScopePolicy.PlacementScoped,
+        "cove://commands/nook.open-many" =>
             ScopePolicy.PlacementScoped,
         "cove://commands/nook.read" =>
             ScopePolicy.TargetScoped,
@@ -462,6 +466,16 @@ internal static class ScopeEnforcement
                 return Invalid(request.Id, "agent launch params are required");
             requestedRelativeNookId = parameters.RelativeToNookId;
             requestedBayId = parameters.BayId;
+            placement = parameters.Placement;
+        }
+        else if (request.Uri == "cove://commands/nook.open-many")
+        {
+            var parameters = element.Deserialize(
+                CoveJsonContext.Default.NookOpenManyParams);
+            if (parameters is null)
+                return Invalid(request.Id, "nook open-many params are required");
+            requestedRelativeNookId = parameters.RelativeToNookId;
+            requestedBayId = null;
             placement = parameters.Placement;
         }
         else
