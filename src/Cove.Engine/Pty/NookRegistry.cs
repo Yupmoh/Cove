@@ -11,6 +11,12 @@ public sealed record HandoffExportItem(HandoffNookRecord Record, int MasterFd, b
 
 public enum NookAuthResult { Bound, Unknown, Rejected }
 
+internal sealed class WorkingDirectoryException(string path)
+    : Exception($"Working directory does not exist: {path}")
+{
+    public string Path { get; } = path;
+}
+
 public sealed class NookRegistry : IDisposable, Cove.Engine.Agents.INookWriter
 {
     private readonly IPtyHost _host;
@@ -19,6 +25,7 @@ public sealed class NookRegistry : IDisposable, Cove.Engine.Agents.INookWriter
     private readonly HarnessStartupContext _startupContext;
     private readonly string? _shellDir;
     private readonly IShellResolver _shellResolver;
+    private readonly string _homeDirectory;
     private readonly NookIdentityService _identities = new();
     private readonly NookSessionOwner _sessions = new();
     private readonly NookTerminalState _terminalState;
@@ -32,15 +39,18 @@ public sealed class NookRegistry : IDisposable, Cove.Engine.Agents.INookWriter
         string? shellDir = null,
         string? projectDir = null,
         IShellResolver? shellResolver = null,
-        HarnessStartupContext? startupContext = null)
+        HarnessStartupContext? startupContext = null,
+        string? homeDirectory = null)
     {
         ArgumentNullException.ThrowIfNull(host);
         ArgumentNullException.ThrowIfNull(logger);
         _host = host;
         _logger = logger;
         _spawnEnvironment = spawnEnv;
+        _homeDirectory = homeDirectory
+            ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         _startupContext = startupContext ?? new HarnessStartupContext(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            _homeDirectory,
             logger);
         _shellDir = shellDir;
         _shellResolver = shellResolver ?? SystemShellResolver.Instance;
@@ -59,29 +69,25 @@ public sealed class NookRegistry : IDisposable, Cove.Engine.Agents.INookWriter
 
     public NookInfo Spawn(SpawnParams parameters, string? defaultCwd = null)
     {
+        var inherited = !string.IsNullOrEmpty(parameters.InheritCwdFrom)
+            && _sessions.TryGet(parameters.InheritCwdFrom, out var source)
+                ? source.Cwd
+                : null;
+        var fallback = !string.IsNullOrEmpty(defaultCwd) ? defaultCwd : _projectDir;
+        var cwd = ResolveWorkingDirectory(
+            inherited,
+            parameters.Cwd,
+            fallback,
+            _homeDirectory,
+            parameters.InheritCwdFrom,
+            parameters.Adapter);
+
         NookIdentity identity;
         do
         {
             identity = _identities.Allocate();
         }
         while (_sessions.Contains(identity.NookId));
-
-        var inherited = !string.IsNullOrEmpty(parameters.InheritCwdFrom)
-            && _sessions.TryGet(parameters.InheritCwdFrom, out var source)
-                ? source.Cwd
-                : null;
-        var fallback = !string.IsNullOrEmpty(defaultCwd) ? defaultCwd : _projectDir;
-        if (string.IsNullOrEmpty(inherited)
-            && string.IsNullOrEmpty(parameters.Cwd)
-            && string.IsNullOrEmpty(fallback))
-        {
-            _logger.NookSpawnCwdFallback(
-                identity.NookId,
-                parameters.Adapter ?? "",
-                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
-        }
-
-        var cwd = ResolveWorkingDirectory(inherited, parameters.Cwd, fallback);
         var command = parameters.Command;
         var args = parameters.Args ?? [];
         if (!string.IsNullOrEmpty(parameters.ShellCommand))
@@ -250,17 +256,74 @@ public sealed class NookRegistry : IDisposable, Cove.Engine.Agents.INookWriter
 
     public NookDescriptor[] Descriptors() => _sessions.Descriptors();
 
-    public static string ResolveWorkingDirectory(
+    internal static string ResolveWorkingDirectory(
         string? inheritedCwd,
         string? explicitCwd,
-        string? projectDir = null) =>
-        !string.IsNullOrEmpty(inheritedCwd)
-            ? inheritedCwd
-            : !string.IsNullOrEmpty(explicitCwd)
-                ? explicitCwd
-                : !string.IsNullOrEmpty(projectDir)
-                    ? projectDir
-                    : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        string? projectDir = null,
+        string? homeDirectory = null)
+    {
+        homeDirectory ??= Environment.GetFolderPath(
+            Environment.SpecialFolder.UserProfile);
+        if (!string.IsNullOrWhiteSpace(inheritedCwd)
+            && Directory.Exists(inheritedCwd))
+        {
+            return inheritedCwd;
+        }
+        if (!string.IsNullOrWhiteSpace(explicitCwd))
+        {
+            if (Directory.Exists(explicitCwd))
+                return explicitCwd;
+            throw new WorkingDirectoryException(explicitCwd);
+        }
+        if (!string.IsNullOrWhiteSpace(projectDir)
+            && Directory.Exists(projectDir))
+        {
+            return projectDir;
+        }
+        if (Directory.Exists(homeDirectory))
+            return homeDirectory;
+        throw new WorkingDirectoryException(homeDirectory);
+    }
+
+    private string ResolveWorkingDirectory(
+        string? inheritedCwd,
+        string? explicitCwd,
+        string? projectDir,
+        string homeDirectory,
+        string? inheritedFromNookId,
+        string? adapter)
+    {
+        var adapterName = adapter ?? "";
+        if (!string.IsNullOrWhiteSpace(inheritedCwd))
+        {
+            if (Directory.Exists(inheritedCwd))
+                return inheritedCwd;
+            _logger.NookSpawnInheritedCwdRejected(
+                inheritedFromNookId ?? "",
+                inheritedCwd,
+                adapterName);
+        }
+        if (!string.IsNullOrWhiteSpace(explicitCwd))
+        {
+            if (Directory.Exists(explicitCwd))
+                return explicitCwd;
+            _logger.NookSpawnExplicitCwdRejected(explicitCwd, adapterName);
+            throw new WorkingDirectoryException(explicitCwd);
+        }
+        if (!string.IsNullOrWhiteSpace(projectDir))
+        {
+            if (Directory.Exists(projectDir))
+                return projectDir;
+            _logger.NookSpawnDefaultCwdRejected(projectDir, adapterName);
+        }
+        if (Directory.Exists(homeDirectory))
+        {
+            _logger.NookSpawnHomeCwdFallback(adapterName, homeDirectory);
+            return homeDirectory;
+        }
+        _logger.NookSpawnHomeCwdInvalid(adapterName, homeDirectory);
+        throw new WorkingDirectoryException(homeDirectory);
+    }
 
     public NookAuthResult Authenticate(string nookId, string? token)
     {

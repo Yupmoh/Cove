@@ -62,8 +62,20 @@ internal static partial class PtyDataLog
     [ZLoggerMessage(3041, LogLevel.Debug, "nook spawn environment nook={nookId} envCount={envCount} argCount={argCount} cwd={cwd}")]
     public static partial void NookSpawnEnv(this ILogger logger, string nookId, int envCount, int argCount, string cwd);
 
-    [ZLoggerMessage(3048, LogLevel.Warning, "nook spawn falling back to home dir nook={nookId} adapter={adapter} home={home} (no inherited, explicit, or bay cwd)")]
-    public static partial void NookSpawnCwdFallback(this ILogger logger, string nookId, string adapter, string home);
+    [ZLoggerMessage(3048, LogLevel.Warning, "nook spawn falling back to home directory adapter={adapter} home={home}")]
+    public static partial void NookSpawnHomeCwdFallback(this ILogger logger, string adapter, string home);
+
+    [ZLoggerMessage(3060, LogLevel.Warning, "nook spawn rejected inherited cwd sourceNook={sourceNook} path={path} adapter={adapter}")]
+    public static partial void NookSpawnInheritedCwdRejected(this ILogger logger, string sourceNook, string path, string adapter);
+
+    [ZLoggerMessage(3061, LogLevel.Warning, "nook spawn rejected explicit cwd path={path} adapter={adapter}")]
+    public static partial void NookSpawnExplicitCwdRejected(this ILogger logger, string path, string adapter);
+
+    [ZLoggerMessage(3062, LogLevel.Warning, "nook spawn rejected default cwd path={path} adapter={adapter}")]
+    public static partial void NookSpawnDefaultCwdRejected(this ILogger logger, string path, string adapter);
+
+    [ZLoggerMessage(3063, LogLevel.Error, "nook spawn home directory is unavailable path={path} adapter={adapter}")]
+    public static partial void NookSpawnHomeCwdInvalid(this ILogger logger, string adapter, string path);
 
     [ZLoggerMessage(3042, LogLevel.Information, "nook respawn nook={nookId} command={command} adapter={adapter}")]
     public static partial void NookRespawn(this ILogger logger, string nookId, string command, string adapter);

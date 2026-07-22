@@ -16,23 +16,20 @@ import {
 } from "./box-launcher";
 
 describe("resolveLaunchCwd", () => {
-  it("defaults to the active bay dir when nothing is specified", () => {
-    expect(resolveLaunchCwd("", "", "/Users/moh/Desktop/Work/Raptor/InSpades")).toBe("/Users/moh/Desktop/Work/Raptor/InSpades");
+  it("leaves default cwd resolution to the engine", () => {
+    expect(resolveLaunchCwd("", "")).toBe("");
   });
-  it("keeps an explicit cwd over the bay dir", () => {
-    expect(resolveLaunchCwd("/tmp/here", "", "/Users/moh/bay")).toBe("/tmp/here");
+  it("keeps an explicitly selected cwd", () => {
+    expect(resolveLaunchCwd("/tmp/here", "")).toBe("/tmp/here");
   });
   it("yields empty so the engine inherits from a sibling nook", () => {
-    expect(resolveLaunchCwd("", "nook-123", "/Users/moh/bay")).toBe("");
+    expect(resolveLaunchCwd("", "nook-123")).toBe("");
   });
-  it("prefers an explicit cwd even when inheriting", () => {
-    expect(resolveLaunchCwd("/tmp/here", "nook-123", "/Users/moh/bay")).toBe("/tmp/here");
-  });
-  it("returns empty when there is no active bay dir to fall back to", () => {
-    expect(resolveLaunchCwd("", "", "")).toBe("");
+  it("preserves explicit intent even when inheritance is requested", () => {
+    expect(resolveLaunchCwd("/tmp/here", "nook-123")).toBe("/tmp/here");
   });
   it("treats whitespace-only values as empty", () => {
-    expect(resolveLaunchCwd("   ", "  ", "/Users/moh/bay")).toBe("/Users/moh/bay");
+    expect(resolveLaunchCwd("   ", "  ")).toBe("");
   });
 });
 

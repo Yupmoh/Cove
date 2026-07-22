@@ -1,4 +1,3 @@
-using System;
 using Cove.Engine.Pty;
 using Xunit;
 
@@ -7,23 +6,90 @@ namespace Cove.Engine.Tests;
 public sealed class CwdResolveTests
 {
     [Fact]
-    public void Resolve_InheritedWins()
+    public void Resolve_ExistingInheritedWinsWithoutInspectingMissingExplicit()
     {
-        Assert.Equal("/proj/src", NookRegistry.ResolveWorkingDirectory("/proj/src", "/other"));
+        var inherited = NewDirectory();
+        var missingExplicit = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        try
+        {
+            Assert.Equal(
+                inherited,
+                NookRegistry.ResolveWorkingDirectory(
+                    inherited,
+                    missingExplicit,
+                    null,
+                    Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"))));
+        }
+        finally
+        {
+            Directory.Delete(inherited);
+        }
     }
 
     [Fact]
-    public void Resolve_EmptyInherited_FallsToExplicit()
+    public void Resolve_MissingInheritedFallsToExistingExplicit()
     {
-        Assert.Equal("/other", NookRegistry.ResolveWorkingDirectory(null, "/other"));
-        Assert.Equal("/other", NookRegistry.ResolveWorkingDirectory("", "/other"));
+        var explicitCwd = NewDirectory();
+        try
+        {
+            Assert.Equal(
+                explicitCwd,
+                NookRegistry.ResolveWorkingDirectory(
+                    Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N")),
+                    explicitCwd,
+                    null,
+                    Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"))));
+        }
+        finally
+        {
+            Directory.Delete(explicitCwd);
+        }
     }
 
     [Fact]
-    public void Resolve_NeitherGiven_UsesHome()
+    public void Resolve_MissingSelectedExplicitThrowsTypedFailure()
     {
-        string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        Assert.Equal(home, NookRegistry.ResolveWorkingDirectory(null, null));
-        Assert.Equal(home, NookRegistry.ResolveWorkingDirectory("", ""));
+        var missing = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        var failure = Assert.Throws<WorkingDirectoryException>(() =>
+            NookRegistry.ResolveWorkingDirectory(null, missing, null, NewDirectory()));
+
+        Assert.Equal(missing, failure.Path);
+    }
+
+    [Fact]
+    public void Resolve_MissingProjectFallsToExistingHome()
+    {
+        var home = NewDirectory();
+        try
+        {
+            Assert.Equal(
+                home,
+                NookRegistry.ResolveWorkingDirectory(
+                    null,
+                    null,
+                    Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N")),
+                    home));
+        }
+        finally
+        {
+            Directory.Delete(home);
+        }
+    }
+
+    [Fact]
+    public void Resolve_MissingHomeThrowsBeforeSpawn()
+    {
+        var missing = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        var failure = Assert.Throws<WorkingDirectoryException>(() =>
+            NookRegistry.ResolveWorkingDirectory(null, null, null, missing));
+
+        Assert.Equal(missing, failure.Path);
+    }
+
+    private static string NewDirectory()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "cove-cwd-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(path);
+        return path;
     }
 }

@@ -178,7 +178,7 @@ const locallySpawnedNookIds = new Set<string>();
 const renderedStreamNookIds = new Set<string>();
 
 async function spawnNook(params: Record<string, unknown>): Promise<{ nookId: string }> {
-  const cwd = resolveLaunchCwd(String(params.cwd ?? ""), String(params.inheritCwdFrom ?? ""), activeProjectDir());
+  const cwd = resolveLaunchCwd(String(params.cwd ?? ""), String(params.inheritCwdFrom ?? ""));
   const r = await invoke<{ nookId?: string; error?: { code?: string; message?: string } }>(FrontendCommand.AppNookSpawn, { ...params, cwd });
   if (!r?.nookId) {
     const msg = r?.error?.message ?? "the engine could not start this terminal";

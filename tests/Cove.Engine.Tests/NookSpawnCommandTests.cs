@@ -106,6 +106,27 @@ public sealed class NookSpawnCommandTests
     }
 
     [Fact]
+    public async Task SpawnCommand_MissingExplicitCwdReturnsInvalidCwdWithoutPtyCreation()
+    {
+        var host = new CapturingHost();
+        using var registry = new NookRegistry(host, NullLogger.Instance);
+        var missing = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        var request = new ControlRequest(
+            "spawn",
+            "cove://commands/nook.spawn",
+            System.Text.Json.JsonSerializer.SerializeToElement(
+                new SpawnParams("test", [], missing),
+                CoveJsonContext.Default.SpawnParams));
+
+        var response = await EngineCommandRouter.RouteAsync(request, nooks: registry);
+
+        Assert.False(response!.Ok);
+        Assert.Equal("invalid_cwd", response.Error?.Code);
+        Assert.Empty(host.Requests);
+        Assert.Empty(registry.List());
+    }
+
+    [Fact]
     public void Spawn_ExplicitCommandAndArgumentsRemainExactAndBypassShellResolution()
     {
         var host = new CapturingHost();

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Cove.Engine.Layout;
 using Cove.Engine.Protocol;
+using Cove.Engine.Pty;
 using Cove.Engine.Restart;
 using Cove.Persistence;
 using Cove.Protocol;
@@ -206,7 +207,7 @@ internal static class AgentLaunchCommands
                 parameters.Adapter,
                 parameters.SessionId ?? nook.NookId,
                 bayId,
-                command.Cwd,
+                nook.Cwd ?? command.Cwd,
                 DateTimeOffset.UtcNow);
             ctx.HookRouter?.Seed(
                 nook.NookId,
@@ -235,7 +236,9 @@ internal static class AgentLaunchCommands
                     layout.CloseNook(shoreId!, nook.NookId);
                 nooks.Kill(nook.NookId);
             }
-            return ctx.Fail("launch_failed", ex.Message);
+            return ctx.Fail(
+                ex is WorkingDirectoryException ? "invalid_cwd" : "launch_failed",
+                ex.Message);
         }
     }
 

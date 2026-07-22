@@ -144,6 +144,22 @@ describe("WorkspaceViewFeature", () => {
         },
       }],
     });
+    invoke.mockClear();
+    await feature.spawn({
+      command: "",
+      args: [],
+      shellCommand: "npm install -g example",
+      cwd: "",
+      inheritCwdFrom: "",
+    });
+    expect(invoke).toHaveBeenCalledWith("app.nookSpawn", {
+      command: "",
+      args: [],
+      shellCommand: "npm install -g example",
+      cwd: "",
+      inheritCwdFrom: "",
+    });
+
     overviewVisible = false;
     feature.render();
     await vi.waitFor(() =>

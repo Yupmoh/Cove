@@ -163,6 +163,48 @@ public sealed class AgentLaunchCommandTests
     }
 
     [Fact]
+    public async Task MissingExplicitCwdReturnsInvalidCwdWithoutAgentState()
+    {
+        using var nooks = NewNooks();
+        var agents = new AgentMessageRouter();
+        var sessions = new SessionResumeOrchestrator();
+        var layout = new LayoutService();
+        layout.SetActiveBay("bay-1");
+        var shoreId = layout.CreateShore("Main", Leaf("anchor"));
+        layout.FocusNook(shoreId, "anchor");
+        var missing = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        var request = Request(new AgentLaunchParams(
+            "new",
+            "test",
+            "default",
+            null,
+            missing,
+            "anchor",
+            "right",
+            "bay-1",
+            null,
+            false,
+            80,
+            24,
+            "same-bay"));
+
+        var response = await EngineCommandRouter.RouteAsync(
+            request,
+            nooks: nooks,
+            layout: layout,
+            agentRouter: agents,
+            sessions: sessions,
+            launcher: NewLauncher(),
+            nookScopes: NewScopes());
+
+        Assert.False(response!.Ok);
+        Assert.Equal("invalid_cwd", response.Error?.Code);
+        Assert.Empty(nooks.List());
+        Assert.Empty(agents.List());
+        Assert.Equal("anchor", Assert.IsType<NookLeaf>(layout.GetRoot(shoreId)).NookId);
+    }
+
+    [Fact]
     public async Task NookCaller_CannotLaunchAcrossItsScope()
     {
         using var nooks = NewNooks();

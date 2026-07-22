@@ -1,87 +1,145 @@
-using System;
-using System.IO;
-using System.Linq;
 using System.Text.Json;
 using Cove.Engine;
 using Cove.Engine.Bays;
 using Cove.Engine.Pty;
 using Cove.Platform.Pty;
 using Cove.Protocol;
+using Cove.Testing;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
-using Cove.Testing;
 
 namespace Cove.Engine.Tests;
 
 public sealed class BayCwdSpawnTests
 {
-    private static Task<ControlResponse?> Route(NookRegistry nooks, BayManager ws, JsonElement prm) =>
-        EngineCommandRouter.RouteAsync(new ControlRequest("1", "cove://commands/nook.spawn", prm), nooks, null, ws);
+    private static Task<ControlResponse?> Route(
+        NookRegistry nooks,
+        BayManager bays,
+        JsonElement parameters) =>
+        EngineCommandRouter.RouteAsync(
+            new ControlRequest("1", "cove://commands/nook.spawn", parameters),
+            nooks,
+            null,
+            bays);
 
     [PlatformFact(TestOperatingSystem.Unix)]
     public async Task Spawn_NoExplicitCwd_DefaultsToActiveBayDir()
     {
-        var dir = Path.Combine(Path.GetTempPath(), "cove-ws-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(dir);
+        var directory = NewDirectory();
         try
         {
-            using var reg = new NookRegistry(PtyHostFactory.Create(NullLogger.Instance), NullLogger.Instance);
-            await using var mgr = new BayManager();
-            await mgr.CreateBayAsync("w", dir);
-            var prm = JsonSerializer.SerializeToElement(
-                new SpawnParams("/bin/sh", new[] { "-c", "sleep 5" }, null, null, 40, 10), CoveJsonContext.Default.SpawnParams);
-            var resp = await Route(reg, mgr, prm);
-            Assert.True(resp!.Ok);
-            var nookId = resp.Data!.Value.GetProperty("nookId").GetString()!;
-            var desc = reg.Descriptors().First(d => d.NookId == nookId);
-            Assert.Equal(dir, desc.Cwd);
+            using var registry = new NookRegistry(
+                PtyHostFactory.Create(NullLogger.Instance),
+                NullLogger.Instance);
+            await using var bays = new BayManager();
+            await bays.CreateBayAsync("w", directory);
+            var parameters = JsonSerializer.SerializeToElement(
+                new SpawnParams("/bin/sh", ["-c", "sleep 5"], null, null, 40, 10),
+                CoveJsonContext.Default.SpawnParams);
+
+            var response = await Route(registry, bays, parameters);
+
+            Assert.True(response!.Ok);
+            var nookId = response.Data!.Value.GetProperty("nookId").GetString()!;
+            var descriptor = registry.Descriptors().Single(item => item.NookId == nookId);
+            Assert.Equal(directory, descriptor.Cwd);
         }
-        finally { TestDirectory.Delete(dir); }
+        finally
+        {
+            TestDirectory.Delete(directory);
+        }
     }
 
     [PlatformFact(TestOperatingSystem.Unix)]
     public async Task Spawn_ExplicitCwd_OverridesBayDir()
     {
-        var dir = Path.Combine(Path.GetTempPath(), "cove-ws-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(dir);
+        var directory = NewDirectory();
+        var explicitCwd = NewDirectory();
         try
         {
-            using var reg = new NookRegistry(PtyHostFactory.Create(NullLogger.Instance), NullLogger.Instance);
-            await using var mgr = new BayManager();
-            await mgr.CreateBayAsync("w", dir);
-            var prm = JsonSerializer.SerializeToElement(
-                new SpawnParams("/bin/sh", new[] { "-c", "sleep 5" }, "/tmp", null, 40, 10), CoveJsonContext.Default.SpawnParams);
-            var resp = await Route(reg, mgr, prm);
-            Assert.True(resp!.Ok);
-            var nookId = resp.Data!.Value.GetProperty("nookId").GetString()!;
-            var desc = reg.Descriptors().First(d => d.NookId == nookId);
-            Assert.Equal("/tmp", desc.Cwd);
+            using var registry = new NookRegistry(
+                PtyHostFactory.Create(NullLogger.Instance),
+                NullLogger.Instance);
+            await using var bays = new BayManager();
+            await bays.CreateBayAsync("w", directory);
+            var parameters = JsonSerializer.SerializeToElement(
+                new SpawnParams("/bin/sh", ["-c", "sleep 5"], explicitCwd, null, 40, 10),
+                CoveJsonContext.Default.SpawnParams);
+
+            var response = await Route(registry, bays, parameters);
+
+            Assert.True(response!.Ok);
+            var nookId = response.Data!.Value.GetProperty("nookId").GetString()!;
+            var descriptor = registry.Descriptors().Single(item => item.NookId == nookId);
+            Assert.Equal(explicitCwd, descriptor.Cwd);
         }
-        finally { TestDirectory.Delete(dir); }
+        finally
+        {
+            TestDirectory.Delete(directory);
+            TestDirectory.Delete(explicitCwd);
+        }
     }
 
-    [Fact]
-    public void ResolveWorkingDirectory_InheritedWins()
+    [PlatformFact(TestOperatingSystem.Unix)]
+    public async Task Spawn_DeletedActiveBayDirectoryFallsBackToHome()
     {
-        Assert.Equal("/inherited", NookRegistry.ResolveWorkingDirectory("/inherited", "/explicit", "/bay"));
+        var staleBay = NewDirectory();
+        var home = NewDirectory();
+        try
+        {
+            await using var bays = new BayManager();
+            await bays.CreateBayAsync("stale", staleBay);
+            Directory.Delete(staleBay);
+            var logger = new RecordingLogger();
+            using var registry = new NookRegistry(
+                PtyHostFactory.Create(logger),
+                logger,
+                homeDirectory: home);
+            const string shellCommand = "printf COVE_CWD_OK; sleep 1";
+            var parameters = JsonSerializer.SerializeToElement(
+                new SpawnParams(null, [], null, null, 40, 10, ShellCommand: shellCommand),
+                CoveJsonContext.Default.SpawnParams);
+
+            var response = await Route(registry, bays, parameters);
+
+            Assert.True(response!.Ok, response.Error?.Message);
+            var nookId = response.Data!.Value.GetProperty("nookId").GetString()!;
+            var descriptor = registry.Descriptors().Single(item => item.NookId == nookId);
+            Assert.Equal(home, descriptor.Cwd);
+            Assert.Contains(shellCommand, descriptor.Args);
+            Assert.Contains(logger.Messages, message =>
+                message.Contains(staleBay, StringComparison.Ordinal)
+                && message.Contains("rejected default cwd", StringComparison.Ordinal));
+            Assert.Contains(logger.Messages, message =>
+                message.Contains(home, StringComparison.Ordinal)
+                && message.Contains("falling back to home", StringComparison.Ordinal));
+        }
+        finally
+        {
+            TestDirectory.Delete(staleBay);
+            TestDirectory.Delete(home);
+        }
     }
 
-    [Fact]
-    public void ResolveWorkingDirectory_ExplicitOverBay()
+    private sealed class RecordingLogger : ILogger
     {
-        Assert.Equal("/explicit", NookRegistry.ResolveWorkingDirectory(null, "/explicit", "/bay"));
+        public List<string> Messages { get; } = [];
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => true;
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+            => Messages.Add(formatter(state, exception));
     }
 
-    [Fact]
-    public void ResolveWorkingDirectory_BayWhenNoInheritOrExplicit()
+    private static string NewDirectory()
     {
-        Assert.Equal("/bay", NookRegistry.ResolveWorkingDirectory(null, null, "/bay"));
-    }
-
-    [Fact]
-    public void ResolveWorkingDirectory_FallsBackToHomeWhenAllEmpty()
-    {
-        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        Assert.Equal(home, NookRegistry.ResolveWorkingDirectory(null, null, null));
+        var path = Path.Combine(Path.GetTempPath(), "cove-bay-cwd-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(path);
+        return path;
     }
 }

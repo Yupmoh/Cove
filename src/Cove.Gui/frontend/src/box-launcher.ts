@@ -93,10 +93,10 @@ export function isPlaceholderLeaf(node: PlaceholderTreeNode | null | undefined, 
   return isPlaceholderLeaf(node.childA, nookId) || isPlaceholderLeaf(node.childB, nookId);
 }
 
-export function resolveLaunchCwd(explicitCwd: string, inheritCwdFrom: string, activeBayDir: string): string {
+export function resolveLaunchCwd(explicitCwd: string, inheritCwdFrom: string): string {
   if (explicitCwd.trim().length > 0) return explicitCwd;
   if (inheritCwdFrom.trim().length > 0) return "";
-  return activeBayDir;
+  return "";
 }
 
 export type LauncherPlacement = "replace" | "create";

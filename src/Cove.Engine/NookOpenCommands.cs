@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Cove.Engine.Layout;
+using Cove.Engine.Pty;
 using Cove.Persistence;
 using Cove.Protocol;
 
@@ -149,7 +150,9 @@ internal static class NookOpenCommands
                 else
                     ctx.Browser!.Close(nookId);
             }
-            return Task.FromResult(ctx.Fail("launch_failed", exception.Message));
+            return Task.FromResult(ctx.Fail(
+                exception is WorkingDirectoryException ? "invalid_cwd" : "launch_failed",
+                exception.Message));
         }
     }
 

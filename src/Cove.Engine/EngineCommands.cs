@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Cove.Engine.Pty;
 using Cove.Protocol;
 
 namespace Cove.Engine;
@@ -25,14 +26,22 @@ internal static class EngineCommands
             && wm.Get(focusedId) is { } focusedActor
             && !string.IsNullOrEmpty(focusedActor.State.ProjectDir))
             bayDir = focusedActor.State.ProjectDir;
-        NookInfo info = reg.Spawn(p, bayDir);
+        NookInfo info;
+        try
+        {
+            info = reg.Spawn(p, bayDir);
+        }
+        catch (WorkingDirectoryException exception)
+        {
+            return Task.FromResult(ctx.Fail("invalid_cwd", exception.Message));
+        }
         if (p.Adapter is { } adapter)
         {
             ctx.AgentRouter?.Register(info.NookId, adapter, p.AgentName, p.Bay, p.Shore, mcpAccessScope: p.McpAccessScope, mcpVisible: p.McpVisible);
             ctx.Sessions?.Register(info.NookId, adapter, p.SessionId);
             ctx.Launcher?.PersistOverrides(info.NookId, new Cove.Engine.Restart.LauncherOverrides { Yolo = p.Yolo });
             ctx.HookRouter?.Seed(info.NookId, adapter);
-            ctx.RecentSessions?.RecordStart(adapter, info.NookId, p.Bay ?? "", p.Cwd ?? bayDir ?? "", System.DateTimeOffset.UtcNow);
+            ctx.RecentSessions?.RecordStart(adapter, info.NookId, p.Bay ?? "", info.Cwd ?? "", System.DateTimeOffset.UtcNow);
         }
         return Task.FromResult(ctx.Ok(info, CoveJsonContext.Default.NookInfo));
     }

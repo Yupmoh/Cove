@@ -123,6 +123,32 @@ public sealed class NookOpenCommandTests
     }
 
     [Fact]
+    public async Task MissingExplicitCwdReturnsInvalidCwdWithoutProcessOrLayoutMutation()
+    {
+        using var nooks = NewNooks();
+        var layout = LayoutWithAnchor(out var shoreId);
+        var missing = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+
+        var response = await EngineCommandRouter.RouteAsync(
+            Request(new NookOpenParams(
+                "terminal",
+                null,
+                [],
+                missing,
+                "anchor",
+                "right",
+                "bay-1")),
+            nooks: nooks,
+            layout: layout,
+            nookScopes: NewScopes());
+
+        Assert.False(response!.Ok);
+        Assert.Equal("invalid_cwd", response.Error?.Code);
+        Assert.Empty(nooks.List());
+        Assert.Equal("anchor", Assert.IsType<NookLeaf>(layout.GetRoot(shoreId)).NookId);
+    }
+
+    [Fact]
     public async Task NookCaller_CannotOpenAcrossItsScope()
     {
         using var nooks = NewNooks();
