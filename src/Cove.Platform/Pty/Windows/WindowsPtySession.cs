@@ -266,6 +266,7 @@ public sealed class WindowsPtySession : IPtySession
         _logger.WinPseudoConsoleClosed(SessionId);
         if (_pseudoConsole != IntPtr.Zero)
             ConPtyNative.ClosePseudoConsole(_pseudoConsole);
+        _testHooks?.PseudoConsoleClosed?.Invoke();
     }
 
     public void Dispose()
@@ -396,6 +397,7 @@ internal sealed class WindowsPtySessionTestHooks
     public Action? TerminateProcess { get; init; }
     public Action<IntPtr>? CloseHandle { get; init; }
     public Action? ExitSignalSet { get; init; }
+    public Action? PseudoConsoleClosed { get; init; }
     public Action? WatcherResourcesClosed { get; init; }
     public TimeSpan DisposeTimeout { get; init; } = TimeSpan.FromMilliseconds(3000);
 }

@@ -229,6 +229,72 @@ public sealed class WindowsConPtyTests
     }
 
     [PlatformFact(TestOperatingSystem.Windows)]
+    public void KillSkipsPostExitFlushAndClosesResourcesExactlyOnce()
+    {
+        using var watcherEntered = new ManualResetEventSlim();
+        using var releaseWatcher = new ManualResetEventSlim();
+        using var consoleClosed = new ManualResetEventSlim();
+        int terminateCount = 0;
+        int consoleClosedCount = 0;
+        int watcherResourcesClosedCount = 0;
+        int watcherReleaseTimedOut = 0;
+        var closedHandles = new List<IntPtr>();
+        var outputRead = new SafeFileHandle(IntPtr.Zero, ownsHandle: false);
+        var inputWrite = new SafeFileHandle(IntPtr.Zero, ownsHandle: false);
+        var hooks = new WindowsPtySessionTestHooks
+        {
+            WaitForExit = () =>
+            {
+                watcherEntered.Set();
+                if (!releaseWatcher.Wait(TimeSpan.FromSeconds(5)))
+                {
+                    Volatile.Write(ref watcherReleaseTimedOut, 1);
+                    return -1;
+                }
+                return 1;
+            },
+            TerminateProcess = () =>
+            {
+                Interlocked.Increment(ref terminateCount);
+                releaseWatcher.Set();
+            },
+            CloseHandle = closedHandles.Add,
+            PseudoConsoleClosed = () =>
+            {
+                Interlocked.Increment(ref consoleClosedCount);
+                consoleClosed.Set();
+            },
+            WatcherResourcesClosed = () => Interlocked.Increment(ref watcherResourcesClosedCount),
+            DisposeTimeout = TimeSpan.FromSeconds(2),
+        };
+        var session = CreateTestSession(hooks, outputRead, inputWrite);
+
+        Assert.True(
+            watcherEntered.Wait(TimeSpan.FromSeconds(5)),
+            "Exit watcher did not enter its held wait within 5 seconds.");
+        var stopwatch = Stopwatch.StartNew();
+        session.Kill();
+        session.Kill();
+        Assert.True(
+            consoleClosed.Wait(TimeSpan.FromSeconds(2)),
+            "Pseudo-console did not close after explicit kill within 2 seconds.");
+        Assert.True(
+            stopwatch.Elapsed < TimeSpan.FromMilliseconds(750),
+            $"Explicit kill waited for the natural-exit flush window: {stopwatch.Elapsed}.");
+        Assert.Equal(1, Volatile.Read(ref terminateCount));
+        Assert.Equal(1, Volatile.Read(ref consoleClosedCount));
+        Assert.Equal(0, Volatile.Read(ref watcherReleaseTimedOut));
+
+        session.Dispose();
+        session.Dispose();
+
+        Assert.Equal(1, Volatile.Read(ref watcherResourcesClosedCount));
+        Assert.Equal(new[] { new IntPtr(202), new IntPtr(101) }, closedHandles);
+        Assert.True(outputRead.IsClosed);
+        Assert.True(inputWrite.IsClosed);
+    }
+
+    [PlatformFact(TestOperatingSystem.Windows)]
     public void DisposeAfterWatcherExitClosesResourcesExactlyOnce()
     {
         using var exitSignalSet = new ManualResetEventSlim();
