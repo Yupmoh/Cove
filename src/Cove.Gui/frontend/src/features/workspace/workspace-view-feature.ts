@@ -346,7 +346,60 @@ function animateNookRepositions(previousRects: ReadonlyMap<string, { left: numbe
     armNookReposition(nook, shiftX, shiftY);
   }
 }
-
+function wireNookDrag(nookId: string, el: HTMLElement, header: HTMLElement, title: HTMLElement): void {
+  const isHeaderControl = (target: EventTarget | null): boolean =>
+    (target as Element | null)?.closest?.("button, input, textarea, select, a, [contenteditable='true']") !== null;
+  header.addEventListener("mousedown", (event) => {
+    if (isHeaderControl(event.target)) {
+      event.stopPropagation();
+      return;
+    }
+    focusNook(nookId);
+  });
+  title.draggable = true;
+  header.addEventListener("dragstart", (event) => {
+    if (isHeaderControl(event.target) || !event.target || !title.contains(event.target as Node)) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+    if (!event.dataTransfer) return;
+    event.dataTransfer.setData("text/cove-nook", nookId);
+    event.dataTransfer.effectAllowed = "move";
+    nookDrag.nookId = nookId;
+  });
+  header.addEventListener("dragend", () => {
+    nookDrag.nookId = null;
+    clearDropOverlay();
+  });
+  el.addEventListener("dragover", (event) => {
+    if (!nookDrag.nookId || nookDrag.nookId === nookId) return;
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+    const rect = el.getBoundingClientRect();
+    const zone = dropZoneFor(event.clientX - rect.left, event.clientY - rect.top, rect.width, rect.height);
+    if (zone.kind === "center") clearDropOverlay();
+    else paintDropOverlay(el, zone);
+  });
+  el.addEventListener("dragleave", (event) => {
+    if (event.target === el) clearDropOverlay();
+  });
+  el.addEventListener("drop", (event) => {
+    event.preventDefault();
+    const sourceNookId = event.dataTransfer?.getData("text/cove-nook") || nookDrag.nookId;
+    clearDropOverlay();
+    nookDrag.nookId = null;
+    if (!sourceNookId || !workspace.activeShoreId) {
+      console.warn("nook drop without source or active shore");
+      return;
+    }
+    const rect = el.getBoundingClientRect();
+    const zone = dropZoneFor(event.clientX - rect.left, event.clientY - rect.top, rect.width, rect.height);
+    const mutation = moveMutationFor(zone, sourceNookId, nookId);
+    if (!mutation) return;
+    void applyNookMove(mutation, sourceNookId);
+  });
+}
 
 function makeNook(nookId: string, since: number): NookView {
   const el = document.createElement("div");
@@ -526,50 +579,7 @@ function makeNook(nookId: string, since: number): NookView {
     focusNook(nookId);
   });
   const setTitle = () => { titleSpan.textContent = pv.customTitle || pv.title || "shell"; };
-  const isHeaderControl = (target: EventTarget | null): boolean =>
-    (target as Element | null)?.closest?.("button, input, textarea, select, a, [contenteditable='true']") !== null;
-  header.addEventListener("mousedown", (e) => {
-    if (isHeaderControl(e.target)) {
-      e.stopPropagation();
-      return;
-    }
-    focusNook(nookId);
-  });
-  titleSpan.draggable = true;
-  header.addEventListener("dragstart", (e) => {
-    if (isHeaderControl(e.target) || !e.target || !titleSpan.contains(e.target as Node)) {
-      e.preventDefault();
-      e.stopPropagation();
-      return;
-    }
-    if (!e.dataTransfer) return;
-    e.dataTransfer.setData("text/cove-nook", nookId);
-    e.dataTransfer.effectAllowed = "move";
-    nookDrag.nookId = nookId;
-  });
-  header.addEventListener("dragend", () => { nookDrag.nookId = null; clearDropOverlay(); });
-  el.addEventListener("dragover", (e) => {
-    if (!nookDrag.nookId || nookDrag.nookId === nookId) return;
-    e.preventDefault();
-    if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
-    const rect = el.getBoundingClientRect();
-    const zone = dropZoneFor(e.clientX - rect.left, e.clientY - rect.top, rect.width, rect.height);
-    if (zone.kind === "center") clearDropOverlay();
-    else paintDropOverlay(el, zone);
-  });
-  el.addEventListener("dragleave", (e) => { if (e.target === el) clearDropOverlay(); });
-  el.addEventListener("drop", (e) => {
-    e.preventDefault();
-    const src = e.dataTransfer?.getData("text/cove-nook") || nookDrag.nookId;
-    clearDropOverlay();
-    nookDrag.nookId = null;
-    if (!src || !workspace.activeShoreId) { console.warn("nook drop without source or active shore"); return; }
-    const rect = el.getBoundingClientRect();
-    const zone = dropZoneFor(e.clientX - rect.left, e.clientY - rect.top, rect.width, rect.height);
-    const m = moveMutationFor(zone, src, nookId);
-    if (!m) return;
-    void applyNookMove(m, src);
-  });
+  wireNookDrag(nookId, el, header, titleSpan);
   const startRename = () => {
     const input = document.createElement("input");
     input.className = "prename";
@@ -1028,6 +1038,7 @@ function wrapToolNookChrome(nookId: string, label: string, content: HTMLElement)
   closeBtn.title = "Close nook";
   closeBtn.addEventListener("click", (e) => { e.stopPropagation(); void closeNookById(nookId); });
   header.appendChild(closeBtn);
+  wireNookDrag(nookId, el, header, title);
   el.appendChild(header);
   content.style.flex = "1 1 0";
   content.style.minWidth = "0";
