@@ -40,25 +40,7 @@ public sealed class ThemeService
         _builtins = [
             new Theme("catppuccin-mocha", "dark", "#1e1e2e", "#cdd6f4", "#181825", "#cdd6f4", "#cba6f7",
                 ["#45475a", "#f38ba8", "#a6e3a1", "#f9e2af", "#89b4fa", "#f5c2e7", "#94e2d5", "#bac2de",
-                 "#585b70", "#f38ba8", "#a6e3a1", "#f9e2af", "#89b4fa", "#f5c2e7", "#94e2d5", "#a6adc8"]),
-            new Theme("cove-harbor", "dark", "#0b1622", "#e5e9f0", "#0b1622", "#e5e9f0", "#4a9eff",
-                ["#3b4252", "#bf616a", "#a3be8c", "#ebcb8b", "#81a1c1", "#b48ead", "#88c0d0", "#e5e9f0",
-                 "#4c566a", "#bf616a", "#a3be8c", "#ebcb8b", "#81a1c1", "#b48ead", "#8fbcbb", "#eceff4"]),
-            new Theme("cove-daybreak", "light", "#ffffff", "#1a1a2e", "#ffffff", "#1a1a2e", "#2563eb",
-                ["#24292f", "#cf222e", "#116329", "#4d2d00", "#0969da", "#8250df", "#1b7c83", "#6e7781",
-                 "#57606a", "#a40e26", "#1a7f37", "#633c01", "#218bff", "#a475f9", "#3192aa", "#8c959f"]),
-            new Theme("cove-midnight", "dark", "#0a0a1a", "#c0c0d0", "#0a0a1a", "#c0c0d0", "#7c3aed",
-                ["#2a2a40", "#f2779c", "#8ee8b4", "#eed49f", "#8aadf4", "#c6a0f6", "#8bd5ca", "#b8c0e0",
-                 "#494960", "#f2779c", "#8ee8b4", "#eed49f", "#8aadf4", "#c6a0f6", "#8bd5ca", "#cad3f5"]),
-            new Theme("cove-shoal", "light", "#f5f0e8", "#2d2418", "#f5f0e8", "#2d2418", "#b45309",
-                ["#3c3836", "#9d0006", "#79740e", "#b57614", "#076678", "#8f3f71", "#427b58", "#7c6f64",
-                 "#928374", "#9d0006", "#79740e", "#b57614", "#076678", "#8f3f71", "#427b58", "#3c3836"]),
-            new Theme("cove-beacon", "dark", "#0d1117", "#f0f0f0", "#0d1117", "#f0f0f0", "#58a6ff",
-                ["#484f58", "#ff7b72", "#3fb950", "#d29922", "#58a6ff", "#bc8cff", "#39c5cf", "#b1bac4",
-                 "#6e7681", "#ffa198", "#56d364", "#e3b341", "#79c0ff", "#d2a8ff", "#56d4dd", "#f0f6fc"]),
-            new Theme("cove-chalk", "light", "#fafafa", "#1a1a1a", "#fafafa", "#1a1a1a", "#0969da",
-                ["#24292f", "#cf222e", "#116329", "#4d2d00", "#0969da", "#8250df", "#1b7c83", "#6e7781",
-                 "#57606a", "#a40e26", "#1a7f37", "#633c01", "#218bff", "#a475f9", "#3192aa", "#8c959f"]),
+                 "#585b70", "#f38ba8", "#a6e3a1", "#f9e2af", "#89b4fa", "#f5c2e7", "#94e2d5", "#a6adc8"])
         ];
         LoadCustomThemes();
     }

@@ -1,3 +1,4 @@
+using Cove.Engine.Config;
 using Cove.Engine.Theming;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
@@ -9,25 +10,26 @@ public sealed class ThemeServiceTests
     private static string NewDir() => System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"cove-theme-{System.Guid.NewGuid():N}");
 
     [Fact]
-    public void ListBuiltins_Returns7Themes()
+    public void ListBuiltins_ReturnsOnlyCatppuccinMocha()
     {
         var svc = new ThemeService(NewDir());
         var builtins = svc.ListBuiltins();
-        Assert.Equal(7, builtins.Count);
+        Assert.Single(builtins);
     }
 
     [Fact]
-    public void ListBuiltins_ContainsExpectedNames()
+    public void ListBuiltins_ContainsOnlyCatppuccinMocha()
     {
         var svc = new ThemeService(NewDir());
-        var names = svc.ListBuiltins().Select(t => t.Name).ToList();
-        Assert.Contains("catppuccin-mocha", names);
-        Assert.Contains("cove-harbor", names);
-        Assert.Contains("cove-daybreak", names);
-        Assert.Contains("cove-midnight", names);
-        Assert.Contains("cove-shoal", names);
-        Assert.Contains("cove-beacon", names);
-        Assert.Contains("cove-chalk", names);
+        var theme = Assert.Single(svc.ListBuiltins());
+        Assert.Equal("catppuccin-mocha", theme.Name);
+    }
+
+    [Fact]
+    public void ThemeSetting_OffersOnlyCatppuccinMocha()
+    {
+        var entry = Assert.Single(ConfigSchemaGenerator.Generate(), item => item.Key == "theme");
+        Assert.Equal(["catppuccin-mocha"], Assert.IsType<string[]>(entry.Options));
     }
 
     [Fact]
@@ -44,12 +46,10 @@ public sealed class ThemeServiceTests
     }
 
     [Fact]
-    public void Get_ReturnsThemeByName()
+    public void Get_RemovedBuiltin_ReturnsNull()
     {
         var svc = new ThemeService(NewDir());
-        var theme = svc.Get("cove-harbor");
-        Assert.NotNull(theme);
-        Assert.Equal("dark", theme!.Type);
+        Assert.Null(svc.Get("cove-harbor"));
     }
 
     [Fact]
@@ -63,8 +63,8 @@ public sealed class ThemeServiceTests
     public void SetActive_SetsActiveTheme()
     {
         var svc = new ThemeService(NewDir());
-        svc.SetActive("cove-harbor");
-        Assert.Equal("cove-harbor", svc.GetActive()!.Name);
+        svc.SetActive("catppuccin-mocha");
+        Assert.Equal("catppuccin-mocha", svc.GetActive()!.Name);
     }
 
     [Fact]
@@ -101,14 +101,15 @@ public sealed class ThemeServiceTests
     public void DeleteCustom_Builtin_ReturnsFalse()
     {
         var svc = new ThemeService(NewDir());
-        Assert.False(svc.DeleteCustom("cove-harbor"));
+        Assert.False(svc.DeleteCustom("catppuccin-mocha"));
     }
 
     [Fact]
-    public void IsBuiltin_RecognizesBuiltins()
+    public void IsBuiltin_RecognizesOnlyCatppuccinMocha()
     {
         var svc = new ThemeService(NewDir());
-        Assert.True(svc.IsBuiltin("cove-harbor"));
+        Assert.True(svc.IsBuiltin("catppuccin-mocha"));
+        Assert.False(svc.IsBuiltin("cove-harbor"));
         Assert.False(svc.IsBuiltin("my-custom"));
     }
 
@@ -161,47 +162,11 @@ public sealed class ContrastValidatorTests
         Assert.True(ContrastValidator.MeetsAA(ratio), $"catppuccin-mocha contrast {ratio:F2} < 4.5");
     }
 
-    [Fact]
-    public void CoveHarbor_TextOnSurface_MeetsAA()
-    {
-        var ratio = ContrastValidator.ComputeContrastRatio("#e5e9f0", "#0b1622");
-        Assert.True(ContrastValidator.MeetsAA(ratio), $"cove-harbor contrast {ratio:F2} < 4.5");
-    }
 
-    [Fact]
-    public void CoveBeacon_TextOnSurface_MeetsAAA()
-    {
-        var ratio = ContrastValidator.ComputeContrastRatio("#f0f0f0", "#0d1117");
-        Assert.True(ContrastValidator.MeetsAAA(ratio), $"cove-beacon contrast {ratio:F2} < 7.0");
-    }
 
-    [Fact]
-    public void CoveChalk_TextOnSurface_MeetsAAA()
-    {
-        var ratio = ContrastValidator.ComputeContrastRatio("#1a1a1a", "#fafafa");
-        Assert.True(ContrastValidator.MeetsAAA(ratio), $"cove-chalk contrast {ratio:F2} < 7.0");
-    }
 
-    [Fact]
-    public void CoveDaybreak_TextOnSurface_MeetsAA()
-    {
-        var ratio = ContrastValidator.ComputeContrastRatio("#1a1a2e", "#ffffff");
-        Assert.True(ContrastValidator.MeetsAA(ratio), $"cove-daybreak contrast {ratio:F2} < 4.5");
-    }
 
-    [Fact]
-    public void CoveMidnight_TextOnSurface_MeetsAA()
-    {
-        var ratio = ContrastValidator.ComputeContrastRatio("#c0c0d0", "#0a0a1a");
-        Assert.True(ContrastValidator.MeetsAA(ratio), $"cove-midnight contrast {ratio:F2} < 4.5");
-    }
 
-    [Fact]
-    public void CoveShoal_TextOnSurface_MeetsAA()
-    {
-        var ratio = ContrastValidator.ComputeContrastRatio("#2d2418", "#f5f0e8");
-        Assert.True(ContrastValidator.MeetsAA(ratio), $"cove-shoal contrast {ratio:F2} < 4.5");
-    }
 
     [Fact]
     public void MeetsAALarge_Requires3to1()

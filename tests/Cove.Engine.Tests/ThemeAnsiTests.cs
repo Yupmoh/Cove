@@ -57,7 +57,9 @@ public sealed class ThemeAnsiTests
     public void SetActiveIfKnown_UsesTheNamedThemeWhenItExists()
     {
         var svc = new ThemeService(NewDir());
-        var applied = svc.SetActiveIfKnown("cove-beacon");
-        Assert.Equal("cove-beacon", applied!.Name);
+        var theme = new Theme("my-theme", "dark", "#101010", "#e0e0e0", "#0a0a0a", "#e0e0e0", "#ff8800");
+        svc.SaveCustom(theme);
+        var applied = svc.SetActiveIfKnown("my-theme");
+        Assert.Equal("my-theme", applied!.Name);
     }
 }

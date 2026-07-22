@@ -32,7 +32,7 @@ internal static class ConfigValueCoercion
 
 public sealed class CoveConfig
 {
-    [Setting("Theme", "appearance", "select", "Active theme name", Options = new[] { "catppuccin-mocha", "cove-harbor", "cove-daybreak", "cove-midnight", "cove-shoal", "cove-beacon", "cove-chalk" })]
+    [Setting("Theme", "appearance", "select", "Active theme name", Options = new[] { "catppuccin-mocha" })]
     public string Theme { get; set; } = "catppuccin-mocha";
 
     [Setting("Appearance", "appearance", "section", "Appearance settings")]
